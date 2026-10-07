@@ -96,7 +96,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 ## Status
 
 - [x] Plan settled
-- [ ] Owner: Google Places key, Anthropic key, Cloudflare account + token, all
-      added as environment variables above
-- [ ] Category research and blueprints
+- [x] Owner: Google Places key, Anthropic key, Cloudflare account + token, all
+      added as environment variables above and verified working (Places search,
+      Anthropic models, Cloudflare Workers/KV/D1/Queues/Pages/R2)
+- [x] Category research and blueprints: see `research/README.md`;
+      `research/00-shared-baseline.md` is the template architecture and build order
 - [ ] Build the app
