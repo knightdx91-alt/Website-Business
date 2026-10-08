@@ -34,7 +34,11 @@ const ASSET_LINKS = [
     target: {
       namespace: "android_app",
       package_name: "com.knightdx91.websitebusiness",
-      sha256_cert_fingerprints: ["62:7F:C0:94:66:E4:CB:F7:D2:A7:AC:60:BA:D2:48:34:0C:3B:58:B2:06:26:99:5D:83:94:7F:B7:36:CC:FD:FA"],
+      // Every signing key the app has shipped with, so older installs stay full-screen: 1.0-1.1, then 1.2.
+      sha256_cert_fingerprints: [
+        "62:7F:C0:94:66:E4:CB:F7:D2:A7:AC:60:BA:D2:48:34:0C:3B:58:B2:06:26:99:5D:83:94:7F:B7:36:CC:FD:FA",
+        "AB:07:5A:34:16:59:24:70:46:74:79:CF:E8:8A:47:5B:76:01:C3:27:49:F0:BD:08:16:EE:B5:18:50:CE:A3:16",
+      ],
     },
   },
 ];

@@ -176,7 +176,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `_build/website-business.apk`, served behind login at `/api/android.apk` (Settings → Download).
   The app only needs rebuilding for shell changes (name, icon, package); features ship with `npm run deploy`.
   The signing key is deliberately NOT kept anywhere (owner's choice). If it's gone, `android/build.sh`
-  makes a new one: put its fingerprint in `ASSET_LINKS`, redeploy, and phones uninstall + reinstall once.
+  makes a new one: add its fingerprint to `ASSET_LINKS` (keep the old ones so existing installs stay full-screen),
+  redeploy, and phones uninstall + reinstall once to move to the new build. 1.2 (Oct 2026) was signed with a new key.
   Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first.
 - Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS). Several groups share one
   template, and the variant comes from the Google type + business name: food trucks/bakeries/coffee →
