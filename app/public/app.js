@@ -19,7 +19,26 @@
     return Math.round(h / 24) + " days ago";
   };
   const CATEGORY_LABEL = { restaurant: "Restaurant", contractor: "Contractor", salon: "Salon", auto: "Auto", landscaping: "Landscaping", cleaning: "Cleaning" };
-  const SALES = [["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
+  const SALES = [["new", "New"], ["callbacks", "Callbacks"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
+  const OUTCOME_LABEL = { no_answer: "📵 No answer", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested" };
+  const isOwner = () => !meta || !meta.me || meta.me.role === "owner";
+
+  // Dates are calendar days (YYYY-MM-DD) in the phone's time zone, which is Cullman time.
+  const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const dayFromNow = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return isoDay(d); };
+  const dayLabel = (iso) => {
+    if (!iso) return "";
+    if (iso === dayFromNow(0)) return "today";
+    if (iso === dayFromNow(1)) return "tomorrow";
+    const [y, mo, da] = iso.split("-").map(Number);
+    return new Date(y, mo - 1, da).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  };
+  const followChip = (iso) => {
+    if (!iso) return "";
+    const late = iso < dayFromNow(0);
+    const due = iso <= dayFromNow(0);
+    return `<span class="chip ${due ? "chip--warn" : ""}">📅 ${late ? "Overdue: " : "Call back "}${esc(dayLabel(iso))}</span>`;
+  };
   // Rough Claude cost per site at Opus 5.5 rates, measured on real Cullman runs.
   const COST_PER_SITE = { restaurant: 0.04, contractor: 0.1, salon: 0.06, auto: 0.1, landscaping: 0.1, cleaning: 0.1 };
   const MODEL_FACTOR = { "claude-opus-5-5": 1, "claude-sonnet-5-5": 0.5, "claude-haiku-5-5": 0.03 };
@@ -64,18 +83,20 @@
 
   function setNav(active) {
     $nav.hidden = active === "login";
+    $nav.querySelector("[data-nav=inbox]").hidden = !isOwner();
     $nav.querySelectorAll("a").forEach((a) => a.classList.toggle("is-active", a.dataset.nav === active));
   }
 
   /* ---------- login ---------- */
   async function viewLogin() {
+    meta = null;
     setNav("login");
     const state = await api("/auth/state");
     if (state.loggedIn) return go("#/");
     const setup = !state.hasOwner;
     $app.innerHTML = `<div class="login card">
       <h1>${setup ? "Create your password" : "Log in"}</h1>
-      <p class="muted">${setup ? "First time here. Pick a password only you know. You'll use it to open the app on any device." : "Enter your password."}</p>
+      <p class="muted">${setup ? "First time here. Pick a password only you know. You'll use it to open the app on any device." : "Enter your password. Callers use the password the owner gave them."}</p>
       <form id="f">
         <label class="field">Password<input type="password" name="password" autocomplete="${setup ? "new-password" : "current-password"}" minlength="${setup ? 8 : 1}" required></label>
         ${setup ? `<label class="field">Type it again<input type="password" name="again" autocomplete="new-password" required></label>` : ""}
@@ -87,6 +108,7 @@
       if (setup && fd.get("password") !== fd.get("again")) return toast("The passwords don't match");
       try {
         await api(setup ? "/auth/setup" : "/auth/login", { method: "POST", json: { password: fd.get("password") } });
+        meta = null;
         const next = new URLSearchParams(location.search).get("next");
         if (next && next.startsWith("/p/")) location.href = next;
         else go("#/");
@@ -155,6 +177,7 @@
       <div class="lead__top"><a class="lead__name" href="#/lead/${l.id}">${esc(l.name)}</a>${statusChip(l)}</div>
       <div class="lead__meta">${esc(CATEGORY_LABEL[l.category] || l.category)} · ${esc(l.reason || "")} ${rating ? "· " + rating : ""}</div>
       <div class="lead__meta">${esc(l.address || "")}</div>
+      ${l.followUp && (l.salesStatus === "new" || l.salesStatus === "shown") ? `<div>${followChip(l.followUp)}</div>` : ""}
       <div class="btns btns--full">
         ${l.status === "ready" ? `<a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a>` : `<a class="btn btn--small" href="${telHref(l.phone)}">📞 Call</a>`}
         ${l.status === "ready" ? `<a class="btn btn--small" href="#/preview/${l.id}">Preview</a>` : ""}
@@ -165,14 +188,15 @@
   async function viewHome() {
     setNav("home");
     meta = meta || (await api("/meta"));
-    if (!document.getElementById("run")) {
-      $app.innerHTML = `<div class="split"><div>${runCard()}<div id="runs"></div></div><div><section>
+    if (!document.getElementById("leads")) {
+      $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="due"></div><div id="runs"></div></div><div><section>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
           .join("")}</select></label>
         <ul class="list" id="leads"><li class="muted">Loading…</li></ul></section></div></div>`;
       const form = $app.querySelector("#run");
+      if (form) {
       const updateEst = () => {
         const cats = [...form.querySelectorAll("input[name=cat]:checked")].map((i) => i.value);
         const cap = Number(form.cap.value) || 0;
@@ -196,6 +220,7 @@
           btn.disabled = false;
         }
       });
+      }
       $app.querySelectorAll("[data-sales]").forEach((b) =>
         b.addEventListener("click", () => {
           filters.sales = b.dataset.sales;
@@ -215,22 +240,105 @@
     stopPolling();
     if (!location.hash.match(/^#?\/?$/)) return;
     const q = new URLSearchParams();
-    if (filters.sales) q.set("sales", filters.sales);
+    if (filters.sales === "callbacks") q.set("callbacks", "all");
+    else if (filters.sales) q.set("sales", filters.sales);
     if (filters.category) q.set("category", filters.category);
     try {
-      const [{ runs }, { leads }] = await Promise.all([api("/runs"), api("/leads?" + q)]);
+      const [{ runs }, { leads }, { leads: due }] = await Promise.all([
+        isOwner() ? api("/runs") : Promise.resolve({ runs: [] }),
+        api("/leads?" + q),
+        api("/leads?callbacks=due"),
+      ]);
       const runsEl = document.getElementById("runs");
       const leadsEl = document.getElementById("leads");
+      const dueEl = document.getElementById("due");
       if (!runsEl || !leadsEl) return;
       runsEl.innerHTML = runsHtml(runs);
-      leadsEl.innerHTML = leads.length
-        ? leads.map(leadCard).join("")
-        : `<li class="card muted">${filters.sales === "new" ? "No new leads yet. Pick a category and tap Run." : "Nothing here yet."}</li>`;
+      dueEl.innerHTML = due.length
+        ? `<section class="card due"><h2>📅 Call back today (${due.length})</h2><ul class="list">${due
+            .map((l) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a>${l.followUp < dayFromNow(0) ? `<span class="chip chip--warn" style="flex:none">Overdue</span>` : ""}</div>
+              <div class="btns" style="margin-top:6px"><a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a><a class="btn btn--small" href="#/lead/${l.id}">Notes</a></div></li>`)
+            .join("")}</ul></section>`
+        : "";
+      const empty = {
+        new: isOwner() ? "No new leads yet. Pick a category and tap Run." : "No new leads right now. Check back after the next run.",
+        callbacks: "No callbacks scheduled. Use “Call back…” after a call to schedule one.",
+      };
+      leadsEl.innerHTML = leads.length ? leads.map(leadCard).join("") : `<li class="card muted">${empty[filters.sales] || "Nothing here yet."}</li>`;
       const busy = runs.some((r) => !r.done) || leads.some((l) => l.status === "queued" || l.status === "building");
       if (busy) pollTimer = setTimeout(refreshHome, 5000);
     } catch (err) {
       if (err.status !== 401) toast(err.message);
     }
+  }
+
+  /* ---------- call log ---------- */
+  function notesHtml(l, limit) {
+    const notes = limit ? l.notes.slice(0, limit) : l.notes;
+    if (!notes.length) return `<p class="muted small">No calls logged yet.</p>`;
+    const me = meta.me || {};
+    return `<ul class="list notes">${notes
+      .map((n) => `<li><div class="row"><strong>${esc(n.outcome ? OUTCOME_LABEL[n.outcome] || n.outcome : "📝 Note")}</strong>
+        ${!limit && (isOwner() || n.author === me.name) ? `<button class="linkbtn" data-delnote="${n.id}" aria-label="Delete note">Delete</button>` : ""}</div>
+        ${n.body ? `<p>${esc(n.body)}</p>` : ""}<p class="small muted">${esc(n.author)} · ${ago(n.createdAt)}</p></li>`)
+      .join("")}</ul>`;
+  }
+
+  function logCardHtml(l) {
+    const current = l.followUp && l.followUp >= dayFromNow(0) ? l.followUp : "";
+    return `<section class="card" id="logcard"><h2>Log this call</h2>
+      <label class="field">Notes<textarea name="note" rows="3" maxlength="2000" placeholder="Who you talked to, what they said, best time to call…"></textarea></label>
+      <div class="field"><span>Call back on <span class="hint">${current ? "Now set for " + esc(dayLabel(current)) : "Not set"}</span></span>
+        <div class="chips">${[[1, "Tomorrow"], [3, "In 3 days"], [7, "Next week"]].map(([n, t]) => `<button type="button" class="pick" data-days="${n}">${t}</button>`).join("")}</div>
+        <input type="date" name="follow" min="${dayFromNow(0)}" value="${current}"></div>
+      <div class="btns btns--full">
+        <button class="btn" data-out="no_answer">📵 No answer</button>
+        <button class="btn" data-out="callback">📅 Call back</button>
+        <button class="btn" data-out="shown">👍 Interested</button>
+        <button class="btn btn--good" data-out="sold">🎉 Sold!</button>
+        <button class="btn" data-out="not_interested">✋ Not interested</button>
+        <button class="btn btn--small" data-out="note">Save note only</button>
+      </div>
+      <p class="small muted" style="margin-top:10px">No answer schedules a callback for tomorrow unless you pick a day. Sold and Not interested clear the callback. If they ask not to be called again, tap Not interested.</p></section>`;
+  }
+
+  function bindLog(l, after) {
+    const card = document.getElementById("logcard");
+    if (!card) return;
+    const date = card.querySelector("[name=follow]");
+    let dirty = false;
+    date.addEventListener("input", () => { dirty = true; });
+    card.querySelectorAll("[data-days]").forEach((b) => b.addEventListener("click", () => {
+      date.value = dayFromNow(Number(b.dataset.days));
+      dirty = true;
+      card.querySelectorAll("[data-days]").forEach((x) => x.classList.toggle("is-on", x === b));
+    }));
+    card.querySelectorAll("[data-out]").forEach((b) => b.addEventListener("click", async () => {
+      const outcome = b.dataset.out;
+      const note = card.querySelector("[name=note]").value.trim();
+      const picked = date.value || null;
+      if (outcome === "callback" && !picked) return toast("Pick a day to call back");
+      if (outcome === "note" && !note) return toast("Write a note first");
+      const payload = { outcome, note };
+      if (dirty || outcome === "callback") payload.followUp = picked;
+      b.disabled = true;
+      try {
+        const res = await api(`/leads/${l.id}/log`, { method: "POST", json: payload });
+        toast(outcome === "sold" ? "Nice! Marked as sold." : res.followUp ? `Saved. Call back ${dayLabel(res.followUp)}.` : "Saved");
+        after();
+      } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+  }
+
+  function bindNotes(l, after) {
+    $app.querySelectorAll("[data-delnote]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Delete this note?")) return;
+      try { await api(`/leads/${l.id}/notes/${b.dataset.delnote}`, { method: "DELETE" }); after(); } catch (err) { toast(err.message); }
+    }));
+    const clear = $app.querySelector("[data-act=clearfollow]");
+    if (clear) clear.addEventListener("click", async () => {
+      try { await api(`/leads/${l.id}/followup`, { method: "PUT", json: { date: null } }); toast("Callback cleared"); after(); } catch (err) { toast(err.message); }
+    });
   }
 
   /* ---------- lead detail ---------- */
@@ -242,6 +350,8 @@
     const blockers = [...lint.errors, ...lint.publishBlockers];
     const ready = l.status === "ready";
     const lookName = (l.looks.find((x) => x.id === l.look) || {}).name || "";
+    const owner = isOwner();
+    const open = l.salesStatus === "new" || l.salesStatus === "shown";
     $app.innerHTML = `<p><a href="#/">← Leads</a></p>
       <div class="split"><div>
       <section class="card">
@@ -267,22 +377,30 @@
           <div class="btns btns--full">
             <a class="btn btn--primary" href="#/preview/${l.id}">Preview</a>
             <a class="btn" href="/p/${l.id}/" target="_blank" rel="noopener">Open full screen</a>
-            <a class="btn" href="#/edit/${l.id}">Edit</a>
+            ${owner ? `<a class="btn" href="#/edit/${l.id}">Edit</a>` : ""}
           </div>` : ""}
         ${l.liveUrl ? `<p style="margin-top:12px">Live at <a href="${esc(l.liveUrl)}" target="_blank" rel="noopener">${esc(l.liveUrl.replace("https://", ""))}</a></p>` : ""}
       </section>
+      <section class="card"><h2>Calls &amp; notes</h2>
+        ${l.followUp && open ? `<div class="row" style="margin-bottom:8px">${followChip(l.followUp)}<button class="linkbtn" data-act="clearfollow" style="flex:none">Clear</button></div>` : ""}
+        ${notesHtml(l)}
+      </section>
       </div><div>
-      ${ready ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
+      ${l.salesStatus !== "live" ? logCardHtml(l) : ""}
+      ${ready && owner ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
         ${blockers.length ? `<ul class="list small">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul><p class="small muted">Fill these in from Edit.</p>` : `<p class="muted">Everything's confirmed. Publishing puts the site on the internet.</p>`}
         ${(lint.suggestions || []).length ? `<h3 style="margin-top:12px">Good to add (talking points)</h3><ul class="list small">${lint.suggestions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         <div class="btns btns--full">
           <button class="btn btn--good" data-act="publish"${blockers.length ? " disabled" : ""}>${l.liveUrl ? "Republish changes" : "Publish to Cloudflare"}</button>
           <button class="btn" data-act="zip"${blockers.length ? " disabled" : ""}>Download zip</button>
         </div></section>` : ""}
-      <section class="card"><h2>More</h2><div class="btns">
+      ${owner ? `<section class="card"><h2>More</h2><div class="btns">
         ${ready ? `<button class="btn btn--small" data-act="rewrite">Rewrite text with AI</button>` : ""}
         ${l.salesStatus !== "live" ? `<button class="btn btn--small btn--danger" data-act="delete">Delete lead</button>` : ""}
-      </div></section></div></div>`;
+      </div></section>` : ""}</div></div>`;
+    const reload = () => viewLead(id);
+    bindLog(l, reload);
+    bindNotes(l, reload);
 
     $app.querySelectorAll("[data-status]").forEach((b) =>
       b.addEventListener("click", async () => {
@@ -565,7 +683,6 @@
     const l = await api("/leads/" + id);
     if (l.status !== "ready") return go("#/lead/" + id);
     const r = l.record;
-    meta = meta || (await api("/meta"));
     const s = meta.settings;
     const phoneDigits = r.phone.e164.slice(2);
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p>
@@ -577,11 +694,13 @@
         <button class="btn" id="copy">Copy preview link</button>
       </div>
       <p class="small muted">Only text the link after they say it's OK. The link works for 14 days.</p>
-      ${!s.companyName || !s.monthlyPrice ? `<div class="card small">Add your company name, your name and your prices in <a href="#/settings">Settings</a> so the guide can use them.</div>` : ""}
+      ${isOwner() && (!s.companyName || !s.monthlyPrice) ? `<div class="card small">Add your company name, your name and your prices in <a href="#/settings">Settings</a> so the guide can use them.</div>` : ""}
+      ${l.notes.length ? `<section class="card"><h2>Earlier calls</h2>${l.followUp ? `<p>${followChip(l.followUp)}</p>` : ""}${notesHtml(l, 3)}</section>` : ""}
       <div id="guide"><div class="card"><span class="spin"></span> Writing the call guide for ${esc(r.name)}… (about 20 seconds)</div></div>`;
 
     const smsBody = (url) => {
-      const who = [s.callerName ? `this is ${s.callerName}` : "", s.companyName ? `with ${s.companyName}` : ""].filter(Boolean).join(" ");
+      const caller = isOwner() ? s.callerName : meta.me.name;
+      const who = [caller ? `this is ${caller}` : "", s.companyName ? `with ${s.companyName}` : ""].filter(Boolean).join(" ");
       return `Hi${who ? ", " + who : ""}. Here's the free website preview I made for ${r.name}: ${url}`;
     };
     $app.querySelector("#sms").addEventListener("click", async (e) => {
@@ -619,21 +738,9 @@
       <section class="card"><h2>If they say…</h2>${pitch.objections.map((o) => `<details class="obj"><summary>“${esc(o.objection)}”</summary><p>${esc(o.response)}</p></details>`).join("")}</section>
       <section class="card opener"><h2>Ask for the yes</h2><p class="big">${esc(pitch.close)}</p></section>
       <section class="card"><h2>Don't say</h2>${list(pitch.avoid)}</section>
-      <section class="card"><h2>How did the call go?</h2><div class="btns btns--full">
-        <button class="btn" data-out="shown">Interested / shown</button>
-        <button class="btn btn--good" data-out="sold">Sold!</button>
-        <button class="btn" data-out="not_interested">Not interested</button>
-      </div><p class="small muted" style="margin-top:10px">If they ask not to be called again, mark Not interested.</p></section>
+      ${l.salesStatus !== "live" ? logCardHtml(l) : ""}
       <p><button class="btn btn--small" id="regen">Write a fresh guide</button></p>`;
-    document.querySelectorAll("[data-out]").forEach((b) =>
-      b.addEventListener("click", async () => {
-        try {
-          await api(`/leads/${id}/status`, { method: "POST", json: { salesStatus: b.dataset.out } });
-          toast(b.dataset.out === "sold" ? "Nice! Marked as sold." : "Saved");
-          go("#/lead/" + id);
-        } catch (err) { toast(err.message); }
-      }),
-    );
+    bindLog(l, () => go("#/lead/" + id));
     document.getElementById("regen").addEventListener("click", () => viewPitch(id, true));
   }
 
@@ -654,16 +761,73 @@
   }
 
   /* ---------- settings ---------- */
+  function deviceCard() {
+    return `<section class="card"><h2>This device</h2>
+      ${meta.me ? `<p class="muted small">Logged in as <strong>${esc(meta.me.name)}</strong>${isOwner() ? "" : " (caller)"}</p>` : ""}
+      <div class="btns">
+        <button class="btn" id="install"${installPrompt ? "" : " hidden"}>Install app</button>
+        <button class="btn btn--danger" id="logout">Log out</button></div>
+        <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>`;
+  }
+
+  function bindDevice() {
+    $app.querySelector("#logout").addEventListener("click", async () => { await api("/auth/logout", { method: "POST" }); meta = null; go("#/login"); });
+    const inst = $app.querySelector("#install");
+    inst.addEventListener("click", async () => { if (!installPrompt) return; installPrompt.prompt(); installPrompt = null; inst.hidden = true; });
+  }
+
+  function callersCard(callers) {
+    return `<section class="card"><h2>Callers</h2>
+      <p class="small muted">People who make sales calls. They can see leads, previews and call guides, text preview links, log calls and set callbacks. They can't run searches, edit or publish sites, delete leads, or see settings, spending or the inbox.</p>
+      <ul class="list">${callers.length ? callers.map((c) => `<li><div class="row"><strong>${esc(c.name)}</strong>${c.disabled ? `<span class="chip" style="flex:none">Turned off</span>` : ""}</div>
+        <div class="btns" style="margin-top:6px">
+          <button class="btn btn--small" data-cpass="${c.id}">New password</button>
+          <button class="btn btn--small" data-ctoggle="${c.id}" data-off="${c.disabled ? 1 : 0}">${c.disabled ? "Turn on" : "Turn off"}</button>
+          <button class="btn btn--small btn--danger" data-cdel="${c.id}">Remove</button></div></li>`).join("") : `<li class="muted small">No callers yet.</li>`}</ul>
+      <form id="cf" style="margin-top:12px"><h3>Add a caller</h3>
+        <label class="field">Their name<input name="name" maxlength="60" required placeholder="Used in call guides and notes"></label>
+        <label class="field">Their password <span class="hint">At least 8 characters, different from yours. Tell them in person.</span><input name="password" type="text" minlength="8" autocomplete="off" required></label>
+        <button class="btn btn--primary" type="submit">Add caller</button></form></section>`;
+  }
+
+  function bindCallers() {
+    $app.querySelector("#cf").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      try {
+        await api("/callers", { method: "POST", json: { name: f.name.value.trim(), password: f.password.value } });
+        toast("Caller added. They log in with that password.");
+        viewSettings();
+      } catch (err) { toast(err.message); }
+    });
+    $app.querySelectorAll("[data-cpass]").forEach((b) => b.addEventListener("click", async () => {
+      const password = prompt("New password for this caller (at least 8 characters). They'll be logged out everywhere.");
+      if (!password) return;
+      try { await api(`/callers/${b.dataset.cpass}`, { method: "PUT", json: { password } }); toast("Password changed"); } catch (err) { toast(err.message); }
+    }));
+    $app.querySelectorAll("[data-ctoggle]").forEach((b) => b.addEventListener("click", async () => {
+      try { await api(`/callers/${b.dataset.ctoggle}`, { method: "PUT", json: { disabled: b.dataset.off !== "1" } }); viewSettings(); } catch (err) { toast(err.message); }
+    }));
+    $app.querySelectorAll("[data-cdel]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Remove this caller? Their notes stay.")) return;
+      try { await api(`/callers/${b.dataset.cdel}`, { method: "DELETE" }); viewSettings(); } catch (err) { toast(err.message); }
+    }));
+  }
+
   async function viewSettings() {
     setNav("settings");
     meta = await api("/meta");
-    const { last30Days: u } = await api("/usage");
+    if (!isOwner()) {
+      $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}</div>`;
+      return bindDevice();
+    }
+    const [{ last30Days: u }, { callers }] = await Promise.all([api("/usage"), api("/callers")]);
     const s = meta.settings;
     $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">
       <section class="card"><h2>Your business &amp; runs</h2><form id="sf">
         <label class="field">Default most sites per run<input name="cap" type="number" min="1" max="500" value="${s.defaultCap}"></label>
         <label class="field">Your company name<input name="companyName" value="${esc(s.companyName || "")}" placeholder="e.g. Cullman Web Co."></label>
-        <label class="field">Caller's name<input name="callerName" value="${esc(s.callerName || "")}" placeholder="Who makes the calls"></label>
+        <label class="field">Caller's name <span class="hint">Used in call guides you open; callers' own logins use their names</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="Who makes the calls"></label>
         <div class="row"><label class="field">Setup price ($)<input name="setupPrice" type="number" min="0" inputmode="decimal" value="${s.setupPrice ?? ""}"></label>
         <label class="field">Monthly price ($)<input name="monthlyPrice" type="number" min="0" inputmode="decimal" value="${s.monthlyPrice ?? ""}"></label></div>
         <label class="field">What's included <span class="hint">Used in the call guide</span><textarea name="offerIncludes" rows="3" placeholder="Hosting, updates when you need them, your own domain…">${esc(s.offerIncludes || "")}</textarea></label>
@@ -672,11 +836,11 @@
       <section class="card"><h2>Spending, last 30 days</h2><ul class="list">
         <li>AI writing: <strong>$${u.aiCost.toFixed(2)}</strong> <span class="muted small">(${u.aiTokensIn.toLocaleString()} in / ${u.aiTokensOut.toLocaleString()} out tokens)</span></li>
         <li>Google: about <strong>$${u.googleCostEstimate.toFixed(2)}</strong> <span class="muted small">(${u.googleRequests} searches, ${u.googlePhotos} photos; estimate, before Google's free monthly credit)</span></li></ul></section>
-      <section class="card"><h2>This device</h2><div class="btns">
-        <button class="btn" id="install"${installPrompt ? "" : " hidden"}>Install app</button>
-        <button class="btn btn--danger" id="logout">Log out</button></div>
-        <p class="small muted">${installPrompt ? "" : "To put this on your home screen: open the browser menu (⋮) and tap “Add to Home screen”."}</p></section>
+      ${callersCard(callers)}
+      ${deviceCard()}
     </div>`;
+    bindCallers();
+    bindDevice();
     $app.querySelector("#sf").addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
@@ -698,9 +862,6 @@
         toast("Saved");
       } catch (err) { toast(err.message); }
     });
-    $app.querySelector("#logout").addEventListener("click", async () => { await api("/auth/logout", { method: "POST" }); meta = null; go("#/login"); });
-    const inst = $app.querySelector("#install");
-    inst.addEventListener("click", async () => { if (!installPrompt) return; installPrompt.prompt(); installPrompt = null; inst.hidden = true; });
   }
 
   /* ---------- router ---------- */
@@ -715,6 +876,8 @@
     let m;
     try {
       if (h === "#/login") return await viewLogin();
+      meta = meta || (await api("/meta"));
+      if (!isOwner() && (/^#\/edit\//.test(h) || h === "#/inbox")) return go("#/");
       if ((m = /^#\/lead\/([a-z0-9]+)$/.exec(h))) return await viewLead(m[1]);
       if ((m = /^#\/edit\/([a-z0-9]+)$/.exec(h))) return await viewEdit(m[1]);
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);

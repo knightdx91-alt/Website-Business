@@ -22,6 +22,8 @@ export interface LeadRow {
   look: string | null;
   lint_json: string | null;
   pitch_json: string | null;
+  follow_up: string | null;
+  last_contact: number | null;
   error: string | null;
   rewrite: number;
   pages_project: string | null;

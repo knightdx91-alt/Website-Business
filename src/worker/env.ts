@@ -42,3 +42,8 @@ export function now(): number {
 export function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+/** Calendar date (YYYY-MM-DD) in Cullman's time zone, optionally some days ahead. */
+export function localDate(addDays = 0, from = Date.now()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(from + addDays * 86_400_000));
+}

@@ -40,18 +40,90 @@ export async function hasOwner(env: Env): Promise<boolean> {
   return (await getSetting(env, "owner_password")) !== null;
 }
 
+async function hashPassword(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return `${b64url(salt)}.${await pbkdf2(password, salt)}`;
+}
+
+async function matches(stored: string, password: string): Promise<boolean> {
+  const [salt, hash] = stored.split(".");
+  if (!salt || !hash) return false;
+  return safeEqual(await pbkdf2(password, fromB64url(salt)), hash);
+}
+
 export async function setupOwner(env: Env, password: string): Promise<void> {
   if (await hasOwner(env)) throw new HttpError(409, "A password is already set");
   if (password.length < 8) throw new HttpError(400, "Use at least 8 characters");
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  await setSetting(env, "owner_password", `${b64url(salt)}.${await pbkdf2(password, salt)}`);
+  await setSetting(env, "owner_password", await hashPassword(password));
 }
 
-export async function checkPassword(env: Env, password: string): Promise<boolean> {
-  const stored = await getSetting(env, "owner_password");
-  if (!stored) return false;
-  const [salt, hash] = stored.split(".");
-  return safeEqual(await pbkdf2(password, fromB64url(salt!)), hash!);
+export interface Session {
+  role: "owner" | "caller";
+  /** Caller's user id; "owner" for the owner. */
+  userId: string;
+  name: string;
+}
+
+interface UserRow {
+  id: string;
+  name: string;
+  password: string;
+  disabled: number;
+  created_at: number;
+}
+
+/** Login is password-only, so every password must be unique across the owner and callers. */
+async function passwordTaken(env: Env, password: string, exceptUserId?: string): Promise<boolean> {
+  const owner = await getSetting(env, "owner_password");
+  if (owner && (await matches(owner, password))) return true;
+  const users = await env.DB.prepare("SELECT * FROM users").all<UserRow>();
+  for (const u of users.results) if (u.id !== exceptUserId && (await matches(u.password, password))) return true;
+  return false;
+}
+
+/** Finds who a password belongs to: the owner first, then enabled callers. */
+export async function checkPassword(env: Env, password: string): Promise<Session | null> {
+  const owner = await getSetting(env, "owner_password");
+  if (owner && (await matches(owner, password))) return { role: "owner", userId: "owner", name: "Owner" };
+  const users = await env.DB.prepare("SELECT * FROM users WHERE disabled = 0").all<UserRow>();
+  for (const u of users.results) if (await matches(u.password, password)) return { role: "caller", userId: u.id, name: u.name };
+  return null;
+}
+
+export async function listCallers(env: Env): Promise<{ id: string; name: string; disabled: boolean; createdAt: number }[]> {
+  const rows = await env.DB.prepare("SELECT * FROM users ORDER BY created_at").all<UserRow>();
+  return rows.results.map((u) => ({ id: u.id, name: u.name, disabled: !!u.disabled, createdAt: u.created_at }));
+}
+
+function checkNewPassword(password: string): void {
+  if (password.length < 8) throw new HttpError(400, "Use at least 8 characters");
+}
+
+export async function addCaller(env: Env, name: string, password: string): Promise<string> {
+  checkNewPassword(password);
+  if (await passwordTaken(env, password)) throw new HttpError(409, "Pick a different password; that one is already in use");
+  const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  await env.DB.prepare("INSERT INTO users (id, name, password, disabled, created_at) VALUES (?, ?, ?, 0, ?)").bind(id, name, await hashPassword(password), Date.now()).run();
+  return id;
+}
+
+/** Changing a caller's password or turning them off signs them out everywhere (the session is bound to the stored hash). */
+export async function updateCaller(env: Env, id: string, change: { name?: string; password?: string; disabled?: boolean }): Promise<void> {
+  const user = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>();
+  if (!user) throw new HttpError(404, "Caller not found");
+  let password = user.password;
+  if (change.password !== undefined) {
+    checkNewPassword(change.password);
+    if (await passwordTaken(env, change.password, id)) throw new HttpError(409, "Pick a different password; that one is already in use");
+    password = await hashPassword(change.password);
+  }
+  await env.DB.prepare("UPDATE users SET name = ?, password = ?, disabled = ? WHERE id = ?")
+    .bind(change.name ?? user.name, password, change.disabled === undefined ? user.disabled : change.disabled ? 1 : 0, id)
+    .run();
+}
+
+export async function removeCaller(env: Env, id: string): Promise<void> {
+  await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
 }
 
 /** Simple brute-force guard: 10 failures within 15 minutes locks login for the rest of the window. */
@@ -69,9 +141,16 @@ export async function recordLoginFailure(env: Env): Promise<void> {
   await setSetting(env, "login_failures", JSON.stringify(fresh ? { count: 1, since: Date.now() } : { count: prev.count + 1, since: prev.since }));
 }
 
-export async function sessionCookie(env: Env): Promise<string> {
+async function sessionKey(env: Env, userId: string): Promise<string | null> {
+  if (userId === "owner") return getSetting(env, "owner_password");
+  const u = await env.DB.prepare("SELECT password, disabled FROM users WHERE id = ?").bind(userId).first<{ password: string; disabled: number }>();
+  return u && !u.disabled ? u.password : null;
+}
+
+export async function sessionCookie(env: Env, s: Session): Promise<string> {
   const exp = Date.now() + SESSION_DAYS * 86_400_000;
-  const value = `${exp}.${await hmac(env.APP_SECRET, `owner.${exp}`)}`;
+  const key = await sessionKey(env, s.userId);
+  const value = `${s.userId}.${exp}.${await hmac(env.APP_SECRET, `session.${s.userId}.${exp}.${key}`)}`;
   return `${COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * 86_400}`;
 }
 
@@ -79,13 +158,17 @@ export function clearCookie(): string {
   return `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
-export async function isLoggedIn(env: Env, req: Request): Promise<boolean> {
+export async function getSession(env: Env, req: Request): Promise<Session | null> {
   const cookie = req.headers.get("cookie") ?? "";
   const m = new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`).exec(cookie);
-  if (!m) return false;
-  const [exp, sig] = m[1]!.split(".");
-  if (!exp || !sig || Number(exp) < Date.now()) return false;
-  return safeEqual(sig, await hmac(env.APP_SECRET, `owner.${exp}`));
+  if (!m) return null;
+  const [userId, exp, sig] = m[1]!.split(".");
+  if (!userId || !exp || !sig || !/^[a-z0-9]+$/.test(userId) || Number(exp) < Date.now()) return null;
+  const key = await sessionKey(env, userId);
+  if (!key || !safeEqual(sig, await hmac(env.APP_SECRET, `session.${userId}.${exp}.${key}`))) return null;
+  if (userId === "owner") return { role: "owner", userId, name: "Owner" };
+  const u = await env.DB.prepare("SELECT name FROM users WHERE id = ?").bind(userId).first<{ name: string }>();
+  return u ? { role: "caller", userId, name: u.name } : null;
 }
 
 /** Private preview link for one business owner. Expires; rotating APP_SECRET revokes every link. */

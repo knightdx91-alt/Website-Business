@@ -8,10 +8,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { writePitch } from "../copy/pitch.ts";
 import { reviewTexts } from "../places/to-record.ts";
 import type { Place } from "../places/client.ts";
-import { checkPassword, clearCookie, hasOwner, isLoggedIn, loginAllowed, recordLoginFailure, sessionCookie, setupOwner, shareToken, verifyShare } from "./auth.ts";
+import { addCaller, checkPassword, clearCookie, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, updateCaller, verifyShare, type Session } from "./auth.ts";
 import { addUsage, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
-import { HttpError, json, newId, now, type Env, type Job } from "./env.ts";
+import { HttpError, json, localDate, newId, now, type Env, type Job } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
 import { renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
@@ -52,10 +52,38 @@ function summary(l: LeadRow) {
     error: l.error,
     liveUrl: l.live_url,
     hasPitch: !!l.pitch_json,
+    followUp: l.follow_up,
+    lastContact: l.last_contact,
     todos: lint?.todos.length ?? 0,
     blockers: lint ? lint.publishBlockers.length + lint.errors.length : null,
     createdAt: l.created_at,
   };
+}
+
+interface NoteRow {
+  id: string;
+  lead_id: string;
+  author: string;
+  outcome: string | null;
+  body: string;
+  created_at: number;
+}
+
+const OUTCOMES = ["note", "no_answer", "callback", "shown", "sold", "not_interested"] as const;
+const OUTCOME_STATUS: Partial<Record<(typeof OUTCOMES)[number], LeadRow["sales_status"]>> = { shown: "shown", sold: "sold", not_interested: "not_interested" };
+const CALLER_NAME = z.string().trim().min(1).max(60).regex(/^[^\u0000-\u001f"\\<>]+$/, "Use letters and spaces only");
+const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-09");
+
+async function notesFor(env: Env, leadId: string) {
+  const rows = await env.DB.prepare("SELECT * FROM lead_notes WHERE lead_id = ? ORDER BY created_at DESC LIMIT 100").bind(leadId).all<NoteRow>();
+  return rows.results.map((n) => ({ id: n.id, author: n.author, outcome: n.outcome, body: n.body, createdAt: n.created_at }));
+}
+
+/** Call guides name the caller; swap the cached name for whoever is opening it instead of paying for a rewrite. */
+function pitchFor(raw: string, callerName: string | undefined): unknown {
+  const { _caller, ...pitch } = JSON.parse(raw) as { _caller?: string };
+  if (!_caller || !callerName || _caller === callerName) return pitch;
+  return JSON.parse(JSON.stringify(pitch).split(_caller).join(callerName.replace(/["\\]/g, "")));
 }
 
 function detail(l: LeadRow) {
@@ -96,28 +124,39 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   // CSRF guard: browsers can't add custom headers to cross-site form posts.
   if (m !== "GET" && req.headers.get("x-wb") !== "1") throw new HttpError(403, "Missing request header");
 
-  if (path === "/auth/state" && m === "GET") return json({ hasOwner: await hasOwner(env), loggedIn: await isLoggedIn(env, req) });
+  if (path === "/auth/state" && m === "GET") {
+    const session = await getSession(env, req);
+    return json({ hasOwner: await hasOwner(env), loggedIn: !!session, role: session?.role ?? null, name: session?.name ?? null });
+  }
   if (path === "/auth/setup" && m === "POST") {
     const { password } = await body(req, z.object({ password: z.string().max(200) }));
     await setupOwner(env, password);
-    return json({ ok: true }, 200, { "set-cookie": await sessionCookie(env) });
+    return json({ ok: true }, 200, { "set-cookie": await sessionCookie(env, { role: "owner", userId: "owner", name: "Owner" }) });
   }
   if (path === "/auth/login" && m === "POST") {
     if (!(await loginAllowed(env))) throw new HttpError(429, "Too many tries. Wait 15 minutes and try again.");
     const { password } = await body(req, z.object({ password: z.string().max(200) }));
-    if (!(await checkPassword(env, password))) {
+    const who = await checkPassword(env, password);
+    if (!who) {
       await recordLoginFailure(env);
       throw new HttpError(401, "Wrong password");
     }
-    return json({ ok: true }, 200, { "set-cookie": await sessionCookie(env) });
+    return json({ ok: true, role: who.role }, 200, { "set-cookie": await sessionCookie(env, who) });
   }
   if (path === "/auth/logout" && m === "POST") return json({ ok: true }, 200, { "set-cookie": clearCookie() });
 
-  if (!(await isLoggedIn(env, req))) throw new HttpError(401, "Please log in");
+  const session = await getSession(env, req);
+  if (!session) throw new HttpError(401, "Please log in");
+  const isOwner = session.role === "owner";
+  // Callers can work leads (view, call guide, share link, sales status, notes) but nothing that costs money or changes sites.
+  const ownerOnly = () => {
+    if (!isOwner) throw new HttpError(403, "Only the owner can do that");
+  };
 
   if (path === "/meta" && m === "GET") {
     const settings = await getSettings(env);
     return json({
+      me: { role: session.role, name: session.name },
       categories: Object.keys(QUERIES).map((id) => ({ id, label: CATEGORY_LABELS[id as CategoryId] ?? id })),
       models: Object.entries(MODEL_PRICES).map(([id, p]) => ({ id, label: p.label })),
       settings,
@@ -125,6 +164,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   }
 
   if (path === "/settings" && m === "PUT") {
+    ownerOnly();
     const s = await body(
       req,
       z.object({
@@ -145,6 +185,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json({ ok: true });
   }
 
+  if (path === "/runs") ownerOnly();
   if (path === "/runs" && m === "POST") {
     const input = await body(req, z.object({ categories: z.array(z.string()).min(1).max(6), cap: z.number().int().min(1).max(500) }));
     const cats = input.categories.filter((c) => QUERIES[c as CategoryId]);
@@ -180,12 +221,39 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json({ runs: out });
   }
 
+  if (path === "/callers" || path.startsWith("/callers/")) ownerOnly();
+  if (path === "/callers" && m === "GET") return json({ callers: await listCallers(env) });
+  if (path === "/callers" && m === "POST") {
+    const input = await body(req, z.object({ name: CALLER_NAME, password: z.string().max(200) }));
+    return json({ id: await addCaller(env, input.name, input.password) });
+  }
+  const callerMatch = /^\/callers\/([a-z0-9]+)$/.exec(path);
+  if (callerMatch && m === "PUT") {
+    const change = await body(req, z.object({ name: CALLER_NAME.optional(), password: z.string().max(200).optional(), disabled: z.boolean().optional() }));
+    await updateCaller(env, callerMatch[1]!, change);
+    return json({ ok: true });
+  }
+  if (callerMatch && m === "DELETE") {
+    await removeCaller(env, callerMatch[1]!);
+    return json({ ok: true });
+  }
+
   if (path === "/leads" && m === "GET") {
     const where: string[] = ["status != 'expired'"];
     const binds: unknown[] = [];
     const sales = url.searchParams.get("sales");
     const category = url.searchParams.get("category");
-    if (sales) {
+    const callbacks = url.searchParams.get("callbacks");
+    let order = "score DESC";
+    if (callbacks) {
+      // "due": today or overdue; "all": every scheduled callback. Closed leads drop off.
+      where.push("follow_up IS NOT NULL", "sales_status IN ('new', 'shown')");
+      if (callbacks === "due") {
+        where.push("follow_up <= ?");
+        binds.push(localDate());
+      }
+      order = "follow_up ASC, score DESC";
+    } else if (sales) {
       where.push("sales_status = ?");
       binds.push(sales);
     }
@@ -193,24 +261,61 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       where.push("category = ?");
       binds.push(category);
     }
-    const rows = await env.DB.prepare(`SELECT * FROM leads WHERE ${where.join(" AND ")} ORDER BY score DESC LIMIT 500`)
+    const rows = await env.DB.prepare(`SELECT * FROM leads WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT 500`)
       .bind(...binds)
       .all<LeadRow>();
     return json({ leads: rows.results.map(summary) });
   }
 
-  const leadMatch = /^\/leads\/([a-z0-9]+)(\/[a-z]+)?$/.exec(path);
+  const leadMatch = /^\/leads\/([a-z0-9]+)(\/[a-z]+)?(?:\/([a-z0-9]+))?$/.exec(path);
   if (leadMatch) {
     const id = leadMatch[1]!;
     const action = leadMatch[2] ?? "";
+    const sub = leadMatch[3];
     const lead = await requireLead(env, id);
+    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup"].includes(action);
+    if (!callerSafe) ownerOnly();
 
-    if (action === "" && m === "GET") return json(detail(lead));
+    if (action === "" && m === "GET") return json({ ...detail(lead), notes: await notesFor(env, id) });
+    if (action === "/log" && m === "POST") {
+      const input = await body(
+        req,
+        z.object({ outcome: z.enum(OUTCOMES), note: z.string().trim().max(2000).default(""), followUp: DATE.nullable().optional() }),
+      );
+      if (input.outcome === "note" && !input.note) throw new HttpError(400, "Write a note first");
+      if (input.outcome === "callback" && !input.followUp) throw new HttpError(400, "Pick a day to call back");
+      if (input.followUp && input.followUp < localDate()) throw new HttpError(400, "Pick today or a later day");
+      const fields: Partial<LeadRow> = {};
+      if (input.outcome !== "note") fields.last_contact = now();
+      if (input.followUp !== undefined) fields.follow_up = input.followUp;
+      else if (input.outcome === "no_answer") fields.follow_up = localDate(1);
+      else if (input.outcome === "sold" || input.outcome === "not_interested") fields.follow_up = null;
+      const status = OUTCOME_STATUS[input.outcome] ?? (input.outcome === "callback" && lead.sales_status === "new" ? "shown" : undefined);
+      if (status && lead.sales_status !== "live") fields.sales_status = status;
+      await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(newId(), id, session.name, input.outcome === "note" ? null : input.outcome, input.note, now())
+        .run();
+      if (Object.keys(fields).length) await updateLead(env, id, fields);
+      return json({ ok: true, followUp: fields.follow_up === undefined ? lead.follow_up : fields.follow_up });
+    }
+    if (action === "/followup" && m === "PUT") {
+      const { date } = await body(req, z.object({ date: DATE.nullable() }));
+      if (date && date < localDate()) throw new HttpError(400, "Pick today or a later day");
+      await updateLead(env, id, { follow_up: date });
+      return json({ ok: true });
+    }
+    if (action === "/notes" && sub && m === "DELETE") {
+      const note = await env.DB.prepare("SELECT * FROM lead_notes WHERE id = ? AND lead_id = ?").bind(sub, id).first<NoteRow>();
+      if (!note) throw new HttpError(404, "Note not found");
+      if (!isOwner && note.author !== session.name) throw new HttpError(403, "You can only delete your own notes");
+      await env.DB.prepare("DELETE FROM lead_notes WHERE id = ?").bind(sub).run();
+      return json({ ok: true });
+    }
     if (action === "" && m === "DELETE") {
       if (lead.sales_status === "live") throw new HttpError(409, "This site is live. It can't be deleted from here.");
       await deletePrefix(env, `previews/${id}/`);
       await deletePrefix(env, `owner/${id}/`);
-      await env.DB.prepare("DELETE FROM leads WHERE id = ?").bind(id).run();
+      await env.DB.batch([env.DB.prepare("DELETE FROM lead_notes WHERE lead_id = ?").bind(id), env.DB.prepare("DELETE FROM leads WHERE id = ?").bind(id)]);
       return json({ ok: true });
     }
     if (action === "/status" && m === "POST") {
@@ -260,9 +365,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       return json({ url: `${url.origin}/s/${token}/`, expiresInDays: 14 });
     }
     if (action === "/pitch" && (m === "GET" || m === "POST")) {
-      if (m === "GET" && lead.pitch_json) return json({ pitch: JSON.parse(lead.pitch_json) });
-      if (!lead.record_json || !lead.lint_json) throw new HttpError(409, "The preview isn't ready yet");
       const settings = await getSettings(env);
+      const callerName = isOwner ? settings.callerName : session.name;
+      if (m === "GET" && lead.pitch_json) return json({ pitch: pitchFor(lead.pitch_json, callerName) });
+      if (!lead.record_json || !lead.lint_json) throw new HttpError(409, "The preview isn't ready yet");
       const lint = JSON.parse(lead.lint_json) as { todos?: string[]; suggestions?: string[] };
       const place = lead.place_json ? (JSON.parse(lead.place_json) as Place) : undefined;
       const record = JSON.parse(lead.record_json) as BusinessRecord;
@@ -273,12 +379,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         reviewContext: place ? reviewTexts(place) : [],
         todos: lint.todos ?? [],
         suggestions: lint.suggestions ?? [],
-        sales: settings,
+        sales: { ...settings, callerName },
         model: settings.copyModel,
       });
       const price = MODEL_PRICES[result.model] ?? MODEL_PRICES["claude-opus-5-5"]!;
       await addUsage(env, { aiIn: result.usage.input, aiOut: result.usage.output, costMicro: Math.round(result.usage.input * price.input + result.usage.output * price.output) });
-      await updateLead(env, id, { pitch_json: JSON.stringify(result.pitch) });
+      await updateLead(env, id, { pitch_json: JSON.stringify({ ...result.pitch, _caller: callerName }) });
       return json({ pitch: result.pitch });
     }
     if (action === "/zip" && m === "GET") {
@@ -288,6 +394,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     }
   }
 
+  if (path === "/inbox" || path.startsWith("/inbox/") || path === "/usage") ownerOnly();
   if (path === "/inbox" && m === "GET") {
     const rows = await env.DB.prepare(
       "SELECT s.id, s.lead_id, s.created_at, s.data_json, s.read, l.name AS business FROM submissions s LEFT JOIN leads l ON l.id = s.lead_id ORDER BY s.created_at DESC LIMIT 200",
@@ -347,9 +454,11 @@ async function expireStaleLeads(env: Env): Promise<void> {
   const cutoffNew = now() - 30 * 86_400_000;
   const cutoffShown = now() - 60 * 86_400_000;
   const stale = await env.DB.prepare(
-    "SELECT id FROM leads WHERE status != 'expired' AND ((sales_status = 'new' AND created_at < ?) OR (sales_status = 'shown' AND created_at < ?)) LIMIT 200",
+    `SELECT id FROM leads WHERE status != 'expired' AND ((sales_status = 'new' AND created_at < ?) OR (sales_status = 'shown' AND created_at < ?))
+     AND NOT (COALESCE(follow_up, '') >= ? AND created_at >= ?) LIMIT 200`,
   )
-    .bind(cutoffNew, cutoffShown)
+    // A scheduled callback keeps a lead around, but never past 90 days of Google data.
+    .bind(cutoffNew, cutoffShown, localDate(), now() - 90 * 86_400_000)
     .all<{ id: string }>();
   for (const { id } of stale.results) {
     await deletePrefix(env, `previews/${id}/`);
@@ -366,7 +475,7 @@ export default {
       if (url.pathname.startsWith("/api/")) return await api(env, req, url);
       const preview = /^\/p\/([a-z0-9]+)(\/.*)?$/.exec(url.pathname);
       if (preview) {
-        if (!(await isLoggedIn(env, req))) return Response.redirect(`${url.origin}/?next=${encodeURIComponent(url.pathname)}`, 302);
+        if (!(await getSession(env, req))) return Response.redirect(`${url.origin}/?next=${encodeURIComponent(url.pathname)}`, 302);
         if (!url.pathname.startsWith(`/p/${preview[1]}/`)) return Response.redirect(`${url.origin}/p/${preview[1]}/`, 301);
         return await servePreview(env, req, preview[1]!, preview[2] ?? "/");
       }
