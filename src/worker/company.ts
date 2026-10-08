@@ -5,6 +5,8 @@ import { escHtml as e } from "./page.ts";
 /** Underground Associates' own website, served on the company domain from live Settings (prices, phone, email). */
 export const COMPANY_HOSTS = ["undergroundassociates.com", "www.undergroundassociates.com"];
 const ORIGIN = "https://undergroundassociates.com";
+/** Year Underground Associates LLC started, for the copyright line. */
+const FOUNDED = 2021;
 
 /** Contact form posts land in the app inbox under this pseudo lead id. */
 export const COMPANY_LEAD_ID = "company";
@@ -177,7 +179,7 @@ ${missing ? `<p class="note note--warn" role="alert">Please add your name and a 
 ${phone || email ? `<p class="direct">Rather talk? ${phone ? `<a href="${telHref(phone)}">${e(phone)}</a>` : ""}${phone && email ? " · " : ""}${email ? `<a href="mailto:${e(email)}">${e(email)}</a>` : ""}</p>` : ""}
 </div></section>
 </main>
-<footer class="ftr"><div class="wrap">© ${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama</div></footer>
+<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama</div></footer>
 ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)}">Call</a><a href="#contact">Free preview</a></nav>` : ""}
 </body></html>`;
   return new Response(html, {
