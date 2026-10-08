@@ -23,15 +23,22 @@ export interface SearchGroup {
 }
 
 export const SEARCH_GROUPS: SearchGroup[] = [
-  { id: "restaurant", label: "Restaurants & cafes", category: "restaurant", terms: ["restaurants", "barbecue", "mexican restaurant", "cafe"] },
+  { id: "restaurant", label: "Restaurants & cafes", category: "restaurant", terms: ["restaurants", "barbecue", "mexican restaurant", "cafe", "pizza"] },
+  { id: "sweets", label: "Bakeries, coffee & sweets", category: "restaurant", terms: ["bakery", "coffee shop", "donut shop", "ice cream shop"] },
   { id: "food_truck", label: "Food trucks", category: "restaurant", terms: ["food truck"] },
   { id: "contractor", label: "Contractors", category: "contractor", terms: ["plumber", "heating and air conditioning", "electrician", "roofing contractor"] },
+  { id: "home_trades", label: "Painters, concrete & handymen", category: "contractor", terms: ["painting contractor", "concrete contractor", "handyman", "remodeling contractor", "fence contractor", "appliance repair"] },
+  { id: "tree_pest", label: "Tree service & pest control", category: "contractor", terms: ["tree service", "pest control"] },
   { id: "salon", label: "Salons & barbers", category: "salon", terms: ["hair salon", "barber shop", "beauty salon"] },
   { id: "nails", label: "Nail salons", category: "salon", terms: ["nail salon"] },
+  { id: "massage", label: "Massage & day spas", category: "salon", terms: ["massage therapist", "day spa"] },
   { id: "pet_grooming", label: "Pet groomers", category: "salon", terms: ["pet grooming", "dog groomer"] },
   { id: "auto", label: "Auto repair", category: "auto", terms: ["auto repair", "mechanic", "tire shop", "transmission repair"] },
+  { id: "auto_more", label: "Body shops, detailing & towing", category: "auto", terms: ["auto body shop", "auto detailing", "towing service"] },
+  { id: "small_engine", label: "Small engine & mower repair", category: "auto", terms: ["small engine repair", "lawn mower repair"] },
   { id: "landscaping", label: "Landscaping & lawn", category: "landscaping", terms: ["landscaping", "lawn care service", "lawn mowing service"] },
   { id: "cleaning", label: "Cleaning services", category: "cleaning", terms: ["house cleaning service", "cleaning service", "janitorial service"] },
+  { id: "pressure_washing", label: "Pressure & window washing", category: "cleaning", terms: ["pressure washing", "window cleaning"] },
 ];
 
 export function groupById(id: string): SearchGroup | undefined {

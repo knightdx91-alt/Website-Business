@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import type { BusinessRecord, Copy } from "../src/generator/types.ts";
+import type { BusinessRecord, CategoryId, Copy } from "../src/generator/types.ts";
 
 export const loadFont = (pkg: string, file: string) => readFile(`node_modules/@fontsource/${pkg}/files/${file}`);
 
@@ -73,15 +73,15 @@ export function sampleCopy(over: Partial<Copy> = {}): Copy {
   };
 }
 
-export function categoryRecord(category: "salon" | "auto" | "landscaping" | "cleaning", over: Partial<BusinessRecord> = {}): BusinessRecord {
+export function categoryRecord(category: Exclude<CategoryId, "restaurant">, over: Partial<BusinessRecord> = {}): BusinessRecord {
   const base = restaurantRecord();
   const storefront = category === "salon" || category === "auto";
   return {
     ...base,
     placeId: `ChIJ${category}`,
-    name: { salon: "Sample Barber Co", auto: "Sample Auto Service", landscaping: "Sample Lawn Care", cleaning: "Sample Cleaning Co" }[category],
+    name: ({ salon: "Sample Barber Co", auto: "Sample Auto Service", landscaping: "Sample Lawn Care", cleaning: "Sample Cleaning Co", contractor: "Sample Home Services" } as Record<string, string>)[category] ?? "Sample Shop",
     category,
-    variant: { salon: "barber", auto: "general", landscaping: "lawn_crew", cleaning: "residential" }[category],
+    variant: ({ salon: "barber", auto: "general", landscaping: "lawn_crew", cleaning: "residential", contractor: "multi" } as Record<string, string>)[category] ?? "general",
     showStreetAddress: storefront,
     hours: storefront ? base.hours : undefined,
     serviceArea: { towns: ["Cullman", "Hanceville"], counties: ["Cullman"] },

@@ -81,16 +81,19 @@ export function qualify(places: Place[], opts: { includeFreeBuilder?: boolean; i
 
 const TYPE_CATEGORY: Array<[RegExp, CategoryId]> = [
   [/restaurant|cafe|coffee|bakery|meal_|food|bar_and_grill|diner|deli|ice_cream|donut|sandwich|pizza|steak|barbecue/, "restaurant"],
-  [/hair|barber|beauty|nail|pet_care|pet_groom|spa$/, "salon"],
-  [/car_repair|auto|tire|transmission|oil_change|car_dealer/, "auto"],
+  [/hair|barber|beauty|nail|pet_care|pet_groom|spa$|massage/, "salon"],
+  [/car_repair|auto|tire|transmission|oil_change|car_dealer|car_wash/, "auto"],
   [/plumb|electric|roofing|contractor|hvac|heating|painter|locksmith|moving|handyman/, "contractor"],
 ];
 
 /** Best-guess template for a Places result (the owner can change it before adding). */
 export function guessCategory(p: Place): CategoryId | null {
   const n = (p.displayName?.text ?? "").toLowerCase();
-  if (/\b(lawn|landscap|mowing|tree service|sod|irrigation)/.test(n)) return "landscaping";
-  if (/\b(clean|maid|janitor|pressure wash)/.test(n)) return "cleaning";
+  if (/\b(collision|body shop|paint (&|and) body|detail|wrecker|towing|small engine|mower repair)/.test(n)) return "auto";
+  if (/\b(lawn|landscap|mowing|sod|irrigation)/.test(n)) return "landscaping";
+  if (/\b(clean|maid|janitor|(pressure|power|soft) ?wash)/.test(n)) return "cleaning";
+  if (/\b(massage|day spa|bodywork)/.test(n)) return "salon";
+  if (/\b(paint|concrete|fenc|pest|termite|remodel|appliance|tree|stump)/.test(n)) return "contractor";
   if (/\b(food truck|truck|grill|bbq|cafe|kitchen|diner|taco|pizza)/.test(n)) return "restaurant";
   for (const t of [p.primaryType ?? "", ...(p.types ?? [])]) {
     for (const [re, cat] of TYPE_CATEGORY) if (re.test(t)) return cat;

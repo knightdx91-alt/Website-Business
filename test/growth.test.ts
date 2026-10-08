@@ -89,5 +89,53 @@ test("hand-added businesses get a sensible template guess", async () => {
   assert.equal(guessCategory(p("Sparkle Maids", "point_of_interest")), "cleaning");
   assert.equal(guessCategory(p("Luxe Nails", "nail_salon")), "salon");
   assert.equal(guessCategory(p("Main St Tire & Auto", "car_repair")), "auto");
+  assert.equal(guessCategory(p("A1 Painting", "point_of_interest")), "contractor");
+  assert.equal(guessCategory(p("Gloss Boss Auto Detailing", "point_of_interest")), "auto");
+  assert.equal(guessCategory(p("Barnett Pressure Washing, LLC", "point_of_interest")), "cleaning");
+  assert.equal(guessCategory(p("Relax & Align Massage", "point_of_interest")), "salon");
+  assert.equal(guessCategory(p("Johnson Small Engine", "point_of_interest")), "auto");
   assert.equal(guessCategory(p("Acme Holdings", "point_of_interest")), null);
+});
+
+test("new variants are picked from the business name", async () => {
+  const { contractorTrade } = await import("../src/generator/packs/contractor.ts");
+  const { autoVariant } = await import("../src/generator/packs/auto.ts");
+  const { salonVariant } = await import("../src/generator/packs/salon.ts");
+  const { cleaningVariant } = await import("../src/generator/packs/cleaning.ts");
+  assert.equal(contractorTrade(undefined, [], "J W Painting & Staining"), "painting");
+  assert.equal(contractorTrade(undefined, [], "Moore's Handyman and Woodworking"), "handyman");
+  assert.equal(contractorTrade(undefined, [], "Cullman Concrete"), "concrete");
+  assert.equal(contractorTrade(undefined, [], "Smith Plumbing"), "plumbing");
+  assert.equal(autoVariant(undefined, [], "Gloss Boss Auto Detailing and Ceramic Coatings"), "detailing");
+  assert.equal(autoVariant(undefined, [], "Simple Man Towing"), "towing");
+  assert.equal(autoVariant(undefined, [], "Davis Small Engine"), "small_engine");
+  assert.equal(autoVariant(undefined, [], "Main St Collision"), "body");
+  assert.equal(salonVariant(undefined, [], "Revive Massage Therapy, LLC"), "massage");
+  assert.equal(salonVariant(undefined, [], "Bella Hair Salon & Spa"), "salon");
+  assert.equal(salonVariant(undefined, [], "Luxe Nail Spa"), "nails");
+  assert.equal(cleaningVariant(undefined, [], "A Plus SoftWash LLC"), "exterior");
+});
+
+test("every new variant renders a clean preview", async () => {
+  const { seedServices } = await import("../src/generator/packs/contractor.ts");
+  const { seedAutoServices } = await import("../src/generator/packs/auto.ts");
+  const { seedCleaningServices } = await import("../src/generator/packs/cleaning.ts");
+  const cases: Array<[Parameters<typeof categoryRecord>[0], string, ReturnType<typeof seedServices>, RegExp]> = [
+    ["contractor", "painting", seedServices("painting"), /Painting in/],
+    ["contractor", "tree", seedServices("tree"), /Stump grinding/],
+    ["auto", "detailing", seedAutoServices("detailing"), /What we offer/],
+    ["auto", "small_engine", seedAutoServices("small_engine"), /Equipment \(type, make, model\)/],
+    ["auto", "body", seedAutoServices("body"), /Collision repair/],
+    ["cleaning", "exterior", seedCleaningServices("exterior"), /What we wash/],
+    ["salon", "massage", seedSalonServices("massage"), /Massage therapy/],
+  ];
+  for (const [category, variant, services, expect] of cases) {
+    const r = categoryRecord(category, { variant, services });
+    const out = await buildSite({ record: r, copy: sampleCopy(), site: { slug: "v", look: "" }, mode: "preview" });
+    const home = String(out.files.get("index.html"));
+    assert.match(home, expect, `${category}/${variant}`);
+    assert.deepEqual(out.lint.errors, [], `${category}/${variant}: ${JSON.stringify(out.lint.errors)}`);
+  }
+  const massage = await buildSite({ record: categoryRecord("salon", { variant: "massage", services: seedSalonServices("massage") }), copy: sampleCopy(), site: { slug: "m", look: "" }, mode: "preview" });
+  assert.ok(massage.todos.some((t) => /license number/.test(t)));
 });

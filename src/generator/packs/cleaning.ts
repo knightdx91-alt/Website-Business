@@ -5,14 +5,16 @@ import type { BusinessRecord, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 export function cleaningVariant(_primaryType: string | undefined, _types: string[], name: string): string {
+  if (/\b(pressure|power|soft)\s?wash\w*|\bwindow\b|\bexterior\b/i.test(name)) return "exterior";
   return /\b(commercial|janitorial|office|building)\b/i.test(name) ? "commercial" : "residential";
 }
 
-const LABEL: Record<string, string> = { residential: "House Cleaning", commercial: "Commercial Cleaning" };
+const LABEL: Record<string, string> = { residential: "House Cleaning", commercial: "Commercial Cleaning", exterior: "Pressure Washing" };
 
 const SEEDS: Record<string, string[]> = {
   residential: ["Standard & recurring cleaning", "Deep cleaning", "Move-in & move-out cleaning", "One-time cleaning"],
   commercial: ["Office cleaning", "Janitorial service", "Move-out cleaning", "Post-construction cleanup"],
+  exterior: ["House washing", "Driveways & sidewalks", "Decks & fences", "Roof soft washing", "Gutter cleaning", "Window cleaning"],
 };
 
 export function seedCleaningServices(variant: string): Service[] {
@@ -81,7 +83,7 @@ export const cleaningPack: CategoryPack = {
     })}
 <main id="main">
 <section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
-<span class="section__label">Services</span><h2 class="section__title" id="services-title">${r.variant === "commercial" ? "What we clean" : "Cleaning options"}</h2>
+<span class="section__label">Services</span><h2 class="section__title" id="services-title">${r.variant === "commercial" ? "What we clean" : r.variant === "exterior" ? "What we wash" : "Cleaning options"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
 ${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: "check" as const })), 2)}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Check the services list", "We guessed at what you offer. Tell us what to add or remove, and if you'd like starting prices shown.", true)}
@@ -99,7 +101,9 @@ ${contactForm(
   ctx,
   r.services.map((s) => s.name),
   r.serviceArea?.towns ?? [],
-  r.variant === "commercial"
+  r.variant === "exterior"
+    ? [{ name: "property", label: "Property", options: ["House", "Business", "Church or school", "Other"] }]
+    : r.variant === "commercial"
     ? [{ name: "frequency", label: "How often?", options: ["One time", "Daily", "Weekly", "Every 2 weeks", "Monthly"] }]
     : [
         { name: "home_size", label: "Home size", options: ["1-2 bedrooms", "3 bedrooms", "4 bedrooms", "5+ bedrooms"] },
@@ -111,14 +115,16 @@ ${ctaBand(ctx, actions(r, ["quote", "call"]))}
 </main>`;
   },
   pages: () => [],
-  copyBrief: () => ({
+  copyBrief: (r) => ({
     voice:
       "Warm, plain-spoken and confident, Southern-friendly without dialect. Short sentences, second person ('your home'). Never mention insurance, bonding, background checks, guarantees, supplies, products, prices or years unless given in the facts.",
     fields: {
       heroTagline: "One sentence (12-22 words) introducing the cleaning options for homes (or businesses) in and around the town.",
       heroSub: "One supporting line (15-25 words) under the headline: who it's for, built only from the facts. No superlatives.",
       serviceBlurbs: "For each service id, one line (12-25 words) on what it's best for. General and true; no prices, no promises.",
-      faq:
+      faq: r.variant === "exterior"
+        ? "5-6 general questions people ask before hiring a pressure washing company (soft washing vs pressure washing, is it safe for siding and roofs, how often to wash, plants and pets, do I need to be home) with helpful general answers (35-60 words). Never state this company's policies, prices, chemicals or guarantees. Invite them to ask for a quote where it depends."
+        :
         "5-6 general questions people ask before hiring a cleaner (difference between standard and deep cleaning, how often to schedule, what to do before the cleaners arrive, etc.) with helpful general answers (35-60 words). Never state this company's policies, prices, guarantees or supplies. Invite them to ask for a quote where it depends.",
       serviceAreaIntro: "One or two sentences about cleaning in the town and nearby communities listed.",
       about:

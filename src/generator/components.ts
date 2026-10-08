@@ -186,7 +186,7 @@ export function faq(items: Faq[], band = false): Raw {
 }
 
 export interface FormField {
-  name: "vehicle" | "frequency" | "home_size";
+  name: "vehicle" | "frequency" | "home_size" | "property" | "quantity";
   label: string;
   options?: string[];
   autocomplete?: string;

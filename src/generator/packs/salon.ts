@@ -10,13 +10,15 @@ export function salonVariant(primaryType: string | undefined, types: string[], n
   const n = name.toLowerCase();
   if (all.includes("pet_care") || all.includes("pet_store") || /\b(groom\w*|pets?|paws?|dogs?|doggy|k-?9|canine|puppy|furry)\b/.test(n)) return "pet";
   if (all.includes("nail_salon") || /\bnails?\b/.test(n)) return "nails";
+  if (/\b(massage|bodywork|reflexology)\b/.test(n)) return "massage";
+  if ((all.includes("massage") || all.includes("spa") || all.includes("day_spa") || /\bspa\b/.test(n)) && !/\b(salon|hair|beauty|barber)/.test(n)) return "massage";
   const barber = all.includes("barber_shop") || /\bbarber/.test(n);
   const salon = all.includes("hair_salon") || all.includes("beauty_salon") || /\b(salon|hair|beauty|studio)\b/.test(n);
   if (barber && salon && /\b(salon|beauty)\b/.test(n)) return "both";
   return barber ? "barber" : "salon";
 }
 
-const LABEL: Record<string, string> = { barber: "Barbershop", salon: "Hair salon", both: "Barber & beauty", nails: "Nail salon", pet: "Pet grooming" };
+const LABEL: Record<string, string> = { barber: "Barbershop", salon: "Hair salon", both: "Barber & beauty", nails: "Nail salon", pet: "Pet grooming", massage: "Massage therapy" };
 
 const SEEDS: Record<string, string[]> = {
   barber: ["Haircut", "Skin fade", "Beard trim", "Hot towel shave", "Kids cut", "Line-up"],
@@ -24,6 +26,7 @@ const SEEDS: Record<string, string[]> = {
   both: ["Haircut", "Fade", "Beard trim", "Women's cut & style", "Color", "Highlights"],
   nails: ["Manicure", "Pedicure", "Gel polish", "Acrylic full set", "Fill-in", "Nail art"],
   pet: ["Full groom", "Bath & brush", "Nail trim", "De-shedding", "Puppy's first groom", "Teeth brushing"],
+  massage: ["Relaxation massage", "Deep tissue massage", "Hot stone massage", "Couples massage", "Chair massage", "Gift certificates"],
 };
 
 /** What "your work" looks like for each kind of shop, for owner to-dos. */
@@ -33,6 +36,7 @@ const WORK_PHOTOS: Record<string, string> = {
   both: "cuts and color you're proud of",
   nails: "nail sets you're proud of",
   pet: "freshly groomed pets (with their owners' OK)",
+  massage: "your treatment rooms and front desk",
 };
 
 export function seedSalonServices(variant: string): Service[] {
@@ -75,9 +79,9 @@ export const salonPack: CategoryPack = {
   hasForm: () => false,
   looks: ["salon.porch_light", "salon.night_shift", "salon.main_street", "salon.color_bar"],
   defaultLook: (r) =>
-    ({ barber: "salon.night_shift", both: "salon.main_street", nails: "salon.color_bar", pet: "salon.main_street" })[r.variant] ?? "salon.porch_light",
+    ({ barber: "salon.night_shift", both: "salon.main_street", nails: "salon.color_bar", pet: "salon.main_street", massage: "salon.porch_light" } as Record<string, string>)[r.variant] ?? "salon.porch_light",
   variantLabel: (r) => LABEL[r.variant] ?? "Hair salon",
-  schemaType: (r) => (r.variant === "nails" ? "NailSalon" : r.variant === "pet" ? "LocalBusiness" : "HairSalon"),
+  schemaType: (r) => (r.variant === "nails" ? "NailSalon" : r.variant === "pet" ? "LocalBusiness" : r.variant === "massage" ? "DaySpa" : "HairSalon"),
   schemaExtras: () => ({}),
   homeTitle(r) {
     const l = LABEL[r.variant] ?? "Hair salon";
@@ -117,6 +121,7 @@ ${ctx.copy.heroSub ? html`<p class="lead">${ctx.copy.heroSub}</p>` : ""}
 ${cardGrid(r.services.map((s, i) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], price: prices[i] })))}
 ${confirmed ? "" : todo(ctx, "Send us your services and prices", "List what you offer and what you charge (or \"from $\" prices). We'll set it up so people can see it on their phones.", true)}
 ${walk ? "" : todo(ctx, "Walk-ins or appointments?", "Tell us whether you take walk-ins, appointments, or both. It's the first thing new customers want to know.", true)}
+${r.variant === "massage" && !r.licenses.length ? todo(ctx, "Send us your Alabama license number", "Alabama asks massage businesses to show their license number in ads, so we'll put it at the bottom of every page.", true) : ""}
 ${r.links.booking ? "" : todo(ctx, "Add your booking link", "If you use Square, Booksy, Vagaro or similar, send us the link and the Book button will open it.")}
 </div></section>
 ${reviews(ctx, true)}
@@ -132,12 +137,16 @@ ${ctaBand(ctx, actions(r, [primary(r), primary(r) === "book" ? "call" : "directi
     voice:
       r.variant === "barber"
         ? "Warm, plain and a bit casual, like a barber talking to a regular. Short sentences. Never invent prices, durations, licenses, awards or years."
+        : r.variant === "massage"
+          ? "Calm, warm and plain. Short sentences. Never make medical or health claims (no 'cures', 'treats', 'heals', 'relieves pain', no conditions), and never invent prices, durations, techniques offered, licenses or years."
         : r.variant === "pet"
           ? "Warm and friendly, talking to pet owners who want their dog or cat treated gently. Short sentences. Never invent prices, breeds served, certifications, awards or years."
           : "Warm, plain and a little polished. Short sentences. Never invent prices, durations, licenses, awards, products or years.",
     fields: {
       heroTagline: `6-12 words under the name saying what the shop does and for whom, naming the town. e.g. "${
-        r.variant === "pet"
+        r.variant === "massage"
+          ? `Relaxing massage in a quiet space in ${r.address.city}`
+          : r.variant === "pet"
           ? `Gentle grooming for dogs and cats in ${r.address.city}`
           : r.variant === "nails"
             ? `Manicures, pedicures and nail art in ${r.address.city}`

@@ -203,7 +203,7 @@
     meta = meta || (await api("/meta"));
     if (!document.getElementById("leads")) {
       $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="due"></div><div id="runs"></div></div><div><section>
-        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a></div>
+        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/playbook">💬 Plans & answers</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
@@ -474,6 +474,7 @@
           ${ready ? `<a class="btn btn--primary" href="#/pitch/${l.id}">Call guide</a>` : ""}
           <a class="btn${ready ? "" : " btn--primary"}" href="${telHref(r ? r.phone.e164.slice(2) : l.phone)}">📞 Call ${esc(r ? r.phone.display : l.phone)}</a>
           ${r ? `<a class="btn" href="${esc(r.mapsUrl)}" target="_blank" rel="noopener">Google listing</a>` : ""}
+          ${open ? `<a class="btn" href="#/playbook">💬 Plans & answers</a>` : ""}
         </div>
       </section>
       <section class="card"><h2>Sales status</h2>
@@ -628,6 +629,7 @@
     const isA = cat === "auto";
     const isL = cat === "landscaping";
     const isK = cat === "cleaning";
+    const isM = isS && r.variant === "massage";
     const serviceArea = isC || isL || isK;
     const hasServices = !isR;
     const hasTowns = isC || isL || isK || isA;
@@ -677,7 +679,7 @@
         ${isS ? `<label class="field">Walk-ins or appointments?<select name="walkIns"><option value="">Not set yet</option>${[["welcome", "Walk-ins welcome"], ["appointment_only", "By appointment only"], ["both", "Both"]].map(([v, label]) => `<option value="${v}"${ext.walkIns === v ? " selected" : ""}>${label}</option>`).join("")}</select></label>` : ""}
         ${isC || isL || isK ? cb("insured", "Insured", !!r.insured) : ""}
         ${isK ? cb("bonded", "Bonded", !!r.bonded) : ""}
-        ${isC || isL ? `<div class="row"><label class="field">License type<input name="licenseLabel" value="${esc(lic.label || "")}" placeholder="${isC ? "AL Plumbing License" : "License"}"></label>
+        ${isC || isL || isM ? `<div class="row"><label class="field">License type<input name="licenseLabel" value="${esc(lic.label || "")}" placeholder="${isC ? "AL Plumbing License" : isM ? "AL Massage Therapist License" : "License"}"></label>
           <label class="field">License #<input name="licenseNumber" value="${esc(lic.number || "")}"></label></div>` : ""}
         ${isC ? cb("emergencyService", "Offers emergency service", !!ext.emergencyService) : ""}
         ${isA ? `${cb("ase", "ASE-certified", !!ext.ase)}
@@ -752,7 +754,7 @@
           familyOwned: on("familyOwned"),
           insured: on("insured"),
           bonded: on("bonded"),
-          license: isC || isL ? (val("licenseNumber") ? { label: val("licenseLabel") || "License", number: val("licenseNumber") } : null) : undefined,
+          license: isC || isL || isM ? (val("licenseNumber") ? { label: val("licenseLabel") || "License", number: val("licenseNumber") } : null) : undefined,
           emergencyService: on("emergencyService"),
           freeEstimates: on("freeEstimates"),
           walkIns: isS ? val("walkIns") || null : undefined,
@@ -811,6 +813,7 @@
         <button class="btn" id="copy">Copy preview link</button>
       </div>
       <p class="small muted">Only text the link after they say it's OK. The link works for 14 days.</p>
+      <p><a class="btn btn--small" href="#/playbook">💬 Plans & answers</a></p>
       ${isOwner() && (!s.companyName || !s.monthlyPrice) ? `<div class="card small">Add your company name, your name and your prices in <a href="#/settings">Settings</a> so the guide can use them.</div>` : ""}
       ${l.notes.length ? `<section class="card"><h2>Earlier calls</h2>${l.followUp ? `<p>${followChip(l.followUp)}</p>` : ""}${notesHtml(l, 3)}</section>` : ""}
       <div id="guide"><div class="card"><span class="spin"></span> Writing the call guide for ${esc(r.name)}… (about 20 seconds)</div></div>`;
@@ -852,7 +855,7 @@
         <section class="card"><h2>What we already built</h2>${list(pitch.whatWeBuilt)}<a class="btn btn--small" href="#/preview/${id}">Open the preview</a></section>
       </div>
       <section class="card"><h2>Questions to ask</h2>${list(pitch.questionsToAsk)}</section>
-      <section class="card"><h2>If they say…</h2>${pitch.objections.map((o) => `<details class="obj"><summary>“${esc(o.objection)}”</summary><p>${esc(o.response)}</p></details>`).join("")}</section>
+      <section class="card"><h2>If they say…</h2><p class="small"><a href="#/playbook">💬 All plans & common answers</a></p>${pitch.objections.map((o) => `<details class="obj"><summary>“${esc(o.objection)}”</summary><p>${esc(o.response)}</p></details>`).join("")}</section>
       <section class="card opener"><h2>Ask for the yes</h2><p class="big">${esc(pitch.close)}</p></section>
       <section class="card"><h2>Don't say</h2>${list(pitch.avoid)}</section>
       ${l.salesStatus !== "live" ? signupCardHtml(l) + logCardHtml(l) : ""}
@@ -860,6 +863,147 @@
     bindLog(l, () => go("#/lead/" + id));
     bindSignup(l, () => go("#/lead/" + id));
     document.getElementById("regen").addEventListener("click", () => viewPitch(id, true));
+  }
+
+  /* ---------- plans & answers (for callers) ---------- */
+  // Selling points by plan tier. Prices, names and "what's included" come live from Settings.
+  const PLAN_PITCH = {
+    basic: {
+      fit: "A business that just needs to be found on Google and get the phone ringing.",
+      points: [
+        "No big bill up front: no setup fee on the 12-month plan. A custom website usually costs $1,500 to $5,000 before hosting.",
+        "We handle hosting, security and updates. They never have to touch a computer.",
+        "Need a change? Text us: hours, holiday closures, a new photo.",
+        "Built for phones, with tap-to-call and directions on every page.",
+      ],
+      line: "If it brings you one new customer a month, it's paid for itself.",
+    },
+    plus: {
+      fit: "Most businesses. Anyone who gets customers from Google Maps (restaurants, salons, shops, auto, trades).",
+      points: [
+        "A monthly text showing how many people looked at their site and tapped to call or get directions. Proof it's working.",
+        "We tune up their Google listing (hours, photos, services, description). That's where most local customers find them, and it's a $149 job on its own.",
+        "Review QR cards for the counter. More reviews push them higher on Google Maps.",
+      ],
+      line: "Most folks pick Plus. It's the website plus getting you found on Google Maps.",
+    },
+    pro: {
+      fit: "Busy owners who want it all handled, and businesses in a crowded field (roofing, HVAC, restaurants).",
+      points: [
+        "We post on their Google profile every month and keep photos fresh. Active profiles tend to show up more.",
+        "Their own domain name and email (like name@theirbusiness.com). Looks established.",
+        "Their changes go to the front of the line.",
+        "Agencies charge $100 to $400 a month just to manage a Google profile.",
+      ],
+      line: "You run the business. We'll keep you looking sharp online every month.",
+    },
+  };
+
+  const PLAN_QUESTIONS = [
+    ["Tight budget, or only wants the basics?", "Basic"],
+    ["Most of their customers find them on Google or Maps?", "Plus"],
+    ["Wants proof it's working?", "Plus (monthly report)"],
+    ["Wants everything done for them, or has lots of competition?", "Pro"],
+    ["Already owns a domain name, or wants a business email?", "Pro (or add the email extra)"],
+  ];
+
+  // Common things owners say on the call, and an honest answer to each.
+  function playbookObjections(s, plans) {
+    const cheapest = plans.reduce((a, p) => (p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
+    const low = cheapest ? `${esc(cheapest.name)} is ${money(cheapest.monthly)} a month, about ${money(Math.round((cheapest.monthly * 12 / 365) * 100) / 100)} a day` : "Our starter plan is low monthly";
+    const min = s.minMonths ?? 12;
+    const flex = s.flexSetup ?? 299;
+    const us = s.companyName || "we";
+    return [
+      ["“I don't need a website. I get plenty of business from word of mouth.”",
+        "That's great, word of mouth is the best kind. But when someone hears about you, the first thing they do is look you up on their phone. This makes sure they find your hours and number right away, and not the place down the road."],
+      ["“I already have a Facebook page.”",
+        "Keep it! We link to it from the site. But a lot of people aren't on Facebook, and Facebook pages don't show up well on Google. The website is yours, it shows up on Google, and it works for everybody."],
+      ["“It's too expensive.” / “I can't afford it right now.”",
+        `I hear you. ${low}, with no setup fee on the ${min}-month plan. If it brings you one customer a month, it pays for itself. Want to start there? You can move up any time.`],
+      ["“I don't want a contract.” / “A year is too long.”",
+        `No problem. You can go month to month: same monthly price, a one-time ${money(flex)} setup, and cancel any time with 30 days' notice.`],
+      ["“I need to think about it.”",
+        "Of course. Can I ask what you want to think over: the price, or whether it'll bring in business? (Answer that.) I'll text you the preview so you can look at it tonight. Is Thursday good for a quick call back? (Log the callback.)"],
+      ["“I need to talk to my wife / husband / partner.”",
+        "Makes sense. I'll text you the preview link so you can show them on your phone. When's a good time to call back after you've both looked? (Log the callback.)"],
+      ["“Just send me some information.” / “Email me something.”",
+        "Sure. Better than a brochure, I'll text you your actual website. It only takes a minute to look at. (Text the preview link, then set a callback for 2 or 3 days.)"],
+      ["“My nephew / a friend can build me one.”",
+        "That works for some folks. The difference is we keep it running every month: hosting, security, and changes when you text us, without waiting on anybody's free time. And yours is already built. You can see it right now."],
+      ["“I already have a website.”",
+        "Read the lead's reason line first. If it's broken, old or not made for phones, say what's wrong: “I pulled it up and it [doesn't load / is hard to use on a phone]. Most people look you up on their phone, so that's costing you calls.” If they own the domain, it stays theirs. We just point it at the new site."],
+      ["“I'm too busy for this.”",
+        "That's the point: it takes almost nothing from you. It's already built. All I need is a few minutes to check your hours and services. After that, you just text us changes."],
+      ["“I'm not good with computers.”",
+        "You don't have to be. We do all of it. If you want something changed, you text us like you'd text a friend."],
+      ["“Is this a scam?” / “I've been burned before.”",
+        `Fair question. ${s.companyName ? `${esc(s.companyName)} is a local company here in Cullman.` : "We're local, here in Cullman."} You can see your site before you pay anything, nothing goes live until you say so, and you sign up and pay through a secure link. I never take card numbers over the phone.`],
+      ["“Do I own it?” / “What if I cancel?”",
+        `Your name, logo, photos and text are always yours, and a domain you own stays in your name. ${min ? `After the first ${min} months you can cancel any time with 30 days' notice` : "You can cancel any time with 30 days' notice"}, and we'll send you a copy of the site's files if you ask.`],
+      ["“Can you guarantee more customers?”",
+        "Nobody honest can promise that. What I can tell you is that it's built to show up on Google and make it easy to call you, and with Plus you get a text every month showing how many people looked and tapped to call."],
+      ["“Can I make changes myself?”",
+        "You don't need to. Text us and we'll do it. Small changes like hours, prices and photos are included in every plan."],
+      ["“Business is good. I'm not taking new customers.”",
+        "Good to hear! A site still saves you phone time: people see your hours, services and directions before they call. And it keeps you strong if things slow down."],
+      ["“Why does it cost money every month?”",
+        "The monthly covers hosting, security, keeping it working on new phones, and your changes. You never get hit with a surprise bill to fix something. If you pay for the year, you get 2 months free."],
+      ["“I'm not interested.”",
+        `No problem at all. I built this one for you either way, so can I text you the link in case you change your mind? (If they say no, thank them and log “Not interested”. Never push past a second no.)`],
+    ];
+  }
+
+  async function viewPlaybook() {
+    setNav("home");
+    const s = meta.settings;
+    const plans = s.plans.length ? s.plans : SUGGESTED_PLANS;
+    const min = s.minMonths ?? 12;
+    const flex = s.flexSetup ?? 299;
+    const free = s.annualMonthsFree ?? 2;
+    const perDay = (m) => money(Math.round((m * 12 / 365) * 100) / 100);
+    const planCard = (p) => {
+      const pitch = PLAN_PITCH[p.id] || { fit: "", points: [], line: "" };
+      const includes = String(p.includes || "").split("\n").map((x) => x.trim()).filter(Boolean);
+      return `<section class="card${p.id === "plus" ? " opener" : ""}"><h2>${esc(p.name)}: ${money(p.monthly)}/month${p.id === "plus" ? " ⭐ most pick this" : ""}</h2>
+        <p class="small muted">${p.setup ? `${money(p.setup)} setup` : "No setup fee"} on the ${min ? `${min}-month` : "monthly"} plan · about ${perDay(p.monthly)} a day</p>
+        ${pitch.fit ? `<p><strong>Good for:</strong> ${esc(pitch.fit)}</p>` : ""}
+        ${includes.length ? `<p><strong>What they get</strong></p><ul class="list">${includes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        ${pitch.points.length ? `<p><strong>Why it's worth it</strong></p><ul class="list">${pitch.points.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        ${pitch.line ? `<p class="big">“${esc(pitch.line)}”</p>` : ""}</section>`;
+    };
+    const ways = [
+      min ? [`${min}-month plan`, `The normal way. Monthly price, ${plans.some((p) => p.setup) ? "setup fee as listed" : "no setup fee"}, then cancel any time after ${min} months.`] : ["Monthly", "Monthly price, cancel any time."],
+      min && flex ? ["Month to month", `For people who hate contracts. Same monthly price plus a one-time ${money(flex)} setup. Cancel any time.`] : null,
+      free ? [`Pay yearly (${free} months free)`, `For people who like to pay once and save. They pay for ${12 - free} months and get 12. ${plans.map((p) => `${esc(p.name)} ${money(p.monthly * (12 - free))}/year`).join(" · ")}`] : null,
+    ].filter(Boolean);
+    const objections = playbookObjections(s, plans);
+    $app.innerHTML = `<p><a href="#/" id="back">← Back</a></p>
+      <h1>Plans & answers</h1>
+      <p class="muted">What each plan gets them, why it's worth it, and what to say when they push back.</p>
+      <section class="card"><h2>Which plan fits?</h2><p class="small muted">Lead with the middle plan. Go down if price is the worry, up if they want it all done for them.</p>
+        <ul class="list">${PLAN_QUESTIONS.map(([q, a]) => `<li>${esc(q)} → <strong>${esc(a)}</strong></li>`).join("")}</ul></section>
+      ${plans.map(planCard).join("")}
+      <section class="card"><h2>Ways to pay</h2><ul class="list">${ways.map(([t, d]) => `<li><strong>${esc(t)}:</strong> ${d}</li>`).join("")}</ul>
+        <p class="small muted">Send the sign-up link from the call guide. They pick the plan and the way to pay, read the agreement, and pay by a secure link. Never take card numbers over the phone.</p></section>
+      ${s.addons && s.addons.length ? `<section class="card"><h2>Extras</h2><ul class="list">${s.addons.map((a) => `<li>${esc(a.name)}: <strong>${money(a.price)}${esc(UNIT_LABEL[a.unit] || "")}</strong></li>`).join("")}</ul></section>` : ""}
+      <section class="card"><h2>If they say…</h2>
+        <label class="field">Find an answer<input id="objq" type="search" placeholder="price, contract, Facebook…" autocomplete="off"></label>
+        <div id="objs">${objections.map(([q, a]) => `<details class="obj"><summary>${esc(q)}</summary><p>${a}</p></details>`).join("")}</div></section>
+      <section class="card"><h2>Always</h2><ul class="list">
+        <li>Be friendly and honest. Never promise rankings, customers or dates.</li>
+        <li>Only text the preview link after they say it's OK.</li>
+        <li>Log every call, and set a callback when they ask for one.</li>
+        <li>Never take card numbers over the phone.</li></ul></section>`;
+    $app.querySelector("#back").addEventListener("click", (e) => { if (history.length > 1) { e.preventDefault(); history.back(); } });
+    $app.querySelector("#objq").addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      $app.querySelectorAll("#objs details").forEach((d) => {
+        const hit = !q || d.textContent.toLowerCase().includes(q);
+        d.hidden = !hit;
+        d.open = !!q && hit;
+      });
+    });
   }
 
   /* ---------- Google Business Profile ---------- */
@@ -989,7 +1133,7 @@
   }
 
   /* ---------- add a business by hand ---------- */
-  const PACKS = [["restaurant", "Restaurant, cafe or food truck"], ["contractor", "Contractor (plumbing, HVAC, roofing, electrical)"], ["salon", "Salon, barber, nails or pet grooming"], ["auto", "Auto repair or tires"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning service"]];
+  const PACKS = [["restaurant", "Restaurant, cafe, bakery or food truck"], ["contractor", "Contractor or home service (plumbing, HVAC, painting, concrete, tree, pest…)"], ["salon", "Salon, barber, nails, massage or pet grooming"], ["auto", "Auto repair, body shop, detailing, towing or small engine"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning or pressure washing"]];
   const PRESENCE = { none: ["No website", "chip--good"], social: ["Only a social page", "chip--good"], free_builder: ["Free-builder site", "chip--warn"], has_site: ["Has a website", "chip--warn"] };
 
   async function viewAdd() {
@@ -1363,6 +1507,7 @@
       if ((m = /^#\/edit\/([a-z0-9]+)$/.exec(h))) return await viewEdit(m[1]);
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
+      if (h === "#/playbook") return await viewPlaybook();
       if (h === "#/route") return await viewRoute();
       if (h === "#/add") return await viewAdd();
       if ((m = /^#\/gbp\/([a-z0-9]+)$/.exec(h))) return await viewGbp(m[1]);
