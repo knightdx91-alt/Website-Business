@@ -13,8 +13,10 @@ import { newId, now, type Env, type Job } from "./env.ts";
 const SEARCH_PAGES = 2;
 
 export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>): Promise<void> {
-  const run = await env.DB.prepare("SELECT status FROM runs WHERE id = ?").bind(job.runId).first<{ status: string }>();
+  const run = await env.DB.prepare("SELECT status, cap, categories FROM runs WHERE id = ?").bind(job.runId).first<{ status: string; cap: number; categories: string }>();
   if (!run || run.status === "cancelled") return;
+  // Split the cap fairly so one category can't use up the whole run.
+  const categoryCap = Math.ceil(run.cap / Math.max(1, run.categories.split(",").length));
   const category = job.category as CategoryId;
   try {
     const places = await searchText(env.GOOGLE_PLACES_API_KEY, {
@@ -30,7 +32,11 @@ export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>)
     for (const lead of qualify(places)) {
       const exists = await env.DB.prepare("SELECT 1 FROM leads WHERE place_id = ?").bind(lead.place.id).first();
       if (exists) continue;
-      const slot = await env.DB.prepare("UPDATE runs SET queued = queued + 1 WHERE id = ? AND queued < cap RETURNING queued").bind(job.runId).first();
+      const slot = await env.DB.prepare(
+        "UPDATE runs SET queued = queued + 1 WHERE id = ? AND queued < cap AND (SELECT COUNT(*) FROM leads WHERE run_id = ? AND category = ?) < ? RETURNING queued",
+      )
+        .bind(job.runId, job.runId, category, categoryCap)
+        .first();
       if (!slot) break;
       const p = lead.place;
       const id = newId();
