@@ -123,3 +123,33 @@ test("fully confirmed site with owner content publishes", async () => {
   assert.ok(out.files.has("sitemap.xml"));
   assert.ok((out.files.get("index.html") as string).includes('rel="canonical" href="https://s.pages.dev/"'));
 });
+
+test("basePath prefixes internal links and assets for previews", async () => {
+  const out = await buildSite({ record: restaurantRecord(), copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview", basePath: "/p/abc" });
+  const home = out.files.get("index.html") as string;
+  assert.ok(home.includes('href="/p/abc/assets/site.css"'));
+  assert.ok(home.includes('href="/p/abc/menu/"'));
+  assert.ok(home.includes('href="tel:+12565550123"'));
+  assert.ok(!/(href|src)="\/(?!p\/abc|\/)/.test(home), "no unprefixed internal links");
+  assert.ok((out.files.get("assets/site.css") as string).includes("url(/p/abc/assets/fonts/"));
+  assert.ok(![...out.files.keys()].some((k) => k.startsWith("assets/fonts/")), "fonts left out when loadFont is omitted");
+});
+
+test("suggested to-dos show in previews but don't block publishing", async () => {
+  const record = restaurantRecord({
+    confirmed: ["name", "phone", "address", "hours", "menu"],
+    ext: { restaurant: { serviceOptions: {}, menu: { sections: [{ name: "Plates", items: [{ name: "Plate", price: "$9" }] }], lastUpdated: "October 2026" } } },
+  });
+  const preview = await buildSite({ record, copy: sampleCopy({ approved: false }), site: { slug: "s", look: "" }, mode: "preview" });
+  assert.ok(preview.suggestions.includes("Add 3 customer quotes"));
+  assert.ok(preview.suggestions.includes("Tell us your story"));
+  assert.deepEqual(preview.todos, []);
+  const out = await buildSite({ record, copy: sampleCopy({ approved: true }), site: { slug: "s", look: "" }, mode: "publish", loadFont });
+  assert.ok(!(out.files.get("index.html") as string).includes("data-todo"));
+});
+
+test("menu is required before a restaurant can publish", async () => {
+  const record = restaurantRecord({ confirmed: ["name", "phone", "address", "hours"] });
+  const preview = await buildSite({ record, copy: sampleCopy({ approved: true }), site: { slug: "s", look: "" }, mode: "preview" });
+  assert.ok(preview.todos.includes("Send us your menu"));
+});

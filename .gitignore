@@ -3,3 +3,4 @@ out/
 .env
 *.log
 .wrangler/
+app/public/fonts/

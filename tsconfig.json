@@ -6,11 +6,22 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
-    "lib": ["es2023", "dom"],
-    "types": ["node"],
+    "lib": [
+      "es2023",
+      "dom"
+    ],
+    "types": [
+      "node"
+    ],
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src", "scripts", "test"]
+  "include": [
+    "src/generator",
+    "src/places",
+    "src/copy",
+    "scripts",
+    "test"
+  ]
 }

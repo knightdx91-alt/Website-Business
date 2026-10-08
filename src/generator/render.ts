@@ -17,14 +17,17 @@ export interface BuildInput {
   mode: BuildMode;
   formEndpoint?: string;
   reviewTexts?: string[];
-  /** Returns the bytes of an @fontsource woff2 file, e.g. "zilla-slab-latin-700-normal.woff2". */
-  loadFont: (pkg: string, file: string) => Promise<Uint8Array>;
+  /** Returns the bytes of an @fontsource woff2 file. Omit to leave fonts out (previews serve them separately). */
+  loadFont?: (pkg: string, file: string) => Promise<Uint8Array>;
+  /** Prefix for every internal link and asset, e.g. "/p/abc123" when a preview is served under a path. */
+  basePath?: string;
 }
 
 export interface BuildOutput {
   files: Map<string, string | Uint8Array>;
   lint: LintResult;
   todos: string[];
+  suggestions: string[];
   look: string;
 }
 
@@ -84,6 +87,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     mode: input.mode,
     site: { ...input.site, look },
     todos: [],
+    suggestions: [],
     formEndpoint: input.formEndpoint,
     hasForm: pack.hasForm(input.record),
   };
@@ -154,10 +158,12 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   const css = buildCss(theme);
   files.set("assets/site.css", css);
   files.set("assets/site.js", CLIENT_SCRIPT);
-  for (const f of [theme.fonts.heading, theme.fonts.body]) {
-    for (const w of f.weights) {
-      const name = fontFileName(f, w);
-      files.set(`assets/fonts/${name}`, await input.loadFont(f.pkg, name));
+  if (input.loadFont) {
+    for (const f of [theme.fonts.heading, theme.fonts.body]) {
+      for (const w of f.weights) {
+        const name = fontFileName(f, w);
+        files.set(`assets/fonts/${name}`, await input.loadFont(f.pkg, name));
+      }
     }
   }
 
@@ -191,5 +197,19 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   if (input.mode === "publish" && (lint.errors.length || lint.publishBlockers.length)) {
     throw new Error(`Publish blocked:\n- ${[...lint.errors, ...lint.publishBlockers].join("\n- ")}`);
   }
-  return { files, lint, todos: [...new Set(ctx.todos)], look };
+  if (input.basePath) {
+    const base = input.basePath.replace(/\/+$/, "");
+    for (const [path, content] of files) {
+      if (typeof content !== "string") continue;
+      if (path.endsWith(".html")) files.set(path, content.replace(/\b(href|src|action)="\/(?!\/)/g, `$1="${base}/`));
+      else if (path.endsWith(".css")) files.set(path, content.replace(/url\(\/assets\//g, `url(${base}/assets/`));
+    }
+  }
+  return { files, lint, todos: [...new Set(ctx.todos)], suggestions: [...new Set(ctx.suggestions)], look };
+}
+
+/** Every font file a look needs, so callers can serve or bundle them. */
+export function fontFilesFor(lookId: string): Array<{ pkg: string; file: string }> {
+  const t = resolveTheme(lookId);
+  return [t.fonts.heading, t.fonts.body].flatMap((f) => f.weights.map((w) => ({ pkg: f.pkg, file: fontFileName(f, w) })));
 }

@@ -114,7 +114,7 @@ function menuHighlights(ctx: Ctx): ReturnType<typeof html> {
   if (!menu) {
     return html`<section class="section section--surface" id="menu" aria-labelledby="menu-title"><div class="wrap">
 ${sectionHead("On the menu", "What we're serving")}
-${todo(ctx, "Send us your menu", "Snap a photo of your printed menu and we'll type it in, with prices, so people can read it on their phones and find it on Google.")}
+${todo(ctx, "Send us your menu", "Snap a photo of your printed menu and we'll type it in, with prices, so people can read it on their phones and find it on Google.", true)}
 <div class="btns">${button(menuBtn, "secondary")}${button(action(ctx.r, "call")!, "ghost")}</div>
 </div></section>`;
   }
@@ -144,7 +144,7 @@ ${menu.sections.map(
   )}</ul></section>`,
 )}
 <p class="muted">Menu updated ${menu.lastUpdated}. Prices and items can change.</p>`
-    : html`${todo(ctx, "Send us your menu", "We'll type your full menu here, grouped by section with prices, so it's easy to read on a phone.")}
+    : html`${todo(ctx, "Send us your menu", "We'll type your full menu here, grouped by section with prices, so it's easy to read on a phone.", true)}
 <p class="lead">Call us for today's menu and specials.</p>`;
   return {
     path: "/menu/",

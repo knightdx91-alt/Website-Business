@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "website-business",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./app/public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/p/*", "/f/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "website-business",
+      "database_id": "057913fc-bab4-452e-8721-107c170db74f",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "website-business-sites" }],
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "website-business-jobs" }],
+    "consumers": [
+      {
+        "queue": "website-business-jobs",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_concurrency": 4,
+        "max_retries": 2
+      }
+    ]
+  },
+  "triggers": { "crons": ["17 8 * * *"] },
+  "vars": { "CF_ACCOUNT_ID": "04d2dbe746314a8494bd7977db7392da" },
+  "observability": { "enabled": true }
+}

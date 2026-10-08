@@ -104,8 +104,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Site generator core + restaurant and contractor packs (`src/generator`), Places
       search/qualify (`src/places`), Claude copy writer (`src/copy`). Tested on real
       Cullman leads: 19 restaurant and 16 contractor leads found.
+- [x] Cloudflare app: live at https://website-business.knightdx91.workers.dev
+      (Worker API + queue pipeline, D1/R2 storage, phone PWA, Pages publish, form inbox)
 - [ ] Packs for salons, auto, landscaping, cleaning
-- [ ] Cloudflare app: Worker API + queue pipeline, D1/R2 storage, phone UI, publish
 
 ## Code map
 
@@ -119,3 +120,25 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - `npm test` · `npm run typecheck` · `npm run demo -- --category restaurant --limit 3 --out <dir>`
   then `CHROMIUM_PATH=... npx tsx scripts/screenshot.ts <dir>/sites <dir>/shots`.
 - Never write demo output (Google data, photos) into the repo; use a scratch dir.
+
+## The app (Cloudflare)
+
+- `src/worker/index.ts`: router. `/api/*` JSON API (owner login via signed cookie;
+  mutating calls need header `x-wb: 1`), `/p/<leadId>/*` private previews from R2,
+  `/f/<leadId>` lead-form posts from published sites, queue consumer, daily cron.
+- `src/worker/pipeline.ts`: queue jobs. `search` (Places → qualify → leads, capped per run)
+  then `build` (record → Claude copy → preview into R2 at `previews/<id>/`).
+- `src/worker/publish.ts` + `pages.ts`: publish gate, then Cloudflare Pages Direct Upload
+  over the REST API (same hashing as wrangler). Owner photos live at `owner/<id>/` in R2.
+- `src/worker/edits.ts`: zod-validated owner edits. `migrations/`: D1 schema.
+- `app/public/`: the phone PWA (vanilla JS, no build step). `npm run prepare:app` copies
+  site fonts into `app/public/fonts/` (gitignored) and renders icons.
+- Deploy: `npm run deploy`. Resources: D1 `website-business`, R2 `website-business-sites`,
+  queue `website-business-jobs`. Worker secrets: GOOGLE_PLACES_API_KEY, ANTHROPIC_API_KEY,
+  CF_API_TOKEN, APP_SECRET (set with `wrangler secret`; never in files).
+- Google data hygiene: photos are proxied live, never stored; the cron expires unsold leads
+  (new after 30 days, shown after 60), keeping only the Place ID.
+- Owner to-dos: `todo(ctx, …, required)` in components. Required ones block publishing;
+  suggested ones only show in previews as talking points.
+- Don't publish a real business for testing. Use a made-up record and delete the Pages
+  project afterwards.

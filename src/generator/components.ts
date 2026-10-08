@@ -12,8 +12,10 @@ export interface Ctx {
   theme: Theme;
   mode: BuildMode;
   site: Site;
-  /** Owner to-dos collected while rendering. Rendered in previews; publish fails if any exist. */
+  /** Required owner to-dos. Rendered in previews; publish fails while any exist. */
   todos: string[];
+  /** Suggested owner to-dos. Rendered in previews only; never block publishing. */
+  suggestions: string[];
   formEndpoint?: string;
   hasForm: boolean;
 }
@@ -29,8 +31,8 @@ export function button(a: Action, variant: "primary" | "secondary" | "ghost" = "
   }</a>`;
 }
 
-export function todo(ctx: Ctx, title: string, body: string): Raw {
-  ctx.todos.push(title);
+export function todo(ctx: Ctx, title: string, body: string, required = false): Raw {
+  (required ? ctx.todos : ctx.suggestions).push(title);
   if (ctx.mode === "publish") return raw("");
   return html`<div class="todo" data-todo><strong>${title}</strong>${body}</div>`;
 }
@@ -142,7 +144,7 @@ export function serviceArea(ctx: Ctx): Raw {
 ${sectionHead("Service area", county ? `Serving ${county}` : `Serving ${ctx.r.address.city} and nearby`, ctx.copy.serviceAreaIntro)}
 <ul class="towns">${sa.towns.map((t) => html`<li class="chip">${icon("pin", 16)}${t}</li>`)}</ul>
 <p>Not sure if we cover your area? <a href="${action(ctx.r, "call")!.href}">Call ${ctx.r.phone.display}</a> and ask.</p>
-${ctx.r.confirmed.includes("service_area") ? "" : todo(ctx, "Confirm your service area", "We listed towns near you. Tell us which ones you actually cover.")}
+${ctx.r.confirmed.includes("service_area") ? "" : todo(ctx, "Confirm your service area", "We listed towns near you. Tell us which ones you actually cover.", true)}
 </div></section>`;
 }
 
@@ -169,7 +171,7 @@ export function about(ctx: Ctx, title: string, label = "About us"): Raw {
   return html`<section class="section" id="about" aria-labelledby="about-title"><div class="wrap narrow">
 <span class="section__label">${label}</span><h2 class="section__title" id="about-title">${title}</h2>
 ${ctx.copy.about.map((p) => html`<p>${p}</p>`)}
-${todo(ctx, "Tell us your story", "Who started it, when, and what you're proud of. We'll turn it into a short, warm About section.")}
+${ctx.copy.approved ? "" : todo(ctx, "Tell us your story", "Who started it, when, and what you're proud of. We'll turn it into a short, warm About section.")}
 </div></section>`;
 }
 
