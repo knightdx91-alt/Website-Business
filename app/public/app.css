@@ -120,3 +120,8 @@ h3 { font-size: 1rem; margin: 0 0 6px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .top__brand .short { display: none; }
 @media (max-width: 420px) { .top__brand .long { display: none; } .top__brand .short { display: inline; } }
+.opener { border-left: 6px solid var(--accent); }
+.big { font-size: 1.15rem; line-height: 1.5; margin: 0; }
+.obj { border-top: 1px solid var(--line); padding: 10px 0; }
+.obj summary { font-weight: 700; cursor: pointer; min-height: 40px; display: flex; align-items: center; }
+.obj p { margin: 6px 0 0; }

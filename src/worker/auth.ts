@@ -87,3 +87,14 @@ export async function isLoggedIn(env: Env, req: Request): Promise<boolean> {
   if (!exp || !sig || Number(exp) < Date.now()) return false;
   return safeEqual(sig, await hmac(env.APP_SECRET, `owner.${exp}`));
 }
+
+/** Private preview link for one business owner. Expires; rotating APP_SECRET revokes every link. */
+export async function shareToken(env: Env, leadId: string, days = 14): Promise<string> {
+  const exp = Date.now() + days * 86_400_000;
+  return `${leadId}.${exp}.${await hmac(env.APP_SECRET, `share.${leadId}.${exp}`)}`;
+}
+
+export async function verifyShare(env: Env, leadId: string, exp: string, sig: string): Promise<boolean> {
+  if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
+  return safeEqual(sig, await hmac(env.APP_SECRET, `share.${leadId}.${exp}`));
+}

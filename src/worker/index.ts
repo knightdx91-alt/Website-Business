@@ -4,8 +4,12 @@ import { menuToText } from "../generator/menu.ts";
 import { packFor } from "../generator/packs/index.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import { CATEGORY_LABELS, QUERIES } from "../places/queries.ts";
-import { checkPassword, clearCookie, hasOwner, isLoggedIn, loginAllowed, recordLoginFailure, sessionCookie, setupOwner } from "./auth.ts";
-import { getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
+import Anthropic from "@anthropic-ai/sdk";
+import { writePitch } from "../copy/pitch.ts";
+import { reviewTexts } from "../places/to-record.ts";
+import type { Place } from "../places/client.ts";
+import { checkPassword, clearCookie, hasOwner, isLoggedIn, loginAllowed, recordLoginFailure, sessionCookie, setupOwner, shareToken, verifyShare } from "./auth.ts";
+import { addUsage, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
 import { HttpError, json, newId, now, type Env, type Job } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
@@ -47,6 +51,7 @@ function summary(l: LeadRow) {
     look: l.look,
     error: l.error,
     liveUrl: l.live_url,
+    hasPitch: !!l.pitch_json,
     todos: lint?.todos.length ?? 0,
     blockers: lint ? lint.publishBlockers.length + lint.errors.length : null,
     createdAt: l.created_at,
@@ -120,8 +125,23 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   }
 
   if (path === "/settings" && m === "PUT") {
-    const s = await body(req, z.object({ defaultCap: z.number().int().min(1).max(500), copyModel: z.enum(Object.keys(MODEL_PRICES) as [string, ...string[]]) }));
+    const s = await body(
+      req,
+      z.object({
+        defaultCap: z.number().int().min(1).max(500),
+        copyModel: z.enum(Object.keys(MODEL_PRICES) as [string, ...string[]]),
+        companyName: z.string().trim().max(80).optional(),
+        callerName: z.string().trim().max(60).optional(),
+        setupPrice: z.number().min(0).max(100_000).optional(),
+        monthlyPrice: z.number().min(0).max(10_000).optional(),
+        offerIncludes: z.string().trim().max(500).optional(),
+      }),
+    );
+    const before = await getSettings(env);
     await setSetting(env, "app_settings", JSON.stringify(s));
+    const salesKeys = ["companyName", "callerName", "setupPrice", "monthlyPrice", "offerIncludes"] as const;
+    // Call guides quote these, so saved guides are rewritten on next open.
+    if (salesKeys.some((k) => before[k] !== s[k])) await env.DB.prepare("UPDATE leads SET pitch_json = NULL WHERE pitch_json IS NOT NULL").run();
     return json({ ok: true });
   }
 
@@ -194,7 +214,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       return json({ ok: true });
     }
     if (action === "/status" && m === "POST") {
-      const { salesStatus } = await body(req, z.object({ salesStatus: z.enum(["new", "shown", "sold"]) }));
+      const { salesStatus } = await body(req, z.object({ salesStatus: z.enum(["new", "shown", "sold", "not_interested"]) }));
       if (lead.sales_status === "live") throw new HttpError(409, "This site is already live");
       await updateLead(env, id, { sales_status: salesStatus });
       return json({ ok: true });
@@ -234,6 +254,33 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       return json({ ok: true });
     }
     if (action === "/publish" && m === "POST") return json(await publishLead(env, lead, url.origin));
+    if (action === "/share" && m === "POST") {
+      if (lead.status !== "ready") throw new HttpError(409, "The preview isn't ready yet");
+      const token = await shareToken(env, id);
+      return json({ url: `${url.origin}/s/${token}/`, expiresInDays: 14 });
+    }
+    if (action === "/pitch" && (m === "GET" || m === "POST")) {
+      if (m === "GET" && lead.pitch_json) return json({ pitch: JSON.parse(lead.pitch_json) });
+      if (!lead.record_json || !lead.lint_json) throw new HttpError(409, "The preview isn't ready yet");
+      const settings = await getSettings(env);
+      const lint = JSON.parse(lead.lint_json) as { todos?: string[]; suggestions?: string[] };
+      const place = lead.place_json ? (JSON.parse(lead.place_json) as Place) : undefined;
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      const result = await writePitch(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }), {
+        record,
+        pack: packFor(record.category),
+        reason: lead.reason ?? "",
+        reviewContext: place ? reviewTexts(place) : [],
+        todos: lint.todos ?? [],
+        suggestions: lint.suggestions ?? [],
+        sales: settings,
+        model: settings.copyModel,
+      });
+      const price = MODEL_PRICES[result.model] ?? MODEL_PRICES["claude-opus-5-5"]!;
+      await addUsage(env, { aiIn: result.usage.input, aiOut: result.usage.output, costMicro: Math.round(result.usage.input * price.input + result.usage.output * price.output) });
+      await updateLead(env, id, { pitch_json: JSON.stringify(result.pitch) });
+      return json({ pitch: result.pitch });
+    }
     if (action === "/zip" && m === "GET") {
       const zip = await zipLead(env, lead, url.origin);
       const name = (lead.pages_project ?? lead.name ?? "site").replace(/[^a-z0-9-]+/gi, "-").toLowerCase();
@@ -277,6 +324,25 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   throw new HttpError(404, "Not found");
 }
 
+/** Serves a preview through a share link: rewrites internal links to the share path and adds a preview banner. */
+async function serveShared(env: Env, req: Request, leadId: string, token: string, rest: string): Promise<Response> {
+  const res = await servePreview(env, req, leadId, rest);
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.startsWith("text/html") && !type.startsWith("text/css")) return res;
+  let text = (await res.text()).split(`/p/${leadId}/`).join(`/s/${token}/`);
+  if (type.startsWith("text/html")) {
+    const lead = await getLead(env, leadId);
+    const settings = await getSettings(env);
+    const name = (lead?.name ?? "your business").replace(/[<>&"]/g, "");
+    const from = settings.companyName ? ` by ${settings.companyName.replace(/[<>&"]/g, "")}` : "";
+    const banner = `<div role="note" style="position:relative;z-index:60;background:#14213d;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 16px;text-align:center">Free preview made for ${name}${from}. Not live yet; photos and details will be checked with you first.</div>`;
+    text = text.replace(/<body([^>]*)>/, `<body$1>${banner}`);
+  }
+  const headers = new Headers(res.headers);
+  headers.delete("content-length");
+  return new Response(text, { status: res.status, headers });
+}
+
 async function expireStaleLeads(env: Env): Promise<void> {
   const cutoffNew = now() - 30 * 86_400_000;
   const cutoffShown = now() - 60 * 86_400_000;
@@ -303,6 +369,16 @@ export default {
         if (!(await isLoggedIn(env, req))) return Response.redirect(`${url.origin}/?next=${encodeURIComponent(url.pathname)}`, 302);
         if (!url.pathname.startsWith(`/p/${preview[1]}/`)) return Response.redirect(`${url.origin}/p/${preview[1]}/`, 301);
         return await servePreview(env, req, preview[1]!, preview[2] ?? "/");
+      }
+      const share = /^\/s\/([a-z0-9]+)\.(\d+)\.([A-Za-z0-9_-]+)(\/.*)?$/.exec(url.pathname);
+      if (share) {
+        const [, leadId, exp, sig, rest] = share as unknown as [string, string, string, string, string | undefined];
+        if (!(await verifyShare(env, leadId, exp, sig))) {
+          return new Response("This preview link has expired. Ask us for a new one.", { status: 410, headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex" } });
+        }
+        const token = `${leadId}.${exp}.${sig}`;
+        if (!rest) return Response.redirect(`${url.origin}/s/${token}/`, 301);
+        return await serveShared(env, req, leadId, token, rest);
       }
       const form = /^\/f\/([a-z0-9]+)$/.exec(url.pathname);
       if (form && req.method === "POST") return await handleFormPost(env, req, form[1]!);

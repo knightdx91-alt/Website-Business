@@ -108,6 +108,8 @@ export async function renderPreview(env: Env, lead: LeadRow, record: BusinessRec
     copy_json: JSON.stringify(copy),
     look: out.look,
     lint_json: JSON.stringify({ ...out.lint, todos: out.todos, suggestions: out.suggestions }),
+    // The call guide asks about what's still missing, so it's redone after any change.
+    pitch_json: null,
     name: record.name,
   });
 }

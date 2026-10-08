@@ -143,5 +143,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (new after 30 days, shown after 60), keeping only the Place ID.
 - Owner to-dos: `todo(ctx, …, required)` in components. Required ones block publishing;
   suggested ones only show in previews as talking points.
+- Call guide (`src/copy/pitch.ts`, `/api/leads/:id/pitch`): Claude-written talking points per lead
+  for the caller, cached in `leads.pitch_json`, cleared when the lead is rebuilt/edited or sales
+  settings (company, caller, prices) change. It describes the preview only from `previewFeatures`.
+- Share links: `/s/<leadId>.<exp>.<hmac>/` serves a preview without login for 14 days, with a
+  "Free preview" banner. Rotating APP_SECRET revokes all share links and logins.
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
   project afterwards.

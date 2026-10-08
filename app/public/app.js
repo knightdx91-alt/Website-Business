@@ -19,7 +19,7 @@
     return Math.round(h / 24) + " days ago";
   };
   const CATEGORY_LABEL = { restaurant: "Restaurant", contractor: "Contractor", salon: "Salon", auto: "Auto", landscaping: "Landscaping", cleaning: "Cleaning" };
-  const SALES = [["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["", "All"]];
+  const SALES = [["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
   // Rough Claude cost per site at Opus 5.5 rates, measured on real Cullman runs.
   const COST_PER_SITE = { restaurant: 0.04, contractor: 0.1, salon: 0.06, auto: 0.1, landscaping: 0.1, cleaning: 0.1 };
   const MODEL_FACTOR = { "claude-opus-5-5": 1, "claude-sonnet-5-5": 0.5, "claude-haiku-5-5": 0.03 };
@@ -142,6 +142,7 @@
 
   function statusChip(l) {
     if (l.salesStatus === "live") return `<span class="chip chip--good">● Live</span>`;
+    if (l.salesStatus === "not_interested") return `<span class="chip">Not interested</span>`;
     if (l.status === "queued") return `<span class="chip">Waiting</span>`;
     if (l.status === "building") return `<span class="chip"><span class="spin"></span> Building</span>`;
     if (l.status === "failed") return `<span class="chip chip--bad">Build failed</span>`;
@@ -155,8 +156,8 @@
       <div class="lead__meta">${esc(CATEGORY_LABEL[l.category] || l.category)} · ${esc(l.reason || "")} ${rating ? "· " + rating : ""}</div>
       <div class="lead__meta">${esc(l.address || "")}</div>
       <div class="btns btns--full">
-        <a class="btn btn--small" href="${telHref(l.phone)}">📞 Call</a>
-        ${l.status === "ready" ? `<a class="btn btn--small btn--primary" href="#/preview/${l.id}">Preview</a>` : ""}
+        ${l.status === "ready" ? `<a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a>` : `<a class="btn btn--small" href="${telHref(l.phone)}">📞 Call</a>`}
+        ${l.status === "ready" ? `<a class="btn btn--small" href="#/preview/${l.id}">Preview</a>` : ""}
         <a class="btn btn--small" href="#/lead/${l.id}">Details</a>
       </div></li>`;
   }
@@ -249,14 +250,15 @@
         ${l.rating ? `<p><span class="stars">★ ${l.rating.toFixed(1)}</span> on Google</p>` : ""}
         <p>${esc(l.address || "")}</p>
         <div class="btns btns--full">
-          <a class="btn btn--primary" href="${telHref(r ? r.phone.e164.slice(2) : l.phone)}">📞 Call ${esc(r ? r.phone.display : l.phone)}</a>
+          ${ready ? `<a class="btn btn--primary" href="#/pitch/${l.id}">Call guide</a>` : ""}
+          <a class="btn${ready ? "" : " btn--primary"}" href="${telHref(r ? r.phone.e164.slice(2) : l.phone)}">📞 Call ${esc(r ? r.phone.display : l.phone)}</a>
           ${r ? `<a class="btn" href="${esc(r.mapsUrl)}" target="_blank" rel="noopener">Google listing</a>` : ""}
         </div>
       </section>
       <section class="card"><h2>Sales status</h2>
         ${l.salesStatus === "live"
           ? `<p class="chip chip--good">● Live</p>`
-          : `<div class="tabs">${[["new", "New"], ["shown", "Shown"], ["sold", "Sold"]].map(([k, t]) => `<button type="button" data-status="${k}" class="${l.salesStatus === k ? "is-on" : ""}">${t}</button>`).join("")}</div>`}
+          : `<div class="tabs">${[["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["not_interested", "Not interested"]].map(([k, t]) => `<button type="button" data-status="${k}" class="${l.salesStatus === k ? "is-on" : ""}">${t}</button>`).join("")}</div>`}
       </section>
       <section class="card"><h2>Website</h2>
         ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p><button class="btn" data-act="retry">Try again</button>` : ""}
@@ -552,6 +554,89 @@
     });
   }
 
+  /* ---------- call guide ---------- */
+  async function shareLink(id) {
+    const { url } = await api(`/leads/${id}/share`, { method: "POST" });
+    return url;
+  }
+
+  async function viewPitch(id, regenerate) {
+    setNav("home");
+    const l = await api("/leads/" + id);
+    if (l.status !== "ready") return go("#/lead/" + id);
+    const r = l.record;
+    meta = meta || (await api("/meta"));
+    const s = meta.settings;
+    const phoneDigits = r.phone.e164.slice(2);
+    $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p>
+      <h1>Call guide: ${esc(r.name)}</h1>
+      <p class="muted">${esc(l.variantLabel || "")} · ${esc(l.reason || "")}</p>
+      <div class="btns btns--full" style="margin-bottom:14px">
+        <a class="btn btn--primary" href="${telHref(phoneDigits)}">📞 Call ${esc(r.phone.display)}</a>
+        <button class="btn" id="sms">Text preview link</button>
+        <button class="btn" id="copy">Copy preview link</button>
+      </div>
+      <p class="small muted">Only text the link after they say it's OK. The link works for 14 days.</p>
+      ${!s.companyName || !s.monthlyPrice ? `<div class="card small">Add your company name, your name and your prices in <a href="#/settings">Settings</a> so the guide can use them.</div>` : ""}
+      <div id="guide"><div class="card"><span class="spin"></span> Writing the call guide for ${esc(r.name)}… (about 20 seconds)</div></div>`;
+
+    const smsBody = (url) => {
+      const who = [s.callerName ? `this is ${s.callerName}` : "", s.companyName ? `with ${s.companyName}` : ""].filter(Boolean).join(" ");
+      return `Hi${who ? ", " + who : ""}. Here's the free website preview I made for ${r.name}: ${url}`;
+    };
+    $app.querySelector("#sms").addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      try {
+        const url = await shareLink(id);
+        location.href = `sms:+1${phoneDigits}?body=${encodeURIComponent(smsBody(url))}`;
+      } catch (err) { toast(err.message); } finally { e.target.disabled = false; }
+    });
+    $app.querySelector("#copy").addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      try {
+        const url = await shareLink(id);
+        await navigator.clipboard.writeText(url);
+        toast("Preview link copied");
+      } catch (err) { toast(err.message); } finally { e.target.disabled = false; }
+    });
+
+    let pitch;
+    try {
+      ({ pitch } = await api(`/leads/${id}/pitch`, { method: regenerate ? "POST" : "GET" }));
+    } catch (err) {
+      document.getElementById("guide").innerHTML = `<div class="card">${esc(err.message)}</div>`;
+      return;
+    }
+    if (location.hash !== `#/pitch/${id}`) return;
+    const list = (items) => `<ul class="list">${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
+    document.getElementById("guide").innerHTML = `
+      <section class="card opener"><h2>Open with</h2><p class="big">${esc(pitch.opener)}</p></section>
+      <div class="grid grid--2">
+        <section class="card"><h2>Why it matters for them</h2>${list(pitch.whyItMatters)}</section>
+        <section class="card"><h2>What we already built</h2>${list(pitch.whatWeBuilt)}<a class="btn btn--small" href="#/preview/${id}">Open the preview</a></section>
+      </div>
+      <section class="card"><h2>Questions to ask</h2>${list(pitch.questionsToAsk)}</section>
+      <section class="card"><h2>If they say…</h2>${pitch.objections.map((o) => `<details class="obj"><summary>“${esc(o.objection)}”</summary><p>${esc(o.response)}</p></details>`).join("")}</section>
+      <section class="card opener"><h2>Ask for the yes</h2><p class="big">${esc(pitch.close)}</p></section>
+      <section class="card"><h2>Don't say</h2>${list(pitch.avoid)}</section>
+      <section class="card"><h2>How did the call go?</h2><div class="btns btns--full">
+        <button class="btn" data-out="shown">Interested / shown</button>
+        <button class="btn btn--good" data-out="sold">Sold!</button>
+        <button class="btn" data-out="not_interested">Not interested</button>
+      </div><p class="small muted" style="margin-top:10px">If they ask not to be called again, mark Not interested.</p></section>
+      <p><button class="btn btn--small" id="regen">Write a fresh guide</button></p>`;
+    document.querySelectorAll("[data-out]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        try {
+          await api(`/leads/${id}/status`, { method: "POST", json: { salesStatus: b.dataset.out } });
+          toast(b.dataset.out === "sold" ? "Nice! Marked as sold." : "Saved");
+          go("#/lead/" + id);
+        } catch (err) { toast(err.message); }
+      }),
+    );
+    document.getElementById("regen").addEventListener("click", () => viewPitch(id, true));
+  }
+
   /* ---------- inbox ---------- */
   async function viewInbox() {
     setNav("inbox");
@@ -575,8 +660,13 @@
     const { last30Days: u } = await api("/usage");
     const s = meta.settings;
     $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">
-      <section class="card"><h2>Runs</h2><form id="sf">
+      <section class="card"><h2>Your business &amp; runs</h2><form id="sf">
         <label class="field">Default most sites per run<input name="cap" type="number" min="1" max="500" value="${s.defaultCap}"></label>
+        <label class="field">Your company name<input name="companyName" value="${esc(s.companyName || "")}" placeholder="e.g. Cullman Web Co."></label>
+        <label class="field">Caller's name<input name="callerName" value="${esc(s.callerName || "")}" placeholder="Who makes the calls"></label>
+        <div class="row"><label class="field">Setup price ($)<input name="setupPrice" type="number" min="0" inputmode="decimal" value="${s.setupPrice ?? ""}"></label>
+        <label class="field">Monthly price ($)<input name="monthlyPrice" type="number" min="0" inputmode="decimal" value="${s.monthlyPrice ?? ""}"></label></div>
+        <label class="field">What's included <span class="hint">Used in the call guide</span><textarea name="offerIncludes" rows="3" placeholder="Hosting, updates when you need them, your own domain…">${esc(s.offerIncludes || "")}</textarea></label>
         <label class="field">AI writer<select name="model">${meta.models.map((m) => `<option value="${esc(m.id)}"${m.id === s.copyModel ? " selected" : ""}>${esc(m.label)}</option>`).join("")}</select></label>
         <button class="btn btn--primary" type="submit">Save</button></form></section>
       <section class="card"><h2>Spending, last 30 days</h2><ul class="list">
@@ -590,7 +680,20 @@
     $app.querySelector("#sf").addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
-        await api("/settings", { method: "PUT", json: { defaultCap: Number(e.target.cap.value), copyModel: e.target.model.value } });
+        const f = e.target;
+        const n = (v) => (v === "" ? undefined : Number(v));
+        await api("/settings", {
+          method: "PUT",
+          json: {
+            defaultCap: Number(f.cap.value),
+            copyModel: f.model.value,
+            companyName: f.companyName.value.trim() || undefined,
+            callerName: f.callerName.value.trim() || undefined,
+            setupPrice: n(f.setupPrice.value),
+            monthlyPrice: n(f.monthlyPrice.value),
+            offerIncludes: f.offerIncludes.value.trim() || undefined,
+          },
+        });
         meta = null;
         toast("Saved");
       } catch (err) { toast(err.message); }
@@ -615,6 +718,7 @@
       if ((m = /^#\/lead\/([a-z0-9]+)$/.exec(h))) return await viewLead(m[1]);
       if ((m = /^#\/edit\/([a-z0-9]+)$/.exec(h))) return await viewEdit(m[1]);
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
+      if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/inbox") return await viewInbox();
       if (h === "#/settings") return await viewSettings();
       $app.innerHTML = "";

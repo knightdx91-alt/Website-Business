@@ -15,12 +15,13 @@ export interface LeadRow {
   reason: string | null;
   score: number;
   status: "queued" | "building" | "ready" | "failed" | "expired";
-  sales_status: "new" | "shown" | "sold" | "live";
+  sales_status: "new" | "shown" | "sold" | "live" | "not_interested";
   place_json: string | null;
   record_json: string | null;
   copy_json: string | null;
   look: string | null;
   lint_json: string | null;
+  pitch_json: string | null;
   error: string | null;
   rewrite: number;
   pages_project: string | null;
@@ -54,6 +55,11 @@ export async function setSetting(env: Env, key: string, value: string): Promise<
 export interface AppSettings {
   defaultCap: number;
   copyModel: string;
+  companyName?: string;
+  callerName?: string;
+  setupPrice?: number;
+  monthlyPrice?: number;
+  offerIncludes?: string;
 }
 
 export const MODEL_PRICES: Record<string, { input: number; output: number; label: string }> = {
@@ -65,7 +71,11 @@ export const MODEL_PRICES: Record<string, { input: number; output: number; label
 export async function getSettings(env: Env): Promise<AppSettings> {
   const raw = await getSetting(env, "app_settings");
   const s = raw ? (JSON.parse(raw) as Partial<AppSettings>) : {};
-  return { defaultCap: s.defaultCap ?? 50, copyModel: s.copyModel && MODEL_PRICES[s.copyModel] ? s.copyModel : "claude-opus-5-5" };
+  return {
+    ...s,
+    defaultCap: s.defaultCap ?? 50,
+    copyModel: s.copyModel && MODEL_PRICES[s.copyModel] ? s.copyModel : "claude-opus-5-5",
+  };
 }
 
 export async function getLead(env: Env, id: string): Promise<LeadRow | null> {
