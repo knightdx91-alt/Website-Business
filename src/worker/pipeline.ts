@@ -81,6 +81,7 @@ export async function chooseLook(env: Env, record: BusinessRecord, leadId: strin
   return pickDesign({
     leadId,
     looks: pack.looks,
+    preferred: pack.defaultLook(record),
     used: rows.results.map((r) => r.look),
     taken: [...rows.results.filter((r) => r.sales_status === "sold" || r.sales_status === "live").map((r) => r.look), ...(current ? [current] : [])],
   });

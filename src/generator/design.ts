@@ -17,9 +17,9 @@ export function layoutOf(design: string): LayoutId {
  * Picks a look + layout for a new site so sites in the same category don't all match:
  * never a design a paying client already has, then the combination used least, then the
  * look and layout used least on their own. Ties break on the lead id, so a batch built at
- * the same moment still spreads out.
+ * the same moment still spreads out. The best-fit look for the business wins a tie.
  */
-export function pickDesign(o: { leadId: string; looks: string[]; used: string[]; taken: string[] }): string {
+export function pickDesign(o: { leadId: string; looks: string[]; used: string[]; taken: string[]; preferred?: string }): string {
   const combo = new Map<string, number>();
   const byLook = new Map<string, number>();
   const byLayout = new Map<string, number>();
@@ -38,7 +38,9 @@ export function pickDesign(o: { leadId: string; looks: string[]; used: string[];
   const score = (d: string) => {
     const { look } = parseDesign(d);
     const layout = layoutOf(d);
-    return (combo.get(d) ?? 0) * 1000 + (takenLooks.has(look) ? 100 : 0) + (byLook.get(look) ?? 0) * 3 + (byLayout.get(layout) ?? 0) * 2;
+    // The pack's best-fit look (and that look's own layout) wins ties, so a screen printer starts with the shirt-shop look.
+    const fit = (look === o.preferred ? -0.6 : 0) + (look === o.preferred && layout === LOOKS[look]?.layout ? -0.3 : 0);
+    return (combo.get(d) ?? 0) * 1000 + (takenLooks.has(look) ? 100 : 0) + (byLook.get(look) ?? 0) * 3 + (byLayout.get(layout) ?? 0) * 2 + fit;
   };
   return options.sort((a, b) => score(a) - score(b) || hash(o.leadId + a) - hash(o.leadId + b))[0]!;
 }

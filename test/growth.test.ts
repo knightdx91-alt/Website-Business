@@ -178,6 +178,7 @@ test("new sites in a category spread across looks and layouts", async () => {
   const sold = used[0]!;
   for (let i = 0; i < 30; i++) assert.notEqual(pickDesign({ leadId: `x${i}`, looks, used: [], taken: [sold] }), sold);
   assert.equal(layoutOf("contractor.toolbox"), "split", "a bare look uses its own default layout");
+  assert.equal(pickDesign({ leadId: "first", looks: looksFor("print"), used: [], taken: [], preferred: "print.fresh_ink" }), "print.fresh_ink~poster", "first site gets the best fit");
 });
 
 test("print and retail shops get the right variant and a clean site", async () => {
