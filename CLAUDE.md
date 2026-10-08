@@ -101,4 +101,21 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       Anthropic models, Cloudflare Workers/KV/D1/Queues/Pages/R2)
 - [x] Category research and blueprints: see `research/README.md`;
       `research/00-shared-baseline.md` is the template architecture and build order
-- [ ] Build the app
+- [x] Site generator core + restaurant and contractor packs (`src/generator`), Places
+      search/qualify (`src/places`), Claude copy writer (`src/copy`). Tested on real
+      Cullman leads: 19 restaurant and 16 contractor leads found.
+- [ ] Packs for salons, auto, landscaping, cleaning
+- [ ] Cloudflare app: Worker API + queue pipeline, D1/R2 storage, phone UI, publish
+
+## Code map
+
+- `src/generator/`: pure TypeScript, runs in Node and Workers. `render.ts#buildSite`
+  turns a `BusinessRecord` + `Copy` into static files and runs the publish gate (`lint.ts`).
+  Looks are design tokens in `themes.ts`, checked for WCAG AA contrast at build.
+- `src/generator/packs/`: one file per category (section order, CTAs, schema type, copy brief).
+- `src/places/`: Places API (New) search, lead qualification/ranking, Place → record.
+- `src/copy/write.ts`: Claude copy with structured output and fact/phrase checks.
+  Default model `claude-opus-5-5` (about $0.04/restaurant, $0.10/contractor site).
+- `npm test` · `npm run typecheck` · `npm run demo -- --category restaurant --limit 3 --out <dir>`
+  then `CHROMIUM_PATH=... npx tsx scripts/screenshot.ts <dir>/sites <dir>/shots`.
+- Never write demo output (Google data, photos) into the repo; use a scratch dir.

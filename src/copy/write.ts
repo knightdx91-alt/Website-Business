@@ -1,0 +1,158 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { z } from "zod";
+import { hasAnyHours, hoursSummary } from "../generator/hours.ts";
+import { BANNED_PHRASES, quotesReview } from "../generator/lint.ts";
+import type { CategoryPack } from "../generator/packs/types.ts";
+import type { BusinessRecord, Copy } from "../generator/types.ts";
+
+export const DEFAULT_COPY_MODEL = "claude-opus-5-5";
+/** Bump when the prompt changes so cached copy is regenerated. */
+export const COPY_PROMPT_VERSION = 3;
+
+const CopySchema = z.object({
+  cuisineLabel: z.string().describe("Restaurants only; empty string otherwise"),
+  heroTagline: z.string(),
+  heroSub: z.string(),
+  about: z.array(z.string()),
+  serviceBlurbs: z.array(z.object({ id: z.string(), text: z.string() })),
+  steps: z.array(z.object({ title: z.string(), body: z.string() })),
+  faq: z.array(z.object({ q: z.string(), a: z.string() })),
+  serviceAreaIntro: z.string(),
+  ctaTitle: z.string(),
+  ctaLine: z.string(),
+  metaDescription: z.string(),
+});
+type CopyOut = z.infer<typeof CopySchema>;
+
+const SYSTEM = `You write website copy for small local businesses in and around Cullman, Alabama. Each site is shown to the owner as a preview, and the owner reviews every word before anything goes live.
+
+Rules that matter more than style:
+- Use only the facts in <facts>. Never invent years, history, family names, awards, licenses, certifications, warranties, prices, response times, "24/7", "emergency", "family-owned", menu items or specialties that aren't given. If a fact is missing, leave it out; don't hedge around it.
+- Google review text in <review_context> is private background so you understand what customers value. Never quote it, paraphrase a specific review, or mention reviews, ratings or star counts.
+- No superlatives or hype: no "best", "#1", "top", "premier", "finest", "unmatched", "world-class", "most trusted". Also avoid: ${BANNED_PHRASES.filter((p) => !["#1", "best in town"].includes(p)).join(", ")}.
+- Write as the business itself, using "we" and "our" (never "they").
+- US English, 6th-8th grade reading level, short sentences, active voice. Plain and local, never corporate. No dialect caricature.
+- Don't restate hours, phone numbers, prices or the street address in prose. The page shows those from live data, and prose copies go stale.
+- Don't recite a list of amenities or options; mention one or two only if they help the story.
+- Write fresh wording for this specific business. Don't reuse generic template sentences.
+- Fill fields the brief doesn't ask for with an empty string or empty array.`;
+
+export interface WriteCopyInput {
+  record: BusinessRecord;
+  pack: CategoryPack;
+  reviewContext: string[];
+  editorialSummary?: string;
+  primaryTypeLabel?: string;
+  model?: string;
+}
+
+export interface WriteCopyResult {
+  copy: Copy;
+  usage: { input: number; output: number };
+  issues: string[];
+  model: string;
+}
+
+function facts(r: BusinessRecord, pack: CategoryPack, primaryTypeLabel?: string): Record<string, unknown> {
+  const so = r.ext.restaurant?.serviceOptions;
+  return {
+    name: r.name,
+    category: pack.label,
+    type: pack.variantLabel(r),
+    google_type: primaryTypeLabel,
+    town: `${r.address.city}, ${r.address.state}`,
+    county: r.address.county ? `${r.address.county} County` : undefined,
+    hours: hasAnyHours(r.hours) ? hoursSummary(r.hours) : "unknown",
+    services: r.services.length ? r.services.map((s) => ({ id: s.id, name: s.name })) : undefined,
+    service_area_towns: r.serviceArea?.towns,
+    restaurant_options: so && Object.keys(so).length ? so : undefined,
+    founded_year: r.foundedYear,
+    ownership: r.ownershipTags.length ? r.ownershipTags : undefined,
+    licensed: r.licenses.length > 0 || undefined,
+    insured: r.insured,
+    owner_story: "unknown",
+  };
+}
+
+function brief(pack: CategoryPack, r: BusinessRecord): string {
+  const b = pack.copyBrief(r);
+  const lines = Object.entries(b.fields).map(([k, v]) => `- ${k}: ${v}`);
+  return `Voice: ${b.voice}\n\nFields to write:\n${lines.join("\n")}`;
+}
+
+/** Numbers in copy that don't appear in the facts are likely invented. */
+function unsupportedNumbers(text: string, factsText: string): string[] {
+  const nums = text.match(/\b\d[\d,.]*\b/g) ?? [];
+  return [...new Set(nums.filter((n) => !factsText.includes(n)))];
+}
+
+function check(out: CopyOut, factsText: string, reviews: string[]): string[] {
+  const issues: string[] = [];
+  const all = [out.cuisineLabel, out.heroTagline, out.heroSub, ...out.about, ...out.serviceBlurbs.map((s) => s.text), ...out.steps.flatMap((s) => [s.title, s.body]), ...out.faq.flatMap((f) => [f.q, f.a]), out.serviceAreaIntro, out.ctaTitle, out.ctaLine, out.metaDescription].join(" \n ");
+  const lower = all.toLowerCase();
+  for (const p of BANNED_PHRASES) if (lower.includes(p)) issues.push(`uses banned phrase "${p}"`);
+  if (/\b(the best|best in|finest)\b/i.test(all)) issues.push("uses a superlative");
+  for (const n of unsupportedNumbers(all, factsText)) issues.push(`mentions the number ${n}, which isn't in the facts`);
+  for (const rv of reviews) if (quotesReview(all, rv)) issues.push("repeats wording from a Google review");
+  return issues;
+}
+
+function toCopy(out: CopyOut): Copy {
+  return {
+    heroTagline: out.heroTagline,
+    heroSub: out.heroSub,
+    about: out.about.filter(Boolean),
+    serviceBlurbs: Object.fromEntries(out.serviceBlurbs.map((s) => [s.id, s.text])),
+    steps: out.steps.length ? out.steps : undefined,
+    faq: out.faq,
+    serviceAreaIntro: out.serviceAreaIntro || undefined,
+    ctaTitle: out.ctaTitle,
+    ctaLine: out.ctaLine,
+    cuisineLabel: out.cuisineLabel || undefined,
+    meta: { title: "", description: out.metaDescription },
+    approved: false,
+  };
+}
+
+export async function writeCopy(client: Anthropic, input: WriteCopyInput): Promise<WriteCopyResult> {
+  const model = input.model ?? DEFAULT_COPY_MODEL;
+  const f = facts(input.record, input.pack, input.primaryTypeLabel);
+  const factsText = JSON.stringify(f);
+  const reviews = input.reviewContext.slice(0, 5).map((t) => t.slice(0, 600));
+  const prompt = `<facts>\n${JSON.stringify(f, null, 2)}\n</facts>
+
+<review_context>
+${reviews.length ? reviews.map((r, i) => `[${i + 1}] ${r}`).join("\n") : "none"}
+${input.editorialSummary ? `Google's own summary: ${input.editorialSummary}` : ""}
+</review_context>
+
+${brief(input.pack, input.record)}`;
+
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: prompt }];
+  const usage = { input: 0, output: 0 };
+  let issues: string[] = [];
+  let out: CopyOut | null = null;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await client.beta.messages.parse({
+      model,
+      max_tokens: 16000,
+      system: SYSTEM,
+      messages,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: "medium", format: betaZodOutputFormat(CopySchema) },
+    });
+    usage.input += res.usage.input_tokens;
+    usage.output += res.usage.output_tokens;
+    if (res.stop_reason === "refusal") throw new Error(`Copy request for ${input.record.name} was declined`);
+    if (!res.parsed_output) throw new Error(`Copy for ${input.record.name} didn't match the schema (stop: ${res.stop_reason})`);
+    out = res.parsed_output;
+    issues = check(out, factsText, input.reviewContext);
+    if (issues.length === 0) break;
+    messages.push({ role: "assistant", content: res.content });
+    messages.push({ role: "user", content: `Please fix these problems and return the full copy again:\n- ${issues.join("\n- ")}` });
+  }
+  return { copy: toCopy(out!), usage, issues, model };
+}
