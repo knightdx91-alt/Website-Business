@@ -3,12 +3,13 @@ import { LOOKS } from "../generator/themes.ts";
 import { menuToText } from "../generator/menu.ts";
 import { packFor } from "../generator/packs/index.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
-import { groupById, SEARCH_GROUPS, searchesFor } from "../places/queries.ts";
+import { groupById, MARKET, SEARCH_GROUPS, searchesFor } from "../places/queries.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { writePitch } from "../copy/pitch.ts";
 import { profileTextProblems, writeMonthlyPosts, writeProfileKit, writeReviewReply, type GbpPost, type ProfileKit } from "../copy/gbp.ts";
 import { reviewTexts } from "../places/to-record.ts";
-import type { Place } from "../places/client.ts";
+import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
+import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
 import { addCaller, checkPassword, clearCookie, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyShare, verifySignup } from "./auth.ts";
 import { previewFlyer, reviewCards } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
@@ -318,6 +319,69 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/sales" && m === "GET") {
     ownerOnly();
     return json(await salesDashboard(env));
+  }
+
+  // Look up one business by name to add it by hand (owner and callers; one Google request per search).
+  if (path === "/places/search" && m === "GET") {
+    const q = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
+    if (q.length < 3) throw new HttpError(400, "Type at least 3 letters");
+    const places = await searchText(env.GOOGLE_PLACES_API_KEY, { textQuery: /\b(al|alabama)\b/i.test(q) ? q : `${q} near ${MARKET.name}`, center: MARKET.center, radiusMeters: MARKET.radiusMeters, maxPages: 1 });
+    await addUsage(env, { places: 1 });
+    const results = [];
+    for (const p of places.slice(0, 10)) {
+      const existing = await env.DB.prepare("SELECT id, status, sales_status, name FROM leads WHERE place_id = ?").bind(p.id).first<{ id: string; status: string; sales_status: string; name: string | null }>();
+      results.push({
+        placeId: p.id,
+        name: p.displayName?.text ?? "",
+        type: p.primaryTypeDisplayName?.text ?? null,
+        address: p.formattedAddress ?? "",
+        phone: p.nationalPhoneNumber ?? null,
+        rating: p.rating ?? null,
+        reviews: p.userRatingCount ?? 0,
+        website: p.websiteUri ?? null,
+        presence: webPresence(p.websiteUri),
+        open: p.businessStatus === "OPERATIONAL",
+        chain: isChain(p.displayName?.text ?? ""),
+        category: guessCategory(p),
+        existing: existing && existing.status !== "expired" ? { id: existing.id, status: existing.status, salesStatus: existing.sales_status } : null,
+      });
+    }
+    return json({ results });
+  }
+  if (path === "/leads/add" && m === "POST") {
+    const input = await body(req, z.object({ placeId: z.string().min(5).max(300), category: z.enum(["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning"]) }));
+    const existing = await env.DB.prepare("SELECT id, status FROM leads WHERE place_id = ?").bind(input.placeId).first<{ id: string; status: string }>();
+    if (existing && existing.status !== "expired") return json({ id: existing.id, existed: true });
+    const p = await getPlace(env.GOOGLE_PLACES_API_KEY, input.placeId, input.category === "restaurant" ? RESTAURANT_FLAGS : []);
+    await addUsage(env, { places: 1 });
+    if (!p.nationalPhoneNumber) throw new HttpError(400, "Google has no phone number for this business, and every site needs one. Add it to their Google listing first.");
+    const presence = webPresence(p.websiteUri) as WebPresence;
+    const count = p.userRatingCount ?? 0;
+    const label = { none: "No website", social: "Only a social page", free_builder: "Free-builder site", has_site: "Has a website", outdated: "Outdated website" }[presence];
+    const reason = `${label} · ${count} Google reviews · added by ${session.name}`;
+    const fields = [p.displayName?.text ?? "", p.nationalPhoneNumber, p.formattedAddress ?? "", p.rating ?? null, p.userRatingCount ?? null, presence, reason, scorePlace(p, presence), JSON.stringify(p), p.location?.latitude ?? null, p.location?.longitude ?? null, now(), now()];
+    let id = existing?.id;
+    if (id) {
+      // An expired lead (old Google data was cleared): bring it back with fresh data.
+      await env.DB.prepare(
+        "UPDATE leads SET category = ?, name = ?, phone = ?, address = ?, rating = ?, review_count = ?, presence = ?, reason = ?, score = ?, place_json = ?, lat = ?, lng = ?, fetched_at = ?, updated_at = ?, status = 'queued', sales_status = 'new', record_json = NULL, copy_json = NULL, lint_json = NULL, pitch_json = NULL, look = NULL, created_at = ? WHERE id = ?",
+      )
+        .bind(input.category, ...fields, now(), id)
+        .run();
+    } else {
+      id = newId();
+      await env.DB.prepare(
+        `INSERT INTO leads (id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, score, status, place_json, lat, lng, fetched_at, created_at, updated_at)
+         VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(id, p.id, input.category, ...fields, now())
+        .run();
+    }
+    await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")
+      .bind(newId(), id, session.name, "Added by hand from a Google search", now())
+      .run();
+    await env.JOBS.send({ type: "build", leadId: id });
+    return json({ id, existed: false });
   }
 
   if (path === "/leads" && m === "GET") {

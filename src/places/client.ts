@@ -130,6 +130,16 @@ export async function searchText(apiKey: string, o: SearchOptions): Promise<Plac
   return out;
 }
 
+/** Place Details (New) for one place, with the same fields a search returns. */
+export async function getPlace(apiKey: string, placeId: string, extraFields: string[] = []): Promise<Place> {
+  const res = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+    headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": [...BASE_FIELDS, ...extraFields].join(",") },
+  });
+  const body = (await res.json()) as Place & { error?: { message: string } };
+  if (!res.ok) throw new PlacesError(res.status, body.error?.message ?? `Place lookup failed (${res.status})`);
+  return body;
+}
+
 /** Fetches photo bytes for previews. Google photos may not be re-hosted on published sites. */
 export async function fetchPhoto(apiKey: string, photoName: string, maxWidthPx = 1600): Promise<{ bytes: Uint8Array; contentType: string }> {
   const url = `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidthPx}&key=${encodeURIComponent(apiKey)}`;

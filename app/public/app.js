@@ -203,7 +203,7 @@
     meta = meta || (await api("/meta"));
     if (!document.getElementById("leads")) {
       $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="due"></div><div id="runs"></div></div><div><section>
-        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/route">🗺️ Plan a walk-in route</a></div>
+        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
@@ -988,6 +988,61 @@
     render(g);
   }
 
+  /* ---------- add a business by hand ---------- */
+  const PACKS = [["restaurant", "Restaurant, cafe or food truck"], ["contractor", "Contractor (plumbing, HVAC, roofing, electrical)"], ["salon", "Salon, barber, nails or pet grooming"], ["auto", "Auto repair or tires"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning service"]];
+  const PRESENCE = { none: ["No website", "chip--good"], social: ["Only a social page", "chip--good"], free_builder: ["Free-builder site", "chip--warn"], has_site: ["Has a website", "chip--warn"] };
+
+  async function viewAdd() {
+    setNav("home");
+    $app.innerHTML = `<p><a href="#/">← Leads</a></p><h1>Add a business</h1>
+      <p class="muted small">Found a business on a call, a drive or a tip? Look it up on Google and build its site, just like a run.</p>
+      <form id="sq" class="card"><label class="field">Business name <span class="hint">Add the town if it's not in Cullman, e.g. “Smith Plumbing Hartselle”</span>
+        <input name="q" required minlength="3" maxlength="120" autocomplete="off" placeholder="e.g. Rusty's Diner"></label>
+        <button class="btn btn--primary" type="submit">Search Google</button></form>
+      <ul class="list" id="results"></ul>
+      <section class="card small muted"><strong>Not on Google?</strong> Their website needs Google's details (hours, map, reviews), so they need a Google Business Profile first. That's your Google profile setup extra. Once their listing is live, search for it here.</section>`;
+    const list = $app.querySelector("#results");
+    $app.querySelector("#sq").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector("button");
+      btn.disabled = true;
+      list.innerHTML = `<li class="card"><span class="spin"></span> Searching…</li>`;
+      try {
+        const { results } = await api("/places/search?q=" + encodeURIComponent(e.target.q.value.trim()));
+        list.innerHTML = results.length
+          ? results.map((x, i) => {
+              const [plabel, pcls] = PRESENCE[x.presence] || ["", ""];
+              const warn = [!x.open ? "Google lists it as closed" : "", x.chain ? "Looks like a chain" : "", !x.phone ? "No phone number on Google, so it can't be added" : ""].filter(Boolean);
+              return `<li class="card lead"><div class="lead__top"><strong class="lead__name">${esc(x.name)}</strong>${plabel ? `<span class="chip ${pcls}" style="flex:none">${plabel}</span>` : ""}</div>
+                <div class="lead__meta">${esc(x.type || "")}${x.rating ? ` · <span class="stars">★ ${x.rating.toFixed(1)}</span> (${x.reviews})` : ""}</div>
+                <div class="lead__meta">${esc(x.address)}${x.phone ? ` · ${esc(x.phone)}` : ""}</div>
+                ${x.website && x.presence !== "none" ? `<div class="lead__meta small">Website: ${esc(x.website.replace(/^https?:\/\//, "").slice(0, 60))}</div>` : ""}
+                ${warn.length ? `<p class="small" style="color:var(--warn);margin:0">⚠️ ${esc(warn.join(" · "))}</p>` : ""}
+                ${x.existing
+                  ? `<div class="btns"><a class="btn btn--small" href="#/lead/${x.existing.id}">Already in your leads: open it</a></div>`
+                  : x.phone
+                    ? `<label class="field" style="margin:0"><span class="sr-only">Kind of business</span><select data-cat="${i}">${x.category ? "" : `<option value="">Pick the kind of business…</option>`}${PACKS.map(([k, t]) => `<option value="${k}"${k === x.category ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+                      <div class="btns btns--full"><button class="btn btn--primary" type="button" data-add="${i}">Add &amp; build site</button></div>`
+                    : ""}</li>`;
+            }).join("")
+          : `<li class="card muted">No matches. Try the exact name from their sign, or add the town.</li>`;
+        list.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", async () => {
+          const x = results[Number(b.dataset.add)];
+          const category = list.querySelector(`[data-cat="${b.dataset.add}"]`).value;
+          if (!category) return toast("Pick the kind of business first");
+          b.disabled = true;
+          b.innerHTML = '<span class="spin"></span> Adding…';
+          try {
+            const res = await api("/leads/add", { method: "POST", json: { placeId: x.placeId, category } });
+            toast(res.existed ? "It's already in your leads" : "Added! Building the site now (about a minute).");
+            go("#/lead/" + res.id);
+          } catch (err) { toast(err.message); b.disabled = false; b.textContent = "Add & build site"; }
+        }));
+      } catch (err) { list.innerHTML = ""; toast(err.message); } finally { btn.disabled = false; }
+    });
+    $app.querySelector("[name=q]").focus();
+  }
+
   /* ---------- walk-in route ---------- */
   const START_TOWNS = [["Cullman", 34.1748, -86.8436], ["Hartselle", 34.4434, -86.9353], ["Arab", 34.3281, -86.4958], ["Hanceville", 34.0607, -86.7675], ["Good Hope", 34.1157, -86.8636], ["Vinemont", 34.2465, -86.8661]];
   const MAX_STOPS = 9; // Google Maps directions links take up to 9 stops
@@ -1309,6 +1364,7 @@
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/route") return await viewRoute();
+      if (h === "#/add") return await viewAdd();
       if ((m = /^#\/gbp\/([a-z0-9]+)$/.exec(h))) return await viewGbp(m[1]);
       if (h === "#/sales") return await viewSales();
       if (h === "#/inbox") return await viewInbox();

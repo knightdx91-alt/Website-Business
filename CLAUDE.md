@@ -203,6 +203,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   https://support.google.com/business/contact/api_default ("Application for Basic API Access"). Then: OAuth
   (scope business.manage) from Settings, sync info, publish approved posts, reply to reviews, and pull
   Performance API metrics (calls, directions, website clicks) into the monthly report.
+- Add a business by hand (`#/add`, owner and callers): `/api/places/search?q=` runs one Places text search near
+  Cullman (flags existing leads, chains, closed, no phone, website status, guesses the template via `guessCategory`);
+  `POST /api/leads/add {placeId, category}` fetches Place Details, inserts the lead (or revives an expired one),
+  logs "Added by hand" in the call log and queues the build. Businesses not on Google can't be added: the site
+  needs Google's data, so they're pointed at the Google profile setup extra instead.
 - Company website: https://undergroundassociates.com (domain on the same Cloudflare account, attached to this Worker
   as custom domains in wrangler.jsonc; www redirects to apex). `src/worker/company.ts` renders it per request from
   Settings (plans, phone, email), so price changes show immediately. Its contact form posts to `/contact` and lands

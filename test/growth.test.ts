@@ -79,3 +79,15 @@ test("Google profile text checks catch what Google rejects", async () => {
   assert.deepEqual(profileTextProblems("The best BBQ in Cullman", 750), ["has a superlative"]);
   assert.deepEqual(profileTextProblems("x".repeat(800), 750), ["over 750 characters"]);
 });
+
+test("hand-added businesses get a sensible template guess", async () => {
+  const { guessCategory } = await import("../src/places/qualify.ts");
+  const p = (name: string, primaryType?: string, types: string[] = []) => ({ id: "x", displayName: { text: name }, primaryType, types });
+  assert.equal(guessCategory(p("Rusty's Diner", "restaurant")), "restaurant");
+  assert.equal(guessCategory(p("Smith Plumbing", "plumber")), "contractor");
+  assert.equal(guessCategory(p("Green Acres Lawn Care", "point_of_interest")), "landscaping");
+  assert.equal(guessCategory(p("Sparkle Maids", "point_of_interest")), "cleaning");
+  assert.equal(guessCategory(p("Luxe Nails", "nail_salon")), "salon");
+  assert.equal(guessCategory(p("Main St Tire & Auto", "car_repair")), "auto");
+  assert.equal(guessCategory(p("Acme Holdings", "point_of_interest")), null);
+});
