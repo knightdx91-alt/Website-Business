@@ -6,6 +6,7 @@ import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import { groupById, SEARCH_GROUPS, searchesFor } from "../places/queries.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { writePitch } from "../copy/pitch.ts";
+import { profileTextProblems, writeMonthlyPosts, writeProfileKit, writeReviewReply, type GbpPost, type ProfileKit } from "../copy/gbp.ts";
 import { reviewTexts } from "../places/to-record.ts";
 import type { Place } from "../places/client.ts";
 import { addCaller, checkPassword, clearCookie, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyShare, verifySignup } from "./auth.ts";
@@ -108,6 +109,22 @@ function pitchFor(raw: string, callerName: string | undefined): unknown {
   return JSON.parse(JSON.stringify(pitch).split(_caller).join(callerName.replace(/["\\]/g, "")));
 }
 
+interface GbpState {
+  checks: Record<string, boolean>;
+  kit?: ProfileKit & { createdAt: number; problems: string[] };
+  posts: Array<GbpPost & { id: string; month: string; status: "draft" | "posted"; createdAt: number; problems: string[] }>;
+  notes?: string;
+}
+
+function gbpState(l: LeadRow): GbpState {
+  return l.gbp_json ? (JSON.parse(l.gbp_json) as GbpState) : { checks: {}, posts: [] };
+}
+
+async function chargeAi(env: Env, model: string, usage: { input: number; output: number }): Promise<void> {
+  const price = MODEL_PRICES[model] ?? MODEL_PRICES["claude-opus-5-5"]!;
+  await addUsage(env, { aiIn: usage.input, aiOut: usage.output, costMicro: Math.round(usage.input * price.input + usage.output * price.output) });
+}
+
 function detail(l: LeadRow) {
   const record = l.record_json ? (JSON.parse(l.record_json) as BusinessRecord) : null;
   const copy = l.copy_json ? (JSON.parse(l.copy_json) as Copy) : null;
@@ -197,6 +214,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         legalName: z.string().trim().max(120).optional(),
         companyPhone: z.string().trim().max(30).optional(),
         companyEmail: z.string().trim().email().max(120).optional(),
+        gbpEmail: z.string().trim().email().max(120).optional(),
         callerName: z.string().trim().max(60).optional(),
         plans: z
           .array(
@@ -372,6 +390,62 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         caller: isOwner ? settings.callerName : session.name,
         days,
       });
+    }
+    if (action === "/gbp") {
+      if (!lead.record_json) throw new HttpError(409, "This site hasn't finished building yet");
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      const state = gbpState(lead);
+      const save = (s: GbpState) => updateLead(env, id, { gbp_json: JSON.stringify(s) });
+      const settings = await getSettings(env);
+      const ai = () => new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+      const website = lead.custom_domain ? `https://${lead.custom_domain}` : (lead.live_url ?? undefined);
+      if (m === "GET" && !sub) return json({ ...state, website, mapsUrl: record.mapsUrl, gbpEmail: settings.gbpEmail ?? null });
+      if (m === "PUT" && !sub) {
+        const input = await body(
+          req,
+          z.object({ check: z.string().regex(/^[a-z_]+$/).optional(), done: z.boolean().optional(), postId: z.string().regex(/^[a-z0-9]+$/).optional(), posted: z.boolean().optional(), removePost: z.boolean().optional(), notes: z.string().max(1000).optional() }),
+        );
+        if (input.check) state.checks[input.check] = !!input.done;
+        if (input.postId) {
+          if (input.removePost) state.posts = state.posts.filter((p) => p.id !== input.postId);
+          else for (const p of state.posts) if (p.id === input.postId) p.status = input.posted ? "posted" : "draft";
+        }
+        if (input.notes !== undefined) state.notes = input.notes;
+        await save(state);
+        return json(state);
+      }
+      if (m === "POST" && sub === "kit") {
+        const { kit, usage } = await writeProfileKit(ai(), { record, pack: packFor(record.category), website, model: settings.copyModel });
+        await chargeAi(env, settings.copyModel, usage);
+        state.kit = { ...kit, createdAt: now(), problems: profileTextProblems(kit.description, 750) };
+        await save(state);
+        return json(state);
+      }
+      if (m === "POST" && sub === "posts") {
+        const { count, notes } = await body(req, z.object({ count: z.number().int().min(1).max(4).default(2), notes: z.string().trim().max(1000).optional() }));
+        const month = new Date().toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "long", year: "numeric" });
+        const { posts, usage } = await writeMonthlyPosts(ai(), {
+          record,
+          pack: packFor(record.category),
+          month,
+          count,
+          recentTopics: state.posts.slice(-8).map((p) => p.topic),
+          ownerNotes: notes ?? state.notes,
+          model: settings.copyModel,
+        });
+        await chargeAi(env, settings.copyModel, usage);
+        if (notes !== undefined) state.notes = notes;
+        state.posts.push(...posts.map((p) => ({ ...p, id: newId(), month, status: "draft" as const, createdAt: now(), problems: profileTextProblems(p.text, 1500) })));
+        state.posts = state.posts.slice(-30);
+        await save(state);
+        return json(state);
+      }
+      if (m === "POST" && sub === "reply") {
+        const input = await body(req, z.object({ review: z.string().trim().min(1).max(4000), stars: z.number().int().min(1).max(5), reviewer: z.string().trim().max(80).optional() }));
+        const { reply, usage } = await writeReviewReply(ai(), { record, ...input, model: settings.copyModel });
+        await chargeAi(env, settings.copyModel, usage);
+        return json({ reply, problems: profileTextProblems(reply, 4000) });
+      }
     }
     if (action === "/reviewcard" && m === "GET") return reviewCards(lead.name ?? "us", lead.place_id);
     if (action === "/stats" && m === "GET") return json(await siteReport(env, id));

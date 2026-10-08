@@ -114,7 +114,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       food trucks / nail salons / pet groomers, nearby towns, walk-in route, sales dashboard
 - [x] Plans set from market research (Oct 2026): Basic $49, Plus $89, Pro $149; 12-mo min or $299 setup
       month to month or yearly with 2 months free; extras $10 inbox, $35 NFC card, $149 GBP setup
-- [ ] Owner to do: Stripe payment links in Settings. LLC is Underground Associates LLC
+- [x] Google profile tools step 1 (AI-assisted checklist, posts, review replies)
+- [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for
+      Google Business Profile API once a client's profile is managed (then build step 2). LLC is Underground Associates LLC
 - [ ] Next ideas: owner gallery/team photos, email/text alerts for inbox items, daycare /
       tattoo / photographer packs (need their own research first), Stripe webhook to mark paid
 
@@ -190,6 +192,16 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Pages domains API (`addDomain` in pages.ts); the lead screen shows the CNAME to add.
 - Walk-in route (`#/route`): open leads sorted by distance (leads.lat/lng, cleared on expiry), up to 9 stops,
   nearest-next order, opens a Google Maps directions link.
+- Google Business Profile, step 1 (`#/gbp/:id`, `src/copy/gbp.ts`, `leads.gbp_json`): owner-only tools for sold/live
+  clients: text the owner the "add us as Manager" steps (Settings → `gbpEmail`), an 11-item tune-up checklist,
+  Claude-written description (≤750) + service blurbs, 2 monthly post drafts, review reply drafts. All text is
+  checked by `profileTextProblems` (no phone, links, superlatives; length) and pasted by hand into Google.
+- Google Business Profile, step 2 (not built): Business Profile APIs, once the owner's Cloud project is approved.
+  Requirements (Google prereqs page): a Google account that is Manager on a profile verified and active 60+ days
+  with a website, an Organization account, Cloud project number, form at
+  https://support.google.com/business/contact/api_default ("Application for Basic API Access"). Then: OAuth
+  (scope business.manage) from Settings, sync info, publish approved posts, reply to reviews, and pull
+  Performance API metrics (calls, directions, website clicks) into the monthly report.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

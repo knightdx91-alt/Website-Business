@@ -27,6 +27,7 @@ export interface LeadRow {
   lat: number | null;
   lng: number | null;
   custom_domain: string | null;
+  gbp_json: string | null;
   error: string | null;
   rewrite: number;
   pages_project: string | null;
@@ -142,6 +143,8 @@ export interface AppSettings {
   legalName?: string;
   companyPhone?: string;
   companyEmail?: string;
+  /** The Google account clients add as a Manager on their Business Profile. */
+  gbpEmail?: string;
   callerName?: string;
   plans: Plan[];
   minMonths?: number;

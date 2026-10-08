@@ -500,6 +500,7 @@
       </div><div>
       ${ready ? signupCardHtml(l) : ""}
       ${l.salesStatus === "live" && owner ? liveCardHtml(l) : ""}
+      ${(l.salesStatus === "live" || l.salesStatus === "sold") && owner && ready ? gbpCardHtml(l) : ""}
       ${l.salesStatus !== "live" ? logCardHtml(l) : ""}
       ${ready && owner ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
         ${blockers.length ? `<ul class="list small">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul><p class="small muted">Fill these in from Edit.</p>` : `<p class="muted">Everything's confirmed. Publishing puts the site on the internet.</p>`}
@@ -861,6 +862,132 @@
     document.getElementById("regen").addEventListener("click", () => viewPitch(id, true));
   }
 
+  /* ---------- Google Business Profile ---------- */
+  const GBP_CHECKS = [
+    ["access", "They added you as a Manager on their Google profile"],
+    ["website", "Website link points to their new site"],
+    ["phone", "Phone number is right"],
+    ["hours", "Hours match the website (and holiday hours are set)"],
+    ["category", "Main category fits what they do"],
+    ["description", "Business description added"],
+    ["services", "Services added"],
+    ["photos", "At least 5 good photos: logo, outside, inside, their work, the team"],
+    ["attributes", "Details checked (accessibility, payments, women- or veteran-owned if true)"],
+    ["duplicates", "No duplicate listing on Google Maps"],
+    ["reviewcards", "Review cards printed and on the counter"],
+  ];
+
+  function accessSteps(l, email) {
+    const name = l.record ? l.record.name : l.name;
+    return `Here's how to let us manage your Google listing for ${name}. It takes a minute and you stay the owner:\n1. On your phone or computer, go to business.google.com and sign in.\n2. Open ${name}, tap the 3-dot menu, then Business Profile settings, then People and access.\n3. Tap Add, enter ${email}, choose Manager, and tap Invite.\nThat's it. We never need your password.`;
+  }
+
+  function gbpCardHtml(l) {
+    return `<section class="card"><h2>Google profile</h2>
+      <p class="small muted">Tune up their Google listing and keep it fresh each month.</p>
+      <div class="btns btns--full"><a class="btn btn--primary" href="#/gbp/${l.id}">Open Google profile tools</a></div></section>`;
+  }
+
+  async function viewGbp(id) {
+    setNav("home");
+    const [l, g] = await Promise.all([api("/leads/" + id), api(`/leads/${id}/gbp`)]);
+    const r = l.record;
+    const phone = r ? r.phone.e164.slice(2) : "";
+    const copyBtn = (text, label = "Copy") => `<button class="btn btn--small" type="button" data-copytext="${esc(text)}">${label}</button>`;
+    const render = (st) => {
+      const done = GBP_CHECKS.filter(([k]) => st.checks[k]).length;
+      const drafts = st.posts.filter((p) => p.status === "draft");
+      const posted = st.posts.filter((p) => p.status === "posted").slice(-6).reverse();
+      const helper = {
+        website: g.website ? `<div class="kit">${esc(g.website)} ${copyBtn(g.website)}</div>` : `<p class="small muted">Publish the site first.</p>`,
+        phone: r ? `<div class="kit">${esc(r.phone.display)}</div>` : "",
+        category: `<div class="kit small">${esc(l.variantLabel || "")}</div>`,
+        description: st.kit
+          ? `<div class="kit"><p>${esc(st.kit.description)}</p><p class="small muted">${st.kit.description.length}/750 characters${st.kit.problems.length ? ` · ⚠️ ${esc(st.kit.problems.join(", "))}: fix before pasting` : ""}</p>${copyBtn(st.kit.description)}</div>`
+          : `<button class="btn btn--small" type="button" data-kit>Write description &amp; services with AI</button>`,
+        services: st.kit
+          ? `<div class="kit">${st.kit.services.map((x) => `<div class="svc"><strong>${esc(x.name)}</strong> ${copyBtn(x.name, "Copy name")}<p class="small">${esc(x.description)}</p>${copyBtn(x.description, "Copy description")}</div>`).join("")}</div>`
+          : "",
+        reviewcards: `<div class="kit"><a class="btn btn--small" href="/api/leads/${id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a></div>`,
+      };
+      $app.innerHTML = `<p><a href="#/lead/${id}">← ${esc(r ? r.name : l.name)}</a></p>
+        <h1>Google profile: ${esc(r ? r.name : l.name)}</h1>
+        <div class="btns btns--full" style="margin-bottom:14px">
+          <a class="btn" href="https://business.google.com/" target="_blank" rel="noopener">Open Google Business Profile</a>
+          <a class="btn" href="https://www.google.com/search?q=${encodeURIComponent((r ? r.name : l.name) + " " + (r ? r.address.city : ""))}" target="_blank" rel="noopener">Find them on Google</a></div>
+        <p class="small muted">Signed in with your Google account as their manager, you can edit their listing from either place.</p>
+        <div class="grid grid--2"><div>
+        <section class="card"><h2>1. Get access</h2>
+          ${g.gbpEmail
+            ? `<p class="small">Text the owner these steps. They add <strong>${esc(g.gbpEmail)}</strong> as a Manager; they stay the owner and never share a password.</p>
+              <div class="btns btns--full"><a class="btn btn--primary" href="sms:+1${phone}?body=${encodeURIComponent(accessSteps(l, g.gbpEmail))}">Text them the steps</a>${copyBtn(accessSteps(l, g.gbpEmail), "Copy steps")}</div>
+              <p class="small muted" style="margin-top:8px">Google emails you an invite. Open it while signed in to ${esc(g.gbpEmail)} and accept.</p>`
+            : `<p class="small">First add the Google account you'll use for client profiles in <a href="#/settings">Settings</a>.</p>`}
+        </section>
+        <section class="card"><h2>2. Tune-up <span class="chip">${done}/${GBP_CHECKS.length}</span></h2>
+          <ul class="list checks">${GBP_CHECKS.map(([k, label]) => `<li><label class="check"><input type="checkbox" data-check="${k}"${st.checks[k] ? " checked" : ""}> ${esc(label)}</label>${helper[k] || ""}</li>`).join("")}</ul>
+        </section></div><div>
+        <section class="card"><h2>3. Monthly posts</h2>
+          <p class="small muted">Pro plan: post 2–4 times a month. Paste each one into “Add update” on their profile, pick the suggested button, add a photo if you have one.</p>
+          <label class="field">Anything to mention this month? <span class="hint">Specials, closures, new services. Leave blank for seasonal tips.</span><textarea id="pnotes" rows="2" maxlength="1000">${esc(st.notes || "")}</textarea></label>
+          <button class="btn btn--primary" type="button" data-posts>Write 2 posts with AI</button>
+          ${drafts.map((p) => `<div class="post"><div class="row"><strong>${esc(p.topic)}</strong><span class="chip" style="flex:none">${esc(p.button)}</span></div>
+            <p>${esc(p.text)}</p><p class="small muted">${esc(p.month)} · ${p.text.length} characters${p.problems.length ? ` · ⚠️ ${esc(p.problems.join(", "))}` : ""}</p>
+            <div class="btns">${copyBtn(p.text)}<button class="btn btn--small btn--good" type="button" data-posted="${p.id}">Mark posted</button><button class="btn btn--small" type="button" data-delpost="${p.id}">Delete</button></div></div>`).join("")}
+          ${posted.length ? `<h3 style="margin-top:14px">Posted</h3><ul class="list small">${posted.map((p) => `<li>✓ ${esc(p.topic)} <span class="muted">· ${esc(p.month)}</span></li>`).join("")}</ul>` : ""}
+        </section>
+        <section class="card"><h2>4. Reply to a review</h2>
+          <p class="small muted">Paste a new review from their profile. Copy the reply back into Google. Never offer anything in exchange for reviews.</p>
+          <label class="field">The review<textarea id="rtext" rows="4" maxlength="4000"></textarea></label>
+          <div class="row"><label class="field">Their name <span class="hint">optional</span><input id="rname" maxlength="80"></label>
+          <label class="field">Stars<select id="rstars">${[5, 4, 3, 2, 1].map((n) => `<option value="${n}">${"★".repeat(n)}</option>`).join("")}</select></label></div>
+          <button class="btn btn--primary" type="button" data-reply>Write reply</button>
+          <div id="rout"></div>
+        </section></div></div>`;
+      bind();
+    };
+    const bind = () => {
+      $app.querySelectorAll("[data-copytext]").forEach((b) => b.addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(b.dataset.copytext); toast("Copied"); } catch (e) { toast("Couldn't copy"); }
+      }));
+      $app.querySelectorAll("[data-check]").forEach((c) => c.addEventListener("change", async () => {
+        try { Object.assign(g, await api(`/leads/${id}/gbp`, { method: "PUT", json: { check: c.dataset.check, done: c.checked } })); render(g); } catch (err) { toast(err.message); }
+      }));
+      const busy = async (btn, label, fn) => {
+        btn.disabled = true;
+        const old = btn.innerHTML;
+        btn.innerHTML = `<span class="spin"></span> ${label}`;
+        try { await fn(); } catch (err) { toast(err.message); btn.disabled = false; btn.innerHTML = old; }
+      };
+      const kitBtn = $app.querySelector("[data-kit]");
+      if (kitBtn) kitBtn.addEventListener("click", () => busy(kitBtn, "Writing… (about 15 seconds)", async () => { Object.assign(g, await api(`/leads/${id}/gbp/kit`, { method: "POST" })); render(g); }));
+      const postsBtn = $app.querySelector("[data-posts]");
+      postsBtn.addEventListener("click", () => busy(postsBtn, "Writing posts…", async () => {
+        Object.assign(g, await api(`/leads/${id}/gbp/posts`, { method: "POST", json: { count: 2, notes: $app.querySelector("#pnotes").value.trim() } }));
+        render(g);
+      }));
+      $app.querySelectorAll("[data-posted],[data-delpost]").forEach((b) => b.addEventListener("click", async () => {
+        const postId = b.dataset.posted || b.dataset.delpost;
+        if (b.dataset.delpost && !confirm("Delete this draft?")) return;
+        try { Object.assign(g, await api(`/leads/${id}/gbp`, { method: "PUT", json: b.dataset.posted ? { postId, posted: true } : { postId, removePost: true } })); render(g); } catch (err) { toast(err.message); }
+      }));
+      const replyBtn = $app.querySelector("[data-reply]");
+      replyBtn.addEventListener("click", () => {
+        const review = $app.querySelector("#rtext").value.trim();
+        if (!review) return toast("Paste the review first");
+        busy(replyBtn, "Writing…", async () => {
+          const res = await api(`/leads/${id}/gbp/reply`, { method: "POST", json: { review, stars: Number($app.querySelector("#rstars").value), reviewer: $app.querySelector("#rname").value.trim() || undefined } });
+          const out = $app.querySelector("#rout");
+          out.innerHTML = `<div class="kit" style="margin-top:12px"><p>${esc(res.reply)}</p>${res.problems.length ? `<p class="small muted">⚠️ ${esc(res.problems.join(", "))}</p>` : ""}<button class="btn btn--small" type="button" id="rcopy">Copy reply</button></div>`;
+          out.querySelector("#rcopy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(res.reply); toast("Copied"); } catch (e) { toast("Couldn't copy"); } });
+          replyBtn.disabled = false;
+          replyBtn.textContent = "Write another version";
+        });
+      });
+    };
+    render(g);
+  }
+
   /* ---------- walk-in route ---------- */
   const START_TOWNS = [["Cullman", 34.1748, -86.8436], ["Hartselle", 34.4434, -86.9353], ["Arab", 34.3281, -86.4958], ["Hanceville", 34.0607, -86.7675], ["Good Hope", 34.1157, -86.8636], ["Vinemont", 34.2465, -86.8661]];
   const MAX_STOPS = 9; // Google Maps directions links take up to 9 stops
@@ -1081,6 +1208,7 @@
         <label class="field">Legal name <span class="hint">Who signs client agreements</span><input name="legalName" value="${esc(s.legalName || "")}" placeholder="e.g. Underground Associates LLC"></label>
         <div class="row"><label class="field">Business phone<input name="companyPhone" type="tel" value="${esc(s.companyPhone || "")}"></label>
         <label class="field">Business email<input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
+        <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
         <label class="field">Caller's name <span class="hint">Used in call guides you open; callers' own logins use their names</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="Who makes the calls"></label>
         <h2 style="margin-top:18px">Plans &amp; prices</h2>
         <p class="small muted">${s.plans.length ? "" : "Suggested starting plans are filled in below. Change them to your prices, then Save. "}Leave a plan's name blank to hide it. For automatic monthly payment, make a <strong>Payment Link</strong> for each plan in Stripe or Square (set as a monthly subscription) and paste it here.</p>
@@ -1145,6 +1273,7 @@
             legalName: v("legalName") || undefined,
             companyPhone: v("companyPhone") || undefined,
             companyEmail: v("companyEmail") || undefined,
+            gbpEmail: v("gbpEmail") || undefined,
             callerName: v("callerName") || undefined,
             plans,
             minMonths: n(v("minMonths")),
@@ -1174,12 +1303,13 @@
     try {
       if (h === "#/login") return await viewLogin();
       meta = meta || (await api("/meta"));
-      if (!isOwner() && (/^#\/edit\//.test(h) || h === "#/inbox" || h === "#/sales")) return go("#/");
+      if (!isOwner() && (/^#\/(edit|gbp)\//.test(h) || h === "#/inbox" || h === "#/sales")) return go("#/");
       if ((m = /^#\/lead\/([a-z0-9]+)$/.exec(h))) return await viewLead(m[1]);
       if ((m = /^#\/edit\/([a-z0-9]+)$/.exec(h))) return await viewEdit(m[1]);
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/route") return await viewRoute();
+      if ((m = /^#\/gbp\/([a-z0-9]+)$/.exec(h))) return await viewGbp(m[1]);
       if (h === "#/sales") return await viewSales();
       if (h === "#/inbox") return await viewInbox();
       if (h === "#/settings") return await viewSettings();

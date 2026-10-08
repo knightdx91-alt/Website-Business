@@ -70,3 +70,12 @@ test("website checker flags outdated and broken sites", async () => {
     globalThis.fetch = real;
   }
 });
+
+test("Google profile text checks catch what Google rejects", async () => {
+  const { profileTextProblems } = await import("../src/copy/gbp.ts");
+  assert.deepEqual(profileTextProblems("Fresh barbecue in Cullman, cooked low and slow every morning.", 750), []);
+  assert.deepEqual(profileTextProblems("Call us at (256) 555-0100 today", 750), ["has a phone number"]);
+  assert.deepEqual(profileTextProblems("Visit www.example.com for more", 750), ["has a link"]);
+  assert.deepEqual(profileTextProblems("The best BBQ in Cullman", 750), ["has a superlative"]);
+  assert.deepEqual(profileTextProblems("x".repeat(800), 750), ["over 750 characters"]);
+});
