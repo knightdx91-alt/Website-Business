@@ -11,9 +11,17 @@ export const QUERIES: Partial<Record<CategoryId, string[]>> = {
     "electrician in Cullman, AL",
     "roofing contractor in Cullman, AL",
   ],
+  salon: ["hair salon in Cullman, AL", "barber shop in Cullman, AL", "beauty salon in Cullman, AL"],
+  auto: ["auto repair in Cullman, AL", "mechanic in Cullman, AL", "tire shop in Cullman, AL", "transmission repair in Cullman, AL"],
+  landscaping: ["landscaping in Cullman, AL", "lawn care service in Cullman, AL", "lawn mowing service in Cullman, AL"],
+  cleaning: ["house cleaning service in Cullman, AL", "cleaning service in Cullman, AL", "janitorial service in Cullman, AL"],
 };
 
 export const CATEGORY_LABELS: Partial<Record<CategoryId, string>> = {
   restaurant: "Restaurants & cafes",
   contractor: "Contractors",
+  salon: "Salons & barbers",
+  auto: "Auto repair",
+  landscaping: "Landscaping & lawn",
+  cleaning: "Cleaning services",
 };

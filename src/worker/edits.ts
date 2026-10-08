@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { parseMenuText } from "../generator/menu.ts";
+import { parsePrice } from "../generator/price.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
-import type { BusinessRecord, ConfirmableField, Copy } from "../generator/types.ts";
+import type { BusinessRecord, ConfirmableField, Copy, Service } from "../generator/types.ts";
 import { HttpError } from "./env.ts";
 
 const url = z.string().trim().url().max(500).or(z.literal(""));
@@ -22,6 +23,13 @@ export const EditsSchema = z.object({
       license: z.object({ label: z.string().trim().max(80), number: z.string().trim().max(40) }).nullable().optional(),
       emergencyService: z.boolean().optional(),
       freeEstimates: z.boolean().optional(),
+      bonded: z.boolean().optional(),
+      walkIns: z.enum(["welcome", "appointment_only", "both"]).nullable().optional(),
+      ase: z.boolean().optional(),
+      warranty: z.object({ months: z.number().int().min(1).max(120).nullable(), miles: z.number().int().min(1).max(500_000).nullable(), nationwide: z.boolean() }).nullable().optional(),
+      backgroundChecked: z.boolean().optional(),
+      suppliesIncluded: z.boolean().optional(),
+      petSafe: z.boolean().optional(),
       links: z
         .object({ order: url, reserve: url, booking: url, facebook: url, instagram: url })
         .partial()
@@ -80,10 +88,38 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
   }
   if (e.insured !== undefined) r.insured = e.insured;
   if (e.license !== undefined) r.licenses = e.license && e.license.number ? [{ label: e.license.label || "License", number: e.license.number }] : [];
+  if (e.bonded !== undefined) r.bonded = e.bonded;
   if (r.category === "contractor") {
     r.ext.contractor = r.ext.contractor ?? { residential: true };
     if (e.emergencyService !== undefined) r.ext.contractor.emergencyService = e.emergencyService;
     if (e.freeEstimates !== undefined) r.ext.contractor.freeEstimates = e.freeEstimates;
+  }
+  if (r.category === "salon") {
+    r.ext.salon = r.ext.salon ?? {};
+    if (e.walkIns !== undefined) r.ext.salon.walkIns = e.walkIns ?? undefined;
+  }
+  if (r.category === "auto") {
+    r.ext.auto = r.ext.auto ?? {};
+    if (e.ase !== undefined) r.ext.auto.ase = e.ase;
+    if (e.freeEstimates !== undefined) r.ext.auto.freeEstimates = e.freeEstimates;
+    if (e.warranty !== undefined) {
+      r.ext.auto.warranty =
+        e.warranty && (e.warranty.months || e.warranty.miles)
+          ? { months: e.warranty.months ?? undefined, miles: e.warranty.miles ?? undefined, nationwide: e.warranty.nationwide }
+          : undefined;
+    }
+  }
+  if (r.category === "landscaping") {
+    r.ext.landscaping = r.ext.landscaping ?? {};
+    if (e.freeEstimates !== undefined) r.ext.landscaping.freeEstimates = e.freeEstimates;
+  }
+  if (r.category === "cleaning") {
+    r.ext.cleaning = r.ext.cleaning ?? {};
+    const c = r.ext.cleaning;
+    if (e.freeEstimates !== undefined) c.freeEstimates = e.freeEstimates;
+    if (e.backgroundChecked !== undefined) c.backgroundChecked = e.backgroundChecked;
+    if (e.suppliesIncluded !== undefined) c.suppliesIncluded = e.suppliesIncluded;
+    if (e.petSafe !== undefined) c.petSafe = e.petSafe;
   }
   if (e.links) {
     const l = e.links;
@@ -97,7 +133,14 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
   if (e.towns) r.serviceArea = { towns: e.towns, counties: r.serviceArea?.counties ?? [] };
   if (e.services) {
     const keep = new Map(r.services.map((s) => [s.name.toLowerCase(), s]));
-    r.services = e.services.map((name) => keep.get(name.toLowerCase()) ?? { id: serviceId(name), name, featured: true });
+    r.services = e.services.map((line) => {
+      const [rawName, rawPrice] = line.split("|").map((x) => x.trim());
+      const name = rawName || line;
+      const existing = keep.get(name.toLowerCase());
+      const svc: Service = existing ? { ...existing, name } : { id: serviceId(name), name, featured: true };
+      if (rawPrice !== undefined) svc.price = parsePrice(rawPrice);
+      return svc;
+    });
   }
   if (e.menuText !== undefined && r.category === "restaurant") {
     r.ext.restaurant = r.ext.restaurant ?? { serviceOptions: {} };

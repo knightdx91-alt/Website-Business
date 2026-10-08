@@ -14,6 +14,7 @@ import { packFor } from "../src/generator/packs/index.ts";
 import { buildSite } from "../src/generator/render.ts";
 import type { CategoryId, Copy } from "../src/generator/types.ts";
 import { fetchPhoto, RESTAURANT_FLAGS, searchText, type Place } from "../src/places/client.ts";
+import { MARKET, QUERIES } from "../src/places/queries.ts";
 import { qualify } from "../src/places/qualify.ts";
 import { placeToRecord, reviewTexts } from "../src/places/to-record.ts";
 
@@ -27,11 +28,7 @@ const { values: args } = parseArgs({
   },
 });
 
-const CULLMAN = { lat: 34.1748, lng: -86.8436 };
-const QUERIES: Record<string, string[]> = {
-  restaurant: ["restaurants in Cullman, AL", "barbecue in Cullman, AL", "mexican restaurant in Cullman, AL", "cafe in Cullman, AL"],
-  contractor: ["plumber in Cullman, AL", "heating and air conditioning in Cullman, AL", "electrician in Cullman, AL", "roofing contractor in Cullman, AL"],
-};
+const CULLMAN = MARKET.center;
 
 const category = args.category as CategoryId;
 const pack = packFor(category);

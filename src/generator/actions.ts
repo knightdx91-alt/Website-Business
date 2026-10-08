@@ -34,6 +34,12 @@ const PROVIDERS: Array<[RegExp, string]> = [
   [/vagaro\.com/, "Vagaro"],
 ];
 
+/** Free estimates only show when the owner has confirmed them, in whichever category the business is. */
+export function freeEstimates(r: BusinessRecord): boolean {
+  const e = r.ext;
+  return !!(e.contractor?.freeEstimates || e.auto?.freeEstimates || e.landscaping?.freeEstimates || e.cleaning?.freeEstimates);
+}
+
 export function detectProvider(url: string): string | undefined {
   return PROVIDERS.find(([re]) => re.test(url))?.[1];
 }
@@ -63,8 +69,9 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
     case "book":
       return r.links.booking ? { id, label: "Book online", short: "Book", href: r.links.booking, external: true, icon: "calendar" } : null;
     case "quote": {
-      const label = r.ext.contractor?.freeEstimates ? "Get a free estimate" : "Request service";
-      return { id, label, short: r.ext.contractor?.freeEstimates ? "Estimate" : "Request", href: "#contact", external: false, icon: "clipboard" };
+      const free = freeEstimates(r);
+      const label = free ? (r.category === "contractor" || r.category === "auto" ? "Get a free estimate" : "Get a free quote") : r.category === "auto" ? "Request an appointment" : r.category === "contractor" ? "Request service" : "Request a quote";
+      return { id, label, short: free ? (r.category === "contractor" || r.category === "auto" ? "Estimate" : "Free quote") : r.category === "auto" ? "Request" : "Quote", href: "#contact", external: false, icon: "clipboard" };
     }
     case "menu":
       return { id, label: "View menu", short: "Menu", href: "/menu/", external: false, icon: "list" };

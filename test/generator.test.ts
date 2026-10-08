@@ -153,3 +153,73 @@ test("menu is required before a restaurant can publish", async () => {
   const preview = await buildSite({ record, copy: sampleCopy({ approved: true }), site: { slug: "s", look: "" }, mode: "preview" });
   assert.ok(preview.todos.includes("Send us your menu"));
 });
+
+import { categoryRecord } from "./fixtures.ts";
+import { parsePrice } from "../src/generator/price.ts";
+
+test("price parsing", () => {
+  assert.deepEqual(parsePrice("$25"), { mode: "exact", amount: 25 });
+  assert.deepEqual(parsePrice("from $80"), { mode: "from", amount: 80 });
+  assert.deepEqual(parsePrice("$30-$45"), { mode: "range", min: 30, max: 45 });
+  assert.deepEqual(parsePrice("consult"), { mode: "quote" });
+  assert.equal(parsePrice("call us"), undefined);
+});
+
+const EXPECTED_TYPE = { salon: '"HairSalon"', auto: '"AutoRepair"', landscaping: '"HomeAndConstructionBusiness"', cleaning: '"LocalBusiness"' } as const;
+for (const cat of ["salon", "auto", "landscaping", "cleaning"] as const) {
+  test(`${cat} preview builds clean with the right schema type`, async () => {
+    const out = await buildSite({ record: categoryRecord(cat), copy: sampleCopy({ cuisineLabel: undefined }), site: { slug: "s", look: "" }, mode: "preview" });
+    assert.deepEqual(out.lint.errors, []);
+    const home = out.files.get("index.html") as string;
+    assert.equal((home.match(/<h1[\s>]/g) ?? []).length, 1);
+    assert.ok(home.includes(`"@type":${EXPECTED_TYPE[cat]}`), `schema type for ${cat}`);
+    assert.ok(home.includes('href="tel:+12565550123"'));
+    assert.ok(out.look.startsWith(`${cat}.`));
+    assert.ok(out.todos.length > 0, "an unconfirmed lead has required to-dos");
+  });
+
+  test(`${cat} publishes once the owner confirms everything`, async () => {
+    const extra: Record<string, unknown> = cat === "salon" ? { salon: { walkIns: "welcome" } } : { [cat]: {} };
+    const record = categoryRecord(cat, {
+      confirmed: ["name", "phone", "address", "hours", "services", "service_area"],
+      ext: extra,
+    });
+    const out = await buildSite({ record, copy: sampleCopy({ approved: true, cuisineLabel: undefined }), site: { slug: "s", look: "" }, mode: "publish", loadFont });
+    assert.ok(out.files.has("sitemap.xml"));
+    assert.ok(!(out.files.get("index.html") as string).includes("data-todo"));
+  });
+}
+
+test("service-area categories hide the street; storefronts show it", async () => {
+  for (const [cat, shows] of [["landscaping", false], ["cleaning", false], ["auto", true], ["salon", true]] as const) {
+    const out = await buildSite({ record: categoryRecord(cat), copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview" });
+    assert.equal((out.files.get("index.html") as string).includes("100 Main Ave"), shows, cat);
+  }
+});
+
+test("salon prices and walk-in badge render from owner data", async () => {
+  const record = categoryRecord("salon", {
+    services: [{ id: "cut", name: "Haircut", price: { mode: "exact", amount: 25 } }],
+    ext: { salon: { walkIns: "welcome" } },
+  });
+  const home = (await buildSite({ record, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview" })).files.get("index.html") as string;
+  assert.ok(home.includes("$25"));
+  assert.ok(home.includes("Walk-ins welcome"));
+});
+
+test("auto trust chips only come from owner facts", async () => {
+  const plain = (await buildSite({ record: categoryRecord("auto"), copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview" })).files.get("index.html") as string;
+  assert.ok(!plain.includes("ASE") && !plain.includes("warranty"));
+  const record = categoryRecord("auto", { ext: { auto: { ase: true, warranty: { months: 36, miles: 36000, nationwide: true } } } });
+  const home = (await buildSite({ record, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview" })).files.get("index.html") as string;
+  assert.ok(home.includes("ASE-certified"));
+  assert.ok(home.includes("36-month / 36,000-mile warranty, nationwide"));
+});
+
+test("superlative check allows advice phrasing", async () => {
+  const { SUPERLATIVE } = await import("../src/generator/lint.ts");
+  assert.equal(SUPERLATIVE.test("Fall is the best time to aerate."), false);
+  assert.equal(SUPERLATIVE.test("We keep your business clean."), false);
+  assert.equal(SUPERLATIVE.test("The best plumber in Cullman."), true);
+  assert.equal(SUPERLATIVE.test("Best in town barbecue."), true);
+});

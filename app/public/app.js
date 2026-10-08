@@ -21,7 +21,7 @@
   const CATEGORY_LABEL = { restaurant: "Restaurant", contractor: "Contractor", salon: "Salon", auto: "Auto", landscaping: "Landscaping", cleaning: "Cleaning" };
   const SALES = [["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["", "All"]];
   // Rough Claude cost per site at Opus 5.5 rates, measured on real Cullman runs.
-  const COST_PER_SITE = { restaurant: 0.04, contractor: 0.1 };
+  const COST_PER_SITE = { restaurant: 0.04, contractor: 0.1, salon: 0.06, auto: 0.1, landscaping: 0.1, cleaning: 0.1 };
   const MODEL_FACTOR = { "claude-opus-5-5": 1, "claude-sonnet-5-5": 0.5, "claude-haiku-5-5": 0.03 };
 
   function toast(msg) {
@@ -384,29 +384,51 @@
     if (!l.record) return go("#/lead/" + id);
     const r = l.record;
     const c = l.copy;
-    const isC = r.category === "contractor";
-    const isR = r.category === "restaurant";
+    const cat = r.category;
+    const isR = cat === "restaurant";
+    const isC = cat === "contractor";
+    const isS = cat === "salon";
+    const isA = cat === "auto";
+    const isL = cat === "landscaping";
+    const isK = cat === "cleaning";
+    const serviceArea = isC || isL || isK;
+    const hasServices = !isR;
+    const hasTowns = isC || isL || isK || isA;
+    const ext = r.ext[cat] || {};
     const conf = new Set(r.confirmed);
     const t = r.testimonials.concat([{}, {}, {}]).slice(0, 3);
     const cb = (name, label, on) => `<label class="check"><input type="checkbox" name="${name}"${on ? " checked" : ""}> ${label}</label>`;
     const confirmable = [["name", "Business name is right"], ["phone", "Phone number is right"], ["address", "Address is right"]];
     if (r.hours) confirmable.push(["hours", "Hours are right"]);
-    if (isC) confirmable.push(["service_area", "Service area towns are right"], ["services", "Services list is right"]);
+    if (hasServices) confirmable.push(["services", isS ? "Services and prices are right" : "Services list is right"]);
+    if (hasTowns) confirmable.push(["service_area", "Service area towns are right"]);
     if (isR) confirmable.push(["menu", "Menu is right"]);
+    const priceOf = (s) => {
+      const p = s.price;
+      if (!p) return "";
+      if (p.mode === "exact") return `$${p.amount}`;
+      if (p.mode === "from") return `from $${p.amount}`;
+      if (p.mode === "range") return `$${p.min}-$${p.max}`;
+      if (p.mode === "quote") return "consult";
+      return "";
+    };
+    const serviceLines = r.services.map((s) => (isS && priceOf(s) ? `${s.name} | ${priceOf(s)}` : s.name)).join("\n");
+    const lic = r.licenses[0] || {};
+    const w = ext.warranty || {};
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p><h1>Edit ${esc(r.name)}</h1>
     <form id="ef"><div class="grid grid--2"><div>
       <section class="card"><h2>Confirm with the owner</h2>
         <label class="field">Business name<input name="name" value="${esc(r.name)}" required></label>
         <label class="field">Phone<input name="phone" type="tel" value="${esc(r.phone.display)}" required></label>
         ${cb("smsEnabled", "This number takes texts", r.smsEnabled)}
-        ${isC ? cb("showStreetAddress", "Show the street address (they have a storefront)", r.showStreetAddress) : ""}
+        ${serviceArea ? cb("showStreetAddress", "Show the street address (they have a storefront)", r.showStreetAddress) : ""}
         <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
         ${confirmable.map(([k, label]) => cb("confirm_" + k, label, conf.has(k))).join("")}
       </section>
       <section class="card"><h2>Photo</h2>
         <p class="small muted">${r.media.hero && r.media.hero.source === "google" ? "Using a Google photo (fine for the preview, but it must be replaced before publishing)." : r.media.hero ? "Using the owner's photo." : "No photo yet."}</p>
         <label class="field">Main photo<input type="file" id="photo" accept="image/*"></label>
-        <label class="field">Describe the photo<input id="photoAlt" placeholder="e.g. Smoked brisket plate on the counter"></label>
+        <label class="field">Describe the photo<input id="photoAlt" placeholder="e.g. Freshly mowed front lawn in Cullman"></label>
         <button class="btn btn--small" type="button" id="upload">Upload photo</button>
       </section>
       <section class="card"><h2>Look</h2><label class="field">Design style<select name="look">${l.looks
@@ -415,11 +437,18 @@
       <section class="card"><h2>Facts (only if the owner says so)</h2>
         <label class="field">Year they started<input name="foundedYear" type="number" inputmode="numeric" min="1800" max="2100" value="${r.foundedYear || ""}"></label>
         ${cb("familyOwned", "Family-owned", r.ownershipTags.includes("family_owned"))}
-        ${isC ? `${cb("insured", "Insured", !!r.insured)}
-          <div class="row"><label class="field">License type<input name="licenseLabel" value="${esc((r.licenses[0] || {}).label || "")}" placeholder="AL Plumbing License"></label>
-          <label class="field">License #<input name="licenseNumber" value="${esc((r.licenses[0] || {}).number || "")}"></label></div>
-          ${cb("emergencyService", "Offers emergency service", !!(r.ext.contractor || {}).emergencyService)}
-          ${cb("freeEstimates", "Free estimates", !!(r.ext.contractor || {}).freeEstimates)}` : ""}
+        ${isS ? `<label class="field">Walk-ins or appointments?<select name="walkIns"><option value="">Not set yet</option>${[["welcome", "Walk-ins welcome"], ["appointment_only", "By appointment only"], ["both", "Both"]].map(([v, label]) => `<option value="${v}"${ext.walkIns === v ? " selected" : ""}>${label}</option>`).join("")}</select></label>` : ""}
+        ${isC || isL || isK ? cb("insured", "Insured", !!r.insured) : ""}
+        ${isK ? cb("bonded", "Bonded", !!r.bonded) : ""}
+        ${isC || isL ? `<div class="row"><label class="field">License type<input name="licenseLabel" value="${esc(lic.label || "")}" placeholder="${isC ? "AL Plumbing License" : "License"}"></label>
+          <label class="field">License #<input name="licenseNumber" value="${esc(lic.number || "")}"></label></div>` : ""}
+        ${isC ? cb("emergencyService", "Offers emergency service", !!ext.emergencyService) : ""}
+        ${isA ? `${cb("ase", "ASE-certified", !!ext.ase)}
+          <div class="row"><label class="field">Warranty months<input name="warrantyMonths" type="number" inputmode="numeric" value="${w.months || ""}"></label>
+          <label class="field">Warranty miles<input name="warrantyMiles" type="number" inputmode="numeric" value="${w.miles || ""}"></label></div>
+          ${cb("warrantyNationwide", "Warranty is nationwide", !!w.nationwide)}` : ""}
+        ${isK ? `${cb("backgroundChecked", "Team is background-checked", !!ext.backgroundChecked)}${cb("suppliesIncluded", "They bring their own supplies", !!ext.suppliesIncluded)}${cb("petSafe", "Uses pet-safe products", !!ext.petSafe)}` : ""}
+        ${isC || isA || isL || isK ? cb("freeEstimates", isA || isC ? "Free estimates" : "Free quotes", !!ext.freeEstimates) : ""}
       </section>
       <section class="card"><h2>Links</h2>
         ${isR ? `<label class="field">Online ordering link<input name="order" type="url" value="${esc(r.links.order || "")}" placeholder="https://"></label>
@@ -436,13 +465,13 @@
         <label class="field">Closing heading<input name="ctaTitle" value="${esc(c.ctaTitle)}"></label>
         <label class="field">Closing line<input name="ctaLine" value="${esc(c.ctaLine)}"></label>
         <label class="field">Google search description <span class="hint">About 150 characters</span><textarea name="metaDescription" rows="3">${esc(c.meta.description)}</textarea></label>
-        ${isC ? r.services.map((s) => `<label class="field">${esc(s.name)}<textarea name="blurb_${esc(s.id)}" rows="3">${esc(c.serviceBlurbs[s.id] || "")}</textarea></label>`).join("") : ""}
+        ${hasServices ? r.services.map((s) => `<label class="field">${esc(s.name)}<textarea name="blurb_${esc(s.id)}" rows="3">${esc(c.serviceBlurbs[s.id] || "")}</textarea></label>`).join("") : ""}
       </section>
       ${isR ? `<section class="card"><h2>Menu</h2><p class="small muted">One item per line: <code>Name | $Price | Description</code>. Start a section with <code># Section name</code>.</p>
         <label class="field"><span class="sr-only">Menu</span><textarea name="menuText" rows="12" placeholder="# Plates&#10;Pulled pork plate | $12 | Two sides and bread">${esc(l.menuText)}</textarea></label></section>` : ""}
-      ${isC ? `<section class="card"><h2>Services &amp; area</h2>
-        <label class="field">Services (one per line)<textarea name="services" rows="7">${esc(r.services.map((s) => s.name).join("\n"))}</textarea></label>
-        <label class="field">Towns served (comma separated)<textarea name="towns" rows="3">${esc((r.serviceArea || { towns: [] }).towns.join(", "))}</textarea></label></section>` : ""}
+      ${hasServices ? `<section class="card"><h2>${hasTowns ? "Services &amp; area" : "Services"}</h2>
+        <label class="field">${isS ? "Services and prices, one per line <span class=\"hint\">e.g. <code>Haircut | $25</code> or <code>Color | from $80</code></span>" : "Services (one per line)"}<textarea name="services" rows="7">${esc(serviceLines)}</textarea></label>
+        ${hasTowns ? `<label class="field">Towns served (comma separated)<textarea name="towns" rows="3">${esc((r.serviceArea || { towns: [] }).towns.join(", "))}</textarea></label>` : ""}</section>` : ""}
       <section class="card"><h2>Customer quotes</h2><p class="small muted">Only real quotes the customer said you can use. Never copy Google reviews.</p>
         ${t.map((q, i) => `<label class="field">Quote ${i + 1}<textarea name="q${i}" rows="2">${esc(q.quote || "")}</textarea></label>
           <div class="row"><label class="field">Name<input name="qn${i}" value="${esc(q.displayName || "")}" placeholder="Amy R."></label><label class="field">Town<input name="qt${i}" value="${esc(q.town || "")}"></label></div>`).join("")}
@@ -457,9 +486,9 @@
       if (!file) return toast("Choose a photo first");
       e.target.disabled = true;
       try {
-        const { blob, w, h } = await resizeImage(file);
+        const { blob, w: pw, h: ph } = await resizeImage(file);
         const alt = $app.querySelector("#photoAlt").value || r.name;
-        await api(`/leads/${id}/photo?w=${w}&h=${h}&alt=${encodeURIComponent(alt)}`, { method: "POST", body: blob, type: "image/jpeg" });
+        await api(`/leads/${id}/photo?w=${pw}&h=${ph}&alt=${encodeURIComponent(alt)}`, { method: "POST", body: blob, type: "image/jpeg" });
         toast("Photo saved");
         viewEdit(id);
       } catch (err) { toast(err.message); } finally { e.target.disabled = false; }
@@ -470,28 +499,35 @@
       const f = e.target;
       const val = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
       const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
+      const num = (n) => (val(n) ? Number(val(n)) : null);
       const confirmed = confirmable.map(([k]) => k).filter((k) => on("confirm_" + k));
       const testimonials = [0, 1, 2].map((i) => ({ quote: val("q" + i), displayName: val("qn" + i), town: val("qt" + i) || undefined })).filter((q) => q.quote && q.displayName);
       const blurbs = {};
-      if (isC) r.services.forEach((s) => { const v = val("blurb_" + s.id); if (v !== undefined) blurbs[s.id] = v; });
-      const year = val("foundedYear");
+      if (hasServices) r.services.forEach((s) => { const v = val("blurb_" + s.id); if (v !== undefined) blurbs[s.id] = v; });
       const edits = {
         look: val("look"),
         record: {
           name: val("name"),
           phone: val("phone"),
           smsEnabled: on("smsEnabled"),
-          showStreetAddress: isC ? on("showStreetAddress") : undefined,
-          foundedYear: year ? Number(year) : null,
+          showStreetAddress: serviceArea ? on("showStreetAddress") : undefined,
+          foundedYear: num("foundedYear"),
           familyOwned: on("familyOwned"),
-          insured: isC ? on("insured") : undefined,
-          license: isC ? (val("licenseNumber") ? { label: val("licenseLabel") || "License", number: val("licenseNumber") } : null) : undefined,
-          emergencyService: isC ? on("emergencyService") : undefined,
-          freeEstimates: isC ? on("freeEstimates") : undefined,
+          insured: on("insured"),
+          bonded: on("bonded"),
+          license: isC || isL ? (val("licenseNumber") ? { label: val("licenseLabel") || "License", number: val("licenseNumber") } : null) : undefined,
+          emergencyService: on("emergencyService"),
+          freeEstimates: on("freeEstimates"),
+          walkIns: isS ? val("walkIns") || null : undefined,
+          ase: on("ase"),
+          warranty: isA ? { months: num("warrantyMonths"), miles: num("warrantyMiles"), nationwide: !!on("warrantyNationwide") } : undefined,
+          backgroundChecked: on("backgroundChecked"),
+          suppliesIncluded: on("suppliesIncluded"),
+          petSafe: on("petSafe"),
           links: { order: val("order"), reserve: val("reserve"), booking: val("booking"), facebook: val("facebook"), instagram: val("instagram") },
           testimonials,
-          towns: isC ? val("towns").split(",").map((s) => s.trim()).filter(Boolean) : undefined,
-          services: isC ? val("services").split("\n").map((s) => s.trim()).filter(Boolean) : undefined,
+          towns: hasTowns ? val("towns").split(",").map((s) => s.trim()).filter(Boolean) : undefined,
+          services: hasServices ? val("services").split("\n").map((s) => s.trim()).filter(Boolean) : undefined,
           menuText: isR ? f.elements.menuText.value : undefined,
           confirmed,
         },
@@ -502,7 +538,7 @@
           ctaTitle: val("ctaTitle"),
           ctaLine: val("ctaLine"),
           metaDescription: val("metaDescription"),
-          serviceBlurbs: isC ? blurbs : undefined,
+          serviceBlurbs: hasServices ? blurbs : undefined,
           approved: on("approved"),
         },
       };

@@ -183,17 +183,30 @@ export function faq(items: Faq[], band = false): Raw {
 </div></section>`;
 }
 
-export function contactForm(ctx: Ctx, services: string[], towns: string[]): Raw {
+export interface FormField {
+  name: "vehicle" | "frequency" | "home_size";
+  label: string;
+  options?: string[];
+  autocomplete?: string;
+}
+
+export function contactForm(ctx: Ctx, services: string[], towns: string[], extra: FormField[] = [], intro = "Tell us what's going on and we'll call you back."): Raw {
   const r = ctx.r;
   const endpoint = ctx.formEndpoint ?? "/__preview/form";
+  const q = action(r, "quote")!;
   return html`<section class="section section--band" id="contact" aria-labelledby="contact-title"><div class="wrap narrow">
-${sectionHead("Contact", r.ext.contractor?.freeEstimates ? "Get a free estimate" : "Request service", "Tell us what's going on and we'll call you back.")}
+${sectionHead("Contact", q.label, intro)}
 <form class="form" method="post" action="${endpoint}">
 <input type="hidden" name="place_id" value="${r.placeId}">
 <label>Your name<input name="name" autocomplete="name" required></label>
 <label>Phone<input name="phone" type="tel" autocomplete="tel" inputmode="tel" required></label>
 <label>Email (optional)<input name="email" type="email" autocomplete="email"></label>
 ${services.length ? html`<label>What do you need?<select name="service"><option value="">Choose one</option>${services.map((s) => html`<option>${s}</option>`)}<option>Something else</option></select></label>` : ""}
+${extra.map((f) =>
+  f.options
+    ? html`<label>${f.label}<select name="${f.name}"><option value="">Choose one</option>${f.options.map((o) => html`<option>${o}</option>`)}</select></label>`
+    : html`<label>${f.label}<input name="${f.name}"${f.autocomplete ? raw(` autocomplete="${f.autocomplete}"`) : ""}></label>`,
+)}
 ${towns.length ? html`<label>Town<select name="town"><option value="">Choose one</option>${towns.map((t) => html`<option>${t}</option>`)}<option>Other</option></select></label>` : ""}
 <label>Details (optional)<textarea name="message"></textarea></label>
 <label class="hp" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>

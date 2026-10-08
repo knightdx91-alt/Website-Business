@@ -8,7 +8,7 @@ export interface LintResult {
   warnings: string[];
 }
 
-const PLACEHOLDERS = [/lorem ipsum/i, /\[(city|phone|business|name|town)[^\]]*\]/i, /your business/i, /john doe/i, /example\.com/i, /\bTODO\b/, /slide title/i];
+const PLACEHOLDERS = [/lorem ipsum/i, /\[(city|phone|business|name|town)[^\]]*\]/i, /\byour business (name|here)\b/i, /john doe/i, /example\.com/i, /\bTODO\b/, /slide title/i];
 export const BANNED_PHRASES = [
   "nestled",
   "culinary journey",
@@ -25,7 +25,8 @@ export const BANNED_PHRASES = [
   "best in town",
   "#1",
 ];
-const SUPERLATIVE = /\b(the best|best in|finest|number one)\b/i;
+/** Business superlatives. "the best time to mow" is advice, not a claim, so common advice phrases are allowed. */
+export const SUPERLATIVE = /\b(?:the best(?! (?:time|way|part|thing|fit|results|choice for you|option for you))|best in (?:town|the|cullman|alabama|county)|finest|number one)\b/i;
 
 function visibleText(htmlDoc: string): string {
   return htmlDoc

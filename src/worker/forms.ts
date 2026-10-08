@@ -1,7 +1,7 @@
 import { getLead } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 
-const FIELDS = ["name", "phone", "email", "service", "town", "message"] as const;
+const FIELDS = ["name", "phone", "email", "service", "vehicle", "frequency", "home_size", "town", "message"] as const;
 
 /** Lead form posts from published client sites. Works without JavaScript (plain POST + redirect). */
 export async function handleFormPost(env: Env, req: Request, leadId: string): Promise<Response> {

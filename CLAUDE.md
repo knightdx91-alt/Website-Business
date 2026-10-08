@@ -106,7 +106,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       Cullman leads: 19 restaurant and 16 contractor leads found.
 - [x] Cloudflare app: live at https://website-business.knightdx91.workers.dev
       (Worker API + queue pipeline, D1/R2 storage, phone PWA, Pages publish, form inbox)
-- [ ] Packs for salons, auto, landscaping, cleaning
+- [x] Packs for salons, auto, landscaping, cleaning (24 looks total, all AA-checked).
+      Real Cullman leads found: 14 salon, 20 auto, 11 landscaping, 6 cleaning.
+- [ ] Next ideas: owner gallery/team photos, email/text alerts for inbox items,
+      plan cards (landscaping), cleaning checklist, custom domains for live sites
 
 ## Code map
 

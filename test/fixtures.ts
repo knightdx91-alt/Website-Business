@@ -72,3 +72,24 @@ export function sampleCopy(over: Partial<Copy> = {}): Copy {
     ...over,
   };
 }
+
+export function categoryRecord(category: "salon" | "auto" | "landscaping" | "cleaning", over: Partial<BusinessRecord> = {}): BusinessRecord {
+  const base = restaurantRecord();
+  const storefront = category === "salon" || category === "auto";
+  return {
+    ...base,
+    placeId: `ChIJ${category}`,
+    name: { salon: "Sample Barber Co", auto: "Sample Auto Service", landscaping: "Sample Lawn Care", cleaning: "Sample Cleaning Co" }[category],
+    category,
+    variant: { salon: "barber", auto: "general", landscaping: "lawn_crew", cleaning: "residential" }[category],
+    showStreetAddress: storefront,
+    hours: storefront ? base.hours : undefined,
+    serviceArea: { towns: ["Cullman", "Hanceville"], counties: ["Cullman"] },
+    services: [
+      { id: "one", name: "Service one" },
+      { id: "two", name: "Service two" },
+    ],
+    ext: { [category]: {} },
+    ...over,
+  };
+}

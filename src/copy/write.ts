@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { hasAnyHours, hoursSummary } from "../generator/hours.ts";
-import { BANNED_PHRASES, quotesReview } from "../generator/lint.ts";
+import { BANNED_PHRASES, quotesReview, SUPERLATIVE } from "../generator/lint.ts";
 import type { CategoryPack } from "../generator/packs/types.ts";
 import type { BusinessRecord, Copy } from "../generator/types.ts";
 
@@ -71,6 +71,14 @@ function facts(r: BusinessRecord, pack: CategoryPack, primaryTypeLabel?: string)
     ownership: r.ownershipTags.length ? r.ownershipTags : undefined,
     licensed: r.licenses.length > 0 || undefined,
     insured: r.insured,
+    bonded: r.bonded,
+    free_estimates: r.ext.contractor?.freeEstimates || r.ext.auto?.freeEstimates || r.ext.landscaping?.freeEstimates || r.ext.cleaning?.freeEstimates || undefined,
+    walk_ins: r.ext.salon?.walkIns,
+    ase_certified: r.ext.auto?.ase,
+    warranty: r.ext.auto?.warranty,
+    background_checked: r.ext.cleaning?.backgroundChecked,
+    brings_supplies: r.ext.cleaning?.suppliesIncluded,
+    pet_safe_products: r.ext.cleaning?.petSafe,
     owner_story: "unknown",
   };
 }
@@ -92,7 +100,7 @@ function check(out: CopyOut, factsText: string, reviews: string[]): string[] {
   const all = [out.cuisineLabel, out.heroTagline, out.heroSub, ...out.about, ...out.serviceBlurbs.map((s) => s.text), ...out.steps.flatMap((s) => [s.title, s.body]), ...out.faq.flatMap((f) => [f.q, f.a]), out.serviceAreaIntro, out.ctaTitle, out.ctaLine, out.metaDescription].join(" \n ");
   const lower = all.toLowerCase();
   for (const p of BANNED_PHRASES) if (lower.includes(p)) issues.push(`uses banned phrase "${p}"`);
-  if (/\b(the best|best in|finest)\b/i.test(all)) issues.push("uses a superlative");
+  if (SUPERLATIVE.test(all)) issues.push("uses a superlative");
   for (const n of unsupportedNumbers(all, factsText)) issues.push(`mentions the number ${n}, which isn't in the facts`);
   for (const rv of reviews) if (quotesReview(all, rv)) issues.push("repeats wording from a Google review");
   return issues;

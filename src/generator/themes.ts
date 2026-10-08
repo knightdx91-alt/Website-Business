@@ -1,4 +1,5 @@
-import { bestText, contrast, repairBackground } from "./color.ts";
+import { bestText, contrast, luminance, repairBackground } from "./color.ts";
+import { MORE_LOOKS } from "./looks-more.ts";
 import type { CategoryId } from "./types.ts";
 
 export interface FontSpec {
@@ -200,7 +201,7 @@ export const LOOKS: Record<string, LookDef> = {
     button: "rounded",
     knobs: { hero: "dark", divider: "rule", label: "uppercase", card: "bordered", badge: "plain", priceList: "cards", spacing: "standard" },
     photoDirection: "Wide shots of finished roofs against the sky, crews on pitch with safety gear.",
-  },
+  },  ...MORE_LOOKS,
 };
 
 /**
@@ -212,9 +213,11 @@ export function resolveTheme(lookId: string): Theme {
   if (!look) throw new Error(`Unknown look "${lookId}"`);
   const p = { ...look.palette };
 
-  const onPrimary = bestText(p.primary, p.text, "#FFFFFF");
+  // Dark label candidate: the theme's text color on light themes, near-black on dark themes.
+  const darkLabel = luminance(p.text) < 0.2 ? p.text : "#111111";
+  const onPrimary = bestText(p.primary, darkLabel, "#FFFFFF");
   p.primary = repairBackground(p.primary, onPrimary);
-  const onSecondary = bestText(p.secondary, p.text, "#FFFFFF");
+  const onSecondary = bestText(p.secondary, darkLabel, "#FFFFFF");
   p.secondary = repairBackground(p.secondary, onSecondary);
 
   const colors = { ...p, onPrimary, onSecondary, focus: p.link };

@@ -1,5 +1,9 @@
 import { townsWithin } from "../generator/geo.ts";
+import { autoVariant, seedAutoServices } from "../generator/packs/auto.ts";
+import { cleaningVariant, seedCleaningServices } from "../generator/packs/cleaning.ts";
 import { contractorTrade, seedServices } from "../generator/packs/contractor.ts";
+import { landscapingVariant, seedLandscapingServices } from "../generator/packs/landscaping.ts";
+import { salonVariant, seedSalonServices } from "../generator/packs/salon.ts";
 import { restaurantVariant } from "../generator/packs/restaurant.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import type { BusinessRecord, CategoryId, Hours, Interval, RestaurantExt } from "../generator/types.ts";
@@ -120,6 +124,32 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
       services: seedServices(trade),
       serviceArea: { towns: townsWithin(geo, 25, 10), counties: county ? [county] : [] },
       ext: { contractor: { residential: true } },
+    };
+  }
+  if (category === "salon") {
+    const variant = salonVariant(p.primaryType, types, name);
+    return { ...base, variant, services: seedSalonServices(variant), ext: { salon: {} } };
+  }
+  if (category === "auto") {
+    const variant = autoVariant(p.primaryType, types, name);
+    return {
+      ...base,
+      variant,
+      services: seedAutoServices(variant),
+      serviceArea: { towns: townsWithin(geo, 20, 8), counties: county ? [county] : [] },
+      confirmed: [],
+      ext: { auto: {} },
+    };
+  }
+  if (category === "landscaping" || category === "cleaning") {
+    const variant = category === "landscaping" ? landscapingVariant(p.primaryType, types, name) : cleaningVariant(p.primaryType, types, name);
+    return {
+      ...base,
+      variant,
+      showStreetAddress: false,
+      services: category === "landscaping" ? seedLandscapingServices(variant) : seedCleaningServices(variant),
+      serviceArea: { towns: townsWithin(geo, 25, 10), counties: county ? [county] : [] },
+      ext: category === "landscaping" ? { landscaping: {} } : { cleaning: { commercial: variant === "commercial" } },
     };
   }
   throw new Error(`Category ${category} not supported yet`);

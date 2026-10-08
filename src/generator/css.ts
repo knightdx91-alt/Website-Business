@@ -1,4 +1,4 @@
-import { withAlpha } from "./color.ts";
+import { bestText, withAlpha } from "./color.ts";
 import type { FontSpec, Theme } from "./themes.ts";
 
 export function fontFileName(f: FontSpec, weight: number): string {
@@ -188,7 +188,7 @@ ${divider}
       : k.badge === "seal"
         ? `border:2px solid var(--accent);border-radius:999px;padding:6px 16px`
         : k.badge === "sticker"
-          ? `background:var(--accent);color:#fff;padding:4px 12px;border-radius:6px;transform:rotate(-3deg)`
+          ? `background:var(--accent);color:${bestText(c.accent)};padding:4px 12px;border-radius:6px;transform:rotate(-3deg)`
           : `background:var(--band);color:var(--text);padding:4px 12px;border-radius:999px`
   }}
 /* forms */

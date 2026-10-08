@@ -125,6 +125,29 @@ export interface ContractorExt {
   financing?: { lender: string; url: string };
 }
 
+export interface SalonExt {
+  walkIns?: "welcome" | "appointment_only" | "both";
+}
+
+export interface AutoExt {
+  warranty?: { months?: number; miles?: number; nationwide?: boolean };
+  ase?: boolean;
+  freeEstimates?: boolean;
+}
+
+export interface LandscapingExt {
+  freeEstimates?: boolean;
+  commercial?: boolean;
+}
+
+export interface CleaningExt {
+  freeEstimates?: boolean;
+  backgroundChecked?: boolean;
+  suppliesIncluded?: boolean;
+  petSafe?: boolean;
+  commercial?: boolean;
+}
+
 export interface BusinessRecord {
   placeId: string;
   name: string;
@@ -158,7 +181,14 @@ export interface BusinessRecord {
   };
   media: { logo?: Image; hero?: Image; gallery: Image[] };
   reputation: { rating?: number; count?: number; displayMode: "link_only" | "owner_stated"; ownerStatedText?: string };
-  ext: { restaurant?: RestaurantExt; contractor?: ContractorExt };
+  ext: {
+    restaurant?: RestaurantExt;
+    contractor?: ContractorExt;
+    salon?: SalonExt;
+    auto?: AutoExt;
+    landscaping?: LandscapingExt;
+    cleaning?: CleaningExt;
+  };
   confirmed: ConfirmableField[];
 }
 
