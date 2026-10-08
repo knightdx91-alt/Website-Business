@@ -2,7 +2,7 @@ import { smsHref, telHref } from "./phone.ts";
 import type { IconName } from "./icons.ts";
 import type { BusinessRecord } from "./types.ts";
 
-export type ActionId = "call" | "text" | "directions" | "order" | "reserve" | "book" | "quote" | "menu" | "review";
+export type ActionId = "call" | "text" | "directions" | "order" | "reserve" | "book" | "quote" | "menu" | "review" | "shop";
 
 export interface Action {
   id: ActionId;
@@ -70,11 +70,17 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
       return r.links.booking ? { id, label: "Book online", short: "Book", href: r.links.booking, external: true, icon: "calendar" } : null;
     case "quote": {
       const free = freeEstimates(r);
-      const label = free ? (r.category === "contractor" || r.category === "auto" ? "Get a free estimate" : "Get a free quote") : r.category === "auto" ? "Request an appointment" : r.category === "contractor" ? "Request service" : "Request a quote";
+      const label = free ? (r.category === "contractor" || r.category === "auto" ? "Get a free estimate" : "Get a free quote") : r.category === "auto" ? "Request an appointment" : r.category === "contractor" ? "Request service" : r.category === "print" ? "Get a quote" : "Request a quote";
       return { id, label, short: free ? (r.category === "contractor" || r.category === "auto" ? "Estimate" : "Free quote") : r.category === "auto" ? "Request" : "Quote", href: "#contact", external: false, icon: "clipboard" };
     }
     case "menu":
       return { id, label: "View menu", short: "Menu", href: "/menu/", external: false, icon: "list" };
+    case "shop": {
+      const url = r.ext.retail?.shopUrl;
+      if (!url) return null;
+      const florist = r.category === "retail" && r.variant === "florist";
+      return { id, label: florist ? "Order flowers" : "Shop online", short: florist ? "Order" : "Shop", href: url, external: true, icon: "bag" };
+    }
     case "review":
       return { id, label: "Leave us a review", short: "Review", href: reviewUrl(r), external: true, icon: "star" };
   }

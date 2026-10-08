@@ -1,6 +1,7 @@
 import { bestText, contrast, luminance, repairBackground } from "./color.ts";
 import { isLayout, type LayoutId } from "./layouts.ts";
 import { MORE_LOOKS } from "./looks-more.ts";
+import { SHOP_LOOKS } from "./looks-shops.ts";
 import type { CategoryId } from "./types.ts";
 
 export interface FontSpec {
@@ -214,6 +215,7 @@ export const LOOKS: Record<string, LookDef> = {
     knobs: { hero: "dark", divider: "rule", label: "uppercase", card: "bordered", badge: "plain", priceList: "cards", spacing: "standard" },
     photoDirection: "Wide shots of finished roofs against the sky, crews on pitch with safety gear.",
   },  ...MORE_LOOKS,
+  ...SHOP_LOOKS,
 };
 
 /**

@@ -94,6 +94,10 @@ test("hand-added businesses get a sensible template guess", async () => {
   assert.equal(guessCategory(p("Barnett Pressure Washing, LLC", "point_of_interest")), "cleaning");
   assert.equal(guessCategory(p("Relax & Align Massage", "point_of_interest")), "salon");
   assert.equal(guessCategory(p("Johnson Small Engine", "point_of_interest")), "auto");
+  assert.equal(guessCategory(p("Creative Design & Screen Printing", "service")), "print");
+  assert.equal(guessCategory(p("Cullman Sign and Banner", "point_of_interest")), "print");
+  assert.equal(guessCategory(p("Lavish Boutique Cullman", "clothing_store")), "retail");
+  assert.equal(guessCategory(p("Flowers & More", "point_of_interest")), "retail");
   assert.equal(guessCategory(p("Acme Holdings", "point_of_interest")), null);
 });
 
@@ -143,7 +147,7 @@ test("every new variant renders a clean preview", async () => {
 test("every look renders in every layout", async () => {
   const { LAYOUT_IDS } = await import("../src/generator/layouts.ts");
   const { looksFor, resolveTheme } = await import("../src/generator/themes.ts");
-  for (const category of ["contractor", "salon", "auto", "landscaping", "cleaning"] as const) {
+  for (const category of ["contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail"] as const) {
     for (const look of looksFor(category)) {
       for (const layout of LAYOUT_IDS) {
         const design = `${look}~${layout}`;
@@ -174,4 +178,27 @@ test("new sites in a category spread across looks and layouts", async () => {
   const sold = used[0]!;
   for (let i = 0; i < 30; i++) assert.notEqual(pickDesign({ leadId: `x${i}`, looks, used: [], taken: [sold] }), sold);
   assert.equal(layoutOf("contractor.toolbox"), "split", "a bare look uses its own default layout");
+});
+
+test("print and retail shops get the right variant and a clean site", async () => {
+  const { printVariant, seedPrintServices } = await import("../src/generator/packs/print.ts");
+  const { retailVariant, seedRetailCarry } = await import("../src/generator/packs/retail.ts");
+  assert.equal(printVariant("service", [], "Creative Design & Screen Printing"), "screen_printing");
+  assert.equal(printVariant(undefined, [], "Cullman Sign and Banner"), "signs");
+  assert.equal(printVariant(undefined, [], "Sew Blessed Fabric & Embroidery"), "embroidery");
+  assert.equal(printVariant(undefined, [], "Modernistic Printers Inc"), "print_shop");
+  assert.equal(retailVariant("florist", [], "Flowers & More"), "florist");
+  assert.equal(retailVariant(undefined, [], "Sand Mountain Feed & Seed"), "farm_feed");
+  assert.equal(retailVariant("clothing_store", [], "Lavish Boutique"), "boutique");
+  assert.equal(retailVariant(undefined, [], "Cullman Antique Mall"), "antique");
+  for (const v of ["screen_printing", "embroidery", "signs", "print_shop"]) {
+    const out = await buildSite({ record: categoryRecord("print", { variant: v, services: seedPrintServices(v) }), copy: sampleCopy(), site: { slug: "pr", look: "" }, mode: "preview" });
+    assert.deepEqual(out.lint.errors, [], v);
+    assert.ok(String(out.files.get("index.html")).includes("Send us your design"), v);
+  }
+  for (const v of ["boutique", "gift", "antique", "thrift", "florist", "farm_feed", "furniture"]) {
+    const out = await buildSite({ record: categoryRecord("retail", { variant: v, services: seedRetailCarry(v) }), copy: sampleCopy(), site: { slug: "rt", look: "" }, mode: "preview" });
+    assert.deepEqual(out.lint.errors, [], v);
+    assert.ok(out.todos.includes("Tick what you carry"), v);
+  }
 });

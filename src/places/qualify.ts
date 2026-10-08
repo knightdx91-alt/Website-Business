@@ -28,6 +28,10 @@ const CHAINS = [
   "bojangles", "church's", "hibachi express", "tropical smoothie", "smoothie king", "marco's", "hungry howie",
   "roto-rooter", "mr. rooter", "mister sparky", "one hour heating", "benjamin franklin", "ars rescue", "service experts",
   "lowe's", "home depot", "mr. electric", "rainbow restoration", "servpro", "molly maid", "merry maids", "the grounds guys",
+  "hunt brothers", "the ups store", "fedex office", "office depot", "officemax", "staples", "fastsigns", "signarama", "minuteman press",
+  "alphagraphics", "sir speedy", "speedpro", "big frog", "hobby lobby", "walmart", "rural king", "tractor supply", "southern states",
+  "tj maxx", "homegoods", "kirkland's", "goodwill", "plato's closet", "ashley furniture", "ashley homestore", "rooms to go", "bassett", "farmers home furniture",
+  "petsense", "hollywood feed", "dollar general", "family dollar", "maurices", "cato fashions", "rue21", "hibbett", "1-800-flowers",
 ];
 
 export function isChain(name: string): boolean {
@@ -84,6 +88,7 @@ const TYPE_CATEGORY: Array<[RegExp, CategoryId]> = [
   [/hair|barber|beauty|nail|pet_care|pet_groom|spa$|massage/, "salon"],
   [/car_repair|auto|tire|transmission|oil_change|car_dealer|car_wash/, "auto"],
   [/plumb|electric|roofing|contractor|hvac|heating|painter|locksmith|moving|handyman/, "contractor"],
+  [/florist|clothing_store|gift_shop|furniture_store|thrift_store|flea_market|home_goods_store|shoe_store|garden_center/, "retail"],
 ];
 
 /** Best-guess template for a Places result (the owner can change it before adding). */
@@ -93,6 +98,8 @@ export function guessCategory(p: Place): CategoryId | null {
   if (/\b(lawn|landscap|mowing|sod|irrigation)/.test(n)) return "landscaping";
   if (/\b(clean|maid|janitor|(pressure|power|soft) ?wash)/.test(n)) return "cleaning";
   if (/\b(massage|day spa|bodywork)/.test(n)) return "salon";
+  if (/screen ?print|embroider|monogram|\bsigns?\b|banners?|vinyl|decals|t-?shirts|\bprint(ing|ers)?\b|graphics/.test(n)) return "print";
+  if (/\b(boutique|gifts?|antiques?|thrift|consign|flowers?|florist|floral|feed|seed|furniture|mercantile|vintage)\b/.test(n)) return "retail";
   if (/\b(paint|concrete|fenc|pest|termite|remodel|appliance|tree|stump)/.test(n)) return "contractor";
   if (/\b(food truck|truck|grill|bbq|cafe|kitchen|diner|taco|pizza)/.test(n)) return "restaurant";
   for (const t of [p.primaryType ?? "", ...(p.types ?? [])]) {

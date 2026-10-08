@@ -354,7 +354,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json({ results });
   }
   if (path === "/leads/add" && m === "POST") {
-    const input = await body(req, z.object({ placeId: z.string().min(5).max(300), category: z.enum(["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning"]) }));
+    const input = await body(req, z.object({ placeId: z.string().min(5).max(300), category: z.enum(["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail"]) }));
     const existing = await env.DB.prepare("SELECT id, status FROM leads WHERE place_id = ?").bind(input.placeId).first<{ id: string; status: string }>();
     if (existing && existing.status !== "expired") return json({ id: existing.id, existed: true });
     const p = await getPlace(env.GOOGLE_PLACES_API_KEY, input.placeId, input.category === "restaurant" ? RESTAURANT_FLAGS : []);

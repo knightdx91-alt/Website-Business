@@ -31,8 +31,14 @@ export const EditsSchema = z.object({
       backgroundChecked: z.boolean().optional(),
       suppliesIncluded: z.boolean().optional(),
       petSafe: z.boolean().optional(),
+      email: z.string().trim().email().max(120).or(z.literal("")).optional(),
+      designHelp: z.boolean().optional(),
+      proofBeforePrint: z.boolean().optional(),
+      install: z.boolean().optional(),
+      giftCards: z.boolean().optional(),
+      delivery: z.boolean().optional(),
       links: z
-        .object({ order: url, reserve: url, booking: url, facebook: url, instagram: url })
+        .object({ order: url, reserve: url, booking: url, facebook: url, instagram: url, shop: url })
         .partial()
         .optional(),
       testimonials: z
@@ -113,6 +119,19 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
   if (r.category === "landscaping") {
     r.ext.landscaping = r.ext.landscaping ?? {};
     if (e.freeEstimates !== undefined) r.ext.landscaping.freeEstimates = e.freeEstimates;
+  }
+  if (e.email !== undefined) r.email = e.email || undefined;
+  if (r.category === "print") {
+    const x = (r.ext.print = r.ext.print ?? {});
+    if (e.designHelp !== undefined) x.designHelp = e.designHelp;
+    if (e.proofBeforePrint !== undefined) x.proofBeforePrint = e.proofBeforePrint;
+    if (e.install !== undefined) x.install = e.install;
+  }
+  if (r.category === "retail") {
+    const x = (r.ext.retail = r.ext.retail ?? {});
+    if (e.giftCards !== undefined) x.giftCards = e.giftCards;
+    if (e.delivery !== undefined) x.delivery = e.delivery;
+    if (e.links?.shop !== undefined) x.shopUrl = e.links.shop || undefined;
   }
   if (r.category === "cleaning") {
     r.ext.cleaning = r.ext.cleaning ?? {};

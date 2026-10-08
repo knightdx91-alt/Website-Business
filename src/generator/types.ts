@@ -1,4 +1,4 @@
-export type CategoryId = "restaurant" | "contractor" | "salon" | "auto" | "landscaping" | "cleaning";
+export type CategoryId = "restaurant" | "contractor" | "salon" | "auto" | "landscaping" | "cleaning" | "print" | "retail";
 
 /** Where a value came from. `google` images may appear in previews only. */
 export type Source = "places" | "owner" | "ai" | "system" | "stock" | "google";
@@ -140,6 +140,21 @@ export interface LandscapingExt {
   commercial?: boolean;
 }
 
+export interface PrintExt {
+  /** Other lines the shop does besides its main variant (screen_printing, embroidery, signs, print_shop). */
+  lines?: string[];
+  designHelp?: boolean;
+  proofBeforePrint?: boolean;
+  install?: boolean;
+}
+
+export interface RetailExt {
+  /** Link to an online store (Shopify, Etsy, Facebook shop) or a florist's own order page. */
+  shopUrl?: string;
+  giftCards?: boolean;
+  delivery?: boolean;
+}
+
 export interface CleaningExt {
   freeEstimates?: boolean;
   backgroundChecked?: boolean;
@@ -188,6 +203,8 @@ export interface BusinessRecord {
     auto?: AutoExt;
     landscaping?: LandscapingExt;
     cleaning?: CleaningExt;
+    print?: PrintExt;
+    retail?: RetailExt;
   };
   confirmed: ConfirmableField[];
 }

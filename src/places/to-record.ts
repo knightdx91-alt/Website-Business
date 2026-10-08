@@ -4,7 +4,9 @@ import { cleaningVariant, seedCleaningServices } from "../generator/packs/cleani
 import { contractorTrade, seedServices } from "../generator/packs/contractor.ts";
 import { landscapingVariant, seedLandscapingServices } from "../generator/packs/landscaping.ts";
 import { salonVariant, seedSalonServices } from "../generator/packs/salon.ts";
+import { printVariant, seedPrintServices } from "../generator/packs/print.ts";
 import { restaurantVariant } from "../generator/packs/restaurant.ts";
+import { retailVariant, seedRetailCarry } from "../generator/packs/retail.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import type { BusinessRecord, CategoryId, Hours, Interval, RestaurantExt } from "../generator/types.ts";
 import type { Place, PlacePeriodPoint } from "./client.ts";
@@ -151,6 +153,14 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
       serviceArea: { towns: townsWithin(geo, 25, 10), counties: county ? [county] : [] },
       ext: category === "landscaping" ? { landscaping: {} } : { cleaning: { commercial: variant === "commercial" } },
     };
+  }
+  if (category === "print") {
+    const variant = printVariant(p.primaryType, types, name);
+    return { ...base, variant, services: seedPrintServices(variant), ext: { print: { lines: [variant] } } };
+  }
+  if (category === "retail") {
+    const variant = retailVariant(p.primaryType, types, name);
+    return { ...base, variant, services: seedRetailCarry(variant), ext: { retail: {} } };
   }
   throw new Error(`Category ${category} not supported yet`);
 }

@@ -55,6 +55,8 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
   if (r.category === "restaurant") f.push("a menu section and a separate menu page, ready for their menu to be typed in");
   else f.push(`a services list (${r.services.map((s) => s.name).join(", ")})`);
   if (r.serviceArea?.towns.length) f.push(`a service-area list of nearby towns (${r.serviceArea.towns.slice(0, 5).join(", ")}…)`);
+  if (r.category === "print") f.push("a 'send us your design' section with buttons to email or text their artwork");
+  if (r.category === "retail") f.push("a 'what's new' section that sends shoppers to their Facebook or Instagram for new arrivals");
   if (hasForm) f.push("a request form that sends customer requests to an inbox (once live)");
   f.push("an FAQ section");
   return f;

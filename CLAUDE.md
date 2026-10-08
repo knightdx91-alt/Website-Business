@@ -118,7 +118,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Company website live at undergroundassociates.com (bought on Cloudflare)
 - [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for
       Google Business Profile API once a client's profile is managed (then build step 2). LLC is Underground Associates LLC
-- [ ] Next ideas: owner gallery/team photos, email/text alerts for inbox items, daycare /
+- [x] Plans & answers screen for callers; 7 page layouts; print/sign and retail packs; more search groups
+- [ ] Next ideas: owner gallery/team photos (print and retail sites ask for work/shop photos), email/text alerts for inbox items, daycare /
       tattoo / photographer packs (need their own research first), Stripe webhook to mark paid
 
 ## Code map
@@ -183,6 +184,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `exterior`. "Nearby towns" runs every term of each group for Hartselle,
   Arab, Hanceville, Good Hope, Vinemont. "Outdated websites" checks up to 15 existing sites per search
   (`src/places/site-check.ts`) and keeps broken/insecure/not-phone-friendly/stale ones (presence `outdated`).
+- Looks × layouts: a look (`themes.ts`, `looks-more.ts`, `looks-shops.ts`) is colors + fonts; a layout
+  (`src/generator/layouts.ts`: classic, split, editorial, poster, soft, minimal, overlap) is page structure, CSS only on
+  shared markup. A site's design id is `<look>~<layout>` (bare look = its default layout), stored in `leads.look`.
+  `pickDesign` (`src/generator/design.ts`) gives each new site the least-used combination in its category and never a
+  sold/live client's. Lead screen → "Try another design" (`POST /api/leads/:id/restyle`); Edit has both pickers.
+  Previews from before layouts get restyled on first open if still New (`restyleOldPreview` in preview.ts).
+- Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
+  retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
+  Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).
 - Plans & answers (`#/playbook`, owner and callers): each plan from Settings with who it fits and selling
   points (`PLAN_PITCH` in app.js), ways to pay, extras, and ~18 common objections with answers
   (`playbookObjections`), searchable. Linked from home, lead screen and call guide.

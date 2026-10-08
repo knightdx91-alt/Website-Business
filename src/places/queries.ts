@@ -37,6 +37,9 @@ export const SEARCH_GROUPS: SearchGroup[] = [
   { id: "landscaping", label: "Landscaping & lawn", category: "landscaping", terms: ["landscaping", "lawn care service", "lawn mowing service"] },
   { id: "cleaning", label: "Cleaning services", category: "cleaning", terms: ["house cleaning service", "cleaning service", "janitorial service"] },
   { id: "pressure_washing", label: "Pressure & window washing", category: "cleaning", terms: ["pressure washing", "window cleaning"] },
+  { id: "print", label: "Print, sign & shirt shops", category: "print", terms: ["screen printing", "sign shop", "print shop", "embroidery", "custom t-shirts"] },
+  { id: "retail", label: "Boutiques & gift shops", category: "retail", terms: ["boutique", "gift shop", "florist"] },
+  { id: "retail_more", label: "Antiques, thrift, feed & furniture", category: "retail", terms: ["antique store", "thrift store", "feed store", "furniture store"] },
 ];
 
 export function groupById(id: string): SearchGroup | undefined {

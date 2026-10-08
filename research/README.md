@@ -13,6 +13,8 @@ designs, code or text. Refresh about once a year.
 | `auto-repair.md` | Auto repair: 87 sites (80 opened). Warranty, ASE, coupons, services hub. |
 | `landscaping-lawn-care.md` | Landscaping and lawn care: 65 sites (60 opened). Free quote, services, recurring plans, gallery. |
 | `cleaning-services.md` | Cleaning services: 75 sites (69 opened). Standard/deep/move-out cards, free quote, trust signals. |
+| `print-signs-apparel.md` | Print, sign, screen printing and embroidery shops: 73 home pages. Quote + "send us your design" (email/text, no uploads), work gallery, ordering steps. |
+| `retail-shops.md` | Boutiques, gift, antique, thrift, florist, feed and furniture shops: 78 home pages. Directions/hours first, what-we-carry categories, social for new arrivals, no cart. |
 
 Each category file has: summary, sample table, pages, home-page section order,
 features and CTAs, integrations, mobile behavior, content the AI writes, data
