@@ -162,8 +162,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   full-screen; `/.well-known/assetlinks.json` (in `index.ts`) carries the signing cert fingerprint.
   `npm run android` builds it (needs ANDROID_HOME with platform 36) and uploads it to R2
   `_build/website-business.apk`, served behind login at `/api/android.apk` (Settings → Download).
-  The signing key `website-business.jks` + password are NOT in git or the cloud; the owner keeps them.
-  Every update must use that key (and a higher `versionCode`), or phones refuse to update.
+  The app only needs rebuilding for shell changes (name, icon, package); features ship with `npm run deploy`.
+  The signing key is deliberately NOT kept anywhere (owner's choice). If it's gone, `android/build.sh`
+  makes a new one: put its fingerprint in `ASSET_LINKS`, redeploy, and phones uninstall + reinstall once.
   Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first.
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
   project afterwards.
