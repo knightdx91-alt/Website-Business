@@ -722,8 +722,9 @@ async function serveShared(env: Env, req: Request, leadId: string, token: string
   if (type.startsWith("text/html")) {
     const lead = await getLead(env, leadId);
     const settings = await getSettings(env);
-    const name = (lead?.name ?? "your business").replace(/[<>&"]/g, "");
-    const from = settings.companyName ? ` by ${settings.companyName.replace(/[<>&"]/g, "")}` : "";
+    const esc = (t: string) => t.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
+    const name = esc(lead?.name ?? "your business");
+    const from = settings.companyName ? ` by ${esc(settings.companyName)}` : "";
     const banner = `<div role="note" style="position:relative;z-index:60;background:#14213d;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 16px;text-align:center">Free preview made for ${name}${from}. Not live yet; photos and details will be checked with you first.</div>`;
     text = text.replace(/<body([^>]*)>/, `<body$1>${banner}`);
   }

@@ -500,7 +500,8 @@
             <a class="btn" href="/p/${l.id}/" target="_blank" rel="noopener">Open full screen</a>
             ${owner ? `<a class="btn" href="#/edit/${l.id}">Edit</a>` : ""}
             ${l.salesStatus !== "live" ? `<a class="btn" href="/api/leads/${l.id}/flyer" target="_blank" rel="noopener">Leave-behind flyer (QR)</a>` : ""}
-          </div>` : ""}
+          </div>
+          ${l.salesStatus !== "live" ? `<div style="margin-top:10px">${shareButtonsHtml()}</div>` : ""}` : ""}
         ${l.liveUrl ? `<p style="margin-top:12px">Live at <a href="${esc(l.liveUrl)}" target="_blank" rel="noopener">${esc(l.liveUrl.replace("https://", ""))}</a></p>` : ""}
       </section>
       <section class="card"><h2>Calls &amp; notes</h2>
@@ -546,6 +547,7 @@
         } finally { el.disabled = false; }
       });
     };
+    if (ready && l.salesStatus !== "live") bindShareButtons(l);
     act("restyle", async () => { await api(`/leads/${id}/restyle`, { method: "POST" }); toast("New design ready"); viewLead(id); });
     act("retry", async () => { await api(`/leads/${id}/retry`, { method: "POST" }); toast("Rebuilding…"); setTimeout(() => viewLead(id), 1500); });
     act("rewrite", async () => {
@@ -588,7 +590,14 @@
       <div class="row" style="margin-bottom:10px"><div class="tabs" style="margin:0">
         <button type="button" data-mode="phone">Phone view</button><button type="button" data-mode="desktop">Desktop view</button></div>
         <a class="btn btn--small" href="/p/${id}/" target="_blank" rel="noopener" style="flex:none">Full screen</a></div>
-      <div class="frame-wrap" id="fw"><iframe id="pf" title="Site preview" src="/p/${id}/"></iframe></div>`;
+      <div class="frame-wrap" id="fw"><iframe id="pf" title="Site preview" src="/p/${id}/"></iframe></div>
+      <div id="previewshare" style="margin-top:12px"></div>`;
+    api("/leads/" + id).then((l) => {
+      const box = document.getElementById("previewshare");
+      if (!box || l.status !== "ready" || l.salesStatus === "live") return;
+      box.innerHTML = shareButtonsHtml();
+      bindShareButtons(l);
+    }).catch(() => {});
     const fw = $app.querySelector("#fw");
     const frame = $app.querySelector("#pf");
     const layout = () => {
@@ -818,6 +827,38 @@
     return url;
   }
 
+  // "Text preview link" / "Copy preview link": a 14-day link that opens the preview without logging in.
+  function shareButtonsHtml() {
+    return `<div class="btns btns--full" data-share><button class="btn" type="button" data-share-sms>💬 Text preview link</button><button class="btn" type="button" data-share-copy>🔗 Copy preview link</button></div>
+      <p class="small muted">Only text the link after they say it's OK. It works for 14 days, no login needed.</p>`;
+  }
+
+  function bindShareButtons(l) {
+    const s = meta.settings;
+    const name = l.record ? l.record.name : l.name;
+    const phoneDigits = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+    const smsBody = (url) => {
+      const caller = isOwner() ? s.callerName : meta.me.name;
+      const who = [caller ? `this is ${caller}` : "", s.companyName ? `with ${s.companyName}` : ""].filter(Boolean).join(" ");
+      return `Hi${who ? ", " + who : ""}. Here's the free website preview I made for ${name}: ${url}`;
+    };
+    $app.querySelectorAll("[data-share-sms]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        const url = await shareLink(l.id);
+        location.href = `sms:+1${phoneDigits}?body=${encodeURIComponent(smsBody(url))}`;
+      } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+    $app.querySelectorAll("[data-share-copy]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        const url = await shareLink(l.id);
+        try { await navigator.clipboard.writeText(url); toast("Preview link copied. It works for 14 days."); }
+        catch (e) { prompt("Copy this preview link:", url); }
+      } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+  }
+
   async function viewPitch(id, regenerate) {
     setNav("home");
     const l = await api("/leads/" + id);
@@ -828,37 +869,16 @@
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p>
       <h1>Call guide: ${esc(r.name)}</h1>
       <p class="muted">${esc(l.variantLabel || "")} · ${esc(l.reason || "")}</p>
-      <div class="btns btns--full" style="margin-bottom:14px">
+      <div class="btns btns--full" style="margin-bottom:8px">
         <a class="btn btn--primary" href="${telHref(phoneDigits)}">📞 Call ${esc(r.phone.display)}</a>
-        <button class="btn" id="sms">Text preview link</button>
-        <button class="btn" id="copy">Copy preview link</button>
       </div>
-      <p class="small muted">Only text the link after they say it's OK. The link works for 14 days.</p>
+      ${shareButtonsHtml()}
       <p><a class="btn btn--small" href="#/playbook">💬 Plans & answers</a></p>
       ${isOwner() && (!s.companyName || !s.monthlyPrice) ? `<div class="card small">Add your company name, your name and your prices in <a href="#/settings">Settings</a> so the guide can use them.</div>` : ""}
       ${l.notes.length ? `<section class="card"><h2>Earlier calls</h2>${l.followUp ? `<p>${followChip(l.followUp)}</p>` : ""}${notesHtml(l, 3)}</section>` : ""}
       <div id="guide"><div class="card"><span class="spin"></span> Writing the call guide for ${esc(r.name)}… (about 20 seconds)</div></div>`;
 
-    const smsBody = (url) => {
-      const caller = isOwner() ? s.callerName : meta.me.name;
-      const who = [caller ? `this is ${caller}` : "", s.companyName ? `with ${s.companyName}` : ""].filter(Boolean).join(" ");
-      return `Hi${who ? ", " + who : ""}. Here's the free website preview I made for ${r.name}: ${url}`;
-    };
-    $app.querySelector("#sms").addEventListener("click", async (e) => {
-      e.target.disabled = true;
-      try {
-        const url = await shareLink(id);
-        location.href = `sms:+1${phoneDigits}?body=${encodeURIComponent(smsBody(url))}`;
-      } catch (err) { toast(err.message); } finally { e.target.disabled = false; }
-    });
-    $app.querySelector("#copy").addEventListener("click", async (e) => {
-      e.target.disabled = true;
-      try {
-        const url = await shareLink(id);
-        await navigator.clipboard.writeText(url);
-        toast("Preview link copied");
-      } catch (err) { toast(err.message); } finally { e.target.disabled = false; }
-    });
+    bindShareButtons(l);
 
     let pitch;
     try {

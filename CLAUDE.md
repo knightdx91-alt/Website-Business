@@ -158,7 +158,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   for the caller, cached in `leads.pitch_json`, cleared when the lead is rebuilt/edited or sales
   settings (company, caller, prices) change. It describes the preview only from `previewFeatures`.
 - Share links: `/s/<leadId>.<exp>.<hmac>/` serves a preview without login for 14 days, with a
-  "Free preview" banner. Rotating APP_SECRET revokes all share links and logins.
+  "Free preview" banner. "Text preview link" / "Copy preview link" (`shareButtonsHtml` + `bindShareButtons` in app.js)
+  show on the lead page, the Preview screen and the call guide. Rotating APP_SECRET revokes all share links and logins.
 - Roles: the owner (password in `settings.owner_password`) and callers (`users` table, managed in
   Settings → Callers). Login is password-only, so passwords are unique across everyone. The session
   cookie is `<userId>.<exp>.<hmac>` with the user's stored hash in the HMAC, so changing a password
