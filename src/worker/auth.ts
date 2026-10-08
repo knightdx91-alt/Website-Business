@@ -54,6 +54,8 @@ async function matches(stored: string, password: string): Promise<boolean> {
 export async function setupOwner(env: Env, password: string): Promise<void> {
   if (await hasOwner(env)) throw new HttpError(409, "A password is already set");
   if (password.length < 8) throw new HttpError(400, "Use at least 8 characters");
+  // Login is password-only, so the owner's password can't match a caller's.
+  if (await passwordTaken(env, password)) throw new HttpError(409, "Pick a different password; that one is already in use");
   await setSetting(env, "owner_password", await hashPassword(password));
 }
 
