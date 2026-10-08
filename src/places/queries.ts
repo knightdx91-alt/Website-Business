@@ -2,26 +2,62 @@ import type { CategoryId } from "../generator/types.ts";
 
 export const MARKET = { name: "Cullman, AL", center: { lat: 34.1748, lng: -86.8436 }, radiusMeters: 30_000 };
 
-/** Search phrases per category. Each runs as its own Places text search. */
-export const QUERIES: Partial<Record<CategoryId, string[]>> = {
-  restaurant: ["restaurants in Cullman, AL", "barbecue in Cullman, AL", "mexican restaurant in Cullman, AL", "cafe in Cullman, AL"],
-  contractor: [
-    "plumber in Cullman, AL",
-    "heating and air conditioning in Cullman, AL",
-    "electrician in Cullman, AL",
-    "roofing contractor in Cullman, AL",
-  ],
-  salon: ["hair salon in Cullman, AL", "barber shop in Cullman, AL", "beauty salon in Cullman, AL"],
-  auto: ["auto repair in Cullman, AL", "mechanic in Cullman, AL", "tire shop in Cullman, AL", "transmission repair in Cullman, AL"],
-  landscaping: ["landscaping in Cullman, AL", "lawn care service in Cullman, AL", "lawn mowing service in Cullman, AL"],
-  cleaning: ["house cleaning service in Cullman, AL", "cleaning service in Cullman, AL", "janitorial service in Cullman, AL"],
-};
+/** Nearby towns searched when a run asks for the wider area (each with its own search center). */
+export const WIDER_TOWNS = [
+  { name: "Hartselle, AL", lat: 34.4434, lng: -86.9353 },
+  { name: "Arab, AL", lat: 34.3281, lng: -86.4958 },
+  { name: "Hanceville, AL", lat: 34.0607, lng: -86.7675 },
+  { name: "Good Hope, AL", lat: 34.1157, lng: -86.8636 },
+  { name: "Vinemont, AL", lat: 34.2465, lng: -86.8661 },
+];
+const TOWN_RADIUS = 12_000;
+/** In the wider area only the first few terms of a group run per town, to keep Google costs down. */
+const WIDER_TERMS = 2;
 
-export const CATEGORY_LABELS: Partial<Record<CategoryId, string>> = {
-  restaurant: "Restaurants & cafes",
-  contractor: "Contractors",
-  salon: "Salons & barbers",
-  auto: "Auto repair",
-  landscaping: "Landscaping & lawn",
-  cleaning: "Cleaning services",
-};
+/** What the owner picks at Run. Several groups can share one category pack (template). */
+export interface SearchGroup {
+  id: string;
+  label: string;
+  category: CategoryId;
+  terms: string[];
+}
+
+export const SEARCH_GROUPS: SearchGroup[] = [
+  { id: "restaurant", label: "Restaurants & cafes", category: "restaurant", terms: ["restaurants", "barbecue", "mexican restaurant", "cafe"] },
+  { id: "food_truck", label: "Food trucks", category: "restaurant", terms: ["food truck"] },
+  { id: "contractor", label: "Contractors", category: "contractor", terms: ["plumber", "heating and air conditioning", "electrician", "roofing contractor"] },
+  { id: "salon", label: "Salons & barbers", category: "salon", terms: ["hair salon", "barber shop", "beauty salon"] },
+  { id: "nails", label: "Nail salons", category: "salon", terms: ["nail salon"] },
+  { id: "pet_grooming", label: "Pet groomers", category: "salon", terms: ["pet grooming", "dog groomer"] },
+  { id: "auto", label: "Auto repair", category: "auto", terms: ["auto repair", "mechanic", "tire shop", "transmission repair"] },
+  { id: "landscaping", label: "Landscaping & lawn", category: "landscaping", terms: ["landscaping", "lawn care service", "lawn mowing service"] },
+  { id: "cleaning", label: "Cleaning services", category: "cleaning", terms: ["house cleaning service", "cleaning service", "janitorial service"] },
+];
+
+export function groupById(id: string): SearchGroup | undefined {
+  return SEARCH_GROUPS.find((g) => g.id === id);
+}
+
+export interface PlannedSearch {
+  query: string;
+  center: { lat: number; lng: number };
+  radiusMeters: number;
+}
+
+export function searchesFor(group: SearchGroup, wider: boolean): PlannedSearch[] {
+  const home = group.terms.map((t) => ({ query: `${t} in ${MARKET.name}`, center: MARKET.center, radiusMeters: MARKET.radiusMeters }));
+  if (!wider) return home;
+  const towns = WIDER_TOWNS.flatMap((town) =>
+    group.terms.slice(0, WIDER_TERMS).map((t) => ({ query: `${t} in ${town.name}`, center: { lat: town.lat, lng: town.lng }, radiusMeters: TOWN_RADIUS })),
+  );
+  return [...home, ...towns];
+}
+
+/** Home-town search phrases per category (used by scripts/demo.ts). */
+export const QUERIES: Partial<Record<CategoryId, string[]>> = Object.fromEntries(
+  SEARCH_GROUPS.filter((g) => g.id === g.category).map((g) => [g.category, searchesFor(g, false).map((s) => s.query)]),
+);
+
+export const CATEGORY_LABELS: Partial<Record<CategoryId, string>> = Object.fromEntries(
+  SEARCH_GROUPS.filter((g) => g.id === g.category).map((g) => [g.category, g.label]),
+);

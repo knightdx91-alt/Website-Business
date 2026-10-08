@@ -16,6 +16,7 @@ export interface BuildInput {
   site: Site;
   mode: BuildMode;
   formEndpoint?: string;
+  statsEndpoint?: string;
   reviewTexts?: string[];
   /** Returns the bytes of an @fontsource woff2 file. Omit to leave fonts out (previews serve them separately). */
   loadFont?: (pkg: string, file: string) => Promise<Uint8Array>;
@@ -51,6 +52,7 @@ function doc(ctx: Ctx, pack: CategoryPack, o: DocOpts): string {
 <meta name="description" content="${o.description}">
 ${preview ? html`<meta name="robots" content="noindex, nofollow">` : html`<link rel="canonical" href="${origin}${o.path}">`}
 <meta name="theme-color" content="${ctx.theme.colors.heroBg}">
+${ctx.statsEndpoint ? html`<meta name="wb-stats" content="${ctx.statsEndpoint}">` : ""}
 <meta property="og:type" content="website"><meta property="og:title" content="${o.title}"><meta property="og:description" content="${o.description}"><meta property="og:url" content="${origin}${o.path}">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preload" href="/assets/fonts/${fontFileName(headingFont, headingFont.weights[0]!)}" as="font" type="font/woff2" crossorigin>
@@ -71,7 +73,7 @@ function privacyBody(ctx: Ctx): Raw {
 <h1>Privacy</h1>
 <p>When you send a request through this website, ${ctx.r.name} receives the details you enter (your name, phone number, email if given, and your message) so we can get back to you. We use them only to answer your request.</p>
 <p>We don't sell your information or share it with anyone else, except the service that delivers the message to us.</p>
-<p>This site doesn't use advertising or tracking cookies.</p>
+<p>This site doesn't use advertising or tracking cookies. We count visits and button taps anonymously, without cookies or any personal details, so we know the site is helping.</p>
 <p>Questions? Call us at <a href="tel:${ctx.r.phone.e164}">${ctx.r.phone.display}</a>.</p>
 </div></main>`;
 }
@@ -89,6 +91,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     todos: [],
     suggestions: [],
     formEndpoint: input.formEndpoint,
+    statsEndpoint: input.mode === "publish" ? input.statsEndpoint : undefined,
     hasForm: pack.hasForm(input.record),
   };
   const files = new Map<string, string | Uint8Array>();

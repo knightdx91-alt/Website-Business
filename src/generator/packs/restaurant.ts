@@ -5,9 +5,10 @@ import { html } from "../html.ts";
 import type { BusinessRecord, Faq, RestaurantExt } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
-export const RESTAURANT_VARIANTS = ["bbq", "southern", "diner", "breakfast", "mexican", "pizza", "coffee", "bakery", "cafe", "other"] as const;
+export const RESTAURANT_VARIANTS = ["food_truck", "bbq", "southern", "diner", "breakfast", "mexican", "pizza", "coffee", "bakery", "cafe", "other"] as const;
 
 const VARIANT_LABEL: Record<string, string> = {
+  food_truck: "Food truck",
   bbq: "BBQ",
   southern: "Southern cooking",
   diner: "Diner",
@@ -25,6 +26,7 @@ export function restaurantVariant(primaryType: string | undefined, types: string
   const all = [primaryType ?? "", ...types];
   const has = (t: string) => all.includes(t);
   const n = name.toLowerCase();
+  if (has("food_truck") || /\b(food truck|truck|trailer|on wheels|street eats)\b/.test(n)) return "food_truck";
   if (has("barbecue_restaurant") || /\b(bbq|bar-b-q|barbecue|smokehouse)\b/.test(n)) return "bbq";
   if (has("mexican_restaurant") || /\b(taqueria|cantina|mexican|tacos?)\b/.test(n)) return "mexican";
   if (has("pizza_restaurant") || /\bpizz/.test(n)) return "pizza";
@@ -38,6 +40,7 @@ export function restaurantVariant(primaryType: string | undefined, types: string
 }
 
 const LOOK_BY_VARIANT: Record<string, string> = {
+  food_truck: "restaurant.color_block",
   bbq: "restaurant.pit_plank",
   southern: "restaurant.pit_plank",
   diner: "restaurant.blue_plate",
@@ -88,6 +91,8 @@ function dataFaq(r: BusinessRecord): Faq[] {
   const so = ext(r).serviceOptions;
   const out: Faq[] = [];
   const m = meals(r);
+  if (r.variant === "food_truck")
+    out.push({ q: "Where will the truck be?", a: r.links.social.facebook ? "We post our stops on our Facebook page. Check there for this week's spots, or give us a call." : `Give us a call at ${r.phone.display} to find out where we'll be this week.` });
   if (m.length) out.push({ q: "What meals do you serve?", a: `We serve ${listJoin(m)}. Check our hours below for today's times.` });
   if (so.reservable === true)
     out.push({ q: "Do you take reservations?", a: r.links.reserve ? "Yes. You can reserve a table online, or call us." : `Yes. Call us at ${r.phone.display} to reserve a table.` });
@@ -114,6 +119,7 @@ function menuHighlights(ctx: Ctx): ReturnType<typeof html> {
   if (!menu) {
     return html`<section class="section section--surface" id="menu" aria-labelledby="menu-title"><div class="wrap">
 ${sectionHead("On the menu", "What we're serving")}
+${ctx.r.variant === "food_truck" ? todo(ctx, "Where can people find you?", "Tell us your regular stops and days (or the page where you post them), and we'll put a schedule section on the site.") : ""}
 ${todo(ctx, "Send us your menu", "Snap a photo of your printed menu and we'll type it in, with prices, so people can read it on their phones and find it on Google.", true)}
 <div class="btns">${button(menuBtn, "secondary")}${button(action(ctx.r, "call")!, "ghost")}</div>
 </div></section>`;
@@ -168,7 +174,7 @@ export const restaurantPack: CategoryPack = {
   looks: ["restaurant.pit_plank", "restaurant.blue_plate", "restaurant.garden_table", "restaurant.color_block"],
   defaultLook: (r) => LOOK_BY_VARIANT[r.variant] ?? "restaurant.color_block",
   variantLabel: (r) => VARIANT_LABEL[r.variant] ?? "Restaurant",
-  schemaType: (r) => (r.variant === "coffee" ? "CafeOrCoffeeShop" : r.variant === "bakery" ? "Bakery" : "Restaurant"),
+  schemaType: (r) => (r.variant === "coffee" ? "CafeOrCoffeeShop" : r.variant === "bakery" ? "Bakery" : r.variant === "food_truck" ? "FoodEstablishment" : "Restaurant"),
   schemaExtras(ctx) {
     const e = ext(ctx.r);
     const out: Record<string, unknown> = { hasMenu: `${ctx.site.origin ?? `https://${ctx.site.slug}.pages.dev`}/menu/` };

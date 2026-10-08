@@ -1,6 +1,6 @@
 import type { Place } from "./client.ts";
 
-export type WebPresence = "none" | "social" | "free_builder" | "has_site";
+export type WebPresence = "none" | "social" | "free_builder" | "has_site" | "outdated";
 
 const SOCIAL = /(^|\.)(facebook\.com|fb\.com|fb\.me|instagram\.com|linktr\.ee|tiktok\.com|twitter\.com|x\.com|yelp\.com|nextdoor\.com|business\.site|g\.page)$/i;
 const FREE_BUILDER = /(^|\.)(wixsite\.com|weebly\.com|godaddysites\.com|square\.site|webnode\.com|jimdosite\.com|carrd\.co|sites\.google\.com)$/i;
@@ -41,8 +41,10 @@ export interface QualifiedLead {
   reason: string;
 }
 
-/** Keeps operational, non-chain places with a phone and no real website. Ranks likely buyers first. */
-export function qualify(places: Place[], opts: { includeFreeBuilder?: boolean } = {}): QualifiedLead[] {
+/**
+ * Keeps operational, non-chain places with a phone and no real website. Ranks likely buyers first.
+ * With includeSites, places that have a website come back too, for the caller to check (see site-check.ts). */
+export function qualify(places: Place[], opts: { includeFreeBuilder?: boolean; includeSites?: boolean } = {}): QualifiedLead[] {
   const seen = new Set<string>();
   const out: QualifiedLead[] = [];
   for (const p of places) {
@@ -53,7 +55,7 @@ export function qualify(places: Place[], opts: { includeFreeBuilder?: boolean } 
     if (p.businessStatus !== "OPERATIONAL") continue;
     if (!p.nationalPhoneNumber) continue;
     const presence = webPresence(p.websiteUri);
-    if (presence === "has_site" || (presence === "free_builder" && !opts.includeFreeBuilder)) continue;
+    if (!opts.includeSites && (presence === "has_site" || (presence === "free_builder" && !opts.includeFreeBuilder))) continue;
     const count = p.userRatingCount ?? 0;
     let score = Math.log10(1 + count) * 20 + (p.rating ?? 0) * 3;
     if (presence === "social") score += 8;

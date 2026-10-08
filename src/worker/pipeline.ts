@@ -4,34 +4,47 @@ import { packFor } from "../generator/packs/index.ts";
 import { buildSite } from "../generator/render.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
-import { MARKET } from "../places/queries.ts";
+import { groupById, MARKET } from "../places/queries.ts";
 import { qualify } from "../places/qualify.ts";
+import { websiteProblem } from "../places/site-check.ts";
 import { placeToRecord, reviewTexts } from "../places/to-record.ts";
 import { addUsage, getLead, getSettings, MODEL_PRICES, updateLead, type LeadRow } from "./db.ts";
 import { newId, now, type Env, type Job } from "./env.ts";
 
 const SEARCH_PAGES = 2;
+/** Website checks per search job (each is one outbound request). */
+const MAX_SITE_CHECKS = 15;
 
 export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>): Promise<void> {
   const run = await env.DB.prepare("SELECT status, cap, categories FROM runs WHERE id = ?").bind(job.runId).first<{ status: string; cap: number; categories: string }>();
   if (!run || run.status === "cancelled") return;
-  // Split the cap fairly so one category can't use up the whole run.
-  const categoryCap = Math.ceil(run.cap / Math.max(1, run.categories.split(",").length));
+  // Split the cap fairly so one category can't use up the whole run. Groups sharing a template share its slice.
+  const categories = new Set(run.categories.split(",").map((g) => groupById(g)?.category ?? g));
+  const categoryCap = Math.ceil(run.cap / Math.max(1, categories.size));
   const category = job.category as CategoryId;
   try {
     const places = await searchText(env.GOOGLE_PLACES_API_KEY, {
       textQuery: job.query,
-      center: MARKET.center,
-      radiusMeters: MARKET.radiusMeters,
+      center: job.center ?? MARKET.center,
+      radiusMeters: job.radiusMeters ?? MARKET.radiusMeters,
       extraFields: category === "restaurant" ? RESTAURANT_FLAGS : [],
       maxPages: SEARCH_PAGES,
     });
     await addUsage(env, { places: Math.min(SEARCH_PAGES, Math.ceil(places.length / 20) || 1) });
 
     const builds: Job[] = [];
-    for (const lead of qualify(places)) {
+    let checks = 0;
+    for (const lead of qualify(places, { includeSites: job.badSites })) {
       const exists = await env.DB.prepare("SELECT 1 FROM leads WHERE place_id = ?").bind(lead.place.id).first();
       if (exists) continue;
+      if (lead.presence === "has_site" || lead.presence === "free_builder") {
+        if (checks >= MAX_SITE_CHECKS) continue;
+        checks++;
+        const problem = await websiteProblem(lead.place.websiteUri!);
+        if (!problem) continue;
+        lead.presence = "outdated";
+        lead.reason = `${problem} · ${lead.place.userRatingCount ?? 0} Google reviews`;
+      }
       const slot = await env.DB.prepare(
         "UPDATE runs SET queued = queued + 1 WHERE id = ? AND queued < cap AND (SELECT COUNT(*) FROM leads WHERE run_id = ? AND category = ?) < ? RETURNING queued",
       )
@@ -41,10 +54,10 @@ export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>)
       const p = lead.place;
       const id = newId();
       const inserted = await env.DB.prepare(
-        `INSERT OR IGNORE INTO leads (id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, score, status, place_json, fetched_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)`,
+        `INSERT OR IGNORE INTO leads (id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, score, status, place_json, lat, lng, fetched_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`,
       )
-        .bind(id, p.id, job.runId, category, p.displayName?.text ?? "", p.nationalPhoneNumber ?? "", p.formattedAddress ?? "", p.rating ?? null, p.userRatingCount ?? null, lead.presence, lead.reason, lead.score, JSON.stringify(p), now(), now(), now())
+        .bind(id, p.id, job.runId, category, p.displayName?.text ?? "", p.nationalPhoneNumber ?? "", p.formattedAddress ?? "", p.rating ?? null, p.userRatingCount ?? null, lead.presence, lead.reason, lead.score, JSON.stringify(p), p.location?.latitude ?? null, p.location?.longitude ?? null, now(), now(), now())
         .run();
       if (!inserted.meta.changes) {
         await env.DB.prepare("UPDATE runs SET queued = queued - 1 WHERE id = ?").bind(job.runId).run();

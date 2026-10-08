@@ -19,8 +19,11 @@
     return Math.round(h / 24) + " days ago";
   };
   const CATEGORY_LABEL = { restaurant: "Restaurant", contractor: "Contractor", salon: "Salon", auto: "Auto", landscaping: "Landscaping", cleaning: "Cleaning" };
+  const groupLabel = (id) => ((meta && meta.categories.find((c) => c.id === id)) || {}).label || CATEGORY_LABEL[id] || id;
+  const GOOGLE_PER_SEARCH = 0.064; // up to 2 pages of Text Search per search phrase
   const SALES = [["new", "New"], ["callbacks", "Callbacks"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
-  const OUTCOME_LABEL = { no_answer: "📵 No answer", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested" };
+  const OUTCOME_LABEL = { no_answer: "📵 No answer", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested", signup_sent: "📝 Sent sign-up link", signed: "✍️ Signed up" };
+  const money = (n) => "$" + (Number.isInteger(n) ? n : Number(n).toFixed(2));
   const isOwner = () => !meta || !meta.me || meta.me.role === "owner";
 
   // Dates are calendar days (YYYY-MM-DD) in the phone's time zone, which is Cullman time.
@@ -84,6 +87,7 @@
   function setNav(active) {
     $nav.hidden = active === "login";
     $nav.querySelector("[data-nav=inbox]").hidden = !isOwner();
+    $nav.querySelector("[data-nav=sales]").hidden = !isOwner();
     $nav.querySelectorAll("a").forEach((a) => a.classList.toggle("is-active", a.dataset.nav === active));
   }
 
@@ -121,8 +125,12 @@
   /* ---------- home ---------- */
   function estimate(cats, cap) {
     const model = meta.settings.copyModel;
-    const per = cats.length ? cats.reduce((s, c) => s + (COST_PER_SITE[c] || 0.08), 0) / cats.length : 0;
+    const per = cats.length ? cats.reduce((s, id) => s + (COST_PER_SITE[(meta.categories.find((c) => c.id === id) || {}).category] || 0.08), 0) / cats.length : 0;
     return (per * cap * (MODEL_FACTOR[model] ?? 1)).toFixed(2);
+  }
+  function googleEstimate(cats, wider) {
+    const n = cats.reduce((s, id) => { const g = meta.categories.find((c) => c.id === id); return s + (g ? (wider ? g.widerSearches : g.searches) : 0); }, 0);
+    return (n * GOOGLE_PER_SEARCH).toFixed(2);
   }
 
   function runCard() {
@@ -133,6 +141,10 @@
         <div class="chips" role="group" aria-label="Categories">${meta.categories
           .map((c, i) => `<label class="pick"><input type="checkbox" name="cat" value="${esc(c.id)}"${i === 0 ? " checked" : ""}>${esc(c.label)}</label>`)
           .join("")}</div>
+        <div style="margin-top:12px">
+          <label class="check"><input type="checkbox" name="wider"> Also search nearby towns <span class="hint">(Hartselle, Arab, Hanceville, Good Hope, Vinemont)</span></label>
+          <label class="check"><input type="checkbox" name="badSites"> Also find businesses with outdated or broken websites</label>
+        </div>
         <label class="field" style="margin-top:14px">Most sites to build this run
           <input type="number" name="cap" min="1" max="500" value="${cap}" inputmode="numeric">
           <span class="hint" id="est"></span></label>
@@ -155,7 +167,8 @@
           : r.done
             ? `Done · ${c.ready || 0} sites ready${c.failed ? ` · ${c.failed} failed` : ""}`
             : `Building sites… ${finished} of ${total}`;
-        return `<div><div class="row"><strong>${esc(r.categories.map((x) => CATEGORY_LABEL[x] || x).join(", "))}</strong><span class="muted small" style="text-align:right">${ago(r.createdAt)}</span></div>
+        const opts = [r.options && r.options.wider ? "nearby towns" : "", r.options && r.options.badSites ? "outdated sites" : ""].filter(Boolean);
+        return `<div><div class="row"><strong>${esc(r.categories.map(groupLabel).join(", "))}${opts.length ? ` <span class="muted small">+ ${esc(opts.join(", "))}</span>` : ""}</strong><span class="muted small" style="text-align:right">${ago(r.createdAt)}</span></div>
           <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
           <p class="small muted" style="margin:0 0 10px">${r.done ? "" : '<span class="spin"></span> '}${esc(label)}</p></div>`;
       })
@@ -190,6 +203,7 @@
     meta = meta || (await api("/meta"));
     if (!document.getElementById("leads")) {
       $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="due"></div><div id="runs"></div></div><div><section>
+        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/route">🗺️ Plan a walk-in route</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
@@ -200,7 +214,7 @@
       const updateEst = () => {
         const cats = [...form.querySelectorAll("input[name=cat]:checked")].map((i) => i.value);
         const cap = Number(form.cap.value) || 0;
-        $app.querySelector("#est").textContent = cats.length ? `Up to ${cap} sites. Writing costs about $${estimate(cats, cap)} at most, plus a little for Google searches.` : "Pick at least one category.";
+        $app.querySelector("#est").textContent = cats.length ? `Up to ${cap} sites. Writing costs about $${estimate(cats, cap)} at most, plus up to $${googleEstimate(cats, form.wider.checked)} for Google searches.` : "Pick at least one category.";
       };
       form.addEventListener("input", updateEst);
       updateEst();
@@ -211,7 +225,7 @@
         const btn = form.querySelector("button");
         btn.disabled = true;
         try {
-          await api("/runs", { method: "POST", json: { categories: cats, cap: Number(form.cap.value) } });
+          await api("/runs", { method: "POST", json: { categories: cats, cap: Number(form.cap.value), wider: form.wider.checked, badSites: form.badSites.checked } });
           toast("Run started. Sites will appear below as they're built.");
           refreshHome();
         } catch (err) {
@@ -341,6 +355,102 @@
     });
   }
 
+  /* ---------- sign-up ---------- */
+  function signupCardHtml(l) {
+    const plans = meta.settings.plans || [];
+    const signed = (l.signups || [])[0];
+    return `<section class="card" id="signupcard"><h2>${signed ? "Signed up" : "Sign them up"}</h2>
+      ${(l.signups || []).map((x) => `<div class="signed"><strong>✍️ ${esc(x.plan.name)}: ${money(x.plan.monthly)}/mo${x.plan.setup ? ` + ${money(x.plan.setup)} setup` : ""}</strong>
+        <p class="small muted">${esc(x.signerName)}${x.signerTitle ? ", " + esc(x.signerTitle) : ""} · ${esc(x.signerEmail || "")} · ${ago(x.createdAt)}${x.sentBy ? ` · sent by ${esc(x.sentBy)}` : ""}</p>
+        ${isOwner() ? `<label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label>` : x.paid ? `<p class="chip chip--good">Paid</p>` : ""}</div>`).join("")}
+      ${plans.length
+        ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They read it, sign with their name and set up automatic payment, on your phone or theirs."}</p>
+          <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div>
+          <div id="signuplink"></div>`
+        : isOwner() ? `<p class="small muted">Add your plans and prices in <a href="#/settings">Settings</a> first.</p>` : `<p class="small muted">The owner hasn't set up plans yet.</p>`}
+      </section>`;
+  }
+
+  function bindSignup(l, after) {
+    const card = document.getElementById("signupcard");
+    if (!card) return;
+    card.querySelectorAll("[data-paid]").forEach((c) => c.addEventListener("change", async () => {
+      try { await api(`/leads/${l.id}/paid`, { method: "POST", json: { signupId: c.dataset.paid, paid: c.checked } }); toast(c.checked ? "Marked as paid" : "Marked as not paid"); } catch (err) { toast(err.message); }
+    }));
+    card.querySelectorAll("[data-plan]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        const res = await api(`/leads/${l.id}/signup`, { method: "POST", json: { plan: b.dataset.plan } });
+        const phone = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "");
+        const sms = `Here's the sign-up page for your new website (${res.plan} plan) for ${l.record ? l.record.name : l.name}: ${res.url}`;
+        card.querySelector("#signuplink").innerHTML = `<div class="linkbox"><p class="small"><strong>${esc(res.plan)}</strong> sign-up link ready (works ${res.expiresInDays} days).</p>
+          <div class="btns btns--full"><a class="btn btn--primary" href="${esc(res.url)}" target="_blank" rel="noopener">Open here</a>
+          <a class="btn" href="sms:+1${phone}?body=${encodeURIComponent(sms)}">Text it</a><button class="btn" type="button" data-copy>Copy</button></div>
+          <p class="small muted">“Open here” lets them sign on your phone right now.</p></div>`;
+        card.querySelector("[data-copy]").addEventListener("click", async () => { try { await navigator.clipboard.writeText(res.url); toast("Link copied"); } catch (e) { toast("Couldn't copy"); } });
+      } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+  }
+
+  /* ---------- live client tools ---------- */
+  function liveCardHtml(l) {
+    return `<section class="card" id="livecard"><h2>Client site</h2>
+      <div id="stats"><p class="muted small"><span class="spin"></span> Loading visits…</p></div>
+      <div class="btns btns--full" style="margin-top:10px">
+        <button class="btn" id="report">Text monthly report</button>
+        <a class="btn" href="/api/leads/${l.id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a></div>
+      <h3 style="margin-top:16px">Their own domain</h3>
+      <div id="domain"><p class="muted small">Checking…</p></div></section>`;
+  }
+
+  async function bindLive(l) {
+    const statsEl = document.getElementById("stats");
+    if (!statsEl) return;
+    let st;
+    try {
+      st = await api(`/leads/${l.id}/stats`);
+      const row = (label, t) => `<tr><th scope="row">${label}</th><td>${t.views}</td><td>${t.calls}</td><td>${t.directions}</td><td>${t.requests}</td></tr>`;
+      const monthName = (ym) => new Date(ym + "-15").toLocaleDateString(undefined, { month: "long" });
+      statsEl.innerHTML = `<table class="stats"><thead><tr><th></th><th>Visits</th><th>Calls</th><th>Directions</th><th>Requests</th></tr></thead><tbody>
+        ${row(esc(monthName(st.thisMonth.label)) + " so far", st.thisMonth)}${row(esc(monthName(st.lastMonth.label)), st.lastMonth)}</tbody></table>
+        <p class="small muted">Calls and directions are taps on those buttons. Counted without cookies.</p>`;
+    } catch (err) { statsEl.innerHTML = `<p class="small muted">${esc(err.message)}</p>`; }
+    document.getElementById("report").addEventListener("click", () => {
+      if (!st) return;
+      const t = st.lastMonth.views || !st.thisMonth.views ? st.lastMonth : st.thisMonth;
+      const label = new Date((t === st.lastMonth ? st.lastMonth.label : st.thisMonth.label) + "-15").toLocaleDateString(undefined, { month: "long" });
+      const name = l.record ? l.record.name : l.name;
+      const from = meta.settings.companyName ? ` from ${meta.settings.companyName}` : "";
+      const msg = `Hi! Your website report for ${name}, ${label}${from}: ${t.views} visits, ${t.calls} people tapped Call, ${t.directions} got directions${t.requests ? `, and ${t.requests} sent a request through the site` : ""}. Let us know if you'd like anything updated!`;
+      const phone = l.record ? l.record.phone.e164.slice(2) : "";
+      location.href = `sms:+1${phone}?body=${encodeURIComponent(msg)}`;
+    });
+    const domEl = document.getElementById("domain");
+    const renderDomain = (d) => {
+      const steps = d && d.domain
+        ? `<p><strong>${esc(d.domain)}</strong> ${d.status === "active" ? '<span class="chip chip--good">● Working</span>' : `<span class="chip chip--warn">${esc(d.status || "waiting")}</span>`}</p>
+          ${d.status === "active" ? "" : `<p class="small">At the company where the domain was bought (GoDaddy, Namecheap…), add this DNS record:</p>
+          <p class="small"><code>CNAME</code> · name <code>${esc(d.domain.split(".").length > 2 ? d.domain.split(".")[0] : "@")}</code> · value <code>${esc(d.target)}</code></p>
+          <p class="small muted">${d.domain.split(".").length > 2 ? "" : "A bare domain (no www) works best if the domain uses Cloudflare's nameservers. Using www.yourdomain.com is easiest. "}It can take a few hours. HTTPS is set up automatically.${d.error ? " Last check: " + esc(d.error) : ""}</p>`}
+          <div class="btns"><button class="btn btn--small" data-dom="check">Check again</button><button class="btn btn--small btn--danger" data-dom="remove">Remove</button></div>`
+        : `<form id="domf" class="row"><label class="field" style="margin:0"><span class="sr-only">Domain</span><input name="domain" placeholder="www.theirbusiness.com" autocapitalize="off" autocomplete="off" inputmode="url"></label><button class="btn" style="flex:none">Add</button></form>
+          <p class="small muted">They buy the domain (about $10–15 a year, at Cloudflare, GoDaddy or Namecheap), then add it here.</p>`;
+      domEl.innerHTML = steps;
+      const f = domEl.querySelector("#domf");
+      if (f) f.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try { renderDomain(await api(`/leads/${l.id}/domain`, { method: "PUT", json: { domain: f.domain.value.trim() } })); } catch (err) { toast(err.message); }
+      });
+      domEl.querySelectorAll("[data-dom]").forEach((b) => b.addEventListener("click", async () => {
+        try {
+          if (b.dataset.dom === "remove") { if (!confirm("Remove this domain from the site?")) return; await api(`/leads/${l.id}/domain`, { method: "DELETE" }); renderDomain(null); }
+          else renderDomain(await api(`/leads/${l.id}/domain`));
+        } catch (err) { toast(err.message); }
+      }));
+    };
+    try { renderDomain(await api(`/leads/${l.id}/domain`)); } catch (err) { domEl.innerHTML = `<p class="small muted">${esc(err.message)}</p>`; }
+  }
+
   /* ---------- lead detail ---------- */
   async function viewLead(id) {
     setNav("home");
@@ -378,6 +488,7 @@
             <a class="btn btn--primary" href="#/preview/${l.id}">Preview</a>
             <a class="btn" href="/p/${l.id}/" target="_blank" rel="noopener">Open full screen</a>
             ${owner ? `<a class="btn" href="#/edit/${l.id}">Edit</a>` : ""}
+            ${l.salesStatus !== "live" ? `<a class="btn" href="/api/leads/${l.id}/flyer" target="_blank" rel="noopener">Leave-behind flyer (QR)</a>` : ""}
           </div>` : ""}
         ${l.liveUrl ? `<p style="margin-top:12px">Live at <a href="${esc(l.liveUrl)}" target="_blank" rel="noopener">${esc(l.liveUrl.replace("https://", ""))}</a></p>` : ""}
       </section>
@@ -386,6 +497,8 @@
         ${notesHtml(l)}
       </section>
       </div><div>
+      ${ready ? signupCardHtml(l) : ""}
+      ${l.salesStatus === "live" && owner ? liveCardHtml(l) : ""}
       ${l.salesStatus !== "live" ? logCardHtml(l) : ""}
       ${ready && owner ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
         ${blockers.length ? `<ul class="list small">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul><p class="small muted">Fill these in from Edit.</p>` : `<p class="muted">Everything's confirmed. Publishing puts the site on the internet.</p>`}
@@ -401,6 +514,8 @@
     const reload = () => viewLead(id);
     bindLog(l, reload);
     bindNotes(l, reload);
+    bindSignup(l, reload);
+    if (l.salesStatus === "live" && owner) bindLive(l);
 
     $app.querySelectorAll("[data-status]").forEach((b) =>
       b.addEventListener("click", async () => {
@@ -738,10 +853,119 @@
       <section class="card"><h2>If they say…</h2>${pitch.objections.map((o) => `<details class="obj"><summary>“${esc(o.objection)}”</summary><p>${esc(o.response)}</p></details>`).join("")}</section>
       <section class="card opener"><h2>Ask for the yes</h2><p class="big">${esc(pitch.close)}</p></section>
       <section class="card"><h2>Don't say</h2>${list(pitch.avoid)}</section>
-      ${l.salesStatus !== "live" ? logCardHtml(l) : ""}
+      ${l.salesStatus !== "live" ? signupCardHtml(l) + logCardHtml(l) : ""}
       <p><button class="btn btn--small" id="regen">Write a fresh guide</button></p>`;
     bindLog(l, () => go("#/lead/" + id));
+    bindSignup(l, () => go("#/lead/" + id));
     document.getElementById("regen").addEventListener("click", () => viewPitch(id, true));
+  }
+
+  /* ---------- walk-in route ---------- */
+  const START_TOWNS = [["Cullman", 34.1748, -86.8436], ["Hartselle", 34.4434, -86.9353], ["Arab", 34.3281, -86.4958], ["Hanceville", 34.0607, -86.7675], ["Good Hope", 34.1157, -86.8636], ["Vinemont", 34.2465, -86.8661]];
+  const MAX_STOPS = 9; // Google Maps directions links take up to 9 stops
+  const miles = (a, b) => {
+    const r = (d) => (d * Math.PI) / 180;
+    const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
+    return 2 * 3958.8 * Math.asin(Math.sqrt(h));
+  };
+
+  async function viewRoute() {
+    setNav("home");
+    const { leads } = await api("/leads");
+    const pool = leads.filter((l) => l.lat && l.status === "ready" && (l.salesStatus === "new" || l.salesStatus === "shown"));
+    const picked = new Set();
+    let start = { lat: START_TOWNS[0][1], lng: START_TOWNS[0][2], label: "Cullman" };
+    let category = "";
+    $app.innerHTML = `<p><a href="#/">← Leads</a></p><h1>Walk-in route</h1>
+      <p class="muted small">Pick up to ${MAX_STOPS} businesses, then open the route in Google Maps. Show them their preview on your phone when you walk in.</p>
+      <section class="card"><div class="row" style="flex-wrap:wrap">
+        <label class="field" style="flex:1 1 160px">Start from<select id="from"><option value="me">📍 Where I am now</option>${START_TOWNS.map(([n], i) => `<option value="${i}"${i === 0 ? " selected" : ""}>${n}</option>`).join("")}</select></label>
+        <label class="field" style="flex:1 1 160px">Category<select id="cat"><option value="">All</option>${Object.entries(CATEGORY_LABEL).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label></div></section>
+      <ul class="list" id="stops"></ul>
+      <div class="sticky-save btns btns--full"><a class="btn btn--primary" id="go" target="_blank" rel="noopener">Open route</a><button class="btn" id="clear" type="button">Clear</button></div>`;
+    const list = $app.querySelector("#stops");
+    const goBtn = $app.querySelector("#go");
+    const order = () => {
+      // Nearest stop next, starting from the start point.
+      const left = pool.filter((l) => picked.has(l.id));
+      const out = [];
+      let here = start;
+      while (left.length) {
+        left.sort((a, b) => miles(here, a) - miles(here, b));
+        here = left.shift();
+        out.push(here);
+      }
+      return out;
+    };
+    const update = () => {
+      const stops = order();
+      goBtn.textContent = stops.length ? `Open route (${stops.length} stop${stops.length > 1 ? "s" : ""})` : "Open route";
+      goBtn.classList.toggle("is-disabled", !stops.length);
+      if (!stops.length) { goBtn.removeAttribute("href"); return; }
+      const last = stops[stops.length - 1];
+      const mid = stops.slice(0, -1);
+      const q = new URLSearchParams({ api: "1", origin: `${start.lat},${start.lng}`, destination: last.address || `${last.lat},${last.lng}`, destination_place_id: last.placeId, travelmode: "driving" });
+      if (mid.length) {
+        q.set("waypoints", mid.map((l) => l.address || `${l.lat},${l.lng}`).join("|"));
+        q.set("waypoint_place_ids", mid.map((l) => l.placeId).join("|"));
+      }
+      goBtn.href = "https://www.google.com/maps/dir/?" + q;
+      list.querySelectorAll("input[data-pick]").forEach((c) => { c.disabled = !c.checked && picked.size >= MAX_STOPS; });
+    };
+    const render = () => {
+      const shown = pool.filter((l) => !category || l.category === category).map((l) => ({ l, d: miles(start, l) })).sort((a, b) => a.d - b.d).slice(0, 60);
+      list.innerHTML = shown.length
+        ? shown.map(({ l, d }) => `<li><label class="pickrow"><input type="checkbox" data-pick="${l.id}"${picked.has(l.id) ? " checked" : ""}>
+            <span style="flex:1"><span class="row" style="align-items:baseline"><strong>${esc(l.name)}</strong><span class="dist" style="flex:none">${d.toFixed(1)} mi</span></span>
+            <span class="small muted">${esc(CATEGORY_LABEL[l.category] || l.category)} · ${esc(l.reason || "")}</span><br><span class="small">${esc(l.address || "")}</span>
+            ${l.followUp ? `<br>${followChip(l.followUp)}` : ""}</span></label>
+            <div class="btns" style="margin:6px 0 0 36px"><a class="btn btn--small" href="#/preview/${l.id}">Preview</a><a class="btn btn--small" href="/api/leads/${l.id}/flyer" target="_blank" rel="noopener">Flyer</a></div></li>`).join("")
+        : `<li class="muted">No open leads with a location${category ? " in this category" : ""}.</li>`;
+      list.querySelectorAll("input[data-pick]").forEach((c) => c.addEventListener("change", () => {
+        if (c.checked) picked.add(c.dataset.pick); else picked.delete(c.dataset.pick);
+        update();
+      }));
+      update();
+    };
+    $app.querySelector("#cat").addEventListener("change", (e) => { category = e.target.value; render(); });
+    $app.querySelector("#clear").addEventListener("click", () => { picked.clear(); render(); });
+    $app.querySelector("#from").addEventListener("change", (e) => {
+      const v = e.target.value;
+      if (v !== "me") { const t = START_TOWNS[Number(v)]; start = { lat: t[1], lng: t[2], label: t[0] }; render(); return; }
+      if (!navigator.geolocation) return toast("Location isn't available here. Pick a town instead.");
+      toast("Finding you…");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { start = { lat: pos.coords.latitude, lng: pos.coords.longitude, label: "You" }; render(); },
+        () => { toast("Couldn't get your location. Pick the nearest town instead."); e.target.value = "0"; },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+      );
+    });
+    render();
+  }
+
+  /* ---------- sales ---------- */
+  async function viewSales() {
+    setNav("sales");
+    const d = await api("/sales");
+    const table = (rows) => rows.length
+      ? `<table class="stats"><thead><tr><th>Who</th><th>Calls</th><th>Reached</th><th>Interested</th><th>Sold</th></tr></thead><tbody>${rows
+          .map((r) => `<tr><th scope="row">${esc(r.person)}</th><td>${r.calls}</td><td>${r.reached}</td><td>${r.interested}</td><td><strong>${r.sold}</strong></td></tr>`).join("")}</tbody></table>`
+      : `<p class="muted small">No calls logged yet.</p>`;
+    $app.innerHTML = `<h1>Sales</h1>
+      <div class="grid grid--2">
+        <section class="card"><h2>Monthly revenue</h2><p class="bignum">${money(d.monthlyRevenue)}<span class="small muted"> / month paid</span></p>
+          <p class="small muted">${money(d.signedRevenue)}/month signed in total · ${d.clients.length} client${d.clients.length === 1 ? "" : "s"}. Mark a sign-up as paid on the lead once their payment is set up.</p></section>
+        <section class="card"><h2>Commission this month</h2>${d.commission
+          ? d.commissionOwed.length ? `<ul class="list">${d.commissionOwed.map((c) => `<li><strong>${esc(c.person)}</strong>: ${c.sales} sale${c.sales === 1 ? "" : "s"} × ${money(d.commission)} = <strong>${money(c.amount)}</strong></li>`).join("")}</ul>` : `<p class="muted small">No caller sales yet this month.</p>`
+          : `<p class="muted small">Set a commission per sale in <a href="#/settings">Settings</a>.</p>`}</section>
+        <section class="card"><h2>This week</h2>${table(d.week)}</section>
+        <section class="card"><h2>This month</h2>${table(d.month)}</section>
+      </div>
+      <section class="card"><h2>Clients</h2>${d.clients.length
+        ? `<ul class="list">${d.clients.map((c) => `<li><div class="row"><a href="#/lead/${c.id}"><strong>${esc(c.name)}</strong></a>${c.status === "live" ? '<span class="chip chip--good" style="flex:none">● Live</span>' : '<span class="chip" style="flex:none">Sold</span>'}</div>
+            <p class="small muted" style="margin:4px 0 0">${c.plan ? `${esc(c.plan)} · ${money(c.monthly)}/mo · ${c.paid ? "paid" : "<strong>payment not set up</strong>"}` : "No sign-up on file"}${c.seller ? ` · sold by ${esc(c.seller)}` : ""}</p></li>`).join("")}</ul>`
+        : `<p class="muted small">No clients yet. They show up here once someone signs up or is marked Sold.</p>`}</section>
+      <p class="small muted">Calls are logged outcomes. Reached means someone answered. A sale counts for whoever sent the sign-up link, or whoever marked it Sold.</p>`;
   }
 
   /* ---------- inbox ---------- */
@@ -817,6 +1041,23 @@
     }));
   }
 
+  const PLAN_IDS = ["basic", "plus", "pro"];
+  const SUGGESTED_PLANS = [
+    { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Website on our fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page" },
+    { id: "plus", name: "Plus", setup: 0, monthly: 79, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
+    { id: "pro", name: "Pro", setup: 0, monthly: 129, includes: "Everything in Plus\nYour own domain name and email set up\nMonthly Google profile posts and photo updates\nPriority changes" },
+  ];
+
+  function planRows(plans) {
+    const list = plans.length ? PLAN_IDS.map((id) => plans.find((p) => p.id === id) || { id, name: "", setup: 0, monthly: "", includes: "" }) : SUGGESTED_PLANS;
+    return list.map((p) => `<fieldset class="plan"><legend>${p.id === "basic" ? "Plan 1" : p.id === "plus" ? "Plan 2 (recommended)" : "Plan 3"}</legend>
+      <div class="row"><label class="field">Name<input name="plan_${p.id}_name" value="${esc(p.name)}" maxlength="40"></label>
+      <label class="field">Monthly ($)<input name="plan_${p.id}_monthly" type="number" min="0" inputmode="decimal" value="${p.monthly}"></label>
+      <label class="field">Setup ($)<input name="plan_${p.id}_setup" type="number" min="0" inputmode="decimal" value="${p.setup || 0}"></label></div>
+      <label class="field">What's included <span class="hint">One per line</span><textarea name="plan_${p.id}_includes" rows="3">${esc(p.includes)}</textarea></label>
+      <label class="field">Payment link <span class="hint">Stripe or Square, optional</span><input name="plan_${p.id}_pay" type="url" value="${esc(p.payLink || "")}" placeholder="https://buy.stripe.com/…"></label></fieldset>`).join("");
+  }
+
   async function viewSettings() {
     setNav("settings");
     meta = await api("/meta");
@@ -827,15 +1068,23 @@
     const [{ last30Days: u }, { callers }] = await Promise.all([api("/usage"), api("/callers")]);
     const s = meta.settings;
     $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">
-      <section class="card"><h2>Your business &amp; runs</h2><form id="sf">
-        <label class="field">Default most sites per run<input name="cap" type="number" min="1" max="500" value="${s.defaultCap}"></label>
-        <label class="field">Your company name<input name="companyName" value="${esc(s.companyName || "")}" placeholder="e.g. Cullman Web Co."></label>
+      <form id="sf" class="card settings-form"><h2>Your business</h2>
+        <label class="field">Company name <span class="hint">What clients see</span><input name="companyName" value="${esc(s.companyName || "")}" placeholder="e.g. Underground Associates"></label>
+        <label class="field">Legal name <span class="hint">Who signs client agreements</span><input name="legalName" value="${esc(s.legalName || "")}" placeholder="e.g. Underground Associates LLC"></label>
+        <div class="row"><label class="field">Business phone<input name="companyPhone" type="tel" value="${esc(s.companyPhone || "")}"></label>
+        <label class="field">Business email<input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
         <label class="field">Caller's name <span class="hint">Used in call guides you open; callers' own logins use their names</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="Who makes the calls"></label>
-        <div class="row"><label class="field">Setup price ($)<input name="setupPrice" type="number" min="0" inputmode="decimal" value="${s.setupPrice ?? ""}"></label>
-        <label class="field">Monthly price ($)<input name="monthlyPrice" type="number" min="0" inputmode="decimal" value="${s.monthlyPrice ?? ""}"></label></div>
-        <label class="field">What's included <span class="hint">Used in the call guide</span><textarea name="offerIncludes" rows="3" placeholder="Hosting, updates when you need them, your own domain…">${esc(s.offerIncludes || "")}</textarea></label>
+        <h2 style="margin-top:18px">Plans &amp; prices</h2>
+        <p class="small muted">${s.plans.length ? "" : "Suggested starting plans are filled in below. Change them to your prices, then Save. "}Leave a plan's name blank to hide it. For automatic monthly payment, make a <strong>Payment Link</strong> for each plan in Stripe or Square (set as a monthly subscription) and paste it here.</p>
+        ${planRows(s.plans)}
+        <div class="row"><label class="field">Minimum months<input name="minMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.minMonths ?? 12}"></label>
+        <label class="field">Caller commission per sale ($)<input name="commission" type="number" min="0" inputmode="decimal" value="${s.commission ?? ""}"></label></div>
+        <label class="field">Client agreement <span class="hint">Plain-language starting point, not legal advice. Have a lawyer look it over once.</span><textarea name="terms" rows="10">${esc(s.terms || meta.defaultTerms)}</textarea></label>
+        <button class="btn btn--small" type="button" id="resetterms">Reset agreement to the standard text</button>
+        <h2 style="margin-top:18px">Runs</h2>
+        <label class="field">Default most sites per run<input name="cap" type="number" min="1" max="500" value="${s.defaultCap}"></label>
         <label class="field">AI writer<select name="model">${meta.models.map((m) => `<option value="${esc(m.id)}"${m.id === s.copyModel ? " selected" : ""}>${esc(m.label)}</option>`).join("")}</select></label>
-        <button class="btn btn--primary" type="submit">Save</button></form></section>
+        <div class="sticky-save"><button class="btn btn--primary" type="submit" style="width:100%">Save settings</button></div></form>
       <section class="card"><h2>Spending, last 30 days</h2><ul class="list">
         <li>AI writing: <strong>$${u.aiCost.toFixed(2)}</strong> <span class="muted small">(${u.aiTokensIn.toLocaleString()} in / ${u.aiTokensOut.toLocaleString()} out tokens)</span></li>
         <li>Google: about <strong>$${u.googleCostEstimate.toFixed(2)}</strong> <span class="muted small">(${u.googleRequests} searches, ${u.googlePhotos} photos; estimate, before Google's free monthly credit)</span></li></ul></section>
@@ -844,21 +1093,33 @@
     </div>`;
     bindCallers();
     bindDevice();
+    $app.querySelector("#resetterms").addEventListener("click", () => {
+      if (confirm("Replace the agreement with the standard text?")) $app.querySelector("[name=terms]").value = meta.defaultTerms;
+    });
     $app.querySelector("#sf").addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
         const f = e.target;
-        const n = (v) => (v === "" ? undefined : Number(v));
+        const v = (n) => f.elements[n].value.trim();
+        const n = (x) => (x === "" ? undefined : Number(x));
+        const plans = PLAN_IDS.map((id) => ({ id, name: v(`plan_${id}_name`), setup: Number(v(`plan_${id}_setup`) || 0), monthly: Number(v(`plan_${id}_monthly`) || 0), includes: v(`plan_${id}_includes`), payLink: v(`plan_${id}_pay`) || undefined }))
+          .filter((p) => p.name);
+        if (plans.some((p) => !p.monthly)) return toast("Give every plan a monthly price");
+        const terms = v("terms");
         await api("/settings", {
           method: "PUT",
           json: {
             defaultCap: Number(f.cap.value),
             copyModel: f.model.value,
-            companyName: f.companyName.value.trim() || undefined,
-            callerName: f.callerName.value.trim() || undefined,
-            setupPrice: n(f.setupPrice.value),
-            monthlyPrice: n(f.monthlyPrice.value),
-            offerIncludes: f.offerIncludes.value.trim() || undefined,
+            companyName: v("companyName") || undefined,
+            legalName: v("legalName") || undefined,
+            companyPhone: v("companyPhone") || undefined,
+            companyEmail: v("companyEmail") || undefined,
+            callerName: v("callerName") || undefined,
+            plans,
+            minMonths: n(v("minMonths")),
+            commission: n(v("commission")),
+            terms: terms && terms !== meta.defaultTerms ? terms : undefined,
           },
         });
         meta = null;
@@ -880,11 +1141,13 @@
     try {
       if (h === "#/login") return await viewLogin();
       meta = meta || (await api("/meta"));
-      if (!isOwner() && (/^#\/edit\//.test(h) || h === "#/inbox")) return go("#/");
+      if (!isOwner() && (/^#\/edit\//.test(h) || h === "#/inbox" || h === "#/sales")) return go("#/");
       if ((m = /^#\/lead\/([a-z0-9]+)$/.exec(h))) return await viewLead(m[1]);
       if ((m = /^#\/edit\/([a-z0-9]+)$/.exec(h))) return await viewEdit(m[1]);
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
+      if (h === "#/route") return await viewRoute();
+      if (h === "#/sales") return await viewSales();
       if (h === "#/inbox") return await viewInbox();
       if (h === "#/settings") return await viewSettings();
       $app.innerHTML = "";

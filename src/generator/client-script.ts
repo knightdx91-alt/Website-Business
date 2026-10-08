@@ -93,6 +93,20 @@ if (hd) {
     for (var j = 0; j < rows.length; j++) rows[j].classList.add("is-today");
   } catch (err) {}
 }
+var sm = d.querySelector("meta[name='wb-stats']");
+if (sm && navigator.sendBeacon) {
+  var ep = sm.getAttribute("content");
+  var hit = function (e) { try { navigator.sendBeacon(ep + "?e=" + e); } catch (err) {} };
+  hit("view");
+  d.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a");
+    if (!a) return;
+    var h = a.getAttribute("href") || "";
+    if (h.indexOf("tel:") === 0) hit("call");
+    else if (h.indexOf("sms:") === 0) hit("text");
+    else if (h.indexOf("google.com/maps") > -1 || h.indexOf("maps.apple.com") > -1) hit("directions");
+  });
+}
 var fy = d.querySelectorAll("[data-year]");
 for (var y = 0; y < fy.length; y++) fy[y].textContent = String(new Date().getFullYear());
 })();

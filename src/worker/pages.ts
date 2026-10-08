@@ -169,3 +169,35 @@ export async function deploy(
 export async function deleteProject(auth: PagesAuth, name: string): Promise<void> {
   await cf<unknown>(`/accounts/${auth.accountId}/pages/projects/${name}`, { bearer: auth.token, method: "DELETE" });
 }
+
+export interface PagesDomain {
+  name: string;
+  status: string;
+  verification_data?: { status?: string; error_message?: string };
+  validation_data?: { status?: string; method?: string; error_message?: string; txt_name?: string; txt_value?: string };
+}
+
+/** Attaches a client's own domain to their Pages project. Cloudflare then checks DNS and issues HTTPS. */
+export async function addDomain(auth: PagesAuth, project: string, domain: string): Promise<PagesDomain> {
+  const { body } = await cf<PagesDomain>(`/accounts/${auth.accountId}/pages/projects/${project}/domains`, {
+    method: "POST",
+    bearer: auth.token,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: domain }),
+  });
+  // 8000018: already added to this project, which is fine.
+  if (!body.success && !(body.errors ?? []).some((e) => e.code === 8000018)) fail("Adding the domain", body);
+  return body.result ?? (await getDomain(auth, project, domain))!;
+}
+
+export async function getDomain(auth: PagesAuth, project: string, domain: string): Promise<PagesDomain | null> {
+  const { status, body } = await cf<PagesDomain>(`/accounts/${auth.accountId}/pages/projects/${project}/domains/${domain}`, { bearer: auth.token });
+  if (status === 404) return null;
+  if (!body.success) fail("Checking the domain", body);
+  return body.result;
+}
+
+export async function removeDomain(auth: PagesAuth, project: string, domain: string): Promise<void> {
+  const { status, body } = await cf<unknown>(`/accounts/${auth.accountId}/pages/projects/${project}/domains/${domain}`, { method: "DELETE", bearer: auth.token });
+  if (status !== 404 && !body.success) fail("Removing the domain", body);
+}

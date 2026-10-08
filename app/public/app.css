@@ -130,3 +130,22 @@ h3 { font-size: 1rem; margin: 0 0 6px; }
 .notes p { margin: 4px 0 0; }
 button.pick { font: inherit; color: inherit; }
 button.pick.is-on { border-color: var(--primary); color: var(--primary); }
+.plan { border: 1px solid var(--line); border-radius: 12px; padding: 4px 12px 0; margin: 0 0 12px; }
+.plan legend { font-weight: 800; padding: 0 6px; }
+.plan .row { flex-wrap: wrap; }
+.plan .row > .field { flex: 1 1 90px; }
+.check .hint { font-weight: 400; color: var(--muted); font-size: .88rem; }
+.signed { border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 10px; }
+.signed p { margin: 4px 0; }
+.linkbox { margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--chip); }
+.linkbox p { margin: 0 0 8px; }
+table.stats { width: 100%; border-collapse: collapse; font-size: .92rem; }
+table.stats th, table.stats td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+table.stats th[scope=row], table.stats thead th:first-child { text-align: left; }
+code { background: var(--chip); padding: 1px 6px; border-radius: 6px; word-break: break-all; }
+.dist { font-weight: 700; color: var(--muted); white-space: nowrap; }
+.pickrow { display: flex; gap: 12px; align-items: flex-start; }
+.pickrow input { width: 24px; height: 24px; margin-top: 2px; flex: none; accent-color: var(--primary); }
+.bignum { font-size: 2rem; font-weight: 800; margin: 0; }
+.btn.is-disabled { opacity: .5; pointer-events: none; }
+@media (max-width: 460px) { .top { gap: 6px; padding-left: 12px; padding-right: 12px; } .top__nav a { padding: 10px 8px; font-size: .95rem; } }

@@ -3,13 +3,18 @@ import { LOOKS } from "../generator/themes.ts";
 import { menuToText } from "../generator/menu.ts";
 import { packFor } from "../generator/packs/index.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
-import { CATEGORY_LABELS, QUERIES } from "../places/queries.ts";
+import { groupById, SEARCH_GROUPS, searchesFor } from "../places/queries.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { writePitch } from "../copy/pitch.ts";
 import { reviewTexts } from "../places/to-record.ts";
 import type { Place } from "../places/client.ts";
-import { addCaller, checkPassword, clearCookie, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, updateCaller, verifyShare, type Session } from "./auth.ts";
-import { addUsage, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
+import { addCaller, checkPassword, clearCookie, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyShare, verifySignup } from "./auth.ts";
+import { previewFlyer, reviewCards } from "./cards.ts";
+import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
+import { salesDashboard } from "./sales.ts";
+import { serveSignup, signupsFor } from "./signup.ts";
+import { recordHit, siteReport } from "./stats.ts";
+import { addUsage, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
 import { HttpError, json, localDate, newId, now, type Env, type Job } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
@@ -66,6 +71,10 @@ function summary(l: LeadRow) {
     hasPitch: !!l.pitch_json,
     followUp: l.follow_up,
     lastContact: l.last_contact,
+    placeId: l.place_id,
+    lat: l.lat,
+    lng: l.lng,
+    customDomain: l.custom_domain,
     todos: lint?.todos.length ?? 0,
     blockers: lint ? lint.publishBlockers.length + lint.errors.length : null,
     createdAt: l.created_at,
@@ -169,7 +178,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const settings = await getSettings(env);
     return json({
       me: { role: session.role, name: session.name },
-      categories: Object.keys(QUERIES).map((id) => ({ id, label: CATEGORY_LABELS[id as CategoryId] ?? id })),
+      categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
+      defaultTerms: defaultTerms(settings),
       models: Object.entries(MODEL_PRICES).map(([id, p]) => ({ id, label: p.label })),
       settings,
     });
@@ -183,17 +193,32 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         defaultCap: z.number().int().min(1).max(500),
         copyModel: z.enum(Object.keys(MODEL_PRICES) as [string, ...string[]]),
         companyName: z.string().trim().max(80).optional(),
+        legalName: z.string().trim().max(120).optional(),
+        companyPhone: z.string().trim().max(30).optional(),
+        companyEmail: z.string().trim().email().max(120).optional(),
         callerName: z.string().trim().max(60).optional(),
-        setupPrice: z.number().min(0).max(100_000).optional(),
-        monthlyPrice: z.number().min(0).max(10_000).optional(),
-        offerIncludes: z.string().trim().max(500).optional(),
+        plans: z
+          .array(
+            z.object({
+              id: z.enum(["basic", "plus", "pro"]),
+              name: z.string().trim().min(1).max(40),
+              setup: z.number().min(0).max(100_000),
+              monthly: z.number().min(0).max(10_000),
+              includes: z.string().trim().max(500),
+              payLink: z.string().trim().url().max(500).refine((u) => u.startsWith("https://"), "Payment links must start with https://").optional(),
+            }),
+          )
+          .max(3),
+        minMonths: z.number().int().min(0).max(36).optional(),
+        terms: z.string().trim().max(6000).optional(),
+        commission: z.number().min(0).max(10_000).optional(),
       }),
     );
     const before = await getSettings(env);
     await setSetting(env, "app_settings", JSON.stringify(s));
-    const salesKeys = ["companyName", "callerName", "setupPrice", "monthlyPrice", "offerIncludes"] as const;
     // Call guides quote these, so saved guides are rewritten on next open.
-    if (salesKeys.some((k) => before[k] !== s[k])) await env.DB.prepare("UPDATE leads SET pitch_json = NULL WHERE pitch_json IS NOT NULL").run();
+    const sales = (x: Partial<typeof s>) => JSON.stringify([x.companyName, x.legalName, x.callerName, x.minMonths, (x.plans ?? []).map((p) => [p.name, p.setup, p.monthly, p.includes])]);
+    if (sales(before) !== sales(s)) await env.DB.prepare("UPDATE leads SET pitch_json = NULL WHERE pitch_json IS NOT NULL").run();
     return json({ ok: true });
   }
 
@@ -208,13 +233,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
 
   if (path === "/runs") ownerOnly();
   if (path === "/runs" && m === "POST") {
-    const input = await body(req, z.object({ categories: z.array(z.string()).min(1).max(6), cap: z.number().int().min(1).max(500) }));
-    const cats = input.categories.filter((c) => QUERIES[c as CategoryId]);
-    if (!cats.length) throw new HttpError(400, "Pick at least one category");
-    const jobs: Job[] = cats.flatMap((c) => (QUERIES[c as CategoryId] ?? []).map((query) => ({ type: "search" as const, runId: "", category: c, query })));
+    const input = await body(
+      req,
+      z.object({ categories: z.array(z.string()).min(1).max(SEARCH_GROUPS.length), cap: z.number().int().min(1).max(500), wider: z.boolean().default(false), badSites: z.boolean().default(false) }),
+    );
+    const groups = input.categories.map(groupById).filter((g) => !!g);
+    if (!groups.length) throw new HttpError(400, "Pick at least one category");
+    const jobs: Job[] = groups.flatMap((g) =>
+      searchesFor(g, input.wider).map((p) => ({ type: "search" as const, runId: "", category: g.category, query: p.query, center: p.center, radiusMeters: p.radiusMeters, badSites: input.badSites })),
+    );
     const id = newId();
-    await env.DB.prepare("INSERT INTO runs (id, created_at, categories, cap, searches_total) VALUES (?, ?, ?, ?, ?)")
-      .bind(id, now(), cats.join(","), input.cap, jobs.length)
+    await env.DB.prepare("INSERT INTO runs (id, created_at, categories, cap, searches_total, options_json) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(id, now(), groups.map((g) => g.id).join(","), input.cap, jobs.length, JSON.stringify({ wider: input.wider, badSites: input.badSites }))
       .run();
     await env.JOBS.sendBatch(jobs.map((j) => ({ body: { ...j, runId: id } as Job })));
     return json({ id });
@@ -232,6 +262,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         id: r.id,
         createdAt: r.created_at,
         categories: r.categories.split(","),
+        options: r.options_json ? JSON.parse(r.options_json) : {},
         cap: r.cap,
         searchesDone: r.searches_done,
         searchesTotal: r.searches_total,
@@ -257,6 +288,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (callerMatch && m === "DELETE") {
     await removeCaller(env, callerMatch[1]!);
     return json({ ok: true });
+  }
+
+  if (path === "/sales" && m === "GET") {
+    ownerOnly();
+    return json(await salesDashboard(env));
   }
 
   if (path === "/leads" && m === "GET") {
@@ -294,10 +330,68 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const action = leadMatch[2] ?? "";
     const sub = leadMatch[3];
     const lead = await requireLead(env, id);
-    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup"].includes(action);
+    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/flyer"].includes(action);
     if (!callerSafe) ownerOnly();
 
-    if (action === "" && m === "GET") return json({ ...detail(lead), notes: await notesFor(env, id) });
+    if (action === "" && m === "GET") return json({ ...detail(lead), notes: await notesFor(env, id), signups: await signupsFor(env, id) });
+    if (action === "/signup" && m === "POST") {
+      const { plan } = await body(req, z.object({ plan: z.enum(["basic", "plus", "pro"]) }));
+      const settings = await getSettings(env);
+      const p = settings.plans.find((x) => x.id === plan);
+      if (!p) throw new HttpError(400, "Set up your plans in Settings first");
+      if (lead.status !== "ready") throw new HttpError(409, "The preview isn't ready yet");
+      const token = await signupToken(env, id, plan);
+      await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, 'signup_sent', ?, ?)")
+        .bind(newId(), id, session.name, `Sign-up link for ${p.name}`, now())
+        .run();
+      return json({ url: `${url.origin}/a/${token}`, plan: p.name, expiresInDays: 30 });
+    }
+    if (action === "/paid" && m === "POST") {
+      const { signupId, paid } = await body(req, z.object({ signupId: z.string().regex(/^[a-z0-9]+$/), paid: z.boolean() }));
+      await env.DB.prepare("UPDATE signups SET paid = ? WHERE id = ? AND lead_id = ?").bind(paid ? 1 : 0, signupId, id).run();
+      return json({ ok: true });
+    }
+    if (action === "/flyer" && m === "GET") {
+      if (lead.status !== "ready") throw new HttpError(409, "The preview isn't ready yet");
+      const days = 60;
+      const token = await shareToken(env, id, days);
+      // Leaving a flyer counts as showing them, which also keeps the preview around longer.
+      if (lead.sales_status === "new") await updateLead(env, id, { sales_status: "shown" });
+      const settings = await getSettings(env);
+      return previewFlyer({
+        business: lead.name ?? "your business",
+        previewUrl: `${url.origin}/s/${token}/`,
+        company: settings.companyName,
+        phone: settings.companyPhone,
+        caller: isOwner ? settings.callerName : session.name,
+        days,
+      });
+    }
+    if (action === "/reviewcard" && m === "GET") return reviewCards(lead.name ?? "us", lead.place_id);
+    if (action === "/stats" && m === "GET") return json(await siteReport(env, id));
+    if (action === "/domain") {
+      if (!lead.pages_project) throw new HttpError(409, "Publish the site first, then add its domain");
+      const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
+      const describe = (d: PagesDomain | null) => ({
+        domain: d?.name ?? lead.custom_domain,
+        status: d?.status ?? null,
+        error: d?.verification_data?.error_message ?? d?.validation_data?.error_message ?? null,
+        target: `${lead.pages_project}.pages.dev`,
+      });
+      if (m === "GET") return json(describe(lead.custom_domain ? await getDomain(auth, lead.pages_project, lead.custom_domain) : null));
+      if (m === "PUT") {
+        const { domain } = await body(req, z.object({ domain: z.string().trim().toLowerCase().max(253).regex(/^(?!-)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/, "Type a domain like www.example.com") }));
+        if (lead.custom_domain && lead.custom_domain !== domain) await removeDomain(auth, lead.pages_project, lead.custom_domain);
+        const d = await addDomain(auth, lead.pages_project, domain);
+        await updateLead(env, id, { custom_domain: domain });
+        return json(describe(d));
+      }
+      if (m === "DELETE") {
+        if (lead.custom_domain) await removeDomain(auth, lead.pages_project, lead.custom_domain);
+        await updateLead(env, id, { custom_domain: null });
+        return json({ ok: true });
+      }
+    }
     if (action === "/log" && m === "POST") {
       const input = await body(
         req,
@@ -336,7 +430,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       if (lead.sales_status === "live") throw new HttpError(409, "This site is live. It can't be deleted from here.");
       await deletePrefix(env, `previews/${id}/`);
       await deletePrefix(env, `owner/${id}/`);
-      await env.DB.batch([env.DB.prepare("DELETE FROM lead_notes WHERE lead_id = ?").bind(id), env.DB.prepare("DELETE FROM leads WHERE id = ?").bind(id)]);
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM lead_notes WHERE lead_id = ?").bind(id),
+        env.DB.prepare("DELETE FROM site_stats WHERE lead_id = ?").bind(id),
+        env.DB.prepare("DELETE FROM leads WHERE id = ?").bind(id),
+      ]);
       return json({ ok: true });
     }
     if (action === "/status" && m === "POST") {
@@ -485,7 +583,7 @@ async function expireStaleLeads(env: Env): Promise<void> {
     await deletePrefix(env, `previews/${id}/`);
     await deletePrefix(env, `owner/${id}/`);
     // Keep only the Place ID (allowed indefinitely) so the lead isn't re-found as new.
-    await updateLead(env, id, { status: "expired", place_json: null, record_json: null, copy_json: null, lint_json: null, name: null, phone: null, address: null });
+    await updateLead(env, id, { status: "expired", place_json: null, record_json: null, copy_json: null, lint_json: null, name: null, phone: null, address: null, lat: null, lng: null });
   }
 }
 
@@ -511,6 +609,16 @@ export default {
         return await serveShared(env, req, leadId, token, rest);
       }
       if (url.pathname === "/.well-known/assetlinks.json") return json(ASSET_LINKS, 200, { "cache-control": "public, max-age=3600" });
+      const signup = /^\/a\/([a-z0-9]+)\.(basic|plus|pro)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(url.pathname);
+      if (signup && (req.method === "GET" || req.method === "POST")) {
+        const [, leadId, plan, exp, sig] = signup as unknown as [string, string, string, string, string];
+        if (!(await verifySignup(env, leadId, plan, exp, sig))) {
+          return new Response("This sign-up link has expired. Ask us for a new one.", { status: 410, headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex" } });
+        }
+        return await serveSignup(env, req, leadId, plan, url.origin);
+      }
+      const hit = /^\/t\/([a-z0-9]+)$/.exec(url.pathname);
+      if (hit && req.method === "POST") return await recordHit(env, req, hit[1]!, url.searchParams.get("e"));
       const form = /^\/f\/([a-z0-9]+)$/.exec(url.pathname);
       if (form && req.method === "POST") return await handleFormPost(env, req, form[1]!);
       return env.ASSETS.fetch(req);

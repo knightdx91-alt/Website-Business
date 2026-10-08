@@ -183,3 +183,14 @@ export async function verifyShare(env: Env, leadId: string, exp: string, sig: st
   if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
   return safeEqual(sig, await hmac(env.APP_SECRET, `share.${leadId}.${exp}`));
 }
+
+/** Sign-up link for one business and plan. Expires; rotating APP_SECRET revokes every link. */
+export async function signupToken(env: Env, leadId: string, planId: string, days = 30): Promise<string> {
+  const exp = Date.now() + days * 86_400_000;
+  return `${leadId}.${planId}.${exp}.${await hmac(env.APP_SECRET, `signup.${leadId}.${planId}.${exp}`)}`;
+}
+
+export async function verifySignup(env: Env, leadId: string, planId: string, exp: string, sig: string): Promise<boolean> {
+  if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
+  return safeEqual(sig, await hmac(env.APP_SECRET, `signup.${leadId}.${planId}.${exp}`));
+}

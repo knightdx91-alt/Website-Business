@@ -2,7 +2,7 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: same-origin
   X-Robots-Tag: noindex, nofollow
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Permissions-Policy: camera=(), microphone=(), geolocation=(self), payment=()
   Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none'
 /fonts/*
   Cache-Control: public, max-age=604800

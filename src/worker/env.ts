@@ -11,7 +11,16 @@ export interface Env {
 }
 
 export type Job =
-  | { type: "search"; runId: string; category: string; query: string }
+  | {
+      type: "search";
+      runId: string;
+      category: string;
+      query: string;
+      center?: { lat: number; lng: number };
+      radiusMeters?: number;
+      /** Also take businesses whose website is outdated or broken. */
+      badSites?: boolean;
+    }
   | { type: "build"; leadId: string };
 
 export function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {

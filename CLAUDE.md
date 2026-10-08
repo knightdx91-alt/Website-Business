@@ -109,8 +109,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Packs for salons, auto, landscaping, cleaning (24 looks total, all AA-checked).
       Real Cullman leads found: 14 salon, 20 auto, 11 landscaping, 6 cleaning.
 - [x] Caller logins (limited access), call log with callbacks, Android app (TWA APK)
-- [ ] Next ideas: owner gallery/team photos, email/text alerts for inbox items,
-      plan cards (landscaping), cleaning checklist, custom domains for live sites
+- [x] Growth batch: plans + client sign-up page + Stripe/Square payment links, visit counter +
+      monthly report, review QR cards, preview flyers, custom domains, outdated-website leads,
+      food trucks / nail salons / pet groomers, nearby towns, walk-in route, sales dashboard
+- [ ] Owner to do: set plans/prices and payment links in Settings; LLC is Underground Associates LLC
+- [ ] Next ideas: owner gallery/team photos, email/text alerts for inbox items, daycare /
+      tattoo / photographer packs (need their own research first), Stripe webhook to mark paid
 
 ## Code map
 
@@ -166,5 +170,25 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   The signing key is deliberately NOT kept anywhere (owner's choice). If it's gone, `android/build.sh`
   makes a new one: put its fingerprint in `ASSET_LINKS`, redeploy, and phones uninstall + reinstall once.
   Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first.
+- Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS). Several groups share one
+  template: food trucks → restaurant pack (variant `food_truck`), nail salons and pet groomers →
+  salon pack (variants `nails`, `pet`). "Nearby towns" adds the first 2 terms per group for Hartselle,
+  Arab, Hanceville, Good Hope, Vinemont. "Outdated websites" checks up to 15 existing sites per search
+  (`src/places/site-check.ts`) and keeps broken/insecure/not-phone-friendly/stale ones (presence `outdated`).
+- Sales: Settings holds 3 plans (name, setup, monthly, includes, optional Stripe/Square payment link),
+  company + legal name, min months, agreement text (`defaultTerms` in db.ts), commission. Callers and the
+  owner send `/a/<lead>.<plan>.<exp>.<hmac>` sign-up links (30 days): the client reads the plan and
+  agreement, types their name (stored in `signups` with the agreement text), then goes to the payment
+  link with `client_reference_id`. The owner ticks "Payment is set up" (no Stripe webhook yet).
+  `/api/sales` credits a sale to whoever sent the link, else whoever logged Sold.
+- Live sites send cookie-free beacons to `/t/<lead>` (views, call/directions/text taps), checked against the
+  site's origin, stored per day in `site_stats`. Lead screen shows this/last month + "Text monthly report".
+- Printables (worker-rendered HTML, `cards.ts`): `/api/leads/:id/reviewcard` (4 Google review QR cards) and
+  `/api/leads/:id/flyer` (60-day preview link QR; marks a New lead Shown). Custom domains go through the
+  Pages domains API (`addDomain` in pages.ts); the lead screen shows the CNAME to add.
+- Walk-in route (`#/route`): open leads sorted by distance (leads.lat/lng, cleared on expiry), up to 9 stops,
+  nearest-next order, opens a Google Maps directions link.
+- Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
+  + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
   project afterwards.

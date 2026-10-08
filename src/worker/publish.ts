@@ -39,6 +39,7 @@ async function buildForPublish(env: Env, lead: LeadRow, appOrigin: string, siteO
       site: { slug: lead.pages_project ?? lead.id, look: lead.look ?? "", origin: siteOrigin },
       mode: "publish",
       formEndpoint: `${appOrigin}/f/${lead.id}`,
+      statsEndpoint: `${appOrigin}/t/${lead.id}`,
       loadFont: await loadFontFrom(env, appOrigin),
     });
     for (const [k, v] of await ownerFiles(env, lead.id)) out.files.set(k, v);

@@ -17,6 +17,8 @@ export interface Ctx {
   /** Suggested owner to-dos. Rendered in previews only; never block publishing. */
   suggestions: string[];
   formEndpoint?: string;
+  /** Live sites only: where the cookie-free visit counter sends page views and taps. */
+  statsEndpoint?: string;
   hasForm: boolean;
 }
 
