@@ -76,6 +76,9 @@ export interface SalesSettings {
   callerName?: string;
   plans: Array<{ name: string; setup: number; monthly: number; includes: string }>;
   minMonths?: number;
+  /** Ways to pay, e.g. "Pay yearly (2 months free): pay 12 months up front and get 2 free". */
+  billing?: string[];
+  addons?: string[];
 }
 
 const SYSTEM = `You coach a friendly salesperson who calls small local businesses in and around Cullman, Alabama. The company builds websites for businesses that don't have one (or whose current site is outdated or broken on phones), and has ALREADY built a free preview site for this business. The caller wants to get the owner to look at the preview and sign up.
@@ -86,7 +89,7 @@ Rules:
 - Honest and low-pressure. No fake urgency, no "limited time", no guilt.
 - Never promise rankings, a number of customers, traffic or revenue. Don't claim affiliation with Google or Facebook.
 - Use only the facts given. Prices only if given; if no plans are given, the close should offer to send pricing after the call.
-- If there are several plans, lead with the middle one and mention the others briefly. The caller can send a sign-up link by text, where the owner reads the plan, accepts and sets up automatic monthly payment.
+- If there are several plans, lead with the middle one and mention the others briefly. If the owner balks at a minimum term, mention the month-to-month option; if they like saving money, mention paying yearly. Mention optional extras only if they ask about email, reviews or Google. The caller can send a sign-up link by text, where the owner reads the plan, accepts and sets up automatic monthly payment.
 - If why_they_are_a_lead says they already have a website, don't claim they have none: the angle is that their current site is outdated, down, or hard to use on a phone, and the preview is a modern rebuild.
 - Describe the preview using only preview_features. Don't add features it doesn't have.
 - Be upfront that the preview was built from their public Google listing, and that they'd swap in their own photos and check every detail before it goes live.
@@ -118,6 +121,8 @@ export async function writePitch(
       ? s.plans.map((p) => ({ name: p.name, setup_fee: p.setup ? `$${p.setup}` : "none", monthly: `$${p.monthly}/month`, includes: p.includes || "(not listed)" }))
       : "(not set)",
     minimum_term: s.plans.length ? (s.minMonths ? `${s.minMonths} months, then cancel any time` : "none, cancel any time") : "(not set)",
+    ways_to_pay: s.billing?.length ? s.billing : "(not set)",
+    optional_extras: s.addons?.length ? s.addons : "(none)",
   };
   const prompt = `<facts>\n${JSON.stringify(facts, null, 2)}\n</facts>
 

@@ -64,8 +64,74 @@ export interface Plan {
   setup: number;
   monthly: number;
   includes: string;
-  /** Stripe or Square payment link (subscription) the client is sent to after signing. */
+  /** Stripe or Square payment link (monthly subscription) the client is sent to after signing. */
   payLink?: string;
+  /** Optional links for the other billing choices; without them the client is told we'll invoice. */
+  payLinkFlex?: string;
+  payLinkAnnual?: string;
+}
+
+export interface AddOn {
+  name: string;
+  price: number;
+  unit: "month" | "each" | "one-time";
+}
+
+export const DEFAULT_ADDONS: AddOn[] = [
+  { name: "Extra email inbox", price: 10, unit: "month" },
+  { name: "Tap-to-review card (NFC)", price: 35, unit: "each" },
+  { name: "Google Business Profile setup", price: 149, unit: "one-time" },
+];
+
+export type Billing = "standard" | "flex" | "annual";
+
+export interface BillingOption {
+  id: Billing;
+  label: string;
+  /** Plain description of what they pay and the term. */
+  detail: string;
+  /** For revenue totals. */
+  monthlyEquivalent: number;
+  payLink?: string;
+}
+
+function dollars(n: number): string {
+  return `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+}
+
+/** The ways a client can pay for a plan: standard (minimum term), month to month (setup fee), or yearly (months free). */
+export function billingOptions(plan: Plan, s: Pick<AppSettings, "minMonths" | "flexSetup" | "annualMonthsFree">): BillingOption[] {
+  const min = s.minMonths ?? 12;
+  const setup = plan.setup ? `${dollars(plan.setup)} setup` : "no setup fee";
+  const out: BillingOption[] = [
+    {
+      id: "standard",
+      label: min ? `${min}-month plan` : "Monthly",
+      detail: `${dollars(plan.monthly)}/month · ${setup} · ${min ? `${min}-month minimum, then cancel any time` : "cancel any time"}`,
+      monthlyEquivalent: plan.monthly,
+      payLink: plan.payLink,
+    },
+  ];
+  if (min && s.flexSetup) {
+    out.push({
+      id: "flex",
+      label: "Month to month",
+      detail: `${dollars(plan.monthly)}/month · ${dollars(plan.setup + s.flexSetup)} setup · no minimum, cancel any time`,
+      monthlyEquivalent: plan.monthly,
+      payLink: plan.payLinkFlex,
+    });
+  }
+  if (s.annualMonthsFree) {
+    const yearly = plan.monthly * (12 - s.annualMonthsFree);
+    out.push({
+      id: "annual",
+      label: `Pay yearly (${s.annualMonthsFree} months free)`,
+      detail: `${dollars(yearly)}/year instead of ${dollars(plan.monthly * 12)} · ${setup} · renews yearly`,
+      monthlyEquivalent: Math.round((yearly / 12) * 100) / 100,
+      payLink: plan.payLinkAnnual,
+    });
+  }
+  return out;
 }
 
 export interface AppSettings {
@@ -79,6 +145,11 @@ export interface AppSettings {
   callerName?: string;
   plans: Plan[];
   minMonths?: number;
+  /** Extra setup fee to skip the minimum term (month to month). 0 turns the option off. */
+  flexSetup?: number;
+  /** Months free when paying a year up front. 0 turns the option off. */
+  annualMonthsFree?: number;
+  addons: AddOn[];
   terms?: string;
   commission?: number;
   /** Old single-price fields, read only to build a plan for settings saved before plans existed. */
@@ -93,10 +164,10 @@ export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | 
   const min = s.minMonths ?? 12;
   return [
     `1. What you get: ${us} builds your website, hosts it and keeps it running, plus everything listed in your plan.`,
-    "2. Payment: Any setup fee is due when you sign up. The monthly fee is charged automatically each month, starting today.",
+    "2. Payment: Any setup fee is due when you sign up. Your plan is charged automatically each month (or each year on a yearly plan), starting today.",
     min > 0
-      ? `3. Term: The first ${min} months are a minimum. After that you can cancel any time with 30 days' notice.`
-      : "3. Term: Cancel any time with 30 days' notice.",
+      ? `3. Term: With the ${min}-month plan, the first ${min} months are a minimum, then you can cancel any time with 30 days' notice. With month to month, there's no minimum: cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months and renew each year unless you cancel before the renewal date.`
+      : "3. Term: Cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months and renew each year unless you cancel before the renewal date.",
     "4. Your content stays yours: your business name, logo, photos and text belong to you. You confirm you have the right to use any photos or text you send us.",
     "5. Your domain: A domain you already own stays in your name. If we register one for you, we'll transfer it to you on request if you leave.",
     "6. If you cancel: the site comes down at the end of your last paid month. We'll send you a copy of the site's files on request.",
@@ -122,6 +193,9 @@ export async function getSettings(env: Env): Promise<AppSettings> {
   return {
     ...s,
     plans,
+    addons: s.addons ?? DEFAULT_ADDONS,
+    flexSetup: s.flexSetup ?? 299,
+    annualMonthsFree: s.annualMonthsFree ?? 2,
     defaultCap: s.defaultCap ?? 50,
     copyModel: s.copyModel && MODEL_PRICES[s.copyModel] ? s.copyModel : "claude-opus-5-5",
   };

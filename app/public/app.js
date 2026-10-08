@@ -360,11 +360,12 @@
     const plans = meta.settings.plans || [];
     const signed = (l.signups || [])[0];
     return `<section class="card" id="signupcard"><h2>${signed ? "Signed up" : "Sign them up"}</h2>
-      ${(l.signups || []).map((x) => `<div class="signed"><strong>✍️ ${esc(x.plan.name)}: ${money(x.plan.monthly)}/mo${x.plan.setup ? ` + ${money(x.plan.setup)} setup` : ""}</strong>
+      ${(l.signups || []).map((x) => `<div class="signed"><strong>✍️ ${esc(x.plan.name)}${x.plan.billingLabel ? ` · ${esc(x.plan.billingLabel)}` : ""}</strong>
+        <p class="small">${esc(x.plan.billingDetail || `${money(x.plan.monthly)}/month${x.plan.setup ? ` + ${money(x.plan.setup)} setup` : ""}`)}</p>
         <p class="small muted">${esc(x.signerName)}${x.signerTitle ? ", " + esc(x.signerTitle) : ""} · ${esc(x.signerEmail || "")} · ${ago(x.createdAt)}${x.sentBy ? ` · sent by ${esc(x.sentBy)}` : ""}</p>
         ${isOwner() ? `<label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label>` : x.paid ? `<p class="chip chip--good">Paid</p>` : ""}</div>`).join("")}
       ${plans.length
-        ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They read it, sign with their name and set up automatic payment, on your phone or theirs."}</p>
+        ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
           <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div>
           <div id="signuplink"></div>`
         : isOwner() ? `<p class="small muted">Add your plans and prices in <a href="#/settings">Settings</a> first.</p>` : `<p class="small muted">The owner hasn't set up plans yet.</p>`}
@@ -1042,11 +1043,14 @@
   }
 
   const PLAN_IDS = ["basic", "plus", "pro"];
+  // Priced from market research (Oct 2026): pay-monthly website services charge $78-150/mo, Hibu $99-159/mo,
+  // Google Business Profile management $100-400/mo on its own.
   const SUGGESTED_PLANS = [
-    { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Website on our fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page" },
-    { id: "plus", name: "Plus", setup: 0, monthly: 79, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
-    { id: "pro", name: "Pro", setup: 0, monthly: 129, includes: "Everything in Plus\nYour own domain name and email set up\nMonthly Google profile posts and photo updates\nPriority changes" },
+    { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page" },
+    { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
+    { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name and email set up\nPriority changes" },
   ];
+  const UNIT_LABEL = { month: "/month", each: " each", "one-time": " one-time" };
 
   function planRows(plans) {
     const list = plans.length ? PLAN_IDS.map((id) => plans.find((p) => p.id === id) || { id, name: "", setup: 0, monthly: "", includes: "" }) : SUGGESTED_PLANS;
@@ -1055,7 +1059,11 @@
       <label class="field">Monthly ($)<input name="plan_${p.id}_monthly" type="number" min="0" inputmode="decimal" value="${p.monthly}"></label>
       <label class="field">Setup ($)<input name="plan_${p.id}_setup" type="number" min="0" inputmode="decimal" value="${p.setup || 0}"></label></div>
       <label class="field">What's included <span class="hint">One per line</span><textarea name="plan_${p.id}_includes" rows="3">${esc(p.includes)}</textarea></label>
-      <label class="field">Payment link <span class="hint">Stripe or Square, optional</span><input name="plan_${p.id}_pay" type="url" value="${esc(p.payLink || "")}" placeholder="https://buy.stripe.com/…"></label></fieldset>`).join("");
+      <label class="field">Payment link <span class="hint">Monthly subscription, Stripe or Square</span><input name="plan_${p.id}_pay" type="url" value="${esc(p.payLink || "")}" placeholder="https://buy.stripe.com/…"></label>
+      <details class="more"><summary>Links for month-to-month and yearly (optional)</summary>
+        <label class="field">Month-to-month link <span class="hint">Includes the extra setup fee</span><input name="plan_${p.id}_payflex" type="url" value="${esc(p.payLinkFlex || "")}" placeholder="https://buy.stripe.com/…"></label>
+        <label class="field">Yearly link<input name="plan_${p.id}_payannual" type="url" value="${esc(p.payLinkAnnual || "")}" placeholder="https://buy.stripe.com/…"></label>
+        <p class="small muted">Without these, clients who pick those options are told you'll send an invoice.</p></details></fieldset>`).join("");
   }
 
   async function viewSettings() {
@@ -1077,8 +1085,17 @@
         <h2 style="margin-top:18px">Plans &amp; prices</h2>
         <p class="small muted">${s.plans.length ? "" : "Suggested starting plans are filled in below. Change them to your prices, then Save. "}Leave a plan's name blank to hide it. For automatic monthly payment, make a <strong>Payment Link</strong> for each plan in Stripe or Square (set as a monthly subscription) and paste it here.</p>
         ${planRows(s.plans)}
-        <div class="row"><label class="field">Minimum months<input name="minMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.minMonths ?? 12}"></label>
-        <label class="field">Caller commission per sale ($)<input name="commission" type="number" min="0" inputmode="decimal" value="${s.commission ?? ""}"></label></div>
+        <h2 style="margin-top:18px">Ways to pay</h2>
+        <div class="row" style="flex-wrap:wrap"><label class="field" style="flex:1 1 120px">Minimum months <span class="hint">Standard plan</span><input name="minMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.minMonths ?? 12}"></label>
+        <label class="field" style="flex:1 1 120px">Month-to-month setup ($) <span class="hint">0 = don't offer</span><input name="flexSetup" type="number" min="0" inputmode="decimal" value="${s.flexSetup ?? 299}"></label>
+        <label class="field" style="flex:1 1 120px">Yearly: months free <span class="hint">0 = don't offer</span><input name="annualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.annualMonthsFree ?? 2}"></label></div>
+        <h2 style="margin-top:18px">Extras</h2>
+        <p class="small muted">Shown on the sign-up page and in call guides. Leave a name blank to remove it.</p>
+        ${[...s.addons, { name: "", price: "", unit: "month" }].map((a, i) => `<div class="row addon"><label class="field" style="flex:2"><span class="sr-only">Extra ${i + 1}</span><input name="addon_${i}_name" value="${esc(a.name)}" placeholder="New extra"></label>
+          <label class="field"><span class="sr-only">Price</span><input name="addon_${i}_price" type="number" min="0" inputmode="decimal" value="${a.price}" placeholder="$"></label>
+          <label class="field"><span class="sr-only">Per</span><select name="addon_${i}_unit">${Object.entries(UNIT_LABEL).map(([k, v]) => `<option value="${k}"${a.unit === k ? " selected" : ""}>${v.trim().replace("/", "per ")}</option>`).join("")}</select></label></div>`).join("")}
+        <h2 style="margin-top:18px">Caller commission</h2>
+        <label class="field">Commission per sale ($)<input name="commission" type="number" min="0" inputmode="decimal" value="${s.commission ?? ""}"></label>
         <label class="field">Client agreement <span class="hint">Plain-language starting point, not legal advice. Have a lawyer look it over once.</span><textarea name="terms" rows="10">${esc(s.terms || meta.defaultTerms)}</textarea></label>
         <button class="btn btn--small" type="button" id="resetterms">Reset agreement to the standard text</button>
         <h2 style="margin-top:18px">Runs</h2>
@@ -1102,8 +1119,21 @@
         const f = e.target;
         const v = (n) => f.elements[n].value.trim();
         const n = (x) => (x === "" ? undefined : Number(x));
-        const plans = PLAN_IDS.map((id) => ({ id, name: v(`plan_${id}_name`), setup: Number(v(`plan_${id}_setup`) || 0), monthly: Number(v(`plan_${id}_monthly`) || 0), includes: v(`plan_${id}_includes`), payLink: v(`plan_${id}_pay`) || undefined }))
-          .filter((p) => p.name);
+        const plans = PLAN_IDS.map((id) => ({
+          id,
+          name: v(`plan_${id}_name`),
+          setup: Number(v(`plan_${id}_setup`) || 0),
+          monthly: Number(v(`plan_${id}_monthly`) || 0),
+          includes: v(`plan_${id}_includes`),
+          payLink: v(`plan_${id}_pay`) || undefined,
+          payLinkFlex: v(`plan_${id}_payflex`) || undefined,
+          payLinkAnnual: v(`plan_${id}_payannual`) || undefined,
+        })).filter((p) => p.name);
+        const addons = [];
+        for (let i = 0; f.elements[`addon_${i}_name`]; i++) {
+          const name = v(`addon_${i}_name`);
+          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value });
+        }
         if (plans.some((p) => !p.monthly)) return toast("Give every plan a monthly price");
         const terms = v("terms");
         await api("/settings", {
@@ -1118,6 +1148,9 @@
             callerName: v("callerName") || undefined,
             plans,
             minMonths: n(v("minMonths")),
+            flexSetup: n(v("flexSetup")),
+            annualMonthsFree: n(v("annualMonthsFree")),
+            addons,
             commission: n(v("commission")),
             terms: terms && terms !== meta.defaultTerms ? terms : undefined,
           },

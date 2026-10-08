@@ -67,8 +67,8 @@ export async function salesDashboard(env: Env) {
   };
 
   const clients = sales.results.map((s) => {
-    const plan = s.plan_json ? (JSON.parse(s.plan_json) as Plan) : null;
-    return { id: s.id, name: s.name, status: s.sales_status, plan: plan?.name ?? null, monthly: plan?.monthly ?? 0, paid: !!s.paid, seller: s.sent_by ?? s.sold_by ?? null };
+    const plan = s.plan_json ? (JSON.parse(s.plan_json) as Plan & { monthlyEquivalent?: number; billingLabel?: string }) : null;
+    return { id: s.id, name: s.name, status: s.sales_status, plan: plan ? [plan.name, plan.billingLabel].filter(Boolean).join(", ") : null, monthly: plan?.monthlyEquivalent ?? plan?.monthly ?? 0, paid: !!s.paid, seller: s.sent_by ?? s.sold_by ?? null };
   });
   const commission = settings.commission ?? 0;
   const month = table(periods.month);

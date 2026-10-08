@@ -112,7 +112,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Growth batch: plans + client sign-up page + Stripe/Square payment links, visit counter +
       monthly report, review QR cards, preview flyers, custom domains, outdated-website leads,
       food trucks / nail salons / pet groomers, nearby towns, walk-in route, sales dashboard
-- [ ] Owner to do: set plans/prices and payment links in Settings; LLC is Underground Associates LLC
+- [x] Plans set from market research (Oct 2026): Basic $49, Plus $89, Pro $149; 12-mo min or $299 setup
+      month to month or yearly with 2 months free; extras $10 inbox, $35 NFC card, $149 GBP setup
+- [ ] Owner to do: Stripe payment links in Settings. LLC is Underground Associates LLC
 - [ ] Next ideas: owner gallery/team photos, email/text alerts for inbox items, daycare /
       tattoo / photographer packs (need their own research first), Stripe webhook to mark paid
 

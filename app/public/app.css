@@ -149,3 +149,6 @@ code { background: var(--chip); padding: 1px 6px; border-radius: 6px; word-break
 .bignum { font-size: 2rem; font-weight: 800; margin: 0; }
 .btn.is-disabled { opacity: .5; pointer-events: none; }
 @media (max-width: 460px) { .top { gap: 6px; padding-left: 12px; padding-right: 12px; } .top__nav a { padding: 10px 8px; font-size: .95rem; } }
+.more summary { cursor: pointer; font-weight: 700; min-height: 40px; display: flex; align-items: center; }
+.addon { gap: 8px; }
+.addon .field { margin-bottom: 8px; }

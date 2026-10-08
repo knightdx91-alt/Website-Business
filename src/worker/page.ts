@@ -16,6 +16,9 @@ label{display:grid;gap:6px;font-weight:600;margin-bottom:14px}
 input[type=text],input[type=email]{width:100%;min-height:48px;padding:10px 12px;border:2px solid #d5d9e1;border-radius:10px;font:inherit}
 .check{display:flex;gap:10px;align-items:flex-start;font-weight:600}.check input{width:22px;height:22px;margin-top:3px;flex:none}
 .btn{display:inline-flex;align-items:center;justify-content:center;width:100%;min-height:52px;padding:12px 18px;border:0;border-radius:12px;background:#1d4ed8;color:#fff;font:700 1.05rem system-ui,sans-serif;text-decoration:none;cursor:pointer}
+.billing{border:0;padding:0;margin:0 0 14px}.billing legend{font-weight:700;margin-bottom:8px;padding:0}
+.opt{display:flex;gap:12px;align-items:flex-start;border:2px solid #d5d9e1;border-radius:12px;padding:12px;margin-bottom:8px;font-weight:400}
+.opt input{width:22px;height:22px;margin-top:2px;flex:none}.opt:has(input:checked){border-color:#1d4ed8;background:#f1f5ff}
 .btn--ghost{background:#eef1f6;color:#16181d}.btn+.btn{margin-top:10px}.ok{color:#15803d;font-weight:700}
 @media print{.noprint{display:none!important}body{background:#fff}}`;
 

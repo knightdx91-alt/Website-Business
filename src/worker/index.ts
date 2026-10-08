@@ -14,7 +14,7 @@ import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts
 import { salesDashboard } from "./sales.ts";
 import { serveSignup, signupsFor } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
-import { addUsage, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
+import { addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
 import { HttpError, json, localDate, newId, now, type Env, type Job } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
@@ -92,6 +92,7 @@ interface NoteRow {
 
 const OUTCOMES = ["note", "no_answer", "callback", "shown", "sold", "not_interested"] as const;
 const OUTCOME_STATUS: Partial<Record<(typeof OUTCOMES)[number], LeadRow["sales_status"]>> = { shown: "shown", sold: "sold", not_interested: "not_interested" };
+const PAY_LINK = z.string().trim().url().max(500).refine((u) => u.startsWith("https://"), "Payment links must start with https://");
 const CALLER_NAME = z.string().trim().min(1).max(60).regex(/^[^\u0000-\u001f"\\<>]+$/, "Use letters and spaces only");
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-09");
 
@@ -205,11 +206,16 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
               setup: z.number().min(0).max(100_000),
               monthly: z.number().min(0).max(10_000),
               includes: z.string().trim().max(500),
-              payLink: z.string().trim().url().max(500).refine((u) => u.startsWith("https://"), "Payment links must start with https://").optional(),
+              payLink: PAY_LINK.optional(),
+              payLinkFlex: PAY_LINK.optional(),
+              payLinkAnnual: PAY_LINK.optional(),
             }),
           )
           .max(3),
         minMonths: z.number().int().min(0).max(36).optional(),
+        flexSetup: z.number().min(0).max(10_000).optional(),
+        annualMonthsFree: z.number().int().min(0).max(6).optional(),
+        addons: z.array(z.object({ name: z.string().trim().min(1).max(60), price: z.number().min(0).max(10_000), unit: z.enum(["month", "each", "one-time"]) })).max(10).optional(),
         terms: z.string().trim().max(6000).optional(),
         commission: z.number().min(0).max(10_000).optional(),
       }),
@@ -217,7 +223,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const before = await getSettings(env);
     await setSetting(env, "app_settings", JSON.stringify(s));
     // Call guides quote these, so saved guides are rewritten on next open.
-    const sales = (x: Partial<typeof s>) => JSON.stringify([x.companyName, x.legalName, x.callerName, x.minMonths, (x.plans ?? []).map((p) => [p.name, p.setup, p.monthly, p.includes])]);
+    const sales = (x: Partial<typeof s>) => JSON.stringify([x.companyName, x.legalName, x.callerName, x.minMonths, x.flexSetup, x.annualMonthsFree, x.addons, (x.plans ?? []).map((p) => [p.name, p.setup, p.monthly, p.includes])]);
     if (sales(before) !== sales(s)) await env.DB.prepare("UPDATE leads SET pitch_json = NULL WHERE pitch_json IS NOT NULL").run();
     return json({ ok: true });
   }
@@ -498,7 +504,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         reviewContext: place ? reviewTexts(place) : [],
         todos: lint.todos ?? [],
         suggestions: lint.suggestions ?? [],
-        sales: { ...settings, callerName },
+        sales: {
+          ...settings,
+          callerName,
+          billing: settings.plans[0] ? billingOptions(settings.plans[0], settings).map((o) => `${o.label}: ${o.id === "standard" ? "the normal way" : o.id === "flex" ? `no minimum, but $${settings.flexSetup} extra setup` : `pay 12 months up front and get ${settings.annualMonthsFree} free`}`) : [],
+          addons: settings.addons.map((a) => `${a.name}: $${a.price}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : " one-time"}`),
+        },
         model: settings.copyModel,
       });
       const price = MODEL_PRICES[result.model] ?? MODEL_PRICES["claude-opus-5-5"]!;
