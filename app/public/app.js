@@ -392,7 +392,7 @@
       try {
         const res = await api(`/leads/${l.id}/signup`, { method: "POST", json: { plan: b.dataset.plan } });
         const phone = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "");
-        const sms = `Here's the sign-up page for your new website (${res.plan} plan) for ${l.record ? l.record.name : l.name}: ${res.url}`;
+        const sms = `${greeting()} Here's the sign-up page for your new website (${res.plan} plan) for ${l.record ? l.record.name : l.name}: ${res.url}`;
         card.querySelector("#signuplink").innerHTML = `<div class="linkbox"><p class="small"><strong>${esc(res.plan)}</strong> sign-up link ready (works ${res.expiresInDays} days).</p>
           <div class="btns btns--full"><a class="btn btn--primary" href="${esc(res.url)}" target="_blank" rel="noopener">Open here</a>
           <a class="btn" href="sms:+1${phone}?body=${encodeURIComponent(sms)}">Text it</a><button class="btn" type="button" data-copy>Copy</button></div>
@@ -827,21 +827,35 @@
     return url;
   }
 
+  // Who's sending: a caller's own login name, or the owner's name from Settings (asked once if it's missing).
+  function senderName() {
+    if (!isOwner()) return meta.me.name;
+    let n = meta.settings.callerName;
+    if (!n) { try { n = localStorage.getItem("wb-owner-name") || ""; } catch (e) { n = ""; } }
+    if (!n) {
+      n = (prompt("What name should your texts use? (\"Hi, this is ___ with …\")") || "").trim();
+      if (n) { try { localStorage.setItem("wb-owner-name", n); } catch (e) { /* private mode */ } }
+    }
+    return n;
+  }
+
+  /** "Hi, this is Fox with Underground Associates." */
+  function greeting() {
+    const name = senderName();
+    const co = meta.settings.companyName;
+    return `Hi, this is ${name || "me"}${co ? ` with ${co}` : ""}.`;
+  }
+
   // "Text preview link" / "Copy preview link": a 14-day link that opens the preview without logging in.
   function shareButtonsHtml() {
-    return `<div class="btns btns--full" data-share><button class="btn" type="button" data-share-sms>💬 Text preview link</button><button class="btn" type="button" data-share-copy>🔗 Copy preview link</button></div>
+    return `<div class="btns btns--full" data-share><button class="btn" type="button" data-share-sms>💬 Text preview link</button><button class="btn" type="button" data-share-copy>🔗 Copy message + link</button></div>
       <p class="small muted">Only text the link after they say it's OK. It works for 14 days, no login needed.</p>`;
   }
 
   function bindShareButtons(l) {
-    const s = meta.settings;
     const name = l.record ? l.record.name : l.name;
     const phoneDigits = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
-    const smsBody = (url) => {
-      const caller = isOwner() ? s.callerName : meta.me.name;
-      const who = [caller ? `this is ${caller}` : "", s.companyName ? `with ${s.companyName}` : ""].filter(Boolean).join(" ");
-      return `Hi${who ? ", " + who : ""}. Here's the free website preview I made for ${name}: ${url}`;
-    };
+    const smsBody = (url) => `${greeting()} Here's the free website preview I made for ${name}: ${url}`;
     $app.querySelectorAll("[data-share-sms]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try {
@@ -853,8 +867,9 @@
       b.disabled = true;
       try {
         const url = await shareLink(l.id);
-        try { await navigator.clipboard.writeText(url); toast("Preview link copied. It works for 14 days."); }
-        catch (e) { prompt("Copy this preview link:", url); }
+        const msg = smsBody(url);
+        try { await navigator.clipboard.writeText(msg); toast("Message with the preview link copied. Paste it anywhere."); }
+        catch (e) { prompt("Copy this message:", msg); }
       } catch (err) { toast(err.message); } finally { b.disabled = false; }
     }));
   }
@@ -1510,7 +1525,7 @@
         <div class="row"><label class="field">Business phone<input name="companyPhone" type="tel" value="${esc(s.companyPhone || "")}"></label>
         <label class="field">Business email<input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
         <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
-        <label class="field">Caller's name <span class="hint">Used in call guides you open; callers' own logins use their names</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="Who makes the calls"></label>
+        <label class="field">Your name <span class="hint">Your texts say "Hi, this is ___ with ${esc(s.companyName || "your company")}". Callers' texts use their own login names.</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="e.g. Post"></label>
         <h2 style="margin-top:18px">Plans &amp; prices</h2>
         <p class="small muted">${s.plans.length ? "" : "Suggested starting plans are filled in below. Change them to your prices, then Save. "}Leave a plan's name blank to hide it. For automatic monthly payment, make a <strong>Payment Link</strong> for each plan in Stripe or Square (set as a monthly subscription) and paste it here.</p>
         ${planRows(s.plans)}
