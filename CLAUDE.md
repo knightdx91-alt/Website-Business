@@ -176,10 +176,19 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   makes a new one: put its fingerprint in `ASSET_LINKS`, redeploy, and phones uninstall + reinstall once.
   Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first.
 - Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS). Several groups share one
-  template: food trucks → restaurant pack (variant `food_truck`), nail salons and pet groomers →
-  salon pack (variants `nails`, `pet`). "Nearby towns" adds the first 2 terms per group for Hartselle,
+  template, and the variant comes from the Google type + business name: food trucks/bakeries/coffee →
+  restaurant pack; nails, pet groomers, massage (`massage`, needs the AL license # before publish) → salon
+  pack; painters/concrete/handymen/fencing/remodeling/appliance/tree/pest → contractor pack trades;
+  body shops (`body`), detailing, towing, small engine → auto pack; pressure/window washing → cleaning
+  `exterior`. "Nearby towns" runs every term of each group for Hartselle,
   Arab, Hanceville, Good Hope, Vinemont. "Outdated websites" checks up to 15 existing sites per search
   (`src/places/site-check.ts`) and keeps broken/insecure/not-phone-friendly/stale ones (presence `outdated`).
+- Plans & answers (`#/playbook`, owner and callers): each plan from Settings with who it fits and selling
+  points (`PLAN_PITCH` in app.js), ways to pay, extras, and ~18 common objections with answers
+  (`playbookObjections`), searchable. Linked from home, lead screen and call guide.
+- Coverage check (Oct 2026): a scan of ~70 business types found ~240 no-website businesses in types we
+  didn't search, and ~290 in our existing types (mostly nearby towns and beyond run caps). Re-runs skip
+  leads already in the app, so running the same groups again picks up the next batch.
 - Sales: Settings holds 3 plans (name, setup, monthly, includes, optional Stripe/Square payment link),
   company + legal name, min months, agreement text (`defaultTerms` in db.ts), commission. Callers and the
   owner send `/a/<lead>.<plan>.<exp>.<hmac>` sign-up links (30 days): the client reads the plan and

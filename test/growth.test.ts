@@ -23,7 +23,7 @@ test("search groups: every group has a template, and nearby towns add searches",
   assert.equal(food.category, "restaurant");
   assert.deepEqual(searchesFor(food, false).map((s) => s.query), ["food truck in Cullman, AL"]);
   const wide = searchesFor(groupById("contractor")!, true);
-  assert.equal(wide.length, 4 + 5 * 2);
+  assert.equal(wide.length, 4 + 5 * 4);
   assert.ok(wide.some((s) => s.query === "plumber in Hartselle, AL" && s.center.lat > 34.4));
 });
 

@@ -141,6 +141,7 @@
         <div class="chips" role="group" aria-label="Categories">${meta.categories
           .map((c, i) => `<label class="pick"><input type="checkbox" name="cat" value="${esc(c.id)}"${i === 0 ? " checked" : ""}>${esc(c.label)}</label>`)
           .join("")}</div>
+        <p style="margin:8px 0 0"><button type="button" class="btn btn--small" id="allcats">Pick all</button></p>
         <div style="margin-top:12px">
           <label class="check"><input type="checkbox" name="wider"> Also search nearby towns <span class="hint">(Hartselle, Arab, Hanceville, Good Hope, Vinemont)</span></label>
           <label class="check"><input type="checkbox" name="badSites"> Also find businesses with outdated or broken websites</label>
@@ -218,6 +219,13 @@
       };
       form.addEventListener("input", updateEst);
       updateEst();
+      form.querySelector("#allcats").addEventListener("click", (e) => {
+        const boxes = [...form.querySelectorAll("input[name=cat]")];
+        const all = boxes.every((i) => i.checked);
+        boxes.forEach((i) => (i.checked = !all));
+        e.target.textContent = all ? "Pick all" : "Clear all";
+        updateEst();
+      });
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         const cats = [...form.querySelectorAll("input[name=cat]:checked")].map((i) => i.value);

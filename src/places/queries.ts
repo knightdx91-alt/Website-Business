@@ -11,8 +11,6 @@ export const WIDER_TOWNS = [
   { name: "Vinemont, AL", lat: 34.2465, lng: -86.8661 },
 ];
 const TOWN_RADIUS = 12_000;
-/** In the wider area only the first few terms of a group run per town, to keep Google costs down. */
-const WIDER_TERMS = 2;
 
 /** What the owner picks at Run. Several groups can share one category pack (template). */
 export interface SearchGroup {
@@ -55,7 +53,7 @@ export function searchesFor(group: SearchGroup, wider: boolean): PlannedSearch[]
   const home = group.terms.map((t) => ({ query: `${t} in ${MARKET.name}`, center: MARKET.center, radiusMeters: MARKET.radiusMeters }));
   if (!wider) return home;
   const towns = WIDER_TOWNS.flatMap((town) =>
-    group.terms.slice(0, WIDER_TERMS).map((t) => ({ query: `${t} in ${town.name}`, center: { lat: town.lat, lng: town.lng }, radiusMeters: TOWN_RADIUS })),
+    group.terms.map((t) => ({ query: `${t} in ${town.name}`, center: { lat: town.lat, lng: town.lng }, radiusMeters: TOWN_RADIUS })),
   );
   return [...home, ...towns];
 }
