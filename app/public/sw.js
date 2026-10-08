@@ -1,5 +1,5 @@
 // Caches the app shell so it opens instantly; never caches API data or previews.
-const VERSION = "v8";
+const VERSION = "v9";
 const SHELL = ["/", "/app.css", "/app.js", "/manifest.webmanifest", "/icons/icon-192.png"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -204,7 +204,7 @@
     meta = meta || (await api("/meta"));
     if (!document.getElementById("leads")) {
       $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="due"></div><div id="runs"></div></div><div><section>
-        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/playbook">💬 Plans & answers</a></div>
+        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
@@ -374,6 +374,7 @@
         ${isOwner() ? `<label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label>` : x.paid ? `<p class="chip chip--good">Paid</p>` : ""}</div>`).join("")}
       ${plans.length
         ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
+          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a></p>
           <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div>
           <div id="signuplink"></div>`
         : isOwner() ? `<p class="small muted">Add your plans and prices in <a href="#/settings">Settings</a> first.</p>` : `<p class="small muted">The owner hasn't set up plans yet.</p>`}
@@ -885,6 +886,66 @@
     document.getElementById("regen").addEventListener("click", () => viewPitch(id, true));
   }
 
+  /* ---------- plans to show the customer ---------- */
+  // Customer-facing words for each tier; prices and "what's included" come live from Settings.
+  const PLAN_TAGLINE = {
+    basic: "Get found on Google and get the phone ringing.",
+    plus: "Your website, plus getting found on Google Maps.",
+    pro: "Everything handled for you, every month.",
+  };
+  const EVERY_PLAN = ["We build it for you", "Fast, secure hosting", "Changes when you text us", "Made for phones", "Your name, photos and words stay yours"];
+
+  async function viewShowPlans(leadId) {
+    stopPolling();
+    const s = meta.settings;
+    const plans = (s.plans.length ? s.plans : SUGGESTED_PLANS).filter((p) => p.monthly);
+    const lead = leadId ? await api("/leads/" + leadId).catch(() => null) : null;
+    const business = lead ? (lead.record ? lead.record.name : lead.name) : "";
+    const company = s.companyName || "Underground Associates";
+    const min = s.minMonths ?? 12;
+    const flex = s.flexSetup ?? 299;
+    const free = s.annualMonthsFree ?? 2;
+    const perDay = (m) => money(Math.round((m * 12 / 365) * 100) / 100);
+    $nav.hidden = true;
+    document.body.classList.add("showing");
+    $app.innerHTML = `<div class="show">
+      <div class="show__top"><a href="${leadId ? `#/lead/${leadId}` : "#/"}" class="show__back">← Back</a><span class="show__co">${esc(company)}</span></div>
+      <header class="show__head">
+        <h1>${business ? `Website plans for ${esc(business)}` : "Website plans"}</h1>
+        <p>${s.plans.some((p) => p.setup) ? "Simple monthly plans." : "No setup fee. One simple monthly price."} We build your site, host it and keep it running.</p>
+      </header>
+      <div class="show__plans">${plans.map((p) => {
+        const items = String(p.includes || "").split("\n").map((x) => x.trim()).filter(Boolean);
+        const star = p.id === "plus";
+        return `<section class="show__plan${star ? " show__plan--star" : ""}">
+          ${star ? `<p class="show__badge">Most popular</p>` : ""}
+          <h2>${esc(p.name)}</h2>
+          <p class="show__tag">${esc(PLAN_TAGLINE[p.id] || "")}</p>
+          <p class="show__price"><strong>${money(p.monthly)}</strong><span>/month</span></p>
+          <p class="show__day">${p.setup ? `${money(p.setup)} setup · ` : ""}about ${perDay(p.monthly)} a day</p>
+          <ul>${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+          ${leadId ? `<button class="show__choose" data-choose="${esc(p.id)}">Choose ${esc(p.name)}</button>` : ""}
+        </section>`;
+      }).join("")}</div>
+      <section class="show__box"><h2>Every plan includes</h2><ul class="show__every">${EVERY_PLAN.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>
+      <section class="show__box"><h2>Ways to pay</h2><div class="show__ways">
+        <div><h3>${min ? `${min}-month plan` : "Monthly"}</h3><p>The monthly price${s.plans.some((p) => p.setup) ? " plus any setup fee" : ", no setup fee"}.${min ? ` After ${min} months, cancel any time.` : " Cancel any time."}</p></div>
+        ${min && flex ? `<div><h3>Month to month</h3><p>Same monthly price, one-time ${money(flex)} setup. No contract, cancel any time.</p></div>` : ""}
+        ${free ? `<div><h3>Pay yearly, ${free} months free</h3><p>${plans.map((p) => `${esc(p.name)} ${money(p.monthly * (12 - free))}/year`).join(" · ")}</p></div>` : ""}
+      </div></section>
+      ${s.addons && s.addons.length ? `<section class="show__box"><h2>Add-ons</h2><ul class="show__addons">${s.addons.map((a) => `<li><span>${esc(a.name)}</span><strong>${money(a.price)}${esc(UNIT_LABEL[a.unit] || "")}</strong></li>`).join("")}</ul></section>` : ""}
+      <p class="show__fine">You see your website before you pay anything, and nothing goes live until you say so. Cancel with 30 days' notice${min ? ` after the first ${min} months on the ${min}-month plan` : ""}.</p>
+    </div>`;
+    $app.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      b.textContent = "Opening sign-up…";
+      try {
+        const res = await api(`/leads/${leadId}/signup`, { method: "POST", json: { plan: b.dataset.choose } });
+        location.href = res.url;
+      } catch (err) { toast(err.message); b.disabled = false; b.textContent = "Try again"; }
+    }));
+  }
+
   /* ---------- plans & answers (for callers) ---------- */
   // Selling points by plan tier. Prices, names and "what's included" come live from Settings.
   const PLAN_PITCH = {
@@ -1001,6 +1062,7 @@
     $app.innerHTML = `<p><a href="#/" id="back">← Back</a></p>
       <h1>Plans & answers</h1>
       <p class="muted">What each plan gets them, why it's worth it, and what to say when they push back.</p>
+      <p><a class="btn btn--primary" href="#/plans">📋 Show the customer the plans</a></p>
       <section class="card"><h2>Which plan fits?</h2><p class="small muted">Lead with the middle plan. Go down if price is the worry, up if they want it all done for them.</p>
         <ul class="list">${PLAN_QUESTIONS.map(([q, a]) => `<li>${esc(q)} → <strong>${esc(a)}</strong></li>`).join("")}</ul></section>
       ${plans.map(planCard).join("")}
@@ -1517,6 +1579,7 @@
 
   async function render() {
     stopPolling();
+    document.body.classList.remove("showing");
     const h = location.hash || "#/";
     let m;
     try {
@@ -1528,6 +1591,7 @@
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/playbook") return await viewPlaybook();
+      if ((m = /^#\/plans(?:\/([a-z0-9]+))?$/.exec(h))) return await viewShowPlans(m[1]);
       if (h === "#/route") return await viewRoute();
       if (h === "#/add") return await viewAdd();
       if ((m = /^#\/gbp\/([a-z0-9]+)$/.exec(h))) return await viewGbp(m[1]);

@@ -160,3 +160,43 @@ code { background: var(--chip); padding: 1px 6px; border-radius: 6px; word-break
 .checks li { padding: 6px 0; }
 .post { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
 .post p { margin: 6px 0; white-space: pre-wrap; }
+
+/* Plans screen shown to customers: always light and on-brand, whatever the phone's theme. */
+.show { --sn: #14213d; --sg: #fca311; --st: #16181d; --sm: #4f5663; color: var(--st); background: #fff; margin: -16px; padding: 16px 16px 40px; min-height: 100vh; }
+body.showing { background: #fff; }
+.show__top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.show__back { color: var(--sm); text-decoration: none; font-weight: 600; padding: 8px 0; }
+.show__co { font-weight: 800; color: var(--sn); letter-spacing: .02em; }
+.show__head { text-align: center; margin: 8px auto 22px; max-width: 640px; }
+.show__head h1 { color: var(--sn); font-size: clamp(1.6rem, 6vw, 2.4rem); line-height: 1.15; margin: 0 0 8px; }
+.show__head p { color: var(--sm); font-size: 1.1rem; margin: 0; }
+.show__plans { display: grid; gap: 16px; max-width: 1100px; margin: 0 auto; }
+@media (min-width: 720px) { .show__plans { grid-template-columns: repeat(3, 1fr); align-items: start; } }
+.show__plan { position: relative; border: 2px solid #e1e4ea; border-radius: 18px; padding: 22px 20px; background: #fff; }
+.show__plan--star { border-color: var(--sn); box-shadow: 0 10px 30px rgba(20, 33, 61, .16); }
+.show__badge { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); margin: 0; background: var(--sg); color: var(--sn); font-weight: 800; font-size: .85rem; padding: 4px 14px; border-radius: 999px; white-space: nowrap; }
+.show__plan h2 { margin: 0; color: var(--sn); font-size: 1.5rem; }
+.show__tag { color: var(--sm); margin: 4px 0 12px; }
+.show__price { margin: 0; color: var(--sn); }
+.show__price strong { font-size: 2.6rem; line-height: 1; }
+.show__price span { font-weight: 600; color: var(--sm); }
+.show__day { color: var(--sm); font-size: .95rem; margin: 4px 0 14px; }
+.show__plan ul, .show__every { list-style: none; padding: 0; margin: 0; }
+.show__plan li, .show__every li { position: relative; padding: 6px 0 6px 28px; }
+.show__plan li::before, .show__every li::before { content: "✓"; position: absolute; left: 4px; color: #15803d; font-weight: 800; }
+.show__choose { display: block; width: 100%; margin-top: 16px; min-height: 52px; border: 0; border-radius: 12px; font-weight: 800; font-size: 1.05rem; background: #eef1f6; color: var(--sn); cursor: pointer; }
+.show__plan--star .show__choose { background: var(--sn); color: #fff; }
+.show__box { max-width: 1100px; margin: 20px auto 0; border-radius: 18px; background: #f4f5f8; padding: 20px; }
+.show__box h2 { margin: 0 0 10px; color: var(--sn); font-size: 1.25rem; }
+.show__every { display: grid; gap: 0 20px; }
+@media (min-width: 720px) { .show__every { grid-template-columns: repeat(3, 1fr); } }
+.show__ways { display: grid; gap: 12px; }
+@media (min-width: 720px) { .show__ways { grid-template-columns: repeat(3, 1fr); } }
+.show__ways div { background: #fff; border-radius: 14px; padding: 14px 16px; }
+.show__ways h3 { margin: 0 0 4px; color: var(--sn); font-size: 1.05rem; }
+.show__ways p { margin: 0; color: var(--st); }
+.show__addons { list-style: none; padding: 0; margin: 0; }
+.show__addons li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #e1e4ea; }
+.show__addons li:last-child { border-bottom: 0; }
+.show__fine { max-width: 700px; margin: 20px auto 0; text-align: center; color: var(--sm); font-size: .95rem; }
+body.showing .top { display: none; }

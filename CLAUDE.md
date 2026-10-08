@@ -193,6 +193,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
   retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
   Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).
+- Show plans (`#/plans` or `#/plans/<leadId>`, owner and callers): customer-facing, always light, app bar hidden.
+  Plan cards from Settings (tagline per tier in `PLAN_TAGLINE`), every-plan list, ways to pay, add-ons, fine print.
+  From a lead, "Choose <plan>" creates that lead's sign-up link and opens it on the same phone.
 - Plans & answers (`#/playbook`, owner and callers): each plan from Settings with who it fits and selling
   points (`PLAN_PITCH` in app.js), ways to pay, extras, and ~18 common objections with answers
   (`playbookObjections`), searchable. Linked from home, lead screen and call guide.
