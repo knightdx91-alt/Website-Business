@@ -1,7 +1,8 @@
 import { fetchPhoto, type Place } from "../places/client.ts";
 import { addUsage, getLead, updateLead } from "./db.ts";
 import type { Env } from "./env.ts";
-import { contentType } from "./pipeline.ts";
+import { chooseLook, contentType, renderPreview } from "./pipeline.ts";
+import type { BusinessRecord, Copy } from "../generator/types.ts";
 
 const NOINDEX = { "x-robots-tag": "noindex, nofollow", "referrer-policy": "same-origin" };
 
@@ -59,6 +60,8 @@ export async function servePreview(env: Env, req: Request, leadId: string, rest:
     return new Response(obj.body, { headers: { "content-type": obj.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "private, max-age=3600", ...NOINDEX } });
   }
 
+  if (path === "index.html") await restyleOldPreview(env, leadId);
+
   let obj = await env.BUCKET.get(`previews/${leadId}/${path}`);
   if (!obj && !path.endsWith(".html") && !/\.[a-z0-9]+$/i.test(path)) obj = await env.BUCKET.get(`previews/${leadId}/${path}/index.html`);
   if (!obj) {
@@ -68,4 +71,20 @@ export async function servePreview(env: Env, req: Request, leadId: string, rest:
   return new Response(obj.body, {
     headers: { "content-type": obj.httpMetadata?.contentType ?? contentType(path), "cache-control": path.endsWith(".html") ? "no-store" : "private, max-age=300", ...NOINDEX },
   });
+}
+
+/**
+ * Previews built before layouts existed all looked alike. A lead nobody has shown yet gets a fresh
+ * look + layout the first time its preview opens (no AI cost: same copy, re-rendered).
+ */
+async function restyleOldPreview(env: Env, leadId: string): Promise<void> {
+  const lead = await getLead(env, leadId);
+  if (!lead || lead.status !== "ready" || lead.sales_status !== "new" || (lead.look ?? "").includes("~") || !lead.record_json || !lead.copy_json) return;
+  try {
+    const record = JSON.parse(lead.record_json) as BusinessRecord;
+    const look = await chooseLook(env, record, lead.id);
+    await renderPreview(env, lead, record, JSON.parse(lead.copy_json) as Copy, look);
+  } catch {
+    /* keep serving the old preview */
+  }
 }

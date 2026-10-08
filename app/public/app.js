@@ -468,7 +468,7 @@
     const lint = l.lint || { publishBlockers: [], errors: [], warnings: [], todos: [], suggestions: [] };
     const blockers = [...lint.errors, ...lint.publishBlockers];
     const ready = l.status === "ready";
-    const lookName = (l.looks.find((x) => x.id === l.look) || {}).name || "";
+    const lookName = [(l.looks.find((x) => x.id === l.lookBase) || {}).name, ((l.layouts || []).find((x) => x.id === l.layout) || {}).name].filter(Boolean).join(" · ");
     const owner = isOwner();
     const open = l.salesStatus === "new" || l.salesStatus === "shown";
     $app.innerHTML = `<p><a href="#/">← Leads</a></p>
@@ -493,7 +493,7 @@
       <section class="card"><h2>Website</h2>
         ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p><button class="btn" data-act="retry">Try again</button>` : ""}
         ${l.status === "queued" || l.status === "building" ? `<p><span class="spin"></span> Building… this takes about a minute.</p>` : ""}
-        ${ready ? `<p class="muted small">Look: ${esc(lookName)}</p>
+        ${ready ? `<p class="muted small">Design: ${esc(lookName)}${owner && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="restyle">🎨 Try another design</button>` : ""}</p>
           <div class="btns btns--full">
             <a class="btn btn--primary" href="#/preview/${l.id}">Preview</a>
             <a class="btn" href="/p/${l.id}/" target="_blank" rel="noopener">Open full screen</a>
@@ -545,6 +545,7 @@
         } finally { el.disabled = false; }
       });
     };
+    act("restyle", async () => { await api(`/leads/${id}/restyle`, { method: "POST" }); toast("New design ready"); viewLead(id); });
     act("retry", async () => { await api(`/leads/${id}/retry`, { method: "POST" }); toast("Rebuilding…"); setTimeout(() => viewLead(id), 1500); });
     act("rewrite", async () => {
       if (!confirm("Write new text with AI? Your text edits will be replaced. Facts, photos and menu stay.")) return;
@@ -678,8 +679,11 @@
         <label class="field">Describe the photo<input id="photoAlt" placeholder="e.g. Freshly mowed front lawn in Cullman"></label>
         <button class="btn btn--small" type="button" id="upload">Upload photo</button>
       </section>
-      <section class="card"><h2>Look</h2><label class="field">Design style<select name="look">${l.looks
-        .map((x) => `<option value="${esc(x.id)}"${x.id === l.look ? " selected" : ""}>${esc(x.name)}</option>`)
+      <section class="card"><h2>Design</h2><label class="field">Colors &amp; fonts<select name="lookBase">${l.looks
+        .map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}>${esc(x.name)}</option>`)
+        .join("")}</select></label>
+        <label class="field">Layout<select name="layout">${(l.layouts || [])
+        .map((x) => `<option value="${esc(x.id)}"${x.id === l.layout ? " selected" : ""}>${esc(x.name)}: ${esc(x.about)}</option>`)
         .join("")}</select></label></section>
       <section class="card"><h2>Facts (only if the owner says so)</h2>
         <label class="field">Year they started<input name="foundedYear" type="number" inputmode="numeric" min="1800" max="2100" value="${r.foundedYear || ""}"></label>
@@ -752,7 +756,7 @@
       const blurbs = {};
       if (hasServices) r.services.forEach((s) => { const v = val("blurb_" + s.id); if (v !== undefined) blurbs[s.id] = v; });
       const edits = {
-        look: val("look"),
+        look: val("lookBase") + "~" + val("layout"),
         record: {
           name: val("name"),
           phone: val("phone"),

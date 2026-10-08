@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { writeCopy } from "../copy/write.ts";
 import { packFor } from "../generator/packs/index.ts";
+import { pickDesign } from "../generator/design.ts";
 import { buildSite } from "../generator/render.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
@@ -71,16 +72,18 @@ export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>)
   }
 }
 
-/** Uses the default look unless a client in the same category already owns it (neighbor rule). */
-async function chooseLook(env: Env, record: BusinessRecord): Promise<string> {
+/** Spreads looks and layouts across a category so neighboring businesses get different-looking sites. */
+export async function chooseLook(env: Env, record: BusinessRecord, leadId: string, current?: string): Promise<string> {
   const pack = packFor(record.category);
-  const taken = await env.DB.prepare("SELECT DISTINCT look FROM leads WHERE category = ? AND sales_status IN ('sold','live') AND look IS NOT NULL")
+  const rows = await env.DB.prepare("SELECT look, sales_status FROM leads WHERE category = ? AND look IS NOT NULL AND status != 'expired'")
     .bind(record.category)
-    .all<{ look: string }>();
-  const used = new Set(taken.results.map((r) => r.look));
-  const preferred = pack.defaultLook(record);
-  if (!used.has(preferred)) return preferred;
-  return pack.looks.find((l) => !used.has(l)) ?? preferred;
+    .all<{ look: string; sales_status: string }>();
+  return pickDesign({
+    leadId,
+    looks: pack.looks,
+    used: rows.results.map((r) => r.look),
+    taken: [...rows.results.filter((r) => r.sales_status === "sold" || r.sales_status === "live").map((r) => r.look), ...(current ? [current] : [])],
+  });
 }
 
 export function heroFromPlace(record: BusinessRecord, place: Place): void {
@@ -158,7 +161,7 @@ export async function runBuild(env: Env, job: Extract<Job, { type: "build" }>): 
       });
       copy = result.copy;
     }
-    const look = lead.look ?? (await chooseLook(env, record));
+    const look = lead.look ?? (await chooseLook(env, record, lead.id));
     await renderPreview(env, lead, record, copy, look);
     if (lead.rewrite) await updateLead(env, lead.id, { rewrite: 0 });
   } catch (err) {

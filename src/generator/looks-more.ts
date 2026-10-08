@@ -8,6 +8,7 @@ const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
 export const MORE_LOOKS: Record<string, LookDef> = {
   "salon.porch_light": {
     id: "salon.porch_light",
+    layout: "editorial",
     name: "Porch Light",
     category: "salon",
     palette: {
@@ -24,6 +25,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "salon.night_shift": {
     id: "salon.night_shift",
+    layout: "poster",
     name: "Night Shift",
     category: "salon",
     palette: {
@@ -40,6 +42,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "salon.main_street": {
     id: "salon.main_street",
+    layout: "overlap",
     name: "Main Street",
     category: "salon",
     palette: {
@@ -56,6 +59,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "salon.color_bar": {
     id: "salon.color_bar",
+    layout: "soft",
     name: "Color Bar",
     category: "salon",
     palette: {
@@ -73,6 +77,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
 
   "auto.shop_floor": {
     id: "auto.shop_floor",
+    layout: "split",
     name: "Shop Floor",
     category: "auto",
     palette: {
@@ -89,6 +94,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "auto.main_street_garage": {
     id: "auto.main_street_garage",
+    layout: "overlap",
     name: "Main Street Garage",
     category: "auto",
     palette: {
@@ -105,6 +111,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "auto.clear_diagnostic": {
     id: "auto.clear_diagnostic",
+    layout: "minimal",
     name: "Clear Diagnostic",
     category: "auto",
     palette: {
@@ -121,6 +128,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "auto.night_road": {
     id: "auto.night_road",
+    layout: "poster",
     name: "Night Road",
     category: "auto",
     palette: {
@@ -138,6 +146,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
 
   "landscaping.fresh_stripe": {
     id: "landscaping.fresh_stripe",
+    layout: "soft",
     name: "Fresh Stripe",
     category: "landscaping",
     palette: {
@@ -154,6 +163,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "landscaping.red_clay_pine": {
     id: "landscaping.red_clay_pine",
+    layout: "editorial",
     name: "Red Clay & Pine",
     category: "landscaping",
     palette: {
@@ -170,6 +180,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "landscaping.stone_garden": {
     id: "landscaping.stone_garden",
+    layout: "minimal",
     name: "Stone & Garden",
     category: "landscaping",
     palette: {
@@ -186,6 +197,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "landscaping.neighborhood_crew": {
     id: "landscaping.neighborhood_crew",
+    layout: "overlap",
     name: "Neighborhood Crew",
     category: "landscaping",
     palette: {
@@ -203,6 +215,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
 
   "cleaning.fresh_linen": {
     id: "cleaning.fresh_linen",
+    layout: "editorial",
     name: "Fresh Linen",
     category: "cleaning",
     palette: {
@@ -219,6 +232,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "cleaning.clear_blue": {
     id: "cleaning.clear_blue",
+    layout: "split",
     name: "Clear Blue Professional",
     category: "cleaning",
     palette: {
@@ -235,6 +249,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "cleaning.magnolia_porch": {
     id: "cleaning.magnolia_porch",
+    layout: "overlap",
     name: "Magnolia Porch",
     category: "cleaning",
     palette: {
@@ -251,6 +266,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
   },
   "cleaning.bright_bold": {
     id: "cleaning.bright_bold",
+    layout: "soft",
     name: "Bright & Bold",
     category: "cleaning",
     palette: {

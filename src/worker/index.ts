@@ -1,5 +1,7 @@
+import { layoutOf } from "../generator/design.ts";
+import { LAYOUT_IDS, LAYOUTS } from "../generator/layouts.ts";
 import { z } from "zod";
-import { LOOKS } from "../generator/themes.ts";
+import { LOOKS, parseDesign } from "../generator/themes.ts";
 import { menuToText } from "../generator/menu.ts";
 import { packFor } from "../generator/packs/index.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
@@ -21,7 +23,7 @@ import { addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRI
 import { applyEdits, EditsSchema } from "./edits.ts";
 import { HttpError, json, localDate, newId, now, type Env, type Job } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
-import { renderPreview, runBuild, runSearch } from "./pipeline.ts";
+import { chooseLook, renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
 import { publishLead, zipLead } from "./publish.ts";
 
@@ -140,6 +142,9 @@ function detail(l: LeadRow) {
     menuText: record?.ext.restaurant?.menu ? menuToText(record.ext.restaurant.menu.sections) : "",
     variantLabel: record ? pack.variantLabel(record) : null,
     looks: pack.looks.map((id) => ({ id, name: LOOKS[id]?.name ?? id })),
+    layouts: LAYOUT_IDS.map((id) => ({ id, name: LAYOUTS[id].name, about: LAYOUTS[id].about })),
+    layout: l.look ? layoutOf(l.look) : null,
+    lookBase: l.look ? parseDesign(l.look).look : null,
   };
 }
 
@@ -587,6 +592,14 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       if (lead.sales_status === "live") throw new HttpError(409, "This site is already live");
       await updateLead(env, id, { sales_status: salesStatus });
       return json({ ok: true });
+    }
+    if (action === "/restyle" && m === "POST") {
+      if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");
+      if (lead.sales_status === "live") throw new HttpError(409, "This site is already live. Change its design from Edit.");
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      const look = await chooseLook(env, record, `${id}:${Date.now()}`, lead.look ?? undefined);
+      await renderPreview(env, lead, record, JSON.parse(lead.copy_json), look);
+      return json({ ok: true, look });
     }
     if (action === "/edits" && m === "PUT") {
       if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");

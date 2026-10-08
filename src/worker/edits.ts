@@ -1,3 +1,4 @@
+import { parseDesign } from "../generator/themes.ts";
 import { z } from "zod";
 import { parseMenuText } from "../generator/menu.ts";
 import { parsePrice } from "../generator/price.ts";
@@ -166,7 +167,8 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
 
   let look: string | undefined;
   if (edits.look) {
-    if (!packFor(r.category).looks.includes(edits.look)) throw new HttpError(400, "That look isn't available for this category");
+    const d = parseDesign(edits.look);
+    if (!packFor(r.category).looks.includes(d.look) || (edits.look.includes("~") && !d.layout)) throw new HttpError(400, "That look isn't available for this category");
     look = edits.look;
   }
   return { record: r, copy: c, look };

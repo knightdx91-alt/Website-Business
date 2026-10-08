@@ -1,4 +1,5 @@
 import { bestText, withAlpha } from "./color.ts";
+import { layoutCss } from "./layouts.ts";
 import type { FontSpec, Theme } from "./themes.ts";
 
 export function fontFileName(f: FontSpec, weight: number): string {
@@ -224,5 +225,5 @@ ${divider}
 .about{display:grid;gap:28px}
 @media (min-width:900px){.about--photo{grid-template-columns:1fr 1fr;align-items:center}}
 .about img{border-radius:var(--radius)}
-`;
+${layoutCss(t)}`;
 }

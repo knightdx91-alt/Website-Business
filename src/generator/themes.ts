@@ -1,4 +1,5 @@
 import { bestText, contrast, luminance, repairBackground } from "./color.ts";
+import { isLayout, type LayoutId } from "./layouts.ts";
 import { MORE_LOOKS } from "./looks-more.ts";
 import type { CategoryId } from "./types.ts";
 
@@ -53,9 +54,12 @@ export interface LookDef {
   button: "pill" | "rounded" | "square";
   knobs: Knobs;
   photoDirection: string;
+  /** Page structure used when a site doesn't pick one. */
+  layout?: LayoutId;
 }
 
 export interface Theme extends LookDef {
+  layout: LayoutId;
   colors: Palette & { onPrimary: string; onSecondary: string; focus: string };
   contrastReport: Array<{ pair: string; ratio: number; min: number; ok: boolean }>;
 }
@@ -67,6 +71,7 @@ const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
 export const LOOKS: Record<string, LookDef> = {
   "restaurant.pit_plank": {
     id: "restaurant.pit_plank",
+    layout: "poster",
     name: "Pit & Plank",
     category: "restaurant",
     palette: {
@@ -83,6 +88,7 @@ export const LOOKS: Record<string, LookDef> = {
   },
   "restaurant.blue_plate": {
     id: "restaurant.blue_plate",
+    layout: "soft",
     name: "Blue Plate",
     category: "restaurant",
     palette: {
@@ -99,6 +105,7 @@ export const LOOKS: Record<string, LookDef> = {
   },
   "restaurant.garden_table": {
     id: "restaurant.garden_table",
+    layout: "editorial",
     name: "Garden Table",
     category: "restaurant",
     palette: {
@@ -115,6 +122,7 @@ export const LOOKS: Record<string, LookDef> = {
   },
   "restaurant.color_block": {
     id: "restaurant.color_block",
+    layout: "split",
     name: "Color Block",
     category: "restaurant",
     palette: {
@@ -134,6 +142,7 @@ export const LOOKS: Record<string, LookDef> = {
   },
   "contractor.toolbox": {
     id: "contractor.toolbox",
+    layout: "split",
     name: "Toolbox",
     category: "contractor",
     palette: {
@@ -153,6 +162,7 @@ export const LOOKS: Record<string, LookDef> = {
   },
   "contractor.front_porch": {
     id: "contractor.front_porch",
+    layout: "overlap",
     name: "Front Porch",
     category: "contractor",
     palette: {
@@ -169,6 +179,7 @@ export const LOOKS: Record<string, LookDef> = {
   },
   "contractor.clear_air": {
     id: "contractor.clear_air",
+    layout: "minimal",
     name: "Clear Air",
     category: "contractor",
     palette: {
@@ -185,6 +196,7 @@ export const LOOKS: Record<string, LookDef> = {
   },
   "contractor.ridgeline": {
     id: "contractor.ridgeline",
+    layout: "poster",
     name: "Ridgeline",
     category: "contractor",
     palette: {
@@ -208,7 +220,8 @@ export const LOOKS: Record<string, LookDef> = {
  * Resolves a look into a buildable theme: picks button label colors, repairs brand colors
  * that would fail WCAG AA, then checks every text/background pair the components use.
  */
-export function resolveTheme(lookId: string): Theme {
+export function resolveTheme(designId: string): Theme {
+  const { look: lookId, layout } = parseDesign(designId);
   const look = LOOKS[lookId];
   if (!look) throw new Error(`Unknown look "${lookId}"`);
   const p = { ...look.palette };
@@ -249,7 +262,17 @@ export function resolveTheme(lookId: string): Theme {
   if (failing.length) {
     throw new Error(`Look ${lookId} fails contrast: ${failing.map((f) => `${f.pair} ${f.ratio}:1`).join(", ")}`);
   }
-  return { ...look, colors, contrastReport };
+  return { ...look, layout: layout ?? look.layout ?? "classic", colors, contrastReport };
+}
+
+/** A site's design is "<look>" or "<look>~<layout>", e.g. "contractor.toolbox~editorial". */
+export function parseDesign(designId: string): { look: string; layout?: LayoutId } {
+  const [look, layout] = designId.split("~");
+  return { look: look!, layout: isLayout(layout) ? layout : undefined };
+}
+
+export function designId(look: string, layout?: LayoutId): string {
+  return layout ? `${look}~${layout}` : look;
 }
 
 export function looksFor(category: CategoryId): string[] {
