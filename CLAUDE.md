@@ -149,7 +149,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   site fonts into `app/public/fonts/` (gitignored) and renders icons.
 - Deploy: `npm run deploy`. Resources: D1 `website-business`, R2 `website-business-sites`,
   queue `website-business-jobs`. Worker secrets: GOOGLE_PLACES_API_KEY, ANTHROPIC_API_KEY,
-  CF_API_TOKEN, APP_SECRET (set with `wrangler secret`; never in files).
+  CF_API_TOKEN, APP_SECRET, VAPID_PRIVATE_JWK (set with `wrangler secret`; never in files).
 - Google data hygiene: photos are proxied live, never stored; the cron expires unsold leads
   (new after 30 days, shown after 60), keeping only the Place ID.
 - Owner to-dos: `todo(ctx, …, required)` in components. Required ones block publishing;
@@ -196,6 +196,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
   retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
   Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).
+- Notifications (`#/notifications`, 🔔 in the top bar with an unread count; owner and full-access only):
+  `notify()` in `src/worker/notify.ts` records an `events` row (actor, kind, lead, text) for call logs/notes, status
+  changes, sign-up links sent, client sign-ups, paid, publish, leads added by hand, search runs, and website/company
+  form messages. Each person sees everyone else's events; `notif_seen` holds when they last looked. Phone pushes use
+  Web Push with VAPID (secret `VAPID_PRIVATE_JWK`, a P-256 JWK; public key derived from it) and carry no payload:
+  the service worker's `push` handler fetches `/api/notifications/latest` with the login cookie and shows it.
+  Subscriptions in `push_subs` (dead ones removed on 404/410). The Android app (1.3+) has POST_NOTIFICATIONS,
+  NotificationPermissionRequestActivity and a bell SMALL_ICON so Chrome can delegate notifications to it.
 - Show plans (`#/plans` or `#/plans/<leadId>`, owner and callers): customer-facing, always light, app bar hidden.
   Plan cards from Settings (tagline per tier in `PLAN_TAGLINE`), every-plan list, ways to pay, add-ons, fine print.
   From a lead, "Choose <plan>" creates that lead's sign-up link and opens it on the same phone.

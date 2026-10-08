@@ -8,6 +8,8 @@ export interface Env {
   CF_API_TOKEN: string;
   CF_ACCOUNT_ID: string;
   APP_SECRET: string;
+  /** Web Push signing key as a JWK (ECDSA P-256). Optional: without it, notifications stay in the app. */
+  VAPID_PRIVATE_JWK?: string;
 }
 
 export type Job =

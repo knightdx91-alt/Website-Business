@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
-    "test": "node --import tsx --test test/*.test.ts",
+    "test": "node --import tsx --test test/*.test.ts test/worker/*.test.ts",
     "demo": "tsx scripts/demo.ts",
     "prepare:app": "tsx scripts/prepare-app.ts",
     "deploy": "npm run prepare:app && wrangler deploy",

@@ -1,3 +1,4 @@
+import { notify } from "./notify.ts";
 import { billingOptions, getSettings, type AppSettings } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
@@ -80,6 +81,7 @@ async function contactPost(env: Env, req: Request): Promise<Response> {
   await env.DB.prepare("INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)")
     .bind(newId(), COMPANY_LEAD_ID, now(), JSON.stringify(data), ip)
     .run();
+  await notify(env, { kind: "message", actorName: data.name, text: `💬 New message from your website (undergroundassociates.com): ${data.name}${data.service ? ` · ${data.service}` : ""}` });
   return back("sent=1");
 }
 

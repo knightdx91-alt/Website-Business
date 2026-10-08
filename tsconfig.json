@@ -23,5 +23,6 @@
     "src/copy",
     "scripts",
     "test"
-  ]
+  ],
+  "exclude": ["test/worker"]
 }

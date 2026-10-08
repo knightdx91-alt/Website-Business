@@ -1,3 +1,4 @@
+import { notify } from "./notify.ts";
 import { shareToken } from "./auth.ts";
 import { billingOptions, defaultTerms, getLead, getSettings, updateLead, type BillingOption, type Plan } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
@@ -89,6 +90,7 @@ export async function serveSignup(env: Env, req: Request, leadId: string, planId
     await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, 'signed', ?, ?)")
       .bind(newId(), leadId, name, `Signed up for ${plan.name}, ${option.label}: ${option.detail}${title ? `. Signed as ${title}` : ""}. Email: ${email}`, now())
       .run();
+    await notify(env, { kind: "signed", actorName: name, leadId, text: `✍️ ${name} signed ${lead.name} up for ${plan.name} (${option.label})${sent?.author ? `, from ${sent.author}'s link` : ""}` });
     await updateLead(env, leadId, { sales_status: lead.sales_status === "live" ? "live" : "sold", follow_up: null, last_contact: now() });
     return page(
       "Thank you",

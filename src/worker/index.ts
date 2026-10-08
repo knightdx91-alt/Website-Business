@@ -23,6 +23,7 @@ import { addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRI
 import { applyEdits, EditsSchema } from "./edits.ts";
 import { HttpError, json, localDate, newId, now, type Env, type Job } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
+import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
 import { chooseLook, renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
 import { publishLead, zipLead } from "./publish.ts";
@@ -214,6 +215,33 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     });
   }
 
+  // Notifications (owner and full-access team): what everyone else did.
+  if (path === "/notifications/count" && m === "GET") return json({ unread: isOwner ? await unreadCount(env, session.userId) : 0 });
+  if (path.startsWith("/notifications") || path.startsWith("/push/")) ownerOnly();
+  if (path === "/notifications" && m === "GET") return json(await listEvents(env, session.userId));
+  if (path === "/notifications/seen" && m === "POST") {
+    await markSeen(env, session.userId);
+    return json({ ok: true });
+  }
+  if (path === "/notifications/latest" && m === "GET") return json(await latestForPush(env, session.userId));
+  if (path === "/push/key" && m === "GET") return json({ key: vapidPublicKey(env) });
+  if (path === "/push/subscribe" && (m === "POST" || m === "DELETE")) {
+    const { endpoint } = await body(req, z.object({ endpoint: z.string().url().max(1000) }));
+    if (m === "DELETE") await env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(endpoint).run();
+    else {
+      if (!allowedEndpoint(endpoint)) throw new HttpError(400, "That push service isn't supported");
+      await env.DB.prepare("INSERT INTO push_subs (endpoint, user_id, created_at) VALUES (?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id")
+        .bind(endpoint, session.userId, now())
+        .run();
+    }
+    return json({ ok: true });
+  }
+  if (path === "/push/test" && m === "POST") {
+    const subs = await env.DB.prepare("SELECT endpoint FROM push_subs WHERE user_id = ?").bind(session.userId).all<{ endpoint: string }>();
+    await setSetting(env, `push_test_${session.userId}`, String(now()));
+    return json({ sent: await pushTo(env, subs.results.map((s) => s.endpoint)) });
+  }
+
   if (path === "/settings" && m === "PUT") {
     ownerOnly();
     const s = await body(
@@ -282,6 +310,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       .bind(id, now(), groups.map((g) => g.id).join(","), input.cap, jobs.length, JSON.stringify({ wider: input.wider, badSites: input.badSites }))
       .run();
     await env.JOBS.sendBatch(jobs.map((j) => ({ body: { ...j, runId: id } as Job })));
+    await notify(env, { kind: "run", actor: session, text: `${session.name} started a search run: ${groups.map((g) => g.label).join(", ")} (up to ${input.cap} sites)` });
     return json({ id });
   }
 
@@ -391,6 +420,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       .bind(newId(), id, session.name, "Added by hand from a Google search", now())
       .run();
     await env.JOBS.send({ type: "build", leadId: id });
+    await notify(env, { kind: "added", actor: session, leadId: id, text: `${session.name} added ${p.displayName?.text ?? "a business"} by hand` });
     return json({ id, existed: false });
   }
 
@@ -443,11 +473,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, 'signup_sent', ?, ?)")
         .bind(newId(), id, session.name, `Sign-up link for ${p.name}`, now())
         .run();
+      await notify(env, { kind: "signup_sent", actor: session, leadId: id, text: `${session.name} sent ${lead.name} a ${p.name} sign-up link` });
       return json({ url: `${url.origin}/a/${token}`, plan: p.name, expiresInDays: 30 });
     }
     if (action === "/paid" && m === "POST") {
       const { signupId, paid } = await body(req, z.object({ signupId: z.string().regex(/^[a-z0-9]+$/), paid: z.boolean() }));
       await env.DB.prepare("UPDATE signups SET paid = ? WHERE id = ? AND lead_id = ?").bind(paid ? 1 : 0, signupId, id).run();
+      await notify(env, { kind: "paid", actor: session, leadId: id, text: paid ? `${session.name} marked ${lead.name}'s payment as set up 💵` : `${session.name} marked ${lead.name} as not paid` });
       return json({ ok: true });
     }
     if (action === "/flyer" && m === "GET") {
@@ -566,6 +598,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         .bind(newId(), id, session.name, input.outcome === "note" ? null : input.outcome, input.note, now())
         .run();
       if (Object.keys(fields).length) await updateLead(env, id, fields);
+      const what = {
+        note: `added a note on ${lead.name}`,
+        no_answer: `called ${lead.name}: no answer`,
+        callback: `called ${lead.name}: call back ${fields.follow_up ?? ""}`.trim(),
+        shown: `called ${lead.name}: they're interested 👍`,
+        sold: `SOLD ${lead.name}! 🎉`,
+        not_interested: `called ${lead.name}: not interested`,
+      }[input.outcome];
+      await notify(env, { kind: input.outcome === "note" ? "note" : "call", actor: session, leadId: id, text: `${session.name} ${what}${input.note ? `: "${input.note.slice(0, 160)}"` : ""}` });
       return json({ ok: true, followUp: fields.follow_up === undefined ? lead.follow_up : fields.follow_up });
     }
     if (action === "/followup" && m === "PUT") {
@@ -596,6 +637,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const { salesStatus } = await body(req, z.object({ salesStatus: z.enum(["new", "shown", "sold", "not_interested"]) }));
       if (lead.sales_status === "live") throw new HttpError(409, "This site is already live");
       await updateLead(env, id, { sales_status: salesStatus });
+      if (salesStatus !== lead.sales_status) {
+        const label = { new: "New", shown: "Shown", sold: "Sold 🎉", not_interested: "Not interested" }[salesStatus];
+        await notify(env, { kind: "status", actor: session, leadId: id, text: `${session.name} marked ${lead.name} as ${label}` });
+      }
       return json({ ok: true });
     }
     if (action === "/restyle" && m === "POST") {
@@ -640,7 +685,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await env.JOBS.send({ type: "build", leadId: id });
       return json({ ok: true });
     }
-    if (action === "/publish" && m === "POST") return json(await publishLead(env, lead, url.origin));
+    if (action === "/publish" && m === "POST") {
+      const out = await publishLead(env, lead, url.origin);
+      await notify(env, { kind: "published", actor: session, leadId: id, text: `${session.name} published ${lead.name}'s website 🚀 ${out.url}` });
+      return json(out);
+    }
     if (action === "/share" && m === "POST") {
       if (lead.status !== "ready") throw new HttpError(409, "The preview isn't ready yet");
       const token = await shareToken(env, id);

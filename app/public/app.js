@@ -88,6 +88,8 @@
     $nav.hidden = active === "login";
     $nav.querySelector("[data-nav=inbox]").hidden = !isOwner();
     $nav.querySelector("[data-nav=sales]").hidden = !isOwner();
+    $nav.querySelector("[data-nav=notifications]").hidden = !isOwner();
+    if (isOwner() && active !== "login") refreshNotifCount();
     $nav.querySelectorAll("a").forEach((a) => a.classList.toggle("is-active", a.dataset.nav === active));
   }
 
@@ -1613,6 +1615,78 @@
     });
   }
 
+  /* ---------- notifications ---------- */
+  const NOTIF_ICON = { note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎" };
+
+  async function refreshNotifCount() {
+    try {
+      const { unread } = await api("/notifications/count");
+      const el = document.getElementById("notif-count");
+      el.textContent = unread > 99 ? "99+" : String(unread);
+      el.hidden = !unread;
+      if ("setAppBadge" in navigator) { unread ? navigator.setAppBadge(unread).catch(() => {}) : navigator.clearAppBadge().catch(() => {}); }
+    } catch (e) { /* offline or logged out */ }
+  }
+  setInterval(() => { if (!document.hidden && meta && isOwner()) refreshNotifCount(); }, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && meta && isOwner()) refreshNotifCount(); });
+
+  const b64ToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+
+  async function pushState() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return { supported: false };
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    return { supported: true, permission: Notification.permission, sub, reg };
+  }
+
+  async function turnOnPush() {
+    const { key } = await api("/push/key");
+    if (!key) throw new Error("Phone notifications aren't set up on the server yet");
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") throw new Error("Notifications are blocked. Allow them in your phone's settings for this app, then try again.");
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) }));
+    await api("/push/subscribe", { method: "POST", json: { endpoint: sub.endpoint } });
+  }
+
+  function dayGroup(ms) {
+    const d = new Date(ms);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((today - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+    return diff <= 0 ? "Today" : diff === 1 ? "Yesterday" : d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  }
+
+  async function viewNotifications() {
+    setNav("notifications");
+    const data = await api("/notifications");
+    const ps = await pushState().catch(() => ({ supported: false }));
+    const on = ps.supported && ps.permission === "granted" && ps.sub;
+    let last = "";
+    const rows = data.items.map((i) => {
+      const g = dayGroup(i.at);
+      const head = g !== last ? `<li class="notif__day">${esc(g)}</li>` : "";
+      last = g;
+      const time = new Date(i.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      const href = i.leadId && i.leadId !== "company" ? `#/lead/${i.leadId}` : i.kind === "message" ? "#/inbox" : "";
+      const inner = `<span class="notif__icon" aria-hidden="true">${NOTIF_ICON[i.kind] || "🔔"}</span><span class="notif__text">${esc(i.text)}<span class="small muted"> · ${esc(time)}</span></span>`;
+      return `${head}<li class="notif${i.unread ? " notif--new" : ""}">${href ? `<a href="${href}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
+    }).join("");
+    $app.innerHTML = `<h1>Notifications</h1>
+      <section class="card"><h2>Phone notifications</h2>
+        ${!ps.supported ? `<p class="small muted">This browser can't show phone notifications. Use the installed app or Chrome on Android.</p>`
+          : on ? `<p class="small">✅ On for this phone. You'll get a notification whenever someone else makes a change.</p><div class="btns"><button class="btn btn--small" id="ptest">Send a test</button><button class="btn btn--small" id="poff">Turn off on this phone</button></div>`
+          : `<p class="small muted">Get a notification on this phone when someone adds a note, logs a call, makes a sale, a client signs up, or a website gets a message.</p><button class="btn btn--primary" id="pon">🔔 Turn on phone notifications</button>`}
+      </section>
+      <ul class="list notifs">${rows || `<li class="muted">Nothing yet. When someone else adds a note, logs a call, makes a sale, or a client signs up, it shows here.</li>`}</ul>`;
+    const pon = $app.querySelector("#pon");
+    if (pon) pon.addEventListener("click", async () => { pon.disabled = true; try { await turnOnPush(); toast("Phone notifications are on"); viewNotifications(); } catch (err) { toast(err.message); pon.disabled = false; } });
+    const ptest = $app.querySelector("#ptest");
+    if (ptest) ptest.addEventListener("click", async () => { try { const r = await api("/push/test", { method: "POST" }); toast(r.sent ? "Test sent. It should pop up in a few seconds." : "Couldn't reach this phone. Try turning notifications off and on."); } catch (err) { toast(err.message); } });
+    const poff = $app.querySelector("#poff");
+    if (poff) poff.addEventListener("click", async () => { try { await api("/push/subscribe", { method: "DELETE", json: { endpoint: ps.sub.endpoint } }); await ps.sub.unsubscribe(); toast("Turned off on this phone"); viewNotifications(); } catch (err) { toast(err.message); } });
+    if (data.unread) { await api("/notifications/seen", { method: "POST" }).catch(() => {}); refreshNotifCount(); }
+  }
+
   /* ---------- router ---------- */
   function go(hash) {
     if (location.hash === hash) render();
@@ -1639,6 +1713,7 @@
       if ((m = /^#\/gbp\/([a-z0-9]+)$/.exec(h))) return await viewGbp(m[1]);
       if (h === "#/sales") return await viewSales();
       if (h === "#/inbox") return await viewInbox();
+      if (h === "#/notifications") return await viewNotifications();
       if (h === "#/settings") return await viewSettings();
       $app.innerHTML = "";
       return await viewHome();

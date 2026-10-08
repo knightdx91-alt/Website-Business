@@ -4,5 +4,6 @@
     "lib": ["es2023"],
     "types": ["@cloudflare/workers-types"]
   },
-  "include": ["src/worker", "src/generator", "src/places", "src/copy"]
+  "include": ["src/worker", "src/generator", "src/places", "src/copy", "test/worker"],
+  "exclude": []
 }

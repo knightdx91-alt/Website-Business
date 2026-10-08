@@ -1,3 +1,4 @@
+import { notify } from "./notify.ts";
 import { getLead } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 
@@ -33,5 +34,6 @@ export async function handleFormPost(env: Env, req: Request, leadId: string): Pr
   await env.DB.prepare("INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)")
     .bind(newId(), leadId, now(), JSON.stringify(data), ip)
     .run();
+  await notify(env, { kind: "message", actorName: data.name, leadId, text: `💬 New request from ${lead.name}'s website: ${data.name}${data.service ? `, ${data.service}` : ""}` });
   return back("/thanks/");
 }
