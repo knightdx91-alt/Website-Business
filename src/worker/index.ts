@@ -202,7 +202,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/meta" && m === "GET") {
     const settings = await getSettings(env);
     return json({
-      me: { role: session.role, name: session.name },
+      me: { role: session.role, name: session.name, id: session.userId },
       categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
       defaultTerms: defaultTerms(settings),
       models: Object.entries(MODEL_PRICES).map(([id, p]) => ({ id, label: p.label })),
@@ -307,12 +307,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/callers" || path.startsWith("/callers/")) ownerOnly();
   if (path === "/callers" && m === "GET") return json({ callers: await listCallers(env) });
   if (path === "/callers" && m === "POST") {
-    const input = await body(req, z.object({ name: CALLER_NAME, password: z.string().max(200) }));
-    return json({ id: await addCaller(env, input.name, input.password) });
+    const input = await body(req, z.object({ name: CALLER_NAME, password: z.string().max(200), admin: z.boolean().optional() }));
+    return json({ id: await addCaller(env, input.name, input.password, input.admin) });
   }
   const callerMatch = /^\/callers\/([a-z0-9]+)$/.exec(path);
   if (callerMatch && m === "PUT") {
-    const change = await body(req, z.object({ name: CALLER_NAME.optional(), password: z.string().max(200).optional(), disabled: z.boolean().optional() }));
+    const change = await body(req, z.object({ name: CALLER_NAME.optional(), password: z.string().max(200).optional(), disabled: z.boolean().optional(), admin: z.boolean().optional() }));
+    if (change.admin === false && callerMatch[1] === session.userId) throw new HttpError(400, "You can't take away your own full access");
     await updateCaller(env, callerMatch[1]!, change);
     return json({ ok: true });
   }

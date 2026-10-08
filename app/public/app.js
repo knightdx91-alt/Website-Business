@@ -829,7 +829,7 @@
 
   // Who's sending: a caller's own login name, or the owner's name from Settings (asked once if it's missing).
   function senderName() {
-    if (!isOwner()) return meta.me.name;
+    if (!isOwner() || (meta.me.id && meta.me.id !== "owner")) return meta.me.name;
     let n = meta.settings.callerName;
     if (!n) { try { n = localStorage.getItem("wb-owner-name") || ""; } catch (e) { n = ""; } }
     if (!n) {
@@ -1448,17 +1448,19 @@
   }
 
   function callersCard(callers) {
-    return `<section class="card"><h2>Callers</h2>
-      <p class="small muted">People who make sales calls. They can see leads, previews and call guides, text preview links, log calls and set callbacks. They can't run searches, edit or publish sites, delete leads, or see settings, spending or the inbox.</p>
-      <ul class="list">${callers.length ? callers.map((c) => `<li><div class="row"><strong>${esc(c.name)}</strong>${c.disabled ? `<span class="chip" style="flex:none">Turned off</span>` : ""}</div>
+    return `<section class="card"><h2>Team</h2>
+      <p class="small muted"><strong>Callers</strong> can see leads, previews and call guides, text preview links, log calls and set callbacks. They can't run searches, edit or publish sites, delete leads, or see settings, spending or the inbox.<br><strong>Full access</strong> can do everything you can, under their own name.</p>
+      <ul class="list">${callers.length ? callers.map((c) => `<li><div class="row"><strong>${esc(c.name)}</strong><span class="chip${c.admin ? " chip--good" : ""}" style="flex:none">${c.admin ? "Full access" : "Caller"}</span>${c.disabled ? `<span class="chip" style="flex:none">Turned off</span>` : ""}</div>
         <div class="btns" style="margin-top:6px">
           <button class="btn btn--small" data-cpass="${c.id}">New password</button>
+          ${c.id === meta.me.id ? "" : `<button class="btn btn--small" data-cadmin="${c.id}" data-admin="${c.admin ? 1 : 0}">${c.admin ? "Make caller" : "Give full access"}</button>`}
           <button class="btn btn--small" data-ctoggle="${c.id}" data-off="${c.disabled ? 1 : 0}">${c.disabled ? "Turn on" : "Turn off"}</button>
           <button class="btn btn--small btn--danger" data-cdel="${c.id}">Remove</button></div></li>`).join("") : `<li class="muted small">No callers yet.</li>`}</ul>
-      <form id="cf" style="margin-top:12px"><h3>Add a caller</h3>
-        <label class="field">Their name<input name="name" maxlength="60" required placeholder="Used in call guides and notes"></label>
-        <label class="field">Their password <span class="hint">At least 8 characters, different from yours. Tell them in person.</span><input name="password" type="text" minlength="8" autocomplete="off" required></label>
-        <button class="btn btn--primary" type="submit">Add caller</button></form></section>`;
+      <form id="cf" style="margin-top:12px"><h3>Add someone</h3>
+        <label class="field">Their name<input name="name" maxlength="60" required placeholder="Used in texts, call guides and notes"></label>
+        <label class="field">Their password <span class="hint">At least 8 characters, different from everyone else's. Tell them in person.</span><input name="password" type="text" minlength="8" autocomplete="off" required></label>
+        <label class="check"><input type="checkbox" name="admin"> Full access (can do everything you can)</label>
+        <button class="btn btn--primary" type="submit">Add</button></form></section>`;
   }
 
   function bindCallers() {
@@ -1466,8 +1468,8 @@
       e.preventDefault();
       const f = e.target;
       try {
-        await api("/callers", { method: "POST", json: { name: f.name.value.trim(), password: f.password.value } });
-        toast("Caller added. They log in with that password.");
+        await api("/callers", { method: "POST", json: { name: f.name.value.trim(), password: f.password.value, admin: f.admin.checked } });
+        toast("Added. They log in with that password.");
         viewSettings();
       } catch (err) { toast(err.message); }
     });
@@ -1476,11 +1478,16 @@
       if (!password) return;
       try { await api(`/callers/${b.dataset.cpass}`, { method: "PUT", json: { password } }); toast("Password changed"); } catch (err) { toast(err.message); }
     }));
+    $app.querySelectorAll("[data-cadmin]").forEach((b) => b.addEventListener("click", async () => {
+      const giving = b.dataset.admin !== "1";
+      if (giving && !confirm("Give full access? They'll be able to do everything you can, including settings and publishing.")) return;
+      try { await api(`/callers/${b.dataset.cadmin}`, { method: "PUT", json: { admin: giving } }); viewSettings(); } catch (err) { toast(err.message); }
+    }));
     $app.querySelectorAll("[data-ctoggle]").forEach((b) => b.addEventListener("click", async () => {
       try { await api(`/callers/${b.dataset.ctoggle}`, { method: "PUT", json: { disabled: b.dataset.off !== "1" } }); viewSettings(); } catch (err) { toast(err.message); }
     }));
     $app.querySelectorAll("[data-cdel]").forEach((b) => b.addEventListener("click", async () => {
-      if (!confirm("Remove this caller? Their notes stay.")) return;
+      if (!confirm("Remove this person? Their notes stay.")) return;
       try { await api(`/callers/${b.dataset.cdel}`, { method: "DELETE" }); viewSettings(); } catch (err) { toast(err.message); }
     }));
   }

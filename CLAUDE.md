@@ -160,8 +160,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Share links: `/s/<leadId>.<exp>.<hmac>/` serves a preview without login for 14 days, with a
   "Free preview" banner. "Text preview link" / "Copy preview link" (`shareButtonsHtml` + `bindShareButtons` in app.js)
   show on the lead page, the Preview screen and the call guide. Rotating APP_SECRET revokes all share links and logins.
-- Roles: the owner (password in `settings.owner_password`) and callers (`users` table, managed in
-  Settings → Callers). Login is password-only, so passwords are unique across everyone. The session
+- Roles: the owner (password in `settings.owner_password`) and team members (`users` table, managed in
+  Settings → Team). A team member is a caller, or has `users.admin = 1` ("Full access"): their session gets
+  role "owner" (everything the owner can do) but keeps their own id and name for notes, texts and sales credit. Login is password-only, so passwords are unique across everyone. The session
   cookie is `<userId>.<exp>.<hmac>` with the user's stored hash in the HMAC, so changing a password
   or turning a caller off signs them out. Callers may only use the routes in `callerSafe` /
   non-`ownerOnly()` (leads, previews, call guide, share link, status, call log); everything that costs

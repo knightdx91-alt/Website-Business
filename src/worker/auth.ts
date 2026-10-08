@@ -40,7 +40,7 @@ export async function hasOwner(env: Env): Promise<boolean> {
   return (await getSetting(env, "owner_password")) !== null;
 }
 
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   return `${b64url(salt)}.${await pbkdf2(password, salt)}`;
 }
@@ -61,7 +61,7 @@ export async function setupOwner(env: Env, password: string): Promise<void> {
 
 export interface Session {
   role: "owner" | "caller";
-  /** Caller's user id; "owner" for the owner. */
+  /** Team member's user id; "owner" for the owner. Full-access team members also get role "owner". */
   userId: string;
   name: string;
 }
@@ -71,6 +71,7 @@ interface UserRow {
   name: string;
   password: string;
   disabled: number;
+  admin: number;
   created_at: number;
 }
 
@@ -88,29 +89,30 @@ export async function checkPassword(env: Env, password: string): Promise<Session
   const owner = await getSetting(env, "owner_password");
   if (owner && (await matches(owner, password))) return { role: "owner", userId: "owner", name: "Owner" };
   const users = await env.DB.prepare("SELECT * FROM users WHERE disabled = 0").all<UserRow>();
-  for (const u of users.results) if (await matches(u.password, password)) return { role: "caller", userId: u.id, name: u.name };
+  for (const u of users.results) if (await matches(u.password, password)) return { role: u.admin ? "owner" : "caller", userId: u.id, name: u.name };
   return null;
 }
 
-export async function listCallers(env: Env): Promise<{ id: string; name: string; disabled: boolean; createdAt: number }[]> {
+export async function listCallers(env: Env): Promise<{ id: string; name: string; disabled: boolean; admin: boolean; createdAt: number }[]> {
   const rows = await env.DB.prepare("SELECT * FROM users ORDER BY created_at").all<UserRow>();
-  return rows.results.map((u) => ({ id: u.id, name: u.name, disabled: !!u.disabled, createdAt: u.created_at }));
+  return rows.results.map((u) => ({ id: u.id, name: u.name, disabled: !!u.disabled, admin: !!u.admin, createdAt: u.created_at }));
 }
 
 function checkNewPassword(password: string): void {
   if (password.length < 8) throw new HttpError(400, "Use at least 8 characters");
 }
 
-export async function addCaller(env: Env, name: string, password: string): Promise<string> {
+/** A team member: a caller (limited) or, with admin, full access like the owner under their own name. */
+export async function addCaller(env: Env, name: string, password: string, admin = false): Promise<string> {
   checkNewPassword(password);
   if (await passwordTaken(env, password)) throw new HttpError(409, "Pick a different password; that one is already in use");
   const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-  await env.DB.prepare("INSERT INTO users (id, name, password, disabled, created_at) VALUES (?, ?, ?, 0, ?)").bind(id, name, await hashPassword(password), Date.now()).run();
+  await env.DB.prepare("INSERT INTO users (id, name, password, disabled, admin, created_at) VALUES (?, ?, ?, 0, ?, ?)").bind(id, name, await hashPassword(password), admin ? 1 : 0, Date.now()).run();
   return id;
 }
 
 /** Changing a caller's password or turning them off signs them out everywhere (the session is bound to the stored hash). */
-export async function updateCaller(env: Env, id: string, change: { name?: string; password?: string; disabled?: boolean }): Promise<void> {
+export async function updateCaller(env: Env, id: string, change: { name?: string; password?: string; disabled?: boolean; admin?: boolean }): Promise<void> {
   const user = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>();
   if (!user) throw new HttpError(404, "Caller not found");
   let password = user.password;
@@ -119,8 +121,8 @@ export async function updateCaller(env: Env, id: string, change: { name?: string
     if (await passwordTaken(env, change.password, id)) throw new HttpError(409, "Pick a different password; that one is already in use");
     password = await hashPassword(change.password);
   }
-  await env.DB.prepare("UPDATE users SET name = ?, password = ?, disabled = ? WHERE id = ?")
-    .bind(change.name ?? user.name, password, change.disabled === undefined ? user.disabled : change.disabled ? 1 : 0, id)
+  await env.DB.prepare("UPDATE users SET name = ?, password = ?, disabled = ?, admin = ? WHERE id = ?")
+    .bind(change.name ?? user.name, password, change.disabled === undefined ? user.disabled : change.disabled ? 1 : 0, change.admin === undefined ? user.admin : change.admin ? 1 : 0, id)
     .run();
 }
 
@@ -169,8 +171,8 @@ export async function getSession(env: Env, req: Request): Promise<Session | null
   const key = await sessionKey(env, userId);
   if (!key || !safeEqual(sig, await hmac(env.APP_SECRET, `session.${userId}.${exp}.${key}`))) return null;
   if (userId === "owner") return { role: "owner", userId, name: "Owner" };
-  const u = await env.DB.prepare("SELECT name FROM users WHERE id = ?").bind(userId).first<{ name: string }>();
-  return u ? { role: "caller", userId, name: u.name } : null;
+  const u = await env.DB.prepare("SELECT name, admin FROM users WHERE id = ?").bind(userId).first<{ name: string; admin: number }>();
+  return u ? { role: u.admin ? "owner" : "caller", userId, name: u.name } : null;
 }
 
 /** Private preview link for one business owner. Expires; rotating APP_SECRET revokes every link. */

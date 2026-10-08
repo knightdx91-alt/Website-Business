@@ -71,12 +71,14 @@ export async function salesDashboard(env: Env) {
     return { id: s.id, name: s.name, status: s.sales_status, plan: plan ? [plan.name, plan.billingLabel].filter(Boolean).join(", ") : null, monthly: plan?.monthlyEquivalent ?? plan?.monthly ?? 0, paid: !!s.paid, seller: s.sent_by ?? s.sold_by ?? null };
   });
   const commission = settings.commission ?? 0;
+  // Full-access team members aren't paid commission; callers are.
+  const admins = new Set((await env.DB.prepare("SELECT name FROM users WHERE admin = 1").all<{ name: string }>()).results.map((u) => u.name));
   const month = table(periods.month);
   return {
     week: table(periods.week),
     month,
     commission,
-    commissionOwed: month.filter((r) => r.person !== "Owner").map((r) => ({ person: r.person, sales: r.sold, amount: r.sold * commission })),
+    commissionOwed: month.filter((r) => r.person !== "Owner" && !admins.has(r.person)).map((r) => ({ person: r.person, sales: r.sold, amount: r.sold * commission })),
     clients,
     monthlyRevenue: clients.filter((c) => c.paid).reduce((sum, c) => sum + c.monthly, 0),
     signedRevenue: clients.reduce((sum, c) => sum + c.monthly, 0),
