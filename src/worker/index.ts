@@ -11,6 +11,7 @@ import { reviewTexts } from "../places/to-record.ts";
 import type { Place } from "../places/client.ts";
 import { addCaller, checkPassword, clearCookie, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyShare, verifySignup } from "./auth.ts";
 import { previewFlyer, reviewCards } from "./cards.ts";
+import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
 import { salesDashboard } from "./sales.ts";
 import { serveSignup, signupsFor } from "./signup.ts";
@@ -604,7 +605,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       "SELECT s.id, s.lead_id, s.created_at, s.data_json, s.read, l.name AS business FROM submissions s LEFT JOIN leads l ON l.id = s.lead_id ORDER BY s.created_at DESC LIMIT 200",
     ).all<{ id: string; lead_id: string; created_at: number; data_json: string; read: number; business: string }>();
     return json({
-      items: rows.results.map((r) => ({ id: r.id, leadId: r.lead_id, business: r.business, createdAt: r.created_at, read: !!r.read, data: JSON.parse(r.data_json) })),
+      items: rows.results.map((r) => ({ id: r.id, leadId: r.lead_id, business: r.lead_id === COMPANY_LEAD_ID ? "your own website" : r.business, createdAt: r.created_at, read: !!r.read, data: JSON.parse(r.data_json) })),
     });
   }
   const inboxMatch = /^\/inbox\/([a-z0-9]+)\/read$/.exec(path);
@@ -676,6 +677,7 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     try {
+      if (COMPANY_HOSTS.includes(url.hostname)) return (await serveCompany(env, req, url)) ?? env.ASSETS.fetch(req);
       if (url.pathname.startsWith("/api/")) return await api(env, req, url);
       const preview = /^\/p\/([a-z0-9]+)(\/.*)?$/.exec(url.pathname);
       if (preview) {

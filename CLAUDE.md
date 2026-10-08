@@ -115,6 +115,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Plans set from market research (Oct 2026): Basic $49, Plus $89, Pro $149; 12-mo min or $299 setup
       month to month or yearly with 2 months free; extras $10 inbox, $35 NFC card, $149 GBP setup
 - [x] Google profile tools step 1 (AI-assisted checklist, posts, review replies)
+- [x] Company website live at undergroundassociates.com (bought on Cloudflare)
 - [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for
       Google Business Profile API once a client's profile is managed (then build step 2). LLC is Underground Associates LLC
 - [ ] Next ideas: owner gallery/team photos, email/text alerts for inbox items, daycare /
@@ -202,6 +203,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   https://support.google.com/business/contact/api_default ("Application for Basic API Access"). Then: OAuth
   (scope business.manage) from Settings, sync info, publish approved posts, reply to reviews, and pull
   Performance API metrics (calls, directions, website clicks) into the monthly report.
+- Company website: https://undergroundassociates.com (domain on the same Cloudflare account, attached to this Worker
+  as custom domains in wrangler.jsonc; www redirects to apex). `src/worker/company.ts` renders it per request from
+  Settings (plans, phone, email), so price changes show immediately. Its contact form posts to `/contact` and lands
+  in the app Inbox under lead id `company`. Assets use `run_worker_first: true`; the app stays on workers.dev.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

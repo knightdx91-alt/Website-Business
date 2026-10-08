@@ -116,6 +116,7 @@ export async function writePitch(
     still_needed_from_owner: input.todos,
     nice_to_have_from_owner: input.suggestions,
     our_company: s.companyName ?? "(not set)",
+    our_website: "undergroundassociates.com (they can look us up there)",
     caller_name: s.callerName ?? "(not set)",
     plans: s.plans.length
       ? s.plans.map((p) => ({ name: p.name, setup_fee: p.setup ? `$${p.setup}` : "none", monthly: `$${p.monthly}/month`, includes: p.includes || "(not listed)" }))

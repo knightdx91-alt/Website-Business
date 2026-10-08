@@ -47,6 +47,7 @@ ${svg}
 <p><strong>Point your phone camera at the code.</strong></p>
 <ul><li>Works great on phones, with tap-to-call and directions</li><li>Built from your Google listing; we'll swap in your own photos</li><li>Nothing goes live until you say so</li></ul>
 ${from || o.phone ? `<p class="lead" style="margin-top:20px">${from ? `Questions? ${escHtml(from)}` : "Questions?"}${o.phone ? `<br><strong>${escHtml(o.phone)}</strong>` : ""}</p>` : ""}
+<p class="lead">undergroundassociates.com</p>
 <p class="small muted">This preview link works for ${o.days} days.</p></div>`;
   return page(`Preview flyer: ${o.business}`, body, { brand: "", css: CARD_CSS });
 }
