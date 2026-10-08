@@ -377,7 +377,7 @@ function cardBack(d: CardDetails): string {
   const s = strip(svg(100, 100, seal(COLORWAYS.primary!), ""));
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="${WHITE}"/>
 <rect x="0" y="${H - 32}" width="${W}" height="32" fill="${NAVY}"/>${lines.join("")}
-<g transform="translate(${W - 40 - 104} ${(H - 32 - 104) / 2}) scale(1.04)">${s}</g></svg>`;
+<g transform="translate(${W - 30 - 100} ${(H - 32 - 100) / 2})">${s}</g></svg>`;
 }
 
 async function card(out: string, details: CardDetails, preview: boolean) {
