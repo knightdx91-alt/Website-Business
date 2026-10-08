@@ -75,11 +75,11 @@ p{margin:0 0 1em}
 .hdr.is-hidden{transform:translateY(-100%)}
 .hdr__in{display:flex;align-items:center;gap:12px;min-height:56px}
 .brand{font:${t.headingWeight} 1.3rem/1.1 var(--hf);color:var(--heading);text-decoration:none;margin-right:auto;padding:8px 0;max-width:60vw}
-.hdr__call{display:inline-flex;align-items:center;justify-content:center;gap:.4em;min-width:48px;min-height:48px;border-radius:var(--btn-radius);background:var(--primary);color:var(--on-primary);text-decoration:none;font-weight:700;padding:0 12px}
+.hdr__call{white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:.4em;min-width:48px;min-height:48px;border-radius:var(--btn-radius);background:var(--primary);color:var(--on-primary);text-decoration:none;font-weight:700;padding:0 12px}
 .hdr__call span{display:none}
 .navbtn{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:0;background:transparent;color:var(--text);cursor:pointer;border-radius:var(--radius)}
 .nav ul{list-style:none;margin:0;padding:0}
-.nav a{display:block;padding:14px 4px;font-weight:700;text-decoration:none;color:var(--text);font-size:1.15rem}
+.nav a{display:block;padding:14px 4px;font-weight:700;text-decoration:none;color:var(--text);font-size:1.15rem;white-space:nowrap}
 .no-js .navbtn{display:none}
 .no-js .nav{position:static;display:block;width:100%}
 .no-js .nav ul{display:flex;flex-wrap:wrap;gap:0 18px}
@@ -95,8 +95,10 @@ body.nav-open{overflow:hidden}
  .js .nav ul,.no-js .nav ul{display:flex;gap:4px}
  .js .nav li{border:0}
  .nav a{padding:10px 12px;font-size:1rem}
+ .brand{max-width:32vw}
  .no-js .hdr__in{flex-wrap:nowrap}
 }
+@media (min-width:900px) and (max-width:1180px){.nav a{padding:10px 7px;font-size:.92rem}.hdr__call{padding:0 10px}}
 /* hero */
 .hero{position:relative;background:var(--hero-bg);color:var(--on-hero);overflow:hidden}
 .hero h1,.hero h2{color:var(--on-hero)}
@@ -105,7 +107,7 @@ body.nav-open{overflow:hidden}
 .hero__sub{font-size:clamp(1.1rem,3.2vw,1.35rem);max-width:38rem;margin:0 0 1.2rem}
 .hero__trust{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 1.4rem;padding:0;list-style:none;font-weight:700;font-size:.98rem}
 .hero__trust li{display:inline-flex;align-items:center;gap:.4em}
-.status{display:inline-flex;align-items:center;gap:.5em;font-weight:700;padding:6px 14px;border-radius:999px;background:var(--surface);color:var(--text);margin:0 0 1rem;font-size:.98rem}
+.status{align-self:flex-start;display:inline-flex;align-items:center;gap:.5em;font-weight:700;padding:6px 14px;border-radius:999px;background:var(--surface);color:var(--text);margin:0 0 1rem;font-size:.98rem}
 .status::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--muted)}
 .status.is-open{color:var(--open)}.status.is-open::before{background:var(--open)}
 .status.is-closed{color:var(--closed)}.status.is-closed::before{background:var(--closed)}
@@ -183,7 +185,7 @@ ${divider}
 .quote p{font-size:1.08rem}
 .quote footer{font-weight:700;color:var(--muted)}
 /* badge */
-.badge{display:inline-block;font-weight:700;margin:0 0 1rem;${
+.badge{align-self:flex-start;display:inline-block;font-weight:700;margin:0 0 1rem;${
     k.badge === "stamp"
       ? `border:3px solid currentColor;padding:4px 12px;text-transform:uppercase;letter-spacing:.08em;transform:rotate(-2deg)`
       : k.badge === "seal"

@@ -95,24 +95,22 @@ export const printPack: CategoryPack = {
     return fitTitle([`${t} in ${r.address.city}, ${r.address.state} | ${r.name}`, `${t} in ${r.address.city} | ${r.name}`, `${r.name} | ${r.address.city}, ${r.address.state}`, r.name]);
   },
   nav: () => [
-    { label: "What we make", href: "/#services" },
+    { label: "Services", href: "/#services" },
     { label: "How it works", href: "/#how" },
     { label: "Artwork", href: "/#artwork" },
     { label: "Reviews", href: "/#reviews" },
-    { label: "Hours & location", href: "/#visit" },
-    { label: "Get a quote", href: "/#contact" },
+    { label: "Visit", href: "/#visit" },
+    { label: "Quote", href: "/#contact" },
   ],
   actionBar: (ctx) => actions(ctx.r, ctx.r.smsEnabled ? ["quote", "call", "text"] : ["quote", "call", "directions"]),
   homeFaq: (ctx) => ctx.copy.faq.slice(0, 6),
   home(ctx: Ctx) {
     const r = ctx.r;
     const label = LABEL[r.variant] ?? "Printing";
-    const lines = (r.ext.print?.lines ?? []).filter((l) => l !== r.variant && SHORT[l]);
     const services = html`<section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
 <span class="section__label">What we make</span><h2 class="section__title" id="services-title">${r.variant === "signs" ? "Signs for every job" : r.variant === "print_shop" ? "What we print" : "What we make"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
 ${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: "check" as const })))}
-${lines.length ? html`<p>We also do ${lines.map((l) => SHORT[l]).join(" and ")}. Ask us about it.</p>` : ""}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Check what you make", "We guessed at your services from your Google listing. Tell us what to add or remove (shirts, signs, cards, embroidery…).", true)}
 </div></section>`;
     const gallery = html`<div class="wrap">${todo(ctx, "Send photos of your work", "Three to nine photos of shirts, signs or prints you've made. Real work is what sells a shop like yours. (We can't use Google's photos on the live site.)")}</div>`;

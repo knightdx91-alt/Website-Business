@@ -1,3 +1,5 @@
+import { buildCss } from "../generator/css.ts";
+import { resolveTheme } from "../generator/themes.ts";
 import { fetchPhoto, type Place } from "../places/client.ts";
 import { addUsage, getLead, updateLead } from "./db.ts";
 import type { Env } from "./env.ts";
@@ -61,6 +63,15 @@ export async function servePreview(env: Env, req: Request, leadId: string, rest:
   }
 
   if (path === "index.html") await restyleOldPreview(env, leadId);
+
+  // The stylesheet comes from the look + layout, so build it fresh: design fixes reach every preview at once.
+  if (path === "assets/site.css") {
+    const lead = await getLead(env, leadId);
+    if (lead?.look) {
+      const css = buildCss(resolveTheme(lead.look)).replace(/url\(\/assets\//g, `url(/p/${leadId}/assets/`);
+      return new Response(css, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "private, max-age=60", ...NOINDEX } });
+    }
+  }
 
   let obj = await env.BUCKET.get(`previews/${leadId}/${path}`);
   if (!obj && !path.endsWith(".html") && !/\.[a-z0-9]+$/i.test(path)) obj = await env.BUCKET.get(`previews/${leadId}/${path}/index.html`);
