@@ -73,6 +73,8 @@ const COLORWAYS: Record<string, Colors> = {
   reverse: { tile: NAVY, mark: WHITE, accent: GOLD, word: WHITE, sub: GOLD },
   black: { tile: BLACK, mark: WHITE, accent: WHITE, word: BLACK, sub: BLACK },
   white: { tile: WHITE, mark: NAVY, accent: NAVY, word: WHITE, sub: WHITE },
+  /** No fill: navy lines and lettering with a gold ring, for light paper, engraving and embroidery outlines. */
+  outline: { tile: "none", mark: NAVY, accent: GOLD, word: NAVY, sub: NAVY },
 };
 
 /* ---------- symbols, each on a 100 x 100 tile ---------- */
@@ -110,14 +112,50 @@ ${shape(tile ? c.mark : c.word)}
 <path d="${pin}" fill="${c.accent}"/><circle cx="50" cy="44" r="4" fill="${tile ? c.tile : "none"}"${tile ? "" : ` stroke="none"`}/>`;
 }
 
-/** 05 Seal: round badge with the name around the edge. */
+/**
+ * Text on an arc. Top arcs read left to right over the top with letters pointing out; bottom arcs read left to
+ * right along the bottom with letters upright (pointing in). Angles are degrees clockwise from 12 o'clock.
+ */
+function arcText(f: opentype.Font, s: string, cx: number, cy: number, baseline: number, mid: number, size: number, tracking: number, bottom: boolean): { svg: string; span: number } {
+  const glyphs = f.stringToGlyphs(s);
+  const adv = glyphs.map((g, i) => ((g.advanceWidth ?? 0) / f.unitsPerEm) * size + (i < glyphs.length - 1 ? tracking * size : 0));
+  const total = adv.reduce((a, b) => a + b, 0);
+  const span = (total / mid) * (180 / Math.PI);
+  let out = "";
+  let along = 0;
+  glyphs.forEach((g, i) => {
+    const w = ((g.advanceWidth ?? 0) / f.unitsPerEm) * size;
+    const offset = ((along + w / 2) / mid) * (180 / Math.PI) - span / 2;
+    const d = g.getPath(-w / 2, 0, size).toPathData(2);
+    if (d) {
+      out += bottom
+        ? `<path transform="translate(${cx} ${cy}) rotate(${(-offset).toFixed(2)}) translate(0 ${baseline})" d="${d}"/>`
+        : `<path transform="translate(${cx} ${cy}) rotate(${offset.toFixed(2)}) translate(0 ${-baseline})" d="${d}"/>`;
+    }
+    along += adv[i]!;
+  });
+  return { svg: out, span };
+}
+
+/** 05 Seal: the name over the top, Cullman, Alabama along the bottom, UA and est. 2021 in the middle. */
 function seal(c: Colors): string {
-  const ring = circleText(DM, "UNDERGROUND ASSOCIATES • CULLMAN, ALABAMA • ", 50, 50, 39.5, 8.2);
+  const size = 7.6;
+  const cap = 0.7 * size;
+  const mid = 42.6;
+  const top = arcText(DM, "UNDERGROUND ASSOCIATES", 50, 50, mid - cap / 2, mid, size, 0.06, false);
+  const bottom = arcText(DM, "CULLMAN, ALABAMA", 50, 50, mid + cap / 2, mid, size, 0.16, true);
+  // Gold dots centered in the gaps between the two lines of text.
+  const leftAngle = (top.span / 2 + (180 - bottom.span / 2)) / 2;
+  const dot = (deg: number) => {
+    const rad = (deg * Math.PI) / 180;
+    return `<circle cx="${(50 + mid * Math.sin(rad)).toFixed(2)}" cy="${(50 - mid * Math.cos(rad)).toFixed(2)}" r="1.5" fill="${c.accent}"/>`;
+  };
   const ua = text(BRICO, "UA", 0, 0, 30);
   const est = text(DM, "EST. 2021", 0, 0, 6, 0.18);
-  return `<circle cx="50" cy="50" r="50" fill="${c.tile}"/>
+  const ring = c.tile === "none" ? `<circle cx="50" cy="50" r="49" fill="none" stroke="${c.mark}" stroke-width="2"/>` : `<circle cx="50" cy="50" r="50" fill="${c.tile}"/>`;
+  return `${ring}
 <circle cx="50" cy="50" r="31" fill="none" stroke="${c.accent}" stroke-width="2"/>
-<g fill="${c.mark}">${ring}</g>
+<g fill="${c.mark}">${top.svg}${bottom.svg}</g>${dot(leftAngle)}${dot(360 - leftAngle)}
 <path d="${text(BRICO, "UA", 50 - ua.width / 2, 56, 30).d}" fill="${c.mark}"/>
 <rect x="36" y="60" width="28" height="2.6" rx="1.3" fill="${c.accent}"/>
 <path d="${text(DM, "EST. 2021", 50 - est.width / 2, 71, 6, 0.18).d}" fill="${c.mark}"/>`;
@@ -253,7 +291,8 @@ async function concepts(out: string) {
   await shoot(html, join(out, "review-sheet.png"), 900);
 }
 
-const SIZES = [64, 128, 256, 512, 1024, 2048];
+const SIZES = [64, 128, 256, 512, 1024, 2048, 4096];
+const strip = (svgText: string) => svgText.replace(/^<svg[^>]*>|<title>.*?<\/title>|<\/svg>$/g, "");
 
 async function pkg(out: string, id: string) {
   const k = CONCEPTS.find((x) => x.id === id);
@@ -270,21 +309,28 @@ async function pkg(out: string, id: string) {
   };
   const variants: Array<[string, string]> = [];
   for (const [cw, c] of Object.entries(COLORWAYS)) {
+    if (cw === "outline" && k.id !== "05-seal") continue;
     variants.push([`horizontal-${cw}`, k.lockup(c)]);
-    variants.push([`stacked-${cw}`, stacked(k.id === "05-seal" ? `<g>${seal(c)}</g>` : k.icon(c).replace(/^<svg[^>]*>|<title>.*?<\/title>|<\/svg>$/g, ""), c)]);
+    variants.push([`stacked-${cw}`, stacked(strip(k.icon(c)), c)]);
     variants.push([`icon-${cw}`, k.icon(c)]);
   }
   for (const [name, s] of variants) {
     const dir = join(out, name.split("-")[0]!);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, `underground-associates-${name}.svg`), s);
-    for (const w of name.startsWith("icon") ? SIZES : [512, 1024, 2048]) await png(s, join(dir, `underground-associates-${name}-${w}.png`), w);
+    for (const w of name.startsWith("icon") ? SIZES : [512, 1024, 2048, 4096]) await png(s, join(dir, `underground-associates-${name}-${w}.png`), w);
+    // Vector PDF for print shops: scales to any size without blurring.
+    const m = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(s)!;
+    const wIn = name.startsWith("icon") ? 3 : 6;
+    const hIn = (wIn * Number(m[2])) / Number(m[1]);
+    await page.setContent(`<html><head><style>@page{size:${wIn}in ${hIn}in;margin:0}html,body{margin:0}</style></head><body>${s.replace("<svg ", `<svg style="display:block;width:${wIn}in;height:${hIn}in" `)}</body></html>`);
+    await page.pdf({ path: join(dir, `underground-associates-${name}.pdf`), width: `${wIn}in`, height: `${hIn}in`, printBackground: true, pageRanges: "1" });
   }
   // Ready-made files for specific places.
   const ready = join(out, "ready-to-use");
   mkdirSync(ready, { recursive: true });
   // Profile photos get cropped to a circle, so the symbol sits smaller on a full-bleed square.
-  const inner = k.icon(COLORWAYS.primary!).replace(/^<svg[^>]*>|<title>.*?<\/title>|<\/svg>$/g, "");
+  const inner = strip(k.icon(COLORWAYS.primary!));
   const profile = svg(100, 100, `<rect width="100" height="100" fill="${NAVY}"/><g transform="translate(12 12) scale(0.76)">${inner}</g>`, "Underground Associates");
   writeFileSync(join(ready, "profile-photo.svg"), profile);
   await png(profile, join(ready, "google-profile-logo-720.png"), 720);
@@ -295,7 +341,69 @@ async function pkg(out: string, id: string) {
   await browser.close();
 }
 
+/**
+ * US business card, 3.5 x 2 in, with 0.125 in bleed on every side (3.75 x 2.25 in files). Keep text inside the
+ * 0.125 in safe margin. Front: the seal on navy. Back: contact details (pass them as JSON).
+ */
+interface CardDetails {
+  name?: string;
+  title?: string;
+  phone?: string;
+  email?: string;
+  web?: string;
+}
+
+function cardFront(): string {
+  const W = 375;
+  const H = 225; // hundredths of an inch, bleed included
+  const s = strip(svg(100, 100, seal(COLORWAYS.reverse!), ""));
+  const web = text(DM, "UNDERGROUNDASSOCIATES.COM", 0, 0, 9, 0.18);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="${NAVY}"/>
+<g transform="translate(${(W - 128) / 2} 28) scale(1.28)">${s}</g>
+<path d="${text(DM, "UNDERGROUNDASSOCIATES.COM", (W - web.width) / 2, 192, 9, 0.18).d}" fill="${GOLD}"/></svg>`;
+}
+
+function cardBack(d: CardDetails): string {
+  const W = 375;
+  const H = 225;
+  const x = 40;
+  const lines: string[] = [];
+  let y = 64;
+  if (d.name) lines.push(`<path d="${text(BRICO, d.name, x, (y += 0), 21).d}" fill="${NAVY}"/>`);
+  if (d.title) lines.push(`<path d="${text(DM, d.title.toUpperCase(), x, (y += 20), 8, 0.2).d}" fill="${NAVY}"/>`);
+  lines.push(`<rect x="${x}" y="${(y += 14)}" width="44" height="3" rx="1.5" fill="${GOLD}"/>`);
+  y += 12;
+  for (const v of [d.phone, d.email, d.web ?? "undergroundassociates.com"]) if (v) lines.push(`<path d="${text(DM, v, x, (y += 19), 10.5).d}" fill="${NAVY}"/>`);
+  const s = strip(svg(100, 100, seal(COLORWAYS.primary!), ""));
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="${WHITE}"/>
+<rect x="0" y="${H - 32}" width="${W}" height="32" fill="${NAVY}"/>${lines.join("")}
+<g transform="translate(${W - 40 - 104} ${(H - 32 - 104) / 2}) scale(1.04)">${s}</g></svg>`;
+}
+
+async function card(out: string, details: CardDetails, preview: boolean) {
+  mkdirSync(out, { recursive: true });
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+  const page = await browser.newPage();
+  for (const [side, s] of [["front", cardFront()], ["back", cardBack(details)]] as const) {
+    if (!preview || side === "front") {
+      writeFileSync(join(out, `business-card-${side}.svg`), s);
+      await page.setContent(`<html><head><style>@page{size:3.75in 2.25in;margin:0}html,body{margin:0}</style></head><body>${s.replace("<svg ", `<svg style="display:block;width:3.75in;height:2.25in" `)}</body></html>`);
+      await page.pdf({ path: join(out, `business-card-${side}-print.pdf`), width: "3.75in", height: "2.25in", printBackground: true, pageRanges: "1" });
+    }
+    // 300 dpi: 3.75 x 2.25 in = 1125 x 675 px.
+    await page.setViewportSize({ width: 1125, height: 675 });
+    await page.setContent(`<html><body style="margin:0"><img src="${dataUri(s)}" width="1125" height="675" style="display:block"></body></html>`);
+    await page.screenshot({ path: join(out, `business-card-${side}${preview && side === "back" ? "-preview" : ""}-300dpi.png`) });
+  }
+  await browser.close();
+}
+
 const [cmd, out, id] = process.argv.slice(2);
-if (cmd === "concepts") await concepts(out!);
+if (cmd === "card") {
+  const details = id ? (JSON.parse(id) as CardDetails) : { name: "Your Name", title: "Owner", phone: "(256) 555-0100", email: "you@undergroundassociates.com" };
+  await card(out!, details, !id);
+}
+else if (cmd === "concepts") await concepts(out!);
 else if (cmd === "package") await pkg(out!, id!);
 else console.log("usage: concepts <outDir> | package <outDir> <conceptId>");
