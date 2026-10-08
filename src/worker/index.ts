@@ -17,6 +17,18 @@ import { renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
 import { publishLead, zipLead } from "./publish.ts";
 
+/** Lets the Android app (android/) open this site full-screen. The fingerprint is the app's public signing certificate. */
+const ASSET_LINKS = [
+  {
+    relation: ["delegate_permission/common.handle_all_urls"],
+    target: {
+      namespace: "android_app",
+      package_name: "com.knightdx91.websitebusiness",
+      sha256_cert_fingerprints: ["62:7F:C0:94:66:E4:CB:F7:D2:A7:AC:60:BA:D2:48:34:0C:3B:58:B2:06:26:99:5D:83:94:7F:B7:36:CC:FD:FA"],
+    },
+  },
+];
+
 const PLACES_COST_PER_REQUEST = 0.04;
 const PHOTO_COST = 0.007;
 
@@ -183,6 +195,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     // Call guides quote these, so saved guides are rewritten on next open.
     if (salesKeys.some((k) => before[k] !== s[k])) await env.DB.prepare("UPDATE leads SET pitch_json = NULL WHERE pitch_json IS NOT NULL").run();
     return json({ ok: true });
+  }
+
+  // The Android app (android/), for any logged-in user to install. Uploaded to R2 by `npm run android:upload`.
+  if (path === "/android.apk" && m === "GET") {
+    const apk = await env.BUCKET.get("_build/website-business.apk");
+    if (!apk) throw new HttpError(404, "The Android app hasn't been uploaded yet");
+    return new Response(apk.body, {
+      headers: { "content-type": "application/vnd.android.package-archive", "content-disposition": 'attachment; filename="website-business.apk"', "cache-control": "no-store" },
+    });
   }
 
   if (path === "/runs") ownerOnly();
@@ -489,6 +510,7 @@ export default {
         if (!rest) return Response.redirect(`${url.origin}/s/${token}/`, 301);
         return await serveShared(env, req, leadId, token, rest);
       }
+      if (url.pathname === "/.well-known/assetlinks.json") return json(ASSET_LINKS, 200, { "cache-control": "public, max-age=3600" });
       const form = /^\/f\/([a-z0-9]+)$/.exec(url.pathname);
       if (form && req.method === "POST") return await handleFormPost(env, req, form[1]!);
       return env.ASSETS.fetch(req);

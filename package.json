@@ -7,7 +7,8 @@
     "test": "node --import tsx --test test/*.test.ts",
     "demo": "tsx scripts/demo.ts",
     "prepare:app": "tsx scripts/prepare-app.ts",
-    "deploy": "npm run prepare:app && wrangler deploy"
+    "deploy": "npm run prepare:app && wrangler deploy",
+    "android": "bash android/build.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.0",

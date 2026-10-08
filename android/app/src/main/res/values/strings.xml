@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appName">Website Business</string>
+    <string name="launcherName">Sites</string>
+    <string name="launchUrl">https://website-business.knightdx91.workers.dev/</string>
+    <string name="assetStatements" translatable="false">[{ \"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": { \"namespace\": \"web\", \"site\": \"https://website-business.knightdx91.workers.dev\" } }]</string>
+</resources>

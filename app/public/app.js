@@ -767,7 +767,10 @@
       <div class="btns">
         <button class="btn" id="install"${installPrompt ? "" : " hidden"}>Install app</button>
         <button class="btn btn--danger" id="logout">Log out</button></div>
-        <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>`;
+        <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
+      <section class="card"><h2>Android app</h2>
+        <p class="small muted">Install the app on an Android phone. After downloading, open the file and allow installing from this source if asked. Log in once in the app with the same password.</p>
+        <a class="btn" href="/api/android.apk" download>Download Android app</a></section>`;
   }
 
   function bindDevice() {

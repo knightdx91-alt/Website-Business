@@ -108,6 +108,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       (Worker API + queue pipeline, D1/R2 storage, phone PWA, Pages publish, form inbox)
 - [x] Packs for salons, auto, landscaping, cleaning (24 looks total, all AA-checked).
       Real Cullman leads found: 14 salon, 20 auto, 11 landscaping, 6 cleaning.
+- [x] Caller logins (limited access), call log with callbacks, Android app (TWA APK)
 - [ ] Next ideas: owner gallery/team photos, email/text alerts for inbox items,
       plan cards (landscaping), cleaning checklist, custom domains for live sites
 
@@ -148,5 +149,21 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   settings (company, caller, prices) change. It describes the preview only from `previewFeatures`.
 - Share links: `/s/<leadId>.<exp>.<hmac>/` serves a preview without login for 14 days, with a
   "Free preview" banner. Rotating APP_SECRET revokes all share links and logins.
+- Roles: the owner (password in `settings.owner_password`) and callers (`users` table, managed in
+  Settings → Callers). Login is password-only, so passwords are unique across everyone. The session
+  cookie is `<userId>.<exp>.<hmac>` with the user's stored hash in the HMAC, so changing a password
+  or turning a caller off signs them out. Callers may only use the routes in `callerSafe` /
+  non-`ownerOnly()` (leads, previews, call guide, share link, status, call log); everything that costs
+  money or changes a site is owner-only, enforced in `src/worker/index.ts`.
+- Call log: `lead_notes` (outcome + note + author) and `leads.follow_up` (YYYY-MM-DD, Cullman time) via
+  `POST /api/leads/:id/log`. "No answer" defaults the callback to tomorrow; Sold/Not interested clear it.
+  Home shows "Call back today" (due + overdue). A future callback keeps a lead from expiring, capped at 90 days.
+- Android app (`android/`): a Trusted Web Activity (androidbrowserhelper) that opens the live app
+  full-screen; `/.well-known/assetlinks.json` (in `index.ts`) carries the signing cert fingerprint.
+  `npm run android` builds it (needs ANDROID_HOME with platform 36) and uploads it to R2
+  `_build/website-business.apk`, served behind login at `/api/android.apk` (Settings → Download).
+  The signing key `website-business.jks` + password are NOT in git or the cloud; the owner keeps them.
+  Every update must use that key (and a higher `versionCode`), or phones refuse to update.
+  Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first.
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
   project afterwards.
