@@ -1024,7 +1024,7 @@
       fit: "Busy owners who want it all handled, and businesses in a crowded field (roofing, HVAC, restaurants).",
       points: [
         "We post on their Google profile every month and keep photos fresh. Active profiles tend to show up more.",
-        "Their own domain name and email (like name@theirbusiness.com). Looks established.",
+        "Their own domain name and a business email like info@theirbusiness.com. Looks established. Their choice: free forwarding into the email they already check, or a full Google mailbox we set up (Google bills them directly, about $7–8 a month).",
         "Their changes go to the front of the line.",
         "Agencies charge $100 to $400 a month just to manage a Google profile.",
       ],
@@ -1037,7 +1037,7 @@
     ["Most of their customers find them on Google or Maps?", "Plus"],
     ["Wants proof it's working?", "Plus (monthly report)"],
     ["Wants everything done for them, or has lots of competition?", "Pro"],
-    ["Already owns a domain name, or wants a business email?", "Pro (or add the email extra)"],
+    ["Already owns a domain name, or wants a business email?", "Pro (free email forwarding, or a Google mailbox Google bills them for)"],
   ];
 
   // Common things owners say on the call, and an honest answer to each.
@@ -1057,6 +1057,8 @@
         `I hear you. ${low}, with no setup fee on the ${commitWords(t)} plan. If it brings you one customer a month, it pays for itself. Want to start there? You can move up any time.`],
       ["“I don't want a contract.” / “A year is too long.”",
         `${t.short ? `No problem. There's a ${t.short}-month plan, same price and still no setup fee. ` : "No problem. "}${flex ? `Or go month to month: same monthly price, a one-time ${money(flex)} setup fee, and cancel any time with 30 days' notice.` : "You can cancel any time with 30 days' notice."}`],
+      ["“Do I have to pay extra for email?”",
+        "No. Pro comes with a business email like info@yourbusiness.com that forwards free to the email you already use. If you want a full mailbox you can send from too, we set up Google's for you and Google bills you directly, about $7 to $8 a month. We don't mark it up."],
       ["“I need to think about it.”",
         "Of course. Can I ask what you want to think over: the price, or whether it'll bring in business? (Answer that.) I'll text you the preview so you can look at it tonight. Is Thursday good for a quick call back? (Log the callback.)"],
       ["“I need to talk to my wife / husband / partner.”",
@@ -1510,7 +1512,7 @@
   const SUGGESTED_PLANS = [
     { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page" },
     { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
-    { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name and email set up\nPriority changes" },
+    { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
   ];
   const UNIT_LABEL = { month: "/month", each: " each", "one-time": " one-time" };
 

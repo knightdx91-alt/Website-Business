@@ -81,7 +81,6 @@ export interface AddOn {
 }
 
 export const DEFAULT_ADDONS: AddOn[] = [
-  { name: "Extra email inbox", price: 10, unit: "month" },
   { name: "Tap-to-review card (NFC)", price: 35, unit: "each" },
   { name: "Google Business Profile setup", price: 149, unit: "one-time" },
 ];
@@ -195,7 +194,7 @@ export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | 
       ? `3. Term: With the ${terms}, those first months are a minimum, then you can cancel any time with 30 days' notice. With month to month, there's no minimum: cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months and renew each year unless you cancel before the renewal date.`
       : "3. Term: Cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months and renew each year unless you cancel before the renewal date.",
     "4. Your content stays yours: your business name, logo, photos and text belong to you. You confirm you have the right to use any photos or text you send us.",
-    "5. Your domain: A domain you already own stays in your name. If we register one for you, we'll transfer it to you on request if you leave.",
+    "5. Your domain and email: A domain you already own stays in your name. If we register one for you, we'll transfer it to you on request if you leave. Email forwarding to your own inbox is free with plans that include it. If you choose a Google mailbox instead, Google bills you directly under Google's terms; we set it up but don't charge for it or control Google's prices or service.",
     "6. If you cancel: the site comes down at the end of your last paid month. We'll send you a copy of the site's files on request.",
     "7. Changes: Updates listed in your plan are included. We'll quote anything bigger before doing it.",
     "8. No promises on rankings: the site is built to be found on Google, but no one can guarantee rankings, visitors or sales.",

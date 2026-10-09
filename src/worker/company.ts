@@ -55,6 +55,7 @@ function faq(s: AppSettings): Array<[string, string]> {
     ["Who owns my content?", "You do. Your business name, logo, photos and text belong to you. If you have your own web address, it stays in your name."],
     ["Can you use my own photos?", "Yes, and we recommend it. Send us photos of your place, your work and your team and we'll put them in."],
     ["Can you help with my Google listing?", "Yes. Our Plus and Pro plans include a Google Business Profile tune-up, and Pro includes monthly posts and photo updates."],
+    ["Can I get an email at my own web address?", "Yes, with Pro. You get an address like info@yourbusiness.com that forwards free to the email you already use. Want a full mailbox you can send from too? We set up Google's for you, and Google bills you directly. We don't mark it up."],
     ["Where are you?", "We're based in Cullman, Alabama, and we work with businesses across Cullman County and the towns around it. We're happy to stop by."],
   ];
 }
