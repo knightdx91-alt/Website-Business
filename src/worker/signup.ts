@@ -232,7 +232,9 @@ ${env.STRIPE_SECRET_KEY ? `<p class="small muted">Payment is handled securely by
 /** "Buy extras" page for an existing client (from a link the team texts them). */
 export async function serveExtras(env: Env, req: Request, leadId: string, origin: string): Promise<Response> {
   const lead = await getLead(env, leadId);
-  const settings = await getSettings(env);
+  const real = await getSettings(env);
+  // The "paytest" lead (made by hand to check payments end to end) offers only a $1 test item.
+  const settings = lead?.place_id === "paytest" ? { ...real, addons: [{ name: "Payment test (refund afterwards)", price: 1, unit: "one-time" as const, about: "Checks that online payments reach the app." }] } : real;
   const brand = settings.companyName || "Extras";
   const buyable = settings.addons.map((a, i) => ({ a, i }));
   if (!lead || lead.status === "expired" || !["sold", "live"].includes(lead.sales_status)) {

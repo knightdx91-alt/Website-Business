@@ -486,9 +486,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (!callerSafe) ownerOnly();
 
     if (action === "" && m === "GET") return json({ ...detail(lead), notes: await notesFor(env, id), signups: await signupsFor(env, id), purchases: await purchasesFor(env, id) });
-    if (action === "/extraslink" && m === "POST") {
+    if (action === "/extraslink" && (m === "POST" || m === "GET")) {
       if (!["sold", "live"].includes(lead.sales_status)) throw new HttpError(409, "Extras links are for clients who've signed up");
       const token = await extrasToken(env, id);
+      // GET (opened while logged in) goes straight to the client's Buy extras page.
+      if (m === "GET") return Response.redirect(`${url.origin}/x/${token}`, 302);
       return json({ url: `${url.origin}/x/${token}`, expiresInDays: 30 });
     }
     if (action === "/signup" && m === "POST") {
