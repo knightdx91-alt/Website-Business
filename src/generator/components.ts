@@ -22,6 +22,7 @@ export interface Ctx {
   hasForm: boolean;
   /** Set once the photo gallery is on the page, so render.ts doesn't add it twice. */
   galleryShown?: boolean;
+  credit?: { company: string; url: string; changeUrl: string };
 }
 
 export interface NavItem {
@@ -245,7 +246,9 @@ export function footer(ctx: Ctx, nav: NavItem[]): Raw {
     ([k, u]) => html`<li><a href="${u}" target="_blank" rel="noopener">${label[k] ?? k}<span class="sr"> (opens in new tab)</span></a></li>`,
   )}<li><a href="${r.mapsUrl}" target="_blank" rel="noopener">Google reviews<span class="sr"> (opens in new tab)</span></a></li></ul></div>
 </div>
-<p class="ftr__legal">© <span data-year>${new Date().getFullYear()}</span> ${r.name}${ctx.hasForm ? html` · <a href="/privacy/">Privacy</a>` : ""}</p>
+<p class="ftr__legal">© <span data-year>${new Date().getFullYear()}</span> ${r.name}${ctx.hasForm ? html` · <a href="/privacy/">Privacy</a>` : ""}${
+    ctx.credit ? html` · Website by <a href="${ctx.credit.url}">${ctx.credit.company}</a> · <a href="${ctx.credit.changeUrl}" rel="nofollow">Request a change</a>` : ""
+  }</p>
 </div></footer>`;
 }
 

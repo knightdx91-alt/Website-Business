@@ -8,6 +8,7 @@ import { EXAMPLES } from "../examples/examples.ts";
 /** Underground Associates' own website, served on the company domain from live Settings (prices, phone, email). */
 export const COMPANY_HOSTS = ["undergroundassociates.com", "www.undergroundassociates.com"];
 const ORIGIN = "https://undergroundassociates.com";
+export const COMPANY_ORIGIN = ORIGIN;
 /** Year Underground Associates LLC started, for the copyright line. */
 const FOUNDED = 2021;
 
@@ -68,6 +69,7 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   if (url.hostname === "www.undergroundassociates.com") return Response.redirect(`${ORIGIN}${url.pathname}${url.search}`, 301);
   const path = url.pathname;
   if (path === "/contact" && req.method === "POST") return contactPost(env, req);
+  if (path === "/change") return changeRequest(env, req, url);
   if (path === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`, { headers: { "content-type": "text/plain" } });
   if (path === "/sitemap.xml") {
     return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url><url><loc>${ORIGIN}/terms</loc></url><url><loc>${ORIGIN}/privacy</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
@@ -88,6 +90,44 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   if ((path === "/terms" || path === "/privacy") && req.method === "GET") return policyPage(env, path === "/terms" ? "terms" : "privacy");
   if (path !== "/" || req.method !== "GET") return new Response(null, { status: 302, headers: { location: "/" } });
   return home(env, url);
+}
+
+/** "Request a change" from a client's live site footer: a short form that lands in the app inbox under that lead. */
+async function changeRequest(env: Env, req: Request, url: URL): Promise<Response> {
+  const leadId = /^[a-z0-9]{6,40}$/.test(url.searchParams.get("b") ?? "") ? url.searchParams.get("b")! : null;
+  const lead = leadId ? await env.DB.prepare("SELECT id, name FROM leads WHERE id = ? AND sales_status IN ('sold', 'live')").bind(leadId).first<{ id: string; name: string | null }>() : null;
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  let note = "";
+  if (req.method === "POST" && lead) {
+    const form = await req.formData().catch(() => null);
+    const field = (k: string, max = 200) => String(form?.get(k) ?? "").trim().slice(0, max);
+    const ip = req.headers.get("cf-connecting-ip") ?? "";
+    const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM submissions WHERE lead_id = ? AND ip = ? AND created_at > ?").bind(lead.id, ip, now() - 3_600_000).first<{ n: number }>();
+    const data = { name: field("name"), phone: field("phone"), message: field("message", 2000), service: "Change request for their website" };
+    if (field("website") || (recent?.n ?? 0) >= 5) note = `<p class="note" role="status">Thanks! We got it and will take care of it.</p>`;
+    else if (!data.name || !data.message) note = `<p class="note note--warn" role="alert">Please add your name and what you'd like changed.</p>`;
+    else {
+      await env.DB.prepare("INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)").bind(newId(), lead.id, now(), JSON.stringify(data), ip).run();
+      await notify(env, { kind: "message", actorName: data.name, leadId: lead.id, text: `✏️ Change request for ${lead.name ?? "a client"}'s website from ${data.name}: "${data.message.slice(0, 160)}"` });
+      note = `<p class="note" role="status">Thanks! We got your request and will take care of it, usually within a day or two.</p>`;
+    }
+  }
+  const body = lead
+    ? `<h1>Request a change</h1><p>Need something updated on the ${e(lead.name ?? "")} website? Hours, prices, photos, a new special? Tell us here and we'll handle it.</p>${note}
+<form method="post" class="form"><label>Your name<input name="name" autocomplete="name" required maxlength="200"></label>
+<label>Best phone number <span class="opt">(optional)</span><input name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
+<label>What should we change?<textarea name="message" rows="5" required maxlength="2000"></textarea></label>
+<div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
+<button class="btn" type="submit">Send request</button></form>
+${s.companyPhone ? `<p class="direct">Or text or call <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>. Photos are easiest to text.</p>` : ""}`
+    : `<h1>Request a change</h1><p>This link doesn't match one of our client websites. ${s.companyPhone ? `Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : `<a href="/#contact">Contact us</a>`} and we'll help.</p>`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Request a change | ${e(name)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
+<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a></div></header>
+<main id="main" class="sec sec--dark"><div class="wrap narrow">${body}</div></main>
+${footer(s.legalName || name)}</body></html>`;
+  return new Response(html, { status: lead ? 200 : 404, headers: { ...HEADERS, "cache-control": "no-store" } });
 }
 
 async function contactPost(env: Env, req: Request): Promise<Response> {

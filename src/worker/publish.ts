@@ -2,7 +2,8 @@ import { zipSync } from "fflate";
 import { slugify } from "../generator/html.ts";
 import { buildSite } from "../generator/render.ts";
 import type { BusinessRecord, Copy } from "../generator/types.ts";
-import { updateLead, type LeadRow } from "./db.ts";
+import { getSettings, updateLead, type LeadRow } from "./db.ts";
+import { COMPANY_ORIGIN } from "./company.ts";
 import { HttpError, now, type Env } from "./env.ts";
 import { deploy, ensureProject, projectName, type PagesAuth } from "./pages.ts";
 
@@ -41,6 +42,7 @@ async function buildForPublish(env: Env, lead: LeadRow, appOrigin: string, siteO
       formEndpoint: `${appOrigin}/f/${lead.id}`,
       statsEndpoint: `${appOrigin}/t/${lead.id}`,
       loadFont: await loadFontFrom(env, appOrigin),
+      credit: { company: (await getSettings(env)).companyName || "Underground Associates", url: COMPANY_ORIGIN, changeUrl: `${COMPANY_ORIGIN}/change?b=${lead.id}` },
     });
     for (const [k, v] of await ownerFiles(env, lead.id)) out.files.set(k, v);
     return out;

@@ -20,6 +20,8 @@ export interface BuildInput {
   reviewTexts?: string[];
   /** Returns the bytes of an @fontsource woff2 file. Omit to leave fonts out (previews serve them separately). */
   loadFont?: (pkg: string, file: string) => Promise<Uint8Array>;
+  /** Live sites only: a small "Website by …" credit and a "Request a change" link for the business owner. */
+  credit?: { company: string; url: string; changeUrl: string };
   /** Prefix for every internal link and asset, e.g. "/p/abc123" when a preview is served under a path. */
   basePath?: string;
 }
@@ -105,6 +107,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     formEndpoint: input.formEndpoint,
     statsEndpoint: input.mode === "publish" ? input.statsEndpoint : undefined,
     hasForm: pack.hasForm(input.record),
+    credit: input.mode === "publish" ? input.credit : undefined,
   };
   const files = new Map<string, string | Uint8Array>();
   const pages: Array<{ path: string; html: string }> = [];
