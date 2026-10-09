@@ -159,6 +159,8 @@ export interface AppSettings {
   legalName?: string;
   companyPhone?: string;
   companyEmail?: string;
+  /** The owner's own address, shown next to the business email for people who want them directly. */
+  directEmail?: string;
   /** The Google account clients add as a Manager on their Business Profile. */
   gbpEmail?: string;
   callerName?: string;

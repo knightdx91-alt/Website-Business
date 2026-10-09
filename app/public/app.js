@@ -1543,7 +1543,8 @@
         <label class="field">Company name <span class="hint">What clients see</span><input name="companyName" value="${esc(s.companyName || "")}" placeholder="e.g. Underground Associates"></label>
         <label class="field">Legal name <span class="hint">Who signs client agreements</span><input name="legalName" value="${esc(s.legalName || "")}" placeholder="e.g. Underground Associates LLC"></label>
         <div class="row"><label class="field">Business phone<input name="companyPhone" type="tel" value="${esc(s.companyPhone || "")}"></label>
-        <label class="field">Business email<input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
+        <label class="field">Business email <span class="hint">Shown everywhere</span><input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
+        <label class="field">Owner's direct email <span class="hint">Shown on your website as "Need the owner directly?"</span><input name="directEmail" type="email" value="${esc(s.directEmail || "")}" placeholder="post@undergroundassociates.com"></label>
         <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
         ${!meta.me.id || meta.me.id === "owner" ? `<label class="field">Your name <span class="hint">Your texts say "Hi, this is ___ with ${esc(s.companyName || "your company")}". Everyone else's texts use their own login names.</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="e.g. Post"></label>` : ""}
         <h2 style="margin-top:18px">Plans &amp; prices</h2>
@@ -1611,6 +1612,7 @@
             legalName: v("legalName") || undefined,
             companyPhone: v("companyPhone") || undefined,
             companyEmail: v("companyEmail") || undefined,
+            directEmail: v("directEmail") || undefined,
             gbpEmail: v("gbpEmail") || undefined,
             // Only the owner's own login shows this field; others keep the owner's name as it is.
             callerName: f.elements.callerName ? v("callerName") || undefined : s.callerName,

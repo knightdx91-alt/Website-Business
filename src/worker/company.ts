@@ -197,6 +197,7 @@ ${missing ? `<p class="note note--warn" role="alert">Please add your name and a 
 <button class="btn" type="submit">Send</button>
 </form>
 ${phone || email ? `<p class="direct">Rather talk? ${phone ? `<a href="${telHref(phone)}">${e(phone)}</a>` : ""}${phone && email ? " · " : ""}${email ? `<a href="mailto:${e(email)}">${e(email)}</a>` : ""}</p>` : ""}
+${s.directEmail && s.directEmail !== email ? `<p class="direct">Need ${s.callerName ? e(s.callerName.split(" ")[0]!) : "the owner"} directly? <a href="mailto:${e(s.directEmail)}">${e(s.directEmail)}</a></p>` : ""}
 </div></section>
 </main>
 <footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama</div></footer>
