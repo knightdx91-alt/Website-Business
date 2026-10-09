@@ -535,7 +535,7 @@
         ${ready ? `<p class="muted small">Design: ${esc(lookName)}${owner && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="restyle">🎨 Try another design</button>` : ""}</p>
           <div class="btns btns--full">
             <a class="btn btn--primary" href="#/preview/${l.id}">Preview</a>
-            <a class="btn" href="/p/${l.id}/" target="_blank" rel="noopener">Open full screen</a>
+            <a class="btn" href="#/full/${l.id}">Open full screen</a>
             ${owner ? `<a class="btn" href="#/edit/${l.id}">Edit</a>` : ""}
             ${l.salesStatus !== "live" ? `<a class="btn" href="/api/leads/${l.id}/flyer" target="_blank" rel="noopener">Leave-behind flyer (QR)</a>` : ""}
           </div>
@@ -626,13 +626,24 @@
   }
 
   /* ---------- preview ---------- */
+  // Full-screen preview inside the app (a new tab would leave the Android app, and Back would close it).
+  function viewFull(id, sub) {
+    document.body.classList.add("showing");
+    $app.innerHTML = `<div class="fullview"><iframe title="Site preview" src="/p/${id}/${sub ? sub + "/" : ""}"></iframe>
+      <button class="fullview__close" type="button" aria-label="Close full screen">✕</button></div>`;
+    $app.querySelector(".fullview__close").addEventListener("click", () => {
+      if (history.length > 1) history.back();
+      else go("#/preview/" + id);
+    });
+  }
+
   async function viewPreview(id) {
     setNav("home");
     let mode = matchMedia("(min-width: 760px)").matches ? "desktop" : "phone";
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p>
       <div class="row" style="margin-bottom:10px"><div class="tabs" style="margin:0">
         <button type="button" data-mode="phone">Phone view</button><button type="button" data-mode="desktop">Desktop view</button></div>
-        <a class="btn btn--small" href="/p/${id}/" target="_blank" rel="noopener" style="flex:none">Full screen</a></div>
+        <a class="btn btn--small" href="#/full/${id}" style="flex:none">Full screen</a></div>
       <div class="frame-wrap" id="fw"><iframe id="pf" title="Site preview" src="/p/${id}/"></iframe></div>
       <div id="previewshare" style="margin-top:12px"></div>`;
     api("/leads/" + id).then((l) => {
@@ -745,7 +756,7 @@
       </section>
       <section class="card"><h2>Spanish page</h2>
         <p class="small muted">${c.es ? "This site has a Spanish page at /es/, linked as “Español” in the menu. Rewrite it after big text changes." : "Optional extra. AI translates the site's text into a Spanish page with Spanish buttons and hours (about 20 seconds)."}</p>
-        <div class="btns"><button class="btn btn--small" type="button" id="es-write">${c.es ? "Rewrite Spanish page" : "Write Spanish page"}</button>${c.es ? `<a class="btn btn--small" href="/p/${id}/es/" target="_blank" rel="noopener">See it</a><button class="btn btn--small" type="button" id="es-remove">Remove</button>` : ""}</div>
+        <div class="btns"><button class="btn btn--small" type="button" id="es-write">${c.es ? "Rewrite Spanish page" : "Write Spanish page"}</button>${c.es ? `<a class="btn btn--small" href="#/full/${id}/es">See it</a><button class="btn btn--small" type="button" id="es-remove">Remove</button>` : ""}</div>
       </section>
       <section class="card"><h2>We're hiring</h2>
         <p class="small muted">Optional. Adds a “We're hiring” section with Call/Text buttons. Leave the jobs empty to remove it.</p>
@@ -2228,6 +2239,7 @@
       if ((m = /^#\/lead\/([a-z0-9]+)$/.exec(h))) return await viewLead(m[1]);
       if ((m = /^#\/edit\/([a-z0-9]+)$/.exec(h))) return await viewEdit(m[1]);
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
+      if ((m = /^#\/full\/([a-z0-9]+)(?:\/(es))?$/.exec(h))) return viewFull(m[1], m[2]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/playbook") return await viewPlaybook();
       if ((m = /^#\/walkin(?:\/([a-z0-9]+))?$/.exec(h))) return await viewWalkin(m[1]);
