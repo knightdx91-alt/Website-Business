@@ -9,7 +9,7 @@ import { LOOKS, looksFor, resolveTheme } from "../src/generator/themes.ts";
 import type { CategoryId } from "../src/generator/types.ts";
 import { categoryRecord, restaurantRecord, sampleCopy } from "./fixtures.ts";
 
-const CATEGORIES: CategoryId[] = ["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail", "finance"];
+const CATEGORIES: CategoryId[] = ["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail", "finance", "church"];
 const recordFor = (c: CategoryId) => (c === "restaurant" ? restaurantRecord() : categoryRecord(c));
 
 test("25 layouts, each with a name and blurb", () => {
