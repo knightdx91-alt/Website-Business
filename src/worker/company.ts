@@ -80,6 +80,7 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   if (path === "/start/thanks") return startThanks(env, url);
   if (path.startsWith("/agreement/") && req.method === "GET") return agreementPage(env, path.slice("/agreement/".length));
   if (path === "/portfolio" && req.method === "GET") return portfolio(env);
+  if (path === "/extras" && (req.method === "GET" || req.method === "POST")) return extrasRequest(env, req, url);
   if (path === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`, { headers: { "content-type": "text/plain" } });
   if (path === "/sitemap.xml") {
     return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url><url><loc>${ORIGIN}/portfolio</loc></url><url><loc>${ORIGIN}/terms</loc></url><url><loc>${ORIGIN}/privacy</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
@@ -185,7 +186,8 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
     }
   }
   const types = [...new Set(SEARCH_GROUPS.map((g) => g.label))];
-  const body = `<h1>Get started</h1>
+  const body = `<p class="note" style="margin:0 0 18px">Already a client? You don't need to sign up again. <a href="/extras">Add extras to your website here</a>.</p>
+<h1>Get started</h1>
 <p class="lead">Pick your plan and we'll start building your site. You'll still look it over and approve every detail before it goes live.</p>
 ${note}
 <form method="post" class="form light">
@@ -219,6 +221,75 @@ async function startThanks(env: Env, url: URL): Promise<Response> {
 <p>If you paid online, a receipt is on its way from our payment provider. Nothing goes live until you've approved your site.</p>${copy}
 <p><a class="btn" href="/">Back to the home page</a></p>`;
   return policyShell(name, s.legalName || name, "Thank you", body, { phone: s.companyPhone });
+}
+
+const digits = (t: string) => t.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+
+/** Finds the client an extras request is from: same phone number, else the same business name, among sold/live clients. */
+async function findClient(env: Env, phone: string, business: string): Promise<{ id: string; name: string } | null> {
+  const rows = await env.DB.prepare("SELECT id, name, phone FROM leads WHERE sales_status IN ('sold', 'live') AND status != 'expired'").all<{ id: string; name: string | null; phone: string | null }>();
+  const p = digits(phone);
+  const norm = (t: string) => t.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").replace(/\b(llc|inc|the|co)\b/g, "").trim();
+  const byPhone = p.length === 10 ? rows.results.find((r) => r.phone && digits(r.phone) === p) : undefined;
+  const byName = norm(business) ? rows.results.find((r) => r.name && norm(r.name) === norm(business)) : undefined;
+  const hit = byPhone ?? byName;
+  return hit ? { id: hit.id, name: hit.name ?? business } : null;
+}
+
+/** "Already a client? Add extras": a request form. The team texts the client their own Buy extras link. */
+async function extrasRequest(env: Env, req: Request, url: URL): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  if (url.searchParams.get("sent") === "1") {
+    return policyShell(name, s.legalName || name, "Request sent", `<h1>Got it, thank you!</h1><p class="lead">We'll text you a link within one business day where you can review the agreement for your extras, sign it and pay. ${s.companyPhone ? `Questions? Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>.` : ""}</p><p><a class="btn" href="/">Back to the home page</a></p>`, { phone: s.companyPhone });
+  }
+  let note = "";
+  if (req.method === "POST") {
+    const form = await req.formData().catch(() => null);
+    const field = (k: string, max = 200) => String(form?.get(k) ?? "").trim().slice(0, max);
+    const d = { business: field("business", 120), name: field("name", 100), phone: field("phone", 40), email: field("email", 120), notes: field("notes", 1500) };
+    const wanted = s.addons.filter((_, i) => form?.get(`x_${i}`) === "on").map((a) => a.name);
+    if (field("website")) return Response.redirect(`${ORIGIN}/extras?sent=1`, 303);
+    const ip = req.headers.get("cf-connecting-ip") ?? "";
+    const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM submissions WHERE ip = ? AND created_at > ?").bind(ip, now() - 3_600_000).first<{ n: number }>();
+    if ((recent?.n ?? 0) >= 8) return Response.redirect(`${ORIGIN}/extras?sent=1`, 303);
+    if (!d.business || !d.name || digits(d.phone).length !== 10 || (!wanted.length && !d.notes)) {
+      note = `<p class="note note--warn" role="alert">Please add your business name, your name and a 10-digit phone number, and pick at least one extra (or tell us what you need).</p>`;
+    } else {
+      const client = await findClient(env, d.phone, d.business);
+      const message = [wanted.length ? `Wants: ${wanted.join(", ")}` : "", d.notes && `Notes: ${d.notes}`, client ? "" : `Not matched to a client automatically. Business given: ${d.business}`].filter(Boolean).join("\n");
+      await env.DB.prepare("INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)")
+        .bind(newId(), client?.id ?? COMPANY_LEAD_ID, now(), JSON.stringify({ name: d.name, phone: d.phone, email: d.email || undefined, service: `🛒 Extras request${client ? "" : `: ${d.business}`}`, message }), ip)
+        .run();
+      await notify(env, {
+        kind: "message",
+        actorName: d.name,
+        leadId: client?.id ?? null,
+        text: client
+          ? `🛒 Extras request from ${client.name}: ${wanted.join(", ") || "see notes"}. Open the client and text them their Buy extras link.`
+          : `🛒 Extras request from ${d.business} (not matched to a client): ${wanted.join(", ") || "see notes"}. Find them in your clients, then text their Buy extras link.`,
+      });
+      return Response.redirect(`${ORIGIN}/extras?sent=1`, 303);
+    }
+  }
+  const body = `<p class="eyebrow" style="color:var(--goldtext)">Already a client?</p>
+<h1>Add extras to your website</h1>
+<p class="lead">Tell us what you'd like to add. We'll text you a link made just for your account, where you can read the agreement for your extras, sign it and pay. You won't be signed up for a new plan.</p>
+${note}
+<form method="post" class="form light">
+<fieldset style="border:0;padding:0;margin:0 0 6px"><legend style="font-weight:700;margin-bottom:8px">What would you like to add?</legend>
+${s.addons.map((a, i) => `<label class="xopt"><input type="checkbox" name="x_${i}"><span><strong>${e(a.name)}</strong> · ${e(addonPrice(a))}${a.about ? `<small>${e(a.about)}</small>` : ""}</span></label>`).join("")}
+</fieldset>
+<label>Business name<input name="business" required maxlength="120" autocomplete="organization"></label>
+<label>Your name<input name="name" required maxlength="100" autocomplete="name"></label>
+<label>Phone <span class="opt">(the one on your account, if you can)</span><input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
+<label>Email <span class="opt">(optional)</span><input name="email" type="email" maxlength="120" autocomplete="email"></label>
+<label>Anything else? <span class="opt">(optional)</span><textarea name="notes" rows="3" maxlength="1500"></textarea></label>
+<div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
+<button class="btn" type="submit">Send my request</button>
+</form>
+<p class="small muted" style="margin-top:20px">Not a client yet? <a href="/start">Get started</a> or <a href="/#contact">get a free preview</a>.</p>`;
+  return policyShell(name, s.legalName || name, "Add extras", body, { phone: s.companyPhone });
 }
 
 /** Simple light page in the company style (header, narrow column, footer). */
@@ -343,7 +414,7 @@ ${options.length ? `<h3 style="margin-top:28px">Ways to pay</h3><div class="grid
           return `<div class="card"><h3>${e(o.label)}</h3><p>${e(text)}</p></div>`;
         })
         .join("")}</div>` : ""}
-${s.addons.length ? `<h3 style="margin-top:28px">Extras</h3><p class="small muted">Add any of these to any plan.</p><div class="grid extras">${s.addons.map((a) => `<div class="card"><h3>${e(a.name)}</h3><p class="xprice">${e(addonPrice(a))}</p>${a.about ? `<p>${e(a.about)}</p>` : ""}</div>`).join("")}</div>` : ""}
+${s.addons.length ? `<h3 style="margin-top:28px">Extras</h3><p class="small muted">Add any of these to any plan. Already a client? <a href="/extras">Add extras here</a>.</p><div class="grid extras">${s.addons.map((a) => `<div class="card"><h3>${e(a.name)}</h3><p class="xprice">${e(addonPrice(a))}</p>${a.about ? `<p>${e(a.about)}</p>` : ""}</div>`).join("")}</div>` : ""}
 </div></section>` : ""}
 
 <section class="sec" id="who"><div class="wrap">
@@ -423,7 +494,7 @@ async function portfolio(env: Env): Promise<Response> {
 }
 
 function footer(legal: string, reviewUrl?: string): string {
-  return `<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama · <a href="/terms">Terms &amp; refunds</a> · <a href="/privacy">Privacy</a>${reviewUrl ? ` · <a href="${e(reviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</div></footer>`;
+  return `<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama · <a href="/extras">Clients: add extras</a> · <a href="/terms">Terms &amp; refunds</a> · <a href="/privacy">Privacy</a>${reviewUrl ? ` · <a href="${e(reviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</div></footer>`;
 }
 
 const HEADERS = {
@@ -566,7 +637,10 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .note{background:#e8f5ec;color:#0f5132;border-radius:10px;padding:12px 14px;font-weight:700}.note--warn{background:#fff4e0;color:var(--goldtext)}
 .direct{margin-top:18px}
 .btn--small{min-height:44px;padding:8px 18px;font-size:.98rem}
-.light .form label{color:var(--ink)}.light .opt{color:var(--ink)}.light details{margin:6px 0 10px}.light .terms{white-space:pre-line;background:var(--alt);border-radius:12px;padding:14px;font-size:.92rem}
+.light .form label{color:var(--ink)}
+.xopt{display:flex!important;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 8px;font-weight:400!important;background:#fff}
+.xopt input{width:20px!important;height:20px;min-height:0!important;padding:0!important;margin-top:4px;flex:none}.xopt small{display:block;color:var(--muted)}
+.xopt:has(input:checked){border:2px solid var(--gold);padding:11px}.light .opt{color:var(--ink)}.light details{margin:6px 0 10px}.light .terms{white-space:pre-line;background:var(--alt);border-radius:12px;padding:14px;font-size:.92rem}
 .extras .card h3{margin-bottom:4px}.xprice{color:var(--goldtext)!important;font-weight:700;margin:0 0 8px!important}
 .examples{list-style:none;padding:0;margin:24px 0 0;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}@media (min-width:760px){.examples{grid-template-columns:repeat(4,1fr)}}
 .examples a{display:block;text-decoration:none;color:var(--ink)}.examples img{display:block;width:100%;height:auto;aspect-ratio:1/2;object-fit:cover;object-position:top;border-radius:16px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(20,33,61,.12)}

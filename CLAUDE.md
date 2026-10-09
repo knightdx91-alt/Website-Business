@@ -259,6 +259,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   allow form-action https://checkout.stripe.com in their CSP. Payment test: insert a lead with place_id 'paytest' and
   sales_status 'sold'; its Buy extras page (open /api/leads/<id>/extraslink while logged in) offers only a $1 item.
   Verified end to end in Oct 2026 (checkout → webhook → purchase marked paid → notification); refund it in Stripe after.
+- "Already a client? Add extras" (`/extras` on the company site, `extrasRequest` in company.ts): existing clients pick
+  extras and leave business name, name and phone; `findClient` matches a sold/live lead by phone (10 digits) or
+  normalized business name. Matched requests land in the Inbox under that client (with an "Open client" button) and
+  notify; unmatched ones go under `company`, flagged. The team then texts the client's own Buy extras link (where they
+  sign and pay). Linked from the Get started page ("Already a client?"), the extras list and the footer.
 - Contracts + e-signature (`src/worker/contract.ts`, `src/worker/esign.ts`, migration 0011): every order is signed before
   it can go further. The agreement is built from what was picked: order summary, plan and what it includes, way to pay,
   the main service agreement (Settings → agreement), terms for each extra picked (Settings → Extras → "Contract terms

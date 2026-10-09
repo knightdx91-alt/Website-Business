@@ -1608,9 +1608,10 @@
       <ul class="list">${items.length ? items.map((i) => `<li class="card"><div class="lead__top"><strong>${esc(i.data.name)}</strong>${i.read ? "" : '<span class="chip chip--warn">New</span>'}</div>
         <p class="small muted">For ${esc(i.business || "a client")} · ${ago(i.createdAt)}</p>
         ${i.data.service ? `<p>${esc(i.data.service)}${i.data.town ? " · " + esc(i.data.town) : ""}</p>` : ""}
-        ${i.data.message ? `<p>${esc(i.data.message)}</p>` : ""}
+        ${i.data.message ? `<p style="white-space:pre-line">${esc(i.data.message)}</p>` : ""}
         <div class="btns"><a class="btn btn--small btn--primary" href="${telHref(i.data.phone)}">📞 ${esc(i.data.phone)}</a>
         ${i.data.email ? `<a class="btn btn--small" href="mailto:${esc(i.data.email)}">Email</a>` : ""}
+        ${i.leadId && i.leadId !== "company" ? `<a class="btn btn--small" href="#/lead/${esc(i.leadId)}">Open client</a>` : ""}
         ${i.read ? "" : `<button class="btn btn--small" data-read="${i.id}">Mark read</button>`}</div></li>`).join("") : '<li class="card muted">No requests yet. They show up here once a client site is live.</li>'}</ul>`;
     $app.querySelectorAll("[data-read]").forEach((b) => b.addEventListener("click", async () => { await api(`/inbox/${b.dataset.read}/read`, { method: "POST" }); viewInbox(); }));
   }
