@@ -213,6 +213,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   preview (2nd time)"), callers included: `CALLER_KINDS` in notify.ts is the only kind callers get (their 🔔 list, count
   and pushes are filtered to it). Home shows "Looked at their preview" (`/api/leads?opened=recent`, last 7 days, not yet sold), the lead
   screen shows the count. Home also asks once to turn on phone alerts (`pushAsk`, dismiss stored in localStorage).
+- Example sites (`src/examples/examples.ts`): 8 made-up businesses (555-01xx numbers, "Example" streets), one per pack,
+  each a different look~layout. `npm run prepare:app && npm run examples` builds them (publish mode, fonts pointed at
+  /fonts/) into app/public/examples/<slug>/ with an "Example website" banner + noindex, screenshots each (clock frozen at
+  a weekday morning) and renders app/public/og.png (company link preview). Shown in "See a few examples" on the company
+  site; /examples/* is served with x-robots-tag noindex and their forms post to a harmless /examples/form page.
+- Stripe webhook (`src/worker/stripe.ts`, migration 0009): POST /stripe/webhook, signature checked with Worker secret
+  STRIPE_WEBHOOK_SECRET. checkout.session.completed (client_reference_id = lead id) marks the lead's latest sign-up paid
+  and stores the Stripe customer/subscription; invoice.payment_failed and customer.subscription.deleted notify (and a
+  cancel unmarks paid). Handled event ids go in stripe_events (Stripe retries). Without the secret it returns 503.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.

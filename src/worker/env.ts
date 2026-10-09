@@ -10,6 +10,8 @@ export interface Env {
   APP_SECRET: string;
   /** Web Push signing key as a JWK (ECDSA P-256). Optional: without it, notifications stay in the app. */
   VAPID_PRIVATE_JWK?: string;
+  /** Stripe webhook signing secret (whsec_…). Optional: without it, payments are ticked by hand. */
+  STRIPE_WEBHOOK_SECRET?: string;
 }
 
 export type Job =

@@ -3,6 +3,7 @@ import { billingOptions, defaultTerms, getSettings, type AppSettings } from "./d
 import { newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
 import { SEARCH_GROUPS } from "../places/queries.ts";
+import { EXAMPLES } from "../examples/examples.ts";
 
 /** Underground Associates' own website, served on the company domain from live Settings (prices, phone, email). */
 export const COMPANY_HOSTS = ["undergroundassociates.com", "www.undergroundassociates.com"];
@@ -72,7 +73,17 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
     return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url><url><loc>${ORIGIN}/terms</loc></url><url><loc>${ORIGIN}/privacy</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
   }
   // Fonts and icons come from the app's static assets.
-  if (path.startsWith("/fonts/") || path.startsWith("/icons/")) return null;
+  if (path.startsWith("/fonts/") || path.startsWith("/icons/") || path === "/og.png") return null;
+  if (path === "/examples/form" && req.method === "POST") {
+    return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Example site</title><body style="font:17px/1.5 system-ui;max-width:560px;margin:40px auto;padding:0 20px"><h1>This is an example site</h1><p>Forms on example sites don't send anywhere. On your real site, requests go straight to you.</p><p><a href="${ORIGIN}/#contact">Get a free preview of your own site</a></p>`, { headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex" } });
+  }
+  if (path.startsWith("/examples/") && req.method === "GET") {
+    // Made-up businesses: viewable, never indexed.
+    const res = await env.ASSETS.fetch(req);
+    const headers = new Headers(res.headers);
+    headers.set("x-robots-tag", "noindex");
+    return new Response(res.body, { status: res.status, headers });
+  }
   if (path === "/refunds" || path === "/refund-policy") return Response.redirect(`${ORIGIN}/terms#refunds`, 301);
   if ((path === "/terms" || path === "/privacy") && req.method === "GET") return policyPage(env, path === "/terms" ? "terms" : "privacy");
   if (path !== "/" || req.method !== "GET") return new Response(null, { status: 302, headers: { location: "/" } });
@@ -129,6 +140,7 @@ async function home(env: Env, url: URL): Promise<Response> {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${e(title)}</title><meta name="description" content="${e(description)}"><link rel="canonical" href="${ORIGIN}/">
 <meta property="og:type" content="website"><meta property="og:title" content="${e(title)}"><meta property="og:description" content="${e(description)}"><meta property="og:url" content="${ORIGIN}/">
+<meta property="og:image" content="${ORIGIN}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png">
 <link rel="preload" href="/fonts/bricolage-grotesque-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>${CSS}</style><script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script></head><body>
@@ -140,6 +152,7 @@ async function home(env: Env, url: URL): Promise<Response> {
 <h1>See your new website <span class="hl">before you pay</span> a dime.</h1>
 <p class="lead">We build your website first, free. If you like it, it goes live${lowest ? ` from ${money(lowest)} a month` : ""}, with hosting, updates and support included. No setup fee on ${commitText(s)} plans.</p>
 <div class="btns"><a class="btn" href="#contact">Get my free preview</a>${callBtn}</div>
+<p style="margin:18px 0 0"><a href="#examples" style="color:#fff">See example sites</a></p>
 </div></section>
 
 <section class="sec" id="how"><div class="wrap">
@@ -155,7 +168,13 @@ async function home(env: Env, url: URL): Promise<Response> {
 <div class="grid">${INCLUDED.map(([t, b]) => `<div class="card"><h3>${e(t)}</h3><p>${e(b)}</p></div>`).join("")}</div>
 </div></section>
 
-${plans.length ? `<section class="sec" id="plans"><div class="wrap">
+<section class="sec" id="examples"><div class="wrap">
+<h2>See a few examples</h2>
+<p class="lead">Every business gets its own look. These are made-up businesses so you can see the range. Tap one to try it.</p>
+<ul class="examples">${EXAMPLES.map((x) => `<li><a href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>${e(x.kind)}</span></a></li>`).join("")}</ul>
+</div></section>
+
+${plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap">
 <h2>Simple monthly plans</h2>
 <p class="lead">${(s.minMonths ?? 12) ? `<strong>No setup fee on ${commitText(s)} plans.</strong>${s.flexSetup ? ` Month to month has a one-time ${money(s.flexSetup)} setup fee.` : ""}` : "No setup fee. Cancel any time."}</p>
 <div class="grid plans">${plans
@@ -179,14 +198,14 @@ ${options.length ? `<h3 style="margin-top:28px">Ways to pay</h3><div class="grid
 ${s.addons.length ? `<p class="small muted">Extras: ${s.addons.map((a) => `${e(a.name)} (${money(a.price)}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : a.unit === "one-time" ? " one-time" : ""})`).join(" · ")}</p>` : ""}
 </div></section>` : ""}
 
-<section class="sec sec--alt" id="who"><div class="wrap">
+<section class="sec" id="who"><div class="wrap">
 <h2>Who we work with</h2>
 <p class="lead">Independent local businesses in Cullman, Hanceville, Good Hope, Vinemont, Hartselle, Arab and nearby, including:</p>
 <ul class="chips">${CATEGORIES.map((c) => `<li>${e(c)}</li>`).join("")}</ul>
 <p class="small muted">Don't see yours? <a href="#contact">Ask us</a>. If you serve local customers, we can build for you.</p>
 </div></section>
 
-<section class="sec" id="faq"><div class="wrap narrow">
+<section class="sec sec--alt" id="faq"><div class="wrap narrow">
 <h2>Questions</h2>
 ${faq(s).map(([q, a]) => `<details><summary>${e(q)}</summary><p>${e(a)}</p></details>`).join("")}
 </div></section>
@@ -360,6 +379,9 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .opt{font-weight:400;color:#c9d1e0}.hp{position:absolute;left:-9999px}
 .note{background:#e8f5ec;color:#0f5132;border-radius:10px;padding:12px 14px;font-weight:700}.note--warn{background:#fff4e0;color:var(--goldtext)}
 .direct{margin-top:18px}
+.examples{list-style:none;padding:0;margin:24px 0 0;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}@media (min-width:760px){.examples{grid-template-columns:repeat(4,1fr)}}
+.examples a{display:block;text-decoration:none;color:var(--ink)}.examples img{display:block;width:100%;height:auto;aspect-ratio:1/2;object-fit:cover;object-position:top;border-radius:16px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(20,33,61,.12)}
+.examples span{display:block;margin-top:8px;font-size:.92rem;color:var(--muted)}.examples strong{display:block;color:var(--ink);font-size:1rem}
 .ftr{background:#0d1629;color:#aeb7c8;padding:24px 0;font-size:.92rem}.ftr a{color:#dfe5ef}
 .legal h1{font-size:clamp(1.9rem,6vw,2.8rem)}.legal h2{font-size:1.35rem;margin-top:32px}.legal li{margin-bottom:8px}
 .legal .terms{white-space:pre-line;background:var(--alt);border-radius:12px;padding:16px 18px;font-size:.95rem}

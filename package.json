@@ -8,7 +8,8 @@
     "demo": "tsx scripts/demo.ts",
     "prepare:app": "tsx scripts/prepare-app.ts",
     "deploy": "npm run prepare:app && wrangler deploy",
-    "android": "bash android/build.sh"
+    "android": "bash android/build.sh",
+    "examples": "tsx scripts/examples.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.0",

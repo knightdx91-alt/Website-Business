@@ -24,6 +24,7 @@ import { applyEdits, EditsSchema } from "./edits.ts";
 import { HttpError, json, localDate, newId, now, type Env, type Job } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
 import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
+import { stripeWebhook } from "./stripe.ts";
 import { chooseLook, renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
 import { publishLead, zipLead } from "./publish.ts";
@@ -867,6 +868,7 @@ export default {
         }
         return await serveSignup(env, req, leadId, plan, url.origin);
       }
+      if (url.pathname === "/stripe/webhook" && req.method === "POST") return await stripeWebhook(env, req);
       const hit = /^\/t\/([a-z0-9]+)$/.exec(url.pathname);
       if (hit && req.method === "POST") return await recordHit(env, req, hit[1]!, url.searchParams.get("e"));
       const form = /^\/f\/([a-z0-9]+)$/.exec(url.pathname);
