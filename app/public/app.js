@@ -1911,10 +1911,25 @@
     else location.hash = hash;
   }
 
+  // Each screen opens at the top; the home list remembers where you were when you come back to it.
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  let lastHash = null;
+  const scrollMemo = {};
+  const isHomeHash = (h) => h === "#/" || h === "#" || h === "";
+
   async function render() {
+    const h = location.hash || "#/";
+    if (h === lastHash) return route(h);
+    if (lastHash !== null) scrollMemo[isHomeHash(lastHash) ? "#/" : lastHash] = window.scrollY;
+    lastHash = h;
+    window.scrollTo(0, 0);
+    await route(h);
+    if (location.hash === h || (isHomeHash(h) && isHomeHash(location.hash))) window.scrollTo(0, isHomeHash(h) ? scrollMemo["#/"] || 0 : 0);
+  }
+
+  async function route(h) {
     stopPolling();
     document.body.classList.remove("showing");
-    const h = location.hash || "#/";
     let m;
     try {
       if (h === "#/login") return await viewLogin();
