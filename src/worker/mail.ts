@@ -1,20 +1,38 @@
 import type { Env } from "./env.ts";
 
 /**
- * Transactional email through Resend (https://resend.com), sent as the company email in Settings (info@…), which
- * must be on a domain verified in Resend. Worker secret RESEND_API_KEY; without it nothing is sent and callers fall
- * back to the manual flow. Only for messages a client asked for (never outreach).
+ * Transactional email (only messages a client asked for, never outreach), sent as the company email in Settings
+ * (info@…), whose domain must be verified with the provider. MailerSend (secret MAILERSEND_API_KEY) or Resend
+ * (RESEND_API_KEY); without either, nothing is sent and callers fall back to the manual flow.
  */
+export function mailReady(env: Env): boolean {
+  return !!(env.MAILERSEND_API_KEY || env.RESEND_API_KEY);
+}
+
 export async function sendEmail(
   env: Env,
   m: { from: string; fromName: string; to: string; subject: string; text: string; replyTo?: string },
 ): Promise<boolean> {
-  if (!env.RESEND_API_KEY) return false;
+  let req: { url: string; key: string; body: unknown } | null = null;
+  if (env.MAILERSEND_API_KEY) {
+    req = {
+      url: "https://api.mailersend.com/v1/email",
+      key: env.MAILERSEND_API_KEY,
+      body: { from: { email: m.from, name: m.fromName }, to: [{ email: m.to }], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: { email: m.replyTo } } : {}) },
+    };
+  } else if (env.RESEND_API_KEY) {
+    req = {
+      url: "https://api.resend.com/emails",
+      key: env.RESEND_API_KEY,
+      body: { from: `${m.fromName} <${m.from}>`, to: [m.to], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}) },
+    };
+  }
+  if (!req) return false;
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetch(req.url, {
       method: "POST",
-      headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-      body: JSON.stringify({ from: `${m.fromName} <${m.from}>`, to: [m.to], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}) }),
+      headers: { authorization: `Bearer ${req.key}`, "content-type": "application/json" },
+      body: JSON.stringify(req.body),
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) console.error("email failed", res.status, (await res.text()).slice(0, 300));

@@ -126,7 +126,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       the extras batch (gallery, hiring, Spanish page, social posts, listings checklist, QR table tents/window sign)
 - [x] Online checkout: sign-up links, website Buy now, Buy extras links (Stripe Checkout)
 - [x] Stripe keys set as Worker secrets; live checkout + webhook verified with a $1 test
-- [ ] Owner to do: our own Google Business Profile + review link; Resend account + RESEND_API_KEY for automatic emails
+- [ ] Owner to do: our own Google Business Profile + review link; MailerSend domain verified + MAILERSEND_API_KEY secret for automatic emails
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
 ## Code map
@@ -262,8 +262,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - "Already a client? Add extras" (`/extras` on the company site, `extrasRequest` in company.ts): existing clients pick
   extras and leave business name, name and phone; `findClient` matches a sold/live lead by phone (10 digits) or
   normalized business name. Matched requests land in the Inbox under that client (with an "Open client" button) and
-  notify; unmatched ones go under `company`, flagged. With Worker secret RESEND_API_KEY (`src/worker/mail.ts`, Resend,
-  sent as Settings → company email, which must be on a domain verified in Resend), a matched client gets their Buy extras
+  notify; unmatched ones go under `company`, flagged. With Worker secret MAILERSEND_API_KEY (or RESEND_API_KEY;
+  `src/worker/mail.ts`, sent as Settings → company email, whose domain must be verified with the provider; the owner
+  chose MailerSend and connected the DNS through Cloudflare, SPF now includes both Google and MailerSend), a matched client gets their Buy extras
   link emailed at once, only ever to the signer email on file from their sign-up (max 3 a day; logged in their call log;
   the page shows the masked address). The link uses undergroundassociates.com/x/… (the company host passes /x/ through)
   with ?pick= pre-ticking what they asked for. Otherwise the team texts the link by hand. Linked from the Get started

@@ -26,6 +26,7 @@ import { handleFormPost } from "./forms.ts";
 import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
 import { stripeWebhook } from "./stripe.ts";
 import { extraTerms } from "./contract.ts";
+import { mailReady } from "./mail.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
 import { chooseLook, renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
@@ -220,7 +221,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const settings = await getSettings(env);
     return json({
       me: { role: session.role, name: session.name, id: session.userId },
-      checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: !!env.RESEND_API_KEY },
+      checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: mailReady(env) },
       extraTerms: settings.addons.map((a) => extraTerms(a)),
       categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
       defaultTerms: defaultTerms(settings),

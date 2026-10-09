@@ -5,7 +5,7 @@ import { agreementPage, orderSummary, saveOrder } from "./signup.ts";
 import { contractSectionsHtml, contractText } from "./contract.ts";
 import { esignHtml, readSignature } from "./esign.ts";
 import { extrasToken } from "./auth.ts";
-import { maskEmail, sendEmail } from "./mail.ts";
+import { mailReady, maskEmail, sendEmail } from "./mail.ts";
 import { newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
 import { SEARCH_GROUPS } from "../places/queries.ts";
@@ -267,7 +267,7 @@ async function extrasRequest(env: Env, req: Request, url: URL): Promise<Response
       // Matched client with an email on file (from their sign-up): email their own Buy extras link right away.
       // It only ever goes to the address on file, so a stranger filling in the form can't reach the account.
       let emailedTo: string | null = null;
-      if (client && env.RESEND_API_KEY && s.companyEmail) {
+      if (client && mailReady(env) && s.companyEmail) {
         const onFile = await env.DB.prepare("SELECT signer_email FROM signups WHERE lead_id = ? AND signer_email IS NOT NULL ORDER BY paid DESC, created_at DESC LIMIT 1")
           .bind(client.id)
           .first<{ signer_email: string }>();

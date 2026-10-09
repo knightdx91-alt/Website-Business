@@ -23,3 +23,20 @@ test("emails go to Resend as the company address, with reply-to; nothing is sent
   }
   assert.equal(maskEmail("pat@gmail.com"), "p•••@gmail.com");
 });
+
+test("MailerSend is used when its key is set", async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    calls.push({ url, init });
+    return new Response(null, { status: 202 });
+  }) as typeof fetch;
+  try {
+    assert.equal(await sendEmail({ MAILERSEND_API_KEY: "mlsn.test", RESEND_API_KEY: "re_x" } as Env, { from: "info@x.com", fromName: "UA", to: "owner@shop.com", subject: "Hi", text: "Link", replyTo: "info@x.com" }), true);
+    assert.equal(calls[0]!.url, "https://api.mailersend.com/v1/email");
+    assert.equal((calls[0]!.init.headers as Record<string, string>).authorization, "Bearer mlsn.test");
+    assert.deepEqual(JSON.parse(String(calls[0]!.init.body)), { from: { email: "info@x.com", name: "UA" }, to: [{ email: "owner@shop.com" }], subject: "Hi", text: "Link", reply_to: { email: "info@x.com" } });
+  } finally {
+    globalThis.fetch = real;
+  }
+});
