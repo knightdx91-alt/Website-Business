@@ -1667,7 +1667,7 @@
         list.innerHTML = results.length
           ? results.map((x, i) => {
               const [plabel, pcls] = PRESENCE[x.presence] || ["", ""];
-              const warn = [!x.open ? "Google lists it as closed" : "", x.chain ? "Looks like a chain" : "", !x.phone ? "No phone number on Google, so it can't be added" : ""].filter(Boolean);
+              const warn = [!x.open ? "Google lists it as closed" : "", x.chain ? "Looks like a chain" : "", !x.phone ? "No phone number on Google: type it in below (from their sign, Facebook or the owner)" : ""].filter(Boolean);
               return `<li class="card lead"><div class="lead__top"><strong class="lead__name">${esc(x.name)}</strong>${plabel ? `<span class="chip ${pcls}" style="flex:none">${plabel}</span>` : ""}</div>
                 <div class="lead__meta">${esc(x.type || "")}${x.rating ? ` · <span class="stars">★ ${x.rating.toFixed(1)}</span> (${x.reviews})` : ""}</div>
                 <div class="lead__meta">${esc(x.address)}${x.phone ? ` · ${esc(x.phone)}` : ""}</div>
@@ -1675,20 +1675,23 @@
                 ${warn.length ? `<p class="small" style="color:var(--warn);margin:0">⚠️ ${esc(warn.join(" · "))}</p>` : ""}
                 ${x.existing
                   ? `<div class="btns"><a class="btn btn--small" href="#/lead/${x.existing.id}">Already in your leads: open it</a></div>`
-                  : x.phone
-                    ? `<label class="field" style="margin:0"><span class="sr-only">Kind of business</span><select data-cat="${i}">${x.category ? "" : `<option value="">Pick the kind of business…</option>`}${PACKS.map(([k, t]) => `<option value="${k}"${k === x.category ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+                  : `
+                    ${x.phone ? "" : `<label class="field" style="margin:0">Their phone number<input type="tel" inputmode="tel" autocomplete="off" data-phone="${i}" placeholder="(256) 555-0123"></label>`}<label class="field" style="margin:0"><span class="sr-only">Kind of business</span><select data-cat="${i}">${x.category ? "" : `<option value="">Pick the kind of business…</option>`}${PACKS.map(([k, t]) => `<option value="${k}"${k === x.category ? " selected" : ""}>${t}</option>`).join("")}</select></label>
                       <div class="btns btns--full"><button class="btn btn--primary" type="button" data-add="${i}">Add &amp; build site</button></div>`
-                    : ""}</li>`;
+                    }</li>`;
             }).join("")
           : `<li class="card muted">No matches. Try the exact name from their sign, or add the town.</li>`;
         list.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", async () => {
           const x = results[Number(b.dataset.add)];
           const category = list.querySelector(`[data-cat="${b.dataset.add}"]`).value;
           if (!category) return toast("Pick the kind of business first");
+          const phoneInput = list.querySelector(`[data-phone="${b.dataset.add}"]`);
+          const phone = phoneInput ? phoneInput.value.trim() : undefined;
+          if (phoneInput && phone.replace(/\D/g, "").length < 10) { phoneInput.focus(); return toast("Type their phone number first"); }
           b.disabled = true;
           b.innerHTML = '<span class="spin"></span> Adding…';
           try {
-            const res = await api("/leads/add", { method: "POST", json: { placeId: x.placeId, category } });
+            const res = await api("/leads/add", { method: "POST", json: { placeId: x.placeId, category, phone } });
             toast(res.existed ? "It's already in your leads" : "Added! Building the site now (about a minute).");
             go("#/lead/" + res.id);
           } catch (err) { toast(err.message); b.disabled = false; b.textContent = "Add & build site"; }

@@ -3,6 +3,7 @@ import { LAYOUT_IDS, LAYOUTS } from "../generator/layouts.ts";
 import { z } from "zod";
 import { LOOKS, parseDesign } from "../generator/themes.ts";
 import { menuToText } from "../generator/menu.ts";
+import { normalizeUsPhone } from "../generator/phone.ts";
 import { packFor } from "../generator/packs/index.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import { groupById, MARKET, SEARCH_GROUPS, searchesFor } from "../places/queries.ts";
@@ -413,12 +414,20 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json({ results });
   }
   if (path === "/leads/add" && m === "POST") {
-    const input = await body(req, z.object({ placeId: z.string().min(5).max(300), category: z.enum(["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail", "finance"]) }));
+    const input = await body(req, z.object({ placeId: z.string().min(5).max(300), category: z.enum(["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail", "finance"]), phone: z.string().trim().max(30).optional() }));
     const existing = await env.DB.prepare("SELECT id, status FROM leads WHERE place_id = ?").bind(input.placeId).first<{ id: string; status: string }>();
     if (existing && existing.status !== "expired") return json({ id: existing.id, existed: true });
     const p = await getPlace(env.GOOGLE_PLACES_API_KEY, input.placeId, input.category === "restaurant" ? RESTAURANT_FLAGS : []);
     await addUsage(env, { places: 1 });
-    if (!p.nationalPhoneNumber) throw new HttpError(400, "Google has no phone number for this business, and every site needs one. Add it to their Google listing first.");
+    // Google sometimes has no number (e.g. a BBQ stand on Facebook only). The team can type it in from their sign,
+    // Facebook or the owner; the owner still confirms the phone before anything is published.
+    let typedPhone = false;
+    if (!p.nationalPhoneNumber) {
+      const typed = normalizeUsPhone(input.phone ?? "");
+      if (!typed) throw new HttpError(400, input.phone ? "That doesn't look like a 10-digit US phone number." : "Google has no phone number for this business. Type it in (from their sign, Facebook or the owner) to add it.");
+      p.nationalPhoneNumber = typed.display;
+      typedPhone = true;
+    }
     const presence = webPresence(p.websiteUri) as WebPresence;
     const count = p.userRatingCount ?? 0;
     const label = { none: "No website", social: "Only a social page", free_builder: "Free-builder site", has_site: "Has a website", outdated: "Outdated website" }[presence];
@@ -442,7 +451,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         .run();
     }
     await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")
-      .bind(newId(), id, session.name, "Added by hand from a Google search", now())
+      .bind(newId(), id, session.name, typedPhone ? `Added by hand from a Google search. Google has no phone number for them, so ${p.nationalPhoneNumber} was typed in: double-check it, and suggest adding it to their Google listing.` : "Added by hand from a Google search", now())
       .run();
     await env.JOBS.send({ type: "build", leadId: id });
     await notify(env, { kind: "added", actor: session, leadId: id, text: `${session.name} added ${p.displayName?.text ?? "a business"} by hand` });
