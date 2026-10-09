@@ -25,7 +25,15 @@ const CARD_CSS = `@page{size:letter;margin:0.4in}
 .flyer{max-width:7.5in;margin:0 auto;padding:0.4in;background:#fff;text-align:center}
 .flyer h1{font-size:2rem;margin:0 0 10px}.flyer .lead{font-size:1.2rem}.flyer svg{width:3.2in;height:3.2in;display:block;margin:18px auto}
 .flyer ul{text-align:left;display:inline-block;font-size:1.05rem}
-@media print{.sheet{padding:0}.rc{border-color:#999}}`;
+.tent{max-width:7.7in;margin:0 auto;padding:16px}
+.panel{height:4.6in;border:2px dashed #c9ced8;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#fff;break-inside:avoid}
+.panel--flip{transform:rotate(180deg)}.fold{text-align:center;font-size:.8rem;color:#999;margin:2px 0}
+.panel h2{font-size:1.6rem;margin:0 0 10px}.qrs{display:flex;gap:0.5in;justify-content:center}.qrs div{width:2in}.qrs svg{width:1.8in;height:1.8in;display:block;margin:0 auto 6px}
+.qrs strong{display:block;font-size:1.05rem}
+.window{max-width:7.5in;margin:0 auto;padding:0.5in;background:#fff;text-align:center}
+.window h1{font-size:2.6rem;margin:0}.window .big{font-size:1.5rem;margin:6px 0 0}.window svg.main{width:4in;height:4in;display:block;margin:22px auto 10px}
+.window .small-qr{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:22px}.window .small-qr svg{width:1.3in;height:1.3in}
+@media print{.sheet,.tent{padding:0}.rc,.panel{border-color:#999}}`;
 
 /** Four counter cards per sheet asking customers for a Google review. */
 export function reviewCards(business: string, placeId: string): Response {
@@ -34,6 +42,29 @@ export function reviewCards(business: string, placeId: string): Response {
   const card = `<div class="rc"><div class="stars" aria-hidden="true">★★★★★</div><h2>Enjoyed ${escHtml(business)}?</h2>
 <p>We'd love a quick Google review.</p>${svg}<p class="small muted">Point your phone camera here</p></div>`;
   return page(`Review cards: ${business}`, `${PRINT_BAR}<div class="sheet">${card.repeat(4)}</div>`, { brand: "", css: CARD_CSS });
+}
+
+/** Folded table tent (two panels, top one upside down so both sides read): website/menu QR and review QR. */
+export function tableTents(o: { business: string; siteUrl: string; menu: boolean; placeId: string }): Response {
+  const review = `https://search.google.com/local/writereview?placeid=${encodeURIComponent(o.placeId)}`;
+  const site = qrSvg(o.siteUrl, `QR code to the ${o.business} website`);
+  const rev = qrSvg(review, `QR code to review ${o.business} on Google`);
+  const panel = (flip: boolean) => `<div class="panel${flip ? " panel--flip" : ""}"><h2>${escHtml(o.business)}</h2><div class="qrs">
+<div>${site}<strong>${o.menu ? "See our menu" : "Visit our website"}</strong><span class="small muted">Hours, directions and more</span></div>
+<div>${rev}<strong>Enjoyed your visit?</strong><span class="small muted">Leave us a Google review</span></div></div></div>`;
+  return page(`Table tent: ${o.business}`, `${PRINT_BAR}<div class="tent">${panel(true)}<p class="fold">fold here</p>${panel(false)}</div>`, { brand: "", css: CARD_CSS });
+}
+
+/** A front-window or counter sign: big QR to the website, phone number, small review QR. */
+export function windowSign(o: { business: string; siteUrl: string; phone?: string; placeId: string; menu: boolean }): Response {
+  const review = `https://search.google.com/local/writereview?placeid=${encodeURIComponent(o.placeId)}`;
+  const body = `${PRINT_BAR}<div class="window"><h1>${escHtml(o.business)}</h1>
+<p class="big">${o.menu ? "Menu, hours &amp; directions" : "Hours, services &amp; directions"}</p>
+${qrSvg(o.siteUrl, `QR code to the ${o.business} website`).replace("<svg ", '<svg class="main" ')}
+<p><strong>Point your phone camera at the code</strong></p>
+${o.phone ? `<p class="big">${escHtml(o.phone)}</p>` : ""}
+<div class="small-qr">${qrSvg(review, `QR code to review ${o.business} on Google`)}<p style="text-align:left"><strong>Love it here?</strong><br>Leave us a Google review</p></div></div>`;
+  return page(`Window sign: ${o.business}`, body, { brand: "", css: CARD_CSS });
 }
 
 /** A one-page leave-behind with a QR code to the business's free preview. */

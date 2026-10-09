@@ -122,8 +122,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for
       Google Business Profile API once a client's profile is managed (then build step 2). LLC is Underground Associates LLC
 - [x] Plans & answers screen for callers; 7 page layouts; print/sign and retail packs; more search groups
-- [ ] Next ideas: owner gallery/team photos (print and retail sites ask for work/shop photos), email/text alerts for inbox items, daycare /
-      tattoo / photographer packs (need their own research first), Stripe webhook to mark paid
+- [x] Preview-opened alerts, policies, example sites, Stripe webhook, follow-up texts, change requests, review asks, and
+      the extras batch (gallery, hiring, Spanish page, social posts, listings checklist, QR table tents/window sign)
+- [ ] Owner to do: Stripe webhook (add endpoint + STRIPE_WEBHOOK_SECRET), our own Google Business Profile + review link
+- [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
 ## Code map
 
@@ -222,6 +224,24 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   STRIPE_WEBHOOK_SECRET. checkout.session.completed (client_reference_id = lead id) marks the lead's latest sign-up paid
   and stores the Stripe customer/subscription; invoice.payment_failed and customer.subscription.deleted notify (and a
   cancel unmarks paid). Handled event ids go in stripe_events (Stripe retries). Without the secret it returns 503.
+- Extras (`DEFAULT_ADDONS` in db.ts; Settings → Extras): name, price, unit (month / each / one-time / quote = "priced per
+  job"), and a one-sentence `about`. `addonPrice()` formats prices everywhere (company site cards, Show plans, sign-up page,
+  policies, call guide). Plans & answers adds "Offer to" hints (`OFFER_HINT` in app.js, matched on the extra's name).
+  Tools behind them: photo gallery (Edit → Photo gallery, `POST/DELETE /api/leads/:id/gallery`, up to 12 owner photos at
+  owner/<id>/g….jpg, rendered by `gallery()`; packs with a "send photos" to-do show it there, others get it before
+  Reviews), "We're hiring" (`record.hiring`, Edit, `hiring()` before the closing CTA), Spanish page (`copy.es`, Edit →
+  Write Spanish page → `POST /api/leads/:id/spanish`, `src/copy/spanish.ts`, rendered by `src/generator/spanish.ts` at
+  /es/ with an Español nav link and hreflang; kept across English rewrites), social posts (Google/social tools screen,
+  `POST /api/leads/:id/gbp/social`, `writeSocialPosts` in gbp.ts, drafts in `gbp_json.social`, "Text the drafts to the
+  owner"), Get listed everywhere checklist (`LISTINGS` in app.js, checks stored as `listing_*` in gbp checks), printable
+  QR table tents and window sign (`/api/leads/:id/tents` and `/window`, live sites only; restaurants with a menu point at
+  /menu/). Ordering hookup, rush build, logo, extra changes and ad management are services done by hand.
+- Follow-ups: marking a lead Shown (call log, status, flyer) books a callback 2 days out unless one is already coming
+  (`autoCallback`). The share buttons include "Follow-up texts" (`FOLLOW_UPS` in app.js), each with a fresh preview link.
+- Live sites carry "Website by <company> · Request a change" in the footer (`credit` in BuildInput, publish only). The
+  link opens undergroundassociates.com/change?b=<lead> (sold/live leads only), which posts to the app Inbox and notifies.
+- Review asks: Settings → "Our Google review link" (`companyReviewUrl`) adds "Ask for a review" (text) on sold/live
+  leads and a "Review us on Google" link in the company site footer.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.

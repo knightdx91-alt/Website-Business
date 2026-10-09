@@ -13,7 +13,7 @@ import { reviewTexts } from "../places/to-record.ts";
 import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
 import { addCaller, checkPassword, clearCookie, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyShare, verifySignup } from "./auth.ts";
-import { previewFlyer, reviewCards } from "./cards.ts";
+import { previewFlyer, reviewCards, tableTents, windowSign } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
 import { salesDashboard } from "./sales.ts";
@@ -607,6 +607,14 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       }
     }
     if (action === "/reviewcard" && m === "GET") return reviewCards(lead.name ?? "us", lead.place_id);
+    if ((action === "/tents" || action === "/window") && m === "GET") {
+      const siteUrl = lead.custom_domain ? `https://${lead.custom_domain}/` : lead.live_url;
+      if (!siteUrl) throw new HttpError(409, "Publish the site first: the QR codes point to the live website");
+      const record = lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null;
+      const menu = !!record?.ext.restaurant?.menu;
+      const o = { business: lead.name ?? "Us", siteUrl: menu ? `${siteUrl.replace(/\/$/, "")}/menu/` : siteUrl, menu, placeId: lead.place_id, phone: record?.phone.display };
+      return action === "/tents" ? tableTents(o) : windowSign(o);
+    }
     if (action === "/stats" && m === "GET") return json(await siteReport(env, id));
     if (action === "/domain") {
       if (!lead.pages_project) throw new HttpError(409, "Publish the site first, then add its domain");

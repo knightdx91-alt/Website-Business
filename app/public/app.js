@@ -439,7 +439,9 @@
       <div id="stats"><p class="muted small"><span class="spin"></span> Loading visits…</p></div>
       <div class="btns btns--full" style="margin-top:10px">
         <button class="btn" id="report">Text monthly report</button>
-        <a class="btn" href="/api/leads/${l.id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a></div>
+        <a class="btn" href="/api/leads/${l.id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a>
+        <a class="btn" href="/api/leads/${l.id}/tents" target="_blank" rel="noopener">QR table tents</a>
+        <a class="btn" href="/api/leads/${l.id}/window" target="_blank" rel="noopener">Window sign (QR)</a></div>
       <h3 style="margin-top:16px">Their own domain</h3>
       <div id="domain"><p class="muted small">Checking…</p></div></section>`;
   }
