@@ -163,6 +163,8 @@ export interface AppSettings {
   companyEmail?: string;
   /** The owner's own address, shown next to the business email for people who want them directly. */
   directEmail?: string;
+  /** Our own Google "write a review" link, texted to happy clients. */
+  companyReviewUrl?: string;
   /** The Google account clients add as a Manager on their Business Profile. */
   gbpEmail?: string;
   callerName?: string;

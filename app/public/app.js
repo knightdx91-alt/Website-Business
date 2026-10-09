@@ -544,6 +544,7 @@
       ${ready ? signupCardHtml(l) : ""}
       ${l.salesStatus === "live" && owner ? liveCardHtml(l) : ""}
       ${(l.salesStatus === "live" || l.salesStatus === "sold") && owner && ready ? gbpCardHtml(l) : ""}
+      ${l.salesStatus === "live" || l.salesStatus === "sold" ? reviewAskHtml() : ""}
       ${l.salesStatus !== "live" ? logCardHtml(l) : ""}
       ${ready && owner ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
         ${blockers.length ? `<ul class="list small">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul><p class="small muted">Fill these in from Edit.</p>` : `<p class="muted">Everything's confirmed. Publishing puts the site on the internet.</p>`}
@@ -580,6 +581,7 @@
       });
     };
     if (ready && l.salesStatus !== "live") bindShareButtons(l);
+    bindReviewAsk(l);
     act("restyle", async () => { await api(`/leads/${id}/restyle`, { method: "POST" }); toast("New design ready"); viewLead(id); });
     act("retry", async () => { await api(`/leads/${id}/retry`, { method: "POST" }); toast("Rebuilding…"); setTimeout(() => viewLead(id), 1500); });
     act("rewrite", async () => {
@@ -1203,6 +1205,25 @@
     return `Here's how to let us manage your Google listing for ${name}. It takes a minute and you stay the owner:\n1. On your phone or computer, go to business.google.com and sign in.\n2. Open ${name}, tap the 3-dot menu, then Business Profile settings, then People and access.\n3. Tap Add, enter ${email}, choose Manager, and tap Invite.\nThat's it. We never need your password.`;
   }
 
+  /** Happy client? Text them our Google review link. */
+  function reviewAskHtml() {
+    const url = meta.settings.companyReviewUrl;
+    if (!url) return isOwner() ? `<section class="card"><h2>⭐ Ask for a review</h2><p class="small muted">Add your Google review link in <a href="#/settings">Settings</a> to text happy clients a review request.</p></section>` : "";
+    return `<section class="card"><h2>⭐ Ask for a review</h2><p class="small muted">Once their site is live and they're happy, a quick Google review helps us win the next client.</p>
+      <div class="btns btns--full"><button class="btn" type="button" data-askreview>💬 Text them our review link</button></div></section>`;
+  }
+
+  function bindReviewAsk(l) {
+    const b = $app.querySelector("[data-askreview]");
+    if (!b) return;
+    const name = l.record ? l.record.name : l.name;
+    const phoneDigits = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+    b.addEventListener("click", () => {
+      const msg = `${greeting()} Thanks again for trusting us with the ${name} website! If you have a minute, would you leave us a quick Google review? It really helps a small local business: ${meta.settings.companyReviewUrl}`;
+      location.href = `sms:+1${phoneDigits}?body=${encodeURIComponent(msg)}`;
+    });
+  }
+
   function gbpCardHtml(l) {
     return `<section class="card"><h2>Google profile</h2>
       <p class="small muted">Tune up their Google listing and keep it fresh each month.</p>
@@ -1592,6 +1613,7 @@
         <label class="field">Legal name <span class="hint">Who signs client agreements</span><input name="legalName" value="${esc(s.legalName || "")}" placeholder="e.g. Underground Associates LLC"></label>
         <div class="row"><label class="field">Business phone<input name="companyPhone" type="tel" value="${esc(s.companyPhone || "")}"></label>
         <label class="field">Business email <span class="hint">Shown everywhere</span><input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
+        <label class="field">Our Google review link <span class="hint">From your Google profile: “Ask for reviews” → copy link. Texted to happy clients.</span><input name="companyReviewUrl" type="url" value="${esc(s.companyReviewUrl || "")}" placeholder="https://g.page/r/…/review"></label>
         <label class="field">Owner's direct email <span class="hint">Shown on your website as "Need the owner directly?"</span><input name="directEmail" type="email" value="${esc(s.directEmail || "")}" placeholder="post@undergroundassociates.com"></label>
         <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
         ${!meta.me.id || meta.me.id === "owner" ? `<label class="field">Your name <span class="hint">Your texts say "Hi, this is ___ with ${esc(s.companyName || "your company")}". Everyone else's texts use their own login names.</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="e.g. Post"></label>` : ""}
@@ -1661,6 +1683,7 @@
             companyPhone: v("companyPhone") || undefined,
             companyEmail: v("companyEmail") || undefined,
             directEmail: v("directEmail") || undefined,
+            companyReviewUrl: v("companyReviewUrl") || undefined,
             gbpEmail: v("gbpEmail") || undefined,
             // Only the owner's own login shows this field; others keep the owner's name as it is.
             callerName: f.elements.callerName ? v("callerName") || undefined : s.callerName,

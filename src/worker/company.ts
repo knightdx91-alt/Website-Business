@@ -268,7 +268,7 @@ ${phone || email ? `<p class="direct">Rather talk? ${phone ? `<a href="${telHref
 ${s.directEmail && s.directEmail !== email ? `<p class="direct">Need ${s.callerName ? e(s.callerName.split(" ")[0]!) : "the owner"} directly? <a href="mailto:${e(s.directEmail)}">${e(s.directEmail)}</a></p>` : ""}
 </div></section>
 </main>
-${footer(legal)}
+${footer(legal, s.companyReviewUrl)}
 ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)}">Call</a><a href="#contact">Free preview</a></nav>` : ""}
 </body></html>`;
   return new Response(html, {
@@ -282,8 +282,8 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
   });
 }
 
-function footer(legal: string): string {
-  return `<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama · <a href="/terms">Terms &amp; refunds</a> · <a href="/privacy">Privacy</a></div></footer>`;
+function footer(legal: string, reviewUrl?: string): string {
+  return `<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama · <a href="/terms">Terms &amp; refunds</a> · <a href="/privacy">Privacy</a>${reviewUrl ? ` · <a href="${e(reviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</div></footer>`;
 }
 
 const HEADERS = {

@@ -261,6 +261,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         companyPhone: z.string().trim().max(30).optional(),
         companyEmail: z.string().trim().email().max(120).optional(),
         directEmail: z.string().trim().email().max(120).optional(),
+        companyReviewUrl: z.string().trim().url().max(500).optional(),
         gbpEmail: z.string().trim().email().max(120).optional(),
         callerName: z.string().trim().max(60).optional(),
         plans: z
