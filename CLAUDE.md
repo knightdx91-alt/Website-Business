@@ -125,7 +125,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Preview-opened alerts, policies, example sites, Stripe webhook, follow-up texts, change requests, review asks, and
       the extras batch (gallery, hiring, Spanish page, social posts, listings checklist, QR table tents/window sign)
 - [x] Online checkout: sign-up links, website Buy now, Buy extras links (Stripe Checkout)
-- [ ] Owner to do: STRIPE_SECRET_KEY + Stripe webhook (STRIPE_WEBHOOK_SECRET), our own Google Business Profile + review link
+- [x] Stripe keys set as Worker secrets; live checkout + webhook verified with a $1 test
+- [ ] Owner to do: our own Google Business Profile + review link
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
 ## Code map
@@ -254,7 +255,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `purchases`, monthly extras become their own subscription, reuses the Stripe customer). Checkout metadata kind
   signup/extras lets the webhook mark the exact sign-up or purchase paid. Without the key, everything still records the
   order and says "we'll send an invoice" (sign-up links fall back to the plan payment links). Pages that post to Stripe
-  allow form-action https://checkout.stripe.com in their CSP.
+  allow form-action https://checkout.stripe.com in their CSP. Payment test: insert a lead with place_id 'paytest' and
+  sales_status 'sold'; its Buy extras page (open /api/leads/<id>/extraslink while logged in) offers only a $1 item.
+  Verified end to end in Oct 2026 (checkout → webhook → purchase marked paid → notification); refund it in Stripe after.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.
