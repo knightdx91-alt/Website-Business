@@ -126,7 +126,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       the extras batch (gallery, hiring, Spanish page, social posts, listings checklist, QR table tents/window sign)
 - [x] Online checkout: sign-up links, website Buy now, Buy extras links (Stripe Checkout)
 - [x] Stripe keys set as Worker secrets; live checkout + webhook verified with a $1 test
-- [ ] Owner to do: our own Google Business Profile + review link; MailerSend domain verified + MAILERSEND_API_KEY secret for automatic emails
+- [x] MailerSend verified + MAILERSEND_API_KEY secret; automatic Buy extras email verified live (Oct 2026, landed in inbox)
+- [ ] Owner to do: our own Google Business Profile + review link
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
 ## Code map
