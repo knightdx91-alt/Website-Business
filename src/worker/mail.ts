@@ -2,8 +2,8 @@ import type { Env } from "./env.ts";
 
 /**
  * Transactional email (only messages a client asked for, never outreach), sent as the company email in Settings
- * (info@…), whose domain must be verified with the provider. MailerSend (secret MAILERSEND_API_KEY) or Resend
- * (RESEND_API_KEY); without either, nothing is sent and callers fall back to the manual flow.
+ * (info@…), whose domain must be verified with the provider. Resend (secret RESEND_API_KEY) or MailerSend
+ * (MAILERSEND_API_KEY); without either, nothing is sent and callers fall back to the manual flow.
  */
 export function mailReady(env: Env): boolean {
   return !!(env.MAILERSEND_API_KEY || env.RESEND_API_KEY);
@@ -14,17 +14,18 @@ export async function sendEmail(
   m: { from: string; fromName: string; to: string; subject: string; text: string; replyTo?: string },
 ): Promise<boolean> {
   let req: { url: string; key: string; body: unknown } | null = null;
-  if (env.MAILERSEND_API_KEY) {
-    req = {
-      url: "https://api.mailersend.com/v1/email",
-      key: env.MAILERSEND_API_KEY,
-      body: { from: { email: m.from, name: m.fromName }, to: [{ email: m.to }], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: { email: m.replyTo } } : {}) },
-    };
-  } else if (env.RESEND_API_KEY) {
+  // Resend wins when both keys are set (MailerSend turned the account down in Oct 2026).
+  if (env.RESEND_API_KEY) {
     req = {
       url: "https://api.resend.com/emails",
       key: env.RESEND_API_KEY,
       body: { from: `${m.fromName} <${m.from}>`, to: [m.to], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}) },
+    };
+  } else if (env.MAILERSEND_API_KEY) {
+    req = {
+      url: "https://api.mailersend.com/v1/email",
+      key: env.MAILERSEND_API_KEY,
+      body: { from: { email: m.from, name: m.fromName }, to: [{ email: m.to }], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: { email: m.replyTo } } : {}) },
     };
   }
   if (!req) return false;

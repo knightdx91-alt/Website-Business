@@ -1749,7 +1749,7 @@
           ? `✅ <strong>Online checkout is on.</strong> Sign-up links, “Buy now” on your website and “Buy extras” links all go to a Stripe checkout with exactly what the client picked. The payment links below aren't needed.`
           : `<strong>Online checkout isn't on yet.</strong> Add your Stripe key as the Cloudflare secret <code>STRIPE_SECRET_KEY</code> and clients can pick a plan, way to pay and extras and pay in one checkout. Until then, the payment links below are used (plan only).`}
           ${meta.checkout && !meta.checkout.webhook ? `<br>⚠️ Payments won't mark clients Paid by themselves until the Stripe webhook secret (<code>STRIPE_WEBHOOK_SECRET</code>) is added.` : ""}
-          <br>${meta.checkout && meta.checkout.email ? "✅ <strong>Automatic emails are on</strong> (clients who ask for extras on your website get their Buy extras link by email)." : "Automatic emails are off. Add <code>MAILERSEND_API_KEY</code> (or <code>RESEND_API_KEY</code>) to email clients their Buy extras link when they ask on your website."}</div>
+          <br>${meta.checkout && meta.checkout.email ? "✅ <strong>Automatic emails are on</strong> (clients who ask for extras on your website get their Buy extras link by email)." : "Automatic emails are off. Add <code>RESEND_API_KEY</code> to email clients their Buy extras link when they ask on your website."}</div>
         <p class="small muted">${s.plans.length ? "" : "Suggested starting plans are filled in below. Change them to your prices, then Save. "}Leave a plan's name blank to hide it.</p>
         ${planRows(s.plans)}
         <h2 style="margin-top:18px">Ways to pay</h2>

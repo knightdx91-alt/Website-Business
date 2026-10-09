@@ -126,7 +126,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       the extras batch (gallery, hiring, Spanish page, social posts, listings checklist, QR table tents/window sign)
 - [x] Online checkout: sign-up links, website Buy now, Buy extras links (Stripe Checkout)
 - [x] Stripe keys set as Worker secrets; live checkout + webhook verified with a $1 test
-- [x] MailerSend verified + MAILERSEND_API_KEY secret; automatic Buy extras email verified live (Oct 2026, landed in inbox)
+- [x] Email: MailerSend worked in a test, then turned the account down (Oct 2026). Switched to Resend (RESEND_API_KEY secret wins over MAILERSEND_API_KEY)
 - [ ] Owner to do: our own Google Business Profile + review link
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
@@ -270,9 +270,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - "Already a client? Add extras" (`/extras` on the company site, `extrasRequest` in company.ts): existing clients pick
   extras and leave business name, name and phone; `findClient` matches a sold/live lead by phone (10 digits) or
   normalized business name. Matched requests land in the Inbox under that client (with an "Open client" button) and
-  notify; unmatched ones go under `company`, flagged. With Worker secret MAILERSEND_API_KEY (or RESEND_API_KEY;
+  notify; unmatched ones go under `company`, flagged. With Worker secret RESEND_API_KEY (or MAILERSEND_API_KEY;
   `src/worker/mail.ts`, sent as Settings → company email, whose domain must be verified with the provider; the owner
-  chose MailerSend and connected the DNS through Cloudflare, SPF now includes both Google and MailerSend), a matched client gets their Buy extras
+  first used MailerSend, which rejected the account in Oct 2026; Resend is the provider now, DNS connected through Cloudflare), a matched client gets their Buy extras
   link emailed at once, only ever to the signer email on file from their sign-up (max 3 a day; logged in their call log;
   the page shows the masked address). The link uses undergroundassociates.com/x/… (the company host passes /x/ through)
   with ?pick= pre-ticking what they asked for. Otherwise the team texts the link by hand. Linked from the Get started
