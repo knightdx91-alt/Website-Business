@@ -1,5 +1,5 @@
 import { notify } from "./notify.ts";
-import { billingOptions, defaultTerms, getSettings, type AppSettings } from "./db.ts";
+import { addonPrice, billingOptions, defaultTerms, getSettings, type AppSettings } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
 import { SEARCH_GROUPS } from "../places/queries.ts";
@@ -235,7 +235,7 @@ ${options.length ? `<h3 style="margin-top:28px">Ways to pay</h3><div class="grid
           return `<div class="card"><h3>${e(o.label)}</h3><p>${e(text)}</p></div>`;
         })
         .join("")}</div>` : ""}
-${s.addons.length ? `<p class="small muted">Extras: ${s.addons.map((a) => `${e(a.name)} (${money(a.price)}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : a.unit === "one-time" ? " one-time" : ""})`).join(" · ")}</p>` : ""}
+${s.addons.length ? `<h3 style="margin-top:28px">Extras</h3><p class="small muted">Add any of these to any plan.</p><div class="grid extras">${s.addons.map((a) => `<div class="card"><h3>${e(a.name)}</h3><p class="xprice">${e(addonPrice(a))}</p>${a.about ? `<p>${e(a.about)}</p>` : ""}</div>`).join("")}</div>` : ""}
 </div></section>` : ""}
 
 <section class="sec" id="who"><div class="wrap">
@@ -325,7 +325,7 @@ async function policyPage(env: Env, kind: "terms" | "privacy"): Promise<Response
               ? `pay 12 months up front for the price of ${12 - (s.annualMonthsFree ?? 0)}. No setup fee. Renews each year unless you cancel.`
               : `the monthly price, no setup fee. ${o.id === "short" ? short : min}-month minimum, then cancel any time with 30 days' notice.`,
         )}`))}
-${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${money(a.price)}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : a.unit === "one-time" ? " one-time" : ""})`).join(", ")}.</p>` : ""}
+${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPrice(a))})`).join(", ")}.</p>` : ""}
 <p>The prices in your signed agreement are the ones you pay. We'll give you at least 30 days' notice before any price change.</p>`)
         : "",
       sec("Signing up and paying", `<p>You sign up by reading and accepting your plan and our service agreement on your personal sign-up page. Payments are processed by Stripe and charged automatically to the card you choose; we never see or store your full card number. If a payment fails, we'll reach out. A site may be taken offline if a payment is more than 30 days late.</p>`),
@@ -419,6 +419,7 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .opt{font-weight:400;color:#c9d1e0}.hp{position:absolute;left:-9999px}
 .note{background:#e8f5ec;color:#0f5132;border-radius:10px;padding:12px 14px;font-weight:700}.note--warn{background:#fff4e0;color:var(--goldtext)}
 .direct{margin-top:18px}
+.extras .card h3{margin-bottom:4px}.xprice{color:var(--goldtext)!important;font-weight:700;margin:0 0 8px!important}
 .examples{list-style:none;padding:0;margin:24px 0 0;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}@media (min-width:760px){.examples{grid-template-columns:repeat(4,1fr)}}
 .examples a{display:block;text-decoration:none;color:var(--ink)}.examples img{display:block;width:100%;height:auto;aspect-ratio:1/2;object-fit:cover;object-position:top;border-radius:16px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(20,33,61,.12)}
 .examples span{display:block;margin-top:8px;font-size:.92rem;color:var(--muted)}.examples strong{display:block;color:var(--ink);font-size:1rem}

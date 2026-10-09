@@ -79,12 +79,33 @@ export interface Plan {
 export interface AddOn {
   name: string;
   price: number;
-  unit: "month" | "each" | "one-time";
+  unit: "month" | "each" | "one-time" | "quote";
+  /** One customer-facing sentence on what they get. */
+  about?: string;
+}
+
+/** "$49 one-time", "$129/month", "$35 each", or "priced per job". */
+export function addonPrice(a: Pick<AddOn, "price" | "unit">): string {
+  if (a.unit === "quote") return "priced per job";
+  const p = `$${Number.isInteger(a.price) ? a.price : a.price.toFixed(2)}`;
+  return a.unit === "month" ? `${p}/month` : a.unit === "each" ? `${p} each` : `${p} one-time`;
 }
 
 export const DEFAULT_ADDONS: AddOn[] = [
-  { name: "Tap-to-review card (NFC)", price: 35, unit: "each" },
-  { name: "Google Business Profile setup", price: 149, unit: "one-time" },
+  { name: "Online ordering or booking hookup", price: 99, unit: "one-time", about: "We connect your Square, Toast, DoorDash, Calendly or Booksy so customers can order or book right from your site." },
+  { name: "Get listed everywhere", price: 99, unit: "one-time", about: "We set up or fix your listings on Apple Maps, Bing, Yelp, Facebook, Nextdoor and the BBB so your hours and number match everywhere." },
+  { name: "Google Business Profile setup", price: 149, unit: "one-time", about: "We set up or tune up your Google listing: hours, photos, services and description, so more people find you on Google Maps." },
+  { name: "Photo shoot", price: 199, unit: "one-time", about: "We come by and take 20 to 30 photos of your place, your work and your team for your website and Google profile." },
+  { name: "Spanish version of your site", price: 99, unit: "one-time", about: "A Spanish page with your hours, services and how to reach you, linked from every page." },
+  { name: "\"We're hiring\" section", price: 49, unit: "one-time", about: "Show the jobs you're filling and how to apply. We update it free whenever your openings change." },
+  { name: "Rush build", price: 49, unit: "one-time", about: "Your site goes live within 24 hours of signing up, once you've checked the details." },
+  { name: "Social media posts", price: 129, unit: "month", about: "8 to 12 Facebook and Instagram posts a month written for your business. You approve them before they go up." },
+  { name: "QR table tents & window sign", price: 49, unit: "each", about: "A printed set with QR codes for your website, menu and Google reviews, for your tables, counter or front window." },
+  { name: "Business cards, yard signs & door hangers", price: 0, unit: "quote", about: "Printed pieces that match your website, from a local print shop." },
+  { name: "Logo refresh", price: 179, unit: "one-time", about: "A clean, simple logo in your site's colors, ready for signs, shirts and cards." },
+  { name: "Tap-to-review card (NFC)", price: 35, unit: "each", about: "Customers tap their phone on the card at your counter to leave a Google review." },
+  { name: "Extra changes", price: 50, unit: "each", about: "Bigger jobs beyond your plan's included updates, like a new page or section. We always quote first." },
+  { name: "Ad management", price: 149, unit: "month", about: "We run your Google or Facebook ads and report what they bring in. Ad spend is paid separately." },
 ];
 
 export type Billing = "short" | "standard" | "flex" | "annual";

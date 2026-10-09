@@ -725,6 +725,18 @@
         <label class="field">Describe the photo<input id="photoAlt" placeholder="e.g. Freshly mowed front lawn in Cullman"></label>
         <button class="btn btn--small" type="button" id="upload">Upload photo</button>
       </section>
+      <section class="card"><h2>Photo gallery</h2>
+        <p class="small muted">Up to 12 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site.</p>
+        ${r.media.gallery.length ? `<ul class="thumbs">${r.media.gallery.map((p) => `<li><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy"><button class="linkbtn" type="button" data-delphoto="${esc(p.src.split("/").pop().split(".")[0])}">Remove</button></li>`).join("")}</ul>` : ""}
+        <label class="field">Add photos<input type="file" id="gallery" accept="image/*" multiple></label>
+        <label class="field">Describe them <span class="hint">Used for every photo in this batch</span><input id="galleryAlt" placeholder="e.g. Fresh fade at the shop"></label>
+        <button class="btn btn--small" type="button" id="gupload">Add to gallery</button>
+      </section>
+      <section class="card"><h2>We're hiring</h2>
+        <p class="small muted">Optional. Adds a “We're hiring” section with Call/Text buttons. Leave the jobs empty to remove it.</p>
+        <label class="field">Jobs open (one per line)<textarea name="hiringRoles" rows="3" placeholder="Line cook&#10;Server">${esc(((r.hiring || {}).roles || []).join("\n"))}</textarea></label>
+        <label class="field">How to apply<input name="hiringHow" maxlength="240" value="${esc((r.hiring || {}).how || "")}" placeholder="Stop by between 2 and 4, or give us a call."></label>
+      </section>
       <section class="card"><h2>Design</h2><label class="field">Colors &amp; fonts<select name="lookBase">${l.looks
         .map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}>${esc(x.name)}</option>`)
         .join("")}</select></label>
@@ -795,6 +807,26 @@
       } catch (err) { toast(err.message); } finally { e.target.disabled = false; }
     });
 
+    $app.querySelector("#gupload").addEventListener("click", async (e) => {
+      const files = [...$app.querySelector("#gallery").files];
+      if (!files.length) return toast("Choose photos first");
+      e.target.disabled = true;
+      try {
+        const alt = $app.querySelector("#galleryAlt").value || `Photo of ${r.name}`;
+        for (const [i, file] of files.entries()) {
+          e.target.textContent = `Uploading ${i + 1} of ${files.length}…`;
+          const { blob, w: pw, h: ph } = await resizeImage(file);
+          await api(`/leads/${id}/gallery?w=${pw}&h=${ph}&alt=${encodeURIComponent(alt)}`, { method: "POST", body: blob, type: "image/jpeg" });
+        }
+        toast(files.length === 1 ? "Photo added" : `${files.length} photos added`);
+        viewEdit(id);
+      } catch (err) { toast(err.message); e.target.disabled = false; e.target.textContent = "Add to gallery"; }
+    });
+    $app.querySelectorAll("[data-delphoto]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Remove this photo from the site?")) return;
+      try { await api(`/leads/${id}/gallery/${b.dataset.delphoto}`, { method: "DELETE" }); toast("Photo removed"); viewEdit(id); } catch (err) { toast(err.message); }
+    }));
+
     $app.querySelector("#ef").addEventListener("submit", async (e) => {
       e.preventDefault();
       const f = e.target;
@@ -826,6 +858,7 @@
           suppliesIncluded: on("suppliesIncluded"),
           petSafe: on("petSafe"),
           links: { order: val("order"), reserve: val("reserve"), booking: val("booking"), facebook: val("facebook"), instagram: val("instagram"), ...(isRt ? { shop: val("shop") } : {}) },
+          hiring: (() => { const roles = (val("hiringRoles") || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 8); return roles.length ? { roles, how: val("hiringHow") || "" } : null; })(),
           ...(isP ? { email: val("email"), designHelp: on("designHelp"), proofBeforePrint: on("proofBeforePrint"), ...(r.variant === "signs" ? { install: on("install") } : {}) } : {}),
           ...(isRt ? { giftCards: on("giftCards"), delivery: on("delivery") } : {}),
           testimonials,
@@ -1033,7 +1066,7 @@
       <section class="show__box"><h2>Ways to pay</h2><div class="show__ways">
         ${payWays(s, plans).map(([h, d]) => `<div><h3>${esc(h)}</h3><p>${d}</p></div>`).join("")}
       </div></section>
-      ${s.addons && s.addons.length ? `<section class="show__box"><h2>Add-ons</h2><ul class="show__addons">${s.addons.map((a) => `<li><span>${esc(a.name)}</span><strong>${money(a.price)}${esc(UNIT_LABEL[a.unit] || "")}</strong></li>`).join("")}</ul></section>` : ""}
+      ${s.addons && s.addons.length ? `<section class="show__box"><h2>Add-ons</h2><ul class="show__addons">${s.addons.map((a) => `<li><span>${esc(a.name)}${a.about ? `<small>${esc(a.about)}</small>` : ""}</span><strong>${esc(addonPrice(a))}</strong></li>`).join("")}</ul></section>` : ""}
       <p class="show__fine">You see your website before you pay anything, and nothing goes live until you say so. Cancel with 30 days' notice${t.commits.length ? ` once your ${commitWords(t)} plan's months are up` : ""}.</p>
     </div>`;
     $app.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", async () => {
@@ -1165,7 +1198,7 @@
       ${plans.map(planCard).join("")}
       <section class="card"><h2>Ways to pay</h2><ul class="list">${ways.map(([t, d]) => `<li><strong>${esc(t)}:</strong> ${d}</li>`).join("")}</ul>
         <p class="small muted">Send the sign-up link from the call guide. They pick the plan and the way to pay, read the agreement, and pay by a secure link. Never take card numbers over the phone.</p></section>
-      ${s.addons && s.addons.length ? `<section class="card"><h2>Extras</h2><ul class="list">${s.addons.map((a) => `<li>${esc(a.name)}: <strong>${money(a.price)}${esc(UNIT_LABEL[a.unit] || "")}</strong></li>`).join("")}</ul></section>` : ""}
+      ${s.addons && s.addons.length ? `<section class="card"><h2>Extras</h2><p class="small muted">Offer one when it fits. Any extra goes with any plan.</p><ul class="list">${s.addons.map((a) => `<li><strong>${esc(a.name)}</strong> · ${esc(addonPrice(a))}${a.about ? `<br><span class="small">${esc(a.about)}</span>` : ""}${offerHint(a.name) ? `<br><span class="small muted">Offer to: ${esc(offerHint(a.name))}</span>` : ""}</li>`).join("")}</ul></section>` : ""}
       <section class="card"><h2>If they say…</h2>
         <label class="field">Find an answer<input id="objq" type="search" placeholder="price, contract, Facebook…" autocomplete="off"></label>
         <div id="objs">${objections.map(([q, a]) => `<details class="obj"><summary>${esc(q)}</summary><p>${a}</p></details>`).join("")}</div></section>
@@ -1581,7 +1614,27 @@
     { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
     { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
   ];
-  const UNIT_LABEL = { month: "/month", each: " each", "one-time": " one-time" };
+  const UNIT_LABEL = { month: "/month", each: " each", "one-time": " one-time", quote: " (priced per job)" };
+  const addonPrice = (a) => (a.unit === "quote" ? "Priced per job" : `${money(a.price)}${UNIT_LABEL[a.unit] || ""}`);
+
+  // Playbook: when a caller should bring each extra up (matched on the extra's name).
+  const OFFER_HINT = [
+    [/order|book/i, "Restaurants, salons and groomers that already use Square, Toast, DoorDash, Booksy or Calendly."],
+    [/listed/i, "Anyone. Ask: “Do you show up on Apple Maps?” Most small shops don't."],
+    [/google business/i, "Anyone whose Google listing has old hours, few photos or no description."],
+    [/photo/i, "Anyone with no photos, or only Google's. Their site looks twice as good."],
+    [/spanish/i, "Mexican restaurants, landscapers, cleaners and shops with Spanish-speaking customers."],
+    [/hiring/i, "Restaurants and trades that are hiring. Look for “Now hiring” on their Facebook."],
+    [/rush/i, "Grand openings, busy season, or an event coming up."],
+    [/social/i, "Busy owners whose Facebook hasn't posted in months."],
+    [/table|window/i, "Restaurants (table tents), shops and salons (counter and window)."],
+    [/cards|yard|door/i, "Trades (yard signs, door hangers) and anyone out of business cards."],
+    [/logo/i, "No logo, or a blurry one on their Facebook."],
+    [/review card|nfc/i, "Busy counters: restaurants, salons, shops. More reviews, higher on Maps."],
+    [/changes/i, "Bigger jobs beyond the plan: a new page or section, a redesign."],
+    [/ads?\b|ad management/i, "Contractors in busy season; restaurants with a new menu or event."],
+  ];
+  const offerHint = (name) => (OFFER_HINT.find(([re]) => re.test(name)) || [null, ""])[1];
 
   function planRows(plans) {
     const list = plans.length ? PLAN_IDS.map((id) => plans.find((p) => p.id === id) || { id, name: "", setup: 0, monthly: "", includes: "" }) : SUGGESTED_PLANS;
@@ -1627,9 +1680,10 @@
         <label class="field" style="flex:1 1 120px">Yearly: months free <span class="hint">0 = don't offer</span><input name="annualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.annualMonthsFree ?? 2}"></label></div>
         <h2 style="margin-top:18px">Extras</h2>
         <p class="small muted">Shown on the sign-up page and in call guides. Leave a name blank to remove it.</p>
-        ${[...s.addons, { name: "", price: "", unit: "month" }].map((a, i) => `<div class="row addon"><label class="field" style="flex:2"><span class="sr-only">Extra ${i + 1}</span><input name="addon_${i}_name" value="${esc(a.name)}" placeholder="New extra"></label>
+        ${[...s.addons, { name: "", price: "", unit: "one-time" }].map((a, i) => `<div class="addon"><div class="row"><label class="field" style="flex:2"><span class="sr-only">Extra ${i + 1}</span><input name="addon_${i}_name" value="${esc(a.name)}" placeholder="New extra" maxlength="60"></label>
           <label class="field"><span class="sr-only">Price</span><input name="addon_${i}_price" type="number" min="0" inputmode="decimal" value="${a.price}" placeholder="$"></label>
-          <label class="field"><span class="sr-only">Per</span><select name="addon_${i}_unit">${Object.entries(UNIT_LABEL).map(([k, v]) => `<option value="${k}"${a.unit === k ? " selected" : ""}>${v.trim().replace("/", "per ")}</option>`).join("")}</select></label></div>`).join("")}
+          <label class="field"><span class="sr-only">Per</span><select name="addon_${i}_unit">${Object.entries(UNIT_LABEL).map(([k, v]) => `<option value="${k}"${a.unit === k ? " selected" : ""}>${k === "quote" ? "quote per job" : v.trim().replace("/", "per ")}</option>`).join("")}</select></label></div>
+          <label class="field"><span class="sr-only">What they get</span><input name="addon_${i}_about" value="${esc(a.about || "")}" placeholder="One sentence on what they get" maxlength="200"></label></div>`).join("")}
         <h2 style="margin-top:18px">Caller commission</h2>
         <label class="field">Commission per sale ($)<input name="commission" type="number" min="0" inputmode="decimal" value="${s.commission ?? ""}"></label>
         <label class="field">Client agreement <span class="hint">Plain-language starting point, not legal advice. Have a lawyer look it over once.</span><textarea name="terms" rows="10">${esc(s.terms || meta.defaultTerms)}</textarea></label>
@@ -1669,7 +1723,7 @@
         const addons = [];
         for (let i = 0; f.elements[`addon_${i}_name`]; i++) {
           const name = v(`addon_${i}_name`);
-          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value });
+          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value, about: v(`addon_${i}_about`) || undefined });
         }
         if (plans.some((p) => !p.monthly)) return toast("Give every plan a monthly price");
         const terms = v("terms");

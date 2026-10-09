@@ -19,7 +19,7 @@ import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts
 import { salesDashboard } from "./sales.ts";
 import { serveSignup, signupsFor } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
-import { addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
+import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
 import { HttpError, json, localDate, newId, now, type Env, type Job } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
@@ -283,7 +283,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         shortMonths: z.number().int().min(0).max(36).optional(),
         flexSetup: z.number().min(0).max(10_000).optional(),
         annualMonthsFree: z.number().int().min(0).max(6).optional(),
-        addons: z.array(z.object({ name: z.string().trim().min(1).max(60), price: z.number().min(0).max(10_000), unit: z.enum(["month", "each", "one-time"]) })).max(10).optional(),
+        addons: z
+          .array(z.object({ name: z.string().trim().min(1).max(60), price: z.number().min(0).max(10_000), unit: z.enum(["month", "each", "one-time", "quote"]), about: z.string().trim().max(200).optional() }))
+          .max(20)
+          .optional(),
         terms: z.string().trim().max(6000).optional(),
         commission: z.number().min(0).max(10_000).optional(),
       }),
@@ -691,6 +694,34 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), lead.look ?? "");
       return json(detail((await getLead(env, id))!));
     }
+    // Photo gallery (owner photos, e.g. from the photo shoot extra): up to 12, each owner/<id>/<key>.<ext>.
+    if (action === "/gallery" && m === "POST") {
+      if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");
+      const type = req.headers.get("content-type") ?? "";
+      const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[type];
+      if (!ext) throw new HttpError(415, "Send a JPEG, PNG or WebP photo");
+      const bytes = await req.arrayBuffer();
+      if (bytes.byteLength > 8_000_000) throw new HttpError(413, "That photo is over 8 MB");
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      if (record.media.gallery.length >= 12) throw new HttpError(409, "The gallery holds 12 photos. Remove one first.");
+      const key = `g${newId().slice(0, 10)}`;
+      await env.BUCKET.put(`owner/${id}/${key}.${ext}`, bytes, { httpMetadata: { contentType: type } });
+      const w = Number(url.searchParams.get("w")) || undefined;
+      const h = Number(url.searchParams.get("h")) || undefined;
+      record.media.gallery.push({ src: `/assets/owner/${key}.${ext}`, alt: url.searchParams.get("alt")?.slice(0, 150) || `Photo of ${record.name}`, source: "owner", width: w, height: h });
+      await renderPreview(env, lead, record, JSON.parse(lead.copy_json), lead.look ?? "");
+      return json(detail((await getLead(env, id))!));
+    }
+    if (action === "/gallery" && m === "DELETE" && leadMatch[3]) {
+      if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");
+      const key = leadMatch[3];
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      const gone = record.media.gallery.filter((p) => p.src.startsWith(`/assets/owner/${key}.`));
+      record.media.gallery = record.media.gallery.filter((p) => !gone.includes(p));
+      for (const p of gone) await env.BUCKET.delete(`owner/${id}/${p.src.slice("/assets/owner/".length)}`);
+      await renderPreview(env, lead, record, JSON.parse(lead.copy_json), lead.look ?? "");
+      return json(detail((await getLead(env, id))!));
+    }
     if (action === "/rewrite" && m === "POST") {
       await updateLead(env, id, { rewrite: 1, status: "queued" });
       await env.JOBS.send({ type: "build", leadId: id });
@@ -733,7 +764,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           billing: settings.plans[0]
             ? billingOptions(settings.plans[0], settings).map((o) => `${o.label}: ${o.id === "short" || o.id === "standard" ? "no setup fee" : o.id === "flex" ? `no minimum, one-time $${settings.flexSetup} setup fee` : `pay for ${12 - (settings.annualMonthsFree ?? 0)} months up front, get 12 (${settings.annualMonthsFree} free)`}`)
             : [],
-          addons: settings.addons.map((a) => `${a.name}: $${a.price}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : " one-time"}`),
+          addons: settings.addons.map((a) => `${a.name}: ${addonPrice(a)}${a.about ? ` (${a.about})` : ""}`),
         },
         model: settings.copyModel,
       });

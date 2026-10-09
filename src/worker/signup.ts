@@ -1,6 +1,6 @@
 import { notify } from "./notify.ts";
 import { shareToken } from "./auth.ts";
-import { billingOptions, defaultTerms, getLead, getSettings, updateLead, type BillingOption, type Plan } from "./db.ts";
+import { addonPrice, billingOptions, defaultTerms, getLead, getSettings, updateLead, type BillingOption, type Plan } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 import { escHtml, page } from "./page.ts";
 
@@ -123,7 +123,7 @@ ${already && alreadyOption ? `<div class="card"><p class="ok">Signed by ${escHtm
 <fieldset class="billing"><legend>How would you like to pay?</legend>
 ${options.map((o) => `<label class="opt"><input type="radio" name="billing" value="${o.id}"${o.id === "standard" ? " checked" : ""}><span><strong>${escHtml(o.label)}</strong><br><span class="small muted">${escHtml(o.detail)}</span></span></label>`).join("")}
 </fieldset>
-${settings.addons.length ? `<p class="small muted">Optional extras, just ask: ${settings.addons.map((a) => `${escHtml(a.name)} (${money(a.price)}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : " one-time"})`).join(" · ")}</p>` : ""}
+${settings.addons.length ? `<p class="small muted">Optional extras, just ask: ${settings.addons.map((a) => `${escHtml(a.name)} (${escHtml(addonPrice(a))})`).join(" · ")}</p>` : ""}
 <label>Your full name<input type="text" name="name" autocomplete="name" required maxlength="100"></label>
 <label>Your title <span class="muted small" style="font-weight:400">(optional)</span><input type="text" name="title" placeholder="Owner" maxlength="60"></label>
 <label>Email for receipts<input type="email" name="email" autocomplete="email" required maxlength="120"></label>
