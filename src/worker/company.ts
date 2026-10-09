@@ -4,6 +4,8 @@ import { dollars, pickerHtml, picksFromForm, priceSignup } from "./checkout.ts";
 import { agreementPage, orderSummary, saveOrder } from "./signup.ts";
 import { contractSectionsHtml, contractText } from "./contract.ts";
 import { esignHtml, readSignature } from "./esign.ts";
+import { extrasToken } from "./auth.ts";
+import { maskEmail, sendEmail } from "./mail.ts";
 import { newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
 import { SEARCH_GROUPS } from "../places/queries.ts";
@@ -241,7 +243,11 @@ async function extrasRequest(env: Env, req: Request, url: URL): Promise<Response
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
   if (url.searchParams.get("sent") === "1") {
-    return policyShell(name, s.legalName || name, "Request sent", `<h1>Got it, thank you!</h1><p class="lead">We'll text you a link within one business day where you can review the agreement for your extras, sign it and pay. ${s.companyPhone ? `Questions? Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>.` : ""}</p><p><a class="btn" href="/">Back to the home page</a></p>`, { phone: s.companyPhone });
+    const to = url.searchParams.get("to");
+    const lead = to
+      ? `<p class="lead">We just emailed your personal link to the email we have on file for your business (<strong>${e(to)}</strong>). Open it to review the agreement for your extras, sign it and pay. It can take a minute to arrive; check your spam folder if you don't see it.</p>`
+      : `<p class="lead">We'll send you a link within one business day where you can review the agreement for your extras, sign it and pay.</p>`;
+    return policyShell(name, s.legalName || name, "Request sent", `<h1>Got it, thank you!</h1>${lead}<p>${s.companyPhone ? `Questions? Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>.` : ""}</p><p><a class="btn" href="/">Back to the home page</a></p>`, { phone: s.companyPhone });
   }
   let note = "";
   if (req.method === "POST") {
@@ -257,7 +263,48 @@ async function extrasRequest(env: Env, req: Request, url: URL): Promise<Response
       note = `<p class="note note--warn" role="alert">Please add your business name, your name and a 10-digit phone number, and pick at least one extra (or tell us what you need).</p>`;
     } else {
       const client = await findClient(env, d.phone, d.business);
-      const message = [wanted.length ? `Wants: ${wanted.join(", ")}` : "", d.notes && `Notes: ${d.notes}`, client ? "" : `Not matched to a client automatically. Business given: ${d.business}`].filter(Boolean).join("\n");
+      const picks = s.addons.map((_, i) => i).filter((i) => form?.get(`x_${i}`) === "on");
+      // Matched client with an email on file (from their sign-up): email their own Buy extras link right away.
+      // It only ever goes to the address on file, so a stranger filling in the form can't reach the account.
+      let emailedTo: string | null = null;
+      if (client && env.RESEND_API_KEY && s.companyEmail) {
+        const onFile = await env.DB.prepare("SELECT signer_email FROM signups WHERE lead_id = ? AND signer_email IS NOT NULL ORDER BY paid DESC, created_at DESC LIMIT 1")
+          .bind(client.id)
+          .first<{ signer_email: string }>();
+        const sentToday = await env.DB.prepare("SELECT COUNT(*) AS n FROM lead_notes WHERE lead_id = ? AND body LIKE 'Buy extras link emailed%' AND created_at > ?")
+          .bind(client.id, now() - 86_400_000)
+          .first<{ n: number }>();
+        if (onFile?.signer_email && (sentToday?.n ?? 0) < 3) {
+          const link = `${ORIGIN}/x/${await extrasToken(env, client.id)}${picks.length ? `?pick=${picks.join(",")}` : ""}`;
+          const ok = await sendEmail(env, {
+            from: s.companyEmail,
+            fromName: name,
+            to: onFile.signer_email,
+            replyTo: s.companyEmail,
+            subject: `Your link to add extras to the ${client.name} website`,
+            text: [
+              `Hi ${d.name.split(" ")[0]},`,
+              "",
+              `Here's your personal link to add extras to the ${client.name} website${wanted.length ? ` (${wanted.join(", ")})` : ""}:`,
+              "",
+              link,
+              "",
+              "Open it to review the agreement for your extras, sign it and pay. The link works for 30 days.",
+              "",
+              "If you didn't ask for this, you can ignore this email; nothing changes unless you sign.",
+              "",
+              `${name}${s.companyPhone ? `\n${s.companyPhone}` : ""}`,
+            ].join("\n"),
+          });
+          if (ok) {
+            emailedTo = onFile.signer_email;
+            await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")
+              .bind(newId(), client.id, "Website", `Buy extras link emailed to ${onFile.signer_email} (requested on the website by ${d.name}: ${wanted.join(", ") || "see notes"})`, now())
+              .run();
+          }
+        }
+      }
+      const message = [wanted.length ? `Wants: ${wanted.join(", ")}` : "", d.notes && `Notes: ${d.notes}`, emailedTo ? `Buy extras link emailed automatically to ${emailedTo}.` : "", client ? "" : `Not matched to a client automatically. Business given: ${d.business}`].filter(Boolean).join("\n");
       await env.DB.prepare("INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)")
         .bind(newId(), client?.id ?? COMPANY_LEAD_ID, now(), JSON.stringify({ name: d.name, phone: d.phone, email: d.email || undefined, service: `🛒 Extras request${client ? "" : `: ${d.business}`}`, message }), ip)
         .run();
@@ -266,15 +313,15 @@ async function extrasRequest(env: Env, req: Request, url: URL): Promise<Response
         actorName: d.name,
         leadId: client?.id ?? null,
         text: client
-          ? `🛒 Extras request from ${client.name}: ${wanted.join(", ") || "see notes"}. Open the client and text them their Buy extras link.`
+          ? `🛒 Extras request from ${client.name}: ${wanted.join(", ") || "see notes"}. ${emailedTo ? `Their Buy extras link was emailed to ${emailedTo}.` : "Open the client and text them their Buy extras link."}`
           : `🛒 Extras request from ${d.business} (not matched to a client): ${wanted.join(", ") || "see notes"}. Find them in your clients, then text their Buy extras link.`,
       });
-      return Response.redirect(`${ORIGIN}/extras?sent=1`, 303);
+      return Response.redirect(`${ORIGIN}/extras?sent=1${emailedTo ? `&to=${encodeURIComponent(maskEmail(emailedTo))}` : ""}`, 303);
     }
   }
   const body = `<p class="eyebrow" style="color:var(--goldtext)">Already a client?</p>
 <h1>Add extras to your website</h1>
-<p class="lead">Tell us what you'd like to add. We'll text you a link made just for your account, where you can read the agreement for your extras, sign it and pay. You won't be signed up for a new plan.</p>
+<p class="lead">Tell us what you'd like to add. We'll send a link made just for your account to the email we have on file for your business, where you can read the agreement for your extras, sign it and pay. You won't be signed up for a new plan.</p>
 ${note}
 <form method="post" class="form light">
 <fieldset style="border:0;padding:0;margin:0 0 6px"><legend style="font-weight:700;margin-bottom:8px">What would you like to add?</legend>

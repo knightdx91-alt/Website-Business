@@ -220,7 +220,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const settings = await getSettings(env);
     return json({
       me: { role: session.role, name: session.name, id: session.userId },
-      checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET },
+      checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: !!env.RESEND_API_KEY },
       extraTerms: settings.addons.map((a) => extraTerms(a)),
       categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
       defaultTerms: defaultTerms(settings),
@@ -948,7 +948,8 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     try {
-      if (COMPANY_HOSTS.includes(url.hostname)) return (await serveCompany(env, req, url)) ?? env.ASSETS.fetch(req);
+      // Buy extras links (/x/) also work on the company domain, so emailed links show our own address.
+      if (COMPANY_HOSTS.includes(url.hostname) && !url.pathname.startsWith("/x/")) return (await serveCompany(env, req, url)) ?? env.ASSETS.fetch(req);
       if (url.pathname.startsWith("/api/")) return await api(env, req, url);
       const preview = /^\/p\/([a-z0-9]+)(\/.*)?$/.exec(url.pathname);
       if (preview) {

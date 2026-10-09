@@ -282,6 +282,8 @@ export async function serveExtras(env: Env, req: Request, leadId: string, origin
     }
     return page("Thank you", `<div class="wrap"><div class="card"><h1>Thank you!</h1><p class="ok">We got your request for ${escHtml(lead.name ?? "your business")}.</p>${orderLinesHtml(order)}<p>We'll be in touch shortly${order.lines.length ? " with an invoice" : " with a price"}.</p><p><a href="${escHtml(agreementUrl)}" target="_blank" rel="noopener">📄 View or print your signed agreement</a></p></div></div>`, { brand });
   }
+  // Extras the client already ticked on the website's request form (?pick=3,7).
+  const picked = new Set((url.searchParams.get("pick") ?? "").split(",").map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < settings.addons.length));
   const paidNow = url.searchParams.get("paid") === "1";
   const body = `<div class="wrap">
 ${paidNow ? `<div class="card"><h1>Thank you! 🎉</h1><p class="ok">Your payment went through. We'll get started and keep you posted.</p>${/^[sp][a-z0-9]+\.[A-Za-z0-9_-]+$/.test(url.searchParams.get("a") ?? "") ? `<p><a href="${origin}/agreement/${escHtml(url.searchParams.get("a")!)}" target="_blank" rel="noopener">📄 View or print your signed agreement</a></p>` : ""}</div>` : ""}
@@ -290,7 +292,7 @@ ${url.searchParams.get("none") === "1" ? `<div class="card"><p><strong>Tick at l
 <div class="card"><p class="muted small" style="margin:0">Extras for</p><h1>${escHtml(lead.name ?? "your website")}</h1><p>Pick what you'd like to add. Monthly extras are billed monthly; everything else is a one-time charge.</p></div>
 ${paidNow ? "" : `<form class="card" method="post">
 <style>.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid #d5d9e2;border-radius:12px;padding:12px;margin:0 0 8px}.opt input{margin-top:4px;width:20px;height:20px;flex:none}.opt small{display:block;color:#545b68}.qty{width:64px;margin-left:auto;flex:none}</style>
-${buyable.map(({ a, i }) => `<label class="opt"><input type="checkbox" name="x_${i}"><span><strong>${escHtml(a.name)}</strong> · <span class="pk-price">${escHtml(addonPrice(a))}</span>${a.about ? `<small>${escHtml(a.about)}</small>` : ""}${a.unit === "quote" ? "<small>We'll call you with a price.</small>" : ""}</span>${a.unit === "each" ? `<input class="qty" type="number" name="q_${i}" min="1" max="20" value="1" aria-label="How many">` : ""}</label>`).join("")}
+${buyable.map(({ a, i }) => `<label class="opt"><input type="checkbox" name="x_${i}"${picked.has(i) ? " checked" : ""}><span><strong>${escHtml(a.name)}</strong> · <span class="pk-price">${escHtml(addonPrice(a))}</span>${a.about ? `<small>${escHtml(a.about)}</small>` : ""}${a.unit === "quote" ? "<small>We'll call you with a price.</small>" : ""}</span>${a.unit === "each" ? `<input class="qty" type="number" name="q_${i}" min="1" max="20" value="1" aria-label="How many">` : ""}</label>`).join("")}
 ${esignHtml({ sectionsHtml: contractSectionsHtml(settings, { business: lead.name ?? "your business", kind: "extras", esc: escHtml }), esc: escHtml, title: "Extras agreement" })}
 <button class="btn" type="submit">${env.STRIPE_SECRET_KEY ? "Continue to payment" : "Send my request"}</button>
 ${env.STRIPE_SECRET_KEY ? `<p class="small muted">Payment is handled securely by Stripe. Questions? ${settings.companyPhone ? `Call ${escHtml(settings.companyPhone)}.` : "Just ask."}</p>` : ""}

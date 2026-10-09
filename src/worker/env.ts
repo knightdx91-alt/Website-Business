@@ -14,6 +14,8 @@ export interface Env {
   STRIPE_WEBHOOK_SECRET?: string;
   /** Stripe secret or restricted key (Checkout Sessions: write). Optional: without it, sign-ups use the payment links. */
   STRIPE_SECRET_KEY?: string;
+  /** Resend API key for emails clients ask for (e.g. their Buy extras link). Optional. */
+  RESEND_API_KEY?: string;
 }
 
 export type Job =
