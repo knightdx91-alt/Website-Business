@@ -2,6 +2,14 @@ import { bestText, contrast, luminance, repairBackground } from "./color.ts";
 import { isLayout, type LayoutId } from "./layouts.ts";
 import { MORE_LOOKS } from "./looks-more.ts";
 import { SHOP_LOOKS } from "./looks-shops.ts";
+import { RESTAURANT_LOOKS } from "./looks/restaurant.ts";
+import { CONTRACTOR_LOOKS } from "./looks/contractor.ts";
+import { SALON_LOOKS } from "./looks/salon.ts";
+import { AUTO_LOOKS } from "./looks/auto.ts";
+import { LANDSCAPING_LOOKS } from "./looks/landscaping.ts";
+import { CLEANING_LOOKS } from "./looks/cleaning.ts";
+import { PRINT_LOOKS } from "./looks/print.ts";
+import { RETAIL_LOOKS } from "./looks/retail.ts";
 import type { CategoryId } from "./types.ts";
 
 export interface FontSpec {
@@ -214,8 +222,17 @@ export const LOOKS: Record<string, LookDef> = {
     button: "rounded",
     knobs: { hero: "dark", divider: "rule", label: "uppercase", card: "bordered", badge: "plain", priceList: "cards", spacing: "standard" },
     photoDirection: "Wide shots of finished roofs against the sky, crews on pitch with safety gear.",
-  },  ...MORE_LOOKS,
+  },
+  ...MORE_LOOKS,
   ...SHOP_LOOKS,
+  ...RESTAURANT_LOOKS,
+  ...CONTRACTOR_LOOKS,
+  ...SALON_LOOKS,
+  ...AUTO_LOOKS,
+  ...LANDSCAPING_LOOKS,
+  ...CLEANING_LOOKS,
+  ...PRINT_LOOKS,
+  ...RETAIL_LOOKS,
 };
 
 /**

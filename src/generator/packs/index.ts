@@ -7,6 +7,7 @@ import { printPack } from "./print.ts";
 import { retailPack } from "./retail.ts";
 import { restaurantPack } from "./restaurant.ts";
 import { salonPack } from "./salon.ts";
+import { looksFor } from "../themes.ts";
 import type { CategoryPack } from "./types.ts";
 
 export const PACKS: Partial<Record<CategoryId, CategoryPack>> = {
@@ -19,6 +20,11 @@ export const PACKS: Partial<Record<CategoryId, CategoryPack>> = {
   print: printPack,
   retail: retailPack,
 };
+
+// Each pack lists its first four looks (best fits first); every other look written for the category joins them.
+for (const [category, pack] of Object.entries(PACKS) as Array<[CategoryId, CategoryPack]>) {
+  pack.looks = [...new Set([...pack.looks, ...looksFor(category)])];
+}
 
 export function packFor(category: CategoryId): CategoryPack {
   const p = PACKS[category];

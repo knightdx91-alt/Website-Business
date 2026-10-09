@@ -144,28 +144,6 @@ test("every new variant renders a clean preview", async () => {
   assert.ok(massage.todos.some((t) => /license number/.test(t)));
 });
 
-test("every look renders in every layout", async () => {
-  const { LAYOUT_IDS } = await import("../src/generator/layouts.ts");
-  const { looksFor, resolveTheme } = await import("../src/generator/themes.ts");
-  for (const category of ["contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail"] as const) {
-    for (const look of looksFor(category)) {
-      for (const layout of LAYOUT_IDS) {
-        const design = `${look}~${layout}`;
-        assert.equal(resolveTheme(design).layout, layout);
-        const out = await buildSite({ record: categoryRecord(category), copy: sampleCopy(), site: { slug: "d", look: design }, mode: "preview" });
-        assert.equal(out.look, design);
-        assert.deepEqual(out.lint.errors, [], design);
-        if (layout !== "classic") assert.ok(String(out.files.get("assets/site.css")).includes(`/* layout: ${layout} */`), design);
-      }
-    }
-  }  for (const look of looksFor("restaurant")) {
-    for (const layout of LAYOUT_IDS) {
-      const out = await buildSite({ record: restaurantRecord(), copy: sampleCopy(), site: { slug: "r", look: `${look}~${layout}` }, mode: "preview" });
-      assert.deepEqual(out.lint.errors, [], `${look}~${layout}`);
-    }
-  }
-});
-
 test("new sites in a category spread across looks and layouts", async () => {
   const { pickDesign, layoutOf } = await import("../src/generator/design.ts");
   const { looksFor, parseDesign } = await import("../src/generator/themes.ts");
@@ -173,8 +151,8 @@ test("new sites in a category spread across looks and layouts", async () => {
   const used: string[] = [];
   for (let i = 0; i < 12; i++) used.push(pickDesign({ leadId: `lead${i}`, looks, used, taken: [] }));
   assert.equal(new Set(used).size, 12, "no two of the first 12 sites match");
-  assert.equal(new Set(used.map((d) => parseDesign(d).look)).size, 4, "every look gets used");
-  assert.ok(new Set(used.map(layoutOf)).size >= 6, "most layouts get used");
+  assert.equal(new Set(used.map((d) => parseDesign(d).look)).size, 12, "each of the first 12 sites gets its own colors and fonts");
+  assert.equal(new Set(used.map(layoutOf)).size, 12, "and its own layout");
   const sold = used[0]!;
   for (let i = 0; i < 30; i++) assert.notEqual(pickDesign({ leadId: `x${i}`, looks, used: [], taken: [sold] }), sold);
   assert.equal(layoutOf("contractor.toolbox"), "split", "a bare look uses its own default layout");

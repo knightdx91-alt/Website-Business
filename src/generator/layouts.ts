@@ -1,4 +1,8 @@
 import { withAlpha } from "./color.ts";
+import { INFLOW_MEDIA, kitFor, PLAIN_HERO, SOLID_CREDIT, type LayoutDef } from "./layout-kit.ts";
+import { LAYOUTS_A } from "./layouts-a.ts";
+import { LAYOUTS_B } from "./layouts-b.ts";
+import { LAYOUTS_C } from "./layouts-c.ts";
 import type { Theme } from "./themes.ts";
 
 /**
@@ -7,7 +11,12 @@ import type { Theme } from "./themes.ts";
  * Any look works with any layout, so each category gets looks × layouts distinct designs.
  * Layouts are CSS only (the markup is shared), which keeps every layout accessible and lint-clean.
  * Text only ever sits on a background whose contrast resolveTheme checked.
+ * The first seven are here; the rest live in layouts-a/b/c.ts.
  */
+const EXTRA: Record<string, LayoutDef> = { ...LAYOUTS_A, ...LAYOUTS_B, ...LAYOUTS_C };
+const about = <T extends Record<string, LayoutDef>>(m: T) =>
+  Object.fromEntries(Object.entries(m).map(([id, d]) => [id, { name: d.name, about: d.about }])) as { [K in keyof T]: { name: string; about: string } };
+
 export const LAYOUTS = {
   classic: { name: "Photo banner", about: "Big photo behind the headline, cards for services." },
   split: { name: "Side by side", about: "Headline and photo side by side, numbered service list." },
@@ -16,7 +25,10 @@ export const LAYOUTS = {
   soft: { name: "Rounded cards", about: "Floating rounded header, soft panels, swipeable reviews." },
   minimal: { name: "Clean & simple", about: "Big type, thin lines, services as a list, no clutter." },
   overlap: { name: "Floating card", about: "Full-width photo with the headline on a card over it, zigzag services." },
-} as const;
+  ...about(LAYOUTS_A),
+  ...about(LAYOUTS_B),
+  ...about(LAYOUTS_C),
+};
 
 export type LayoutId = keyof typeof LAYOUTS;
 export const LAYOUT_IDS = Object.keys(LAYOUTS) as LayoutId[];
@@ -25,18 +37,11 @@ export function isLayout(id: string | undefined): id is LayoutId {
   return !!id && id in LAYOUTS;
 }
 
-/** Credit line for a hero photo that isn't under the overlay. */
-const SOLID_CREDIT = `.hero__credit{position:absolute;right:8px;bottom:6px;z-index:2;background:rgba(0,0,0,.62);color:#fff;padding:2px 8px;border-radius:4px}.hero__credit a{color:#fff}`;
-
-/** In-flow hero image (not behind the text). */
-const INFLOW_MEDIA = `.hero--photo .hero__media{position:relative;inset:auto}.hero--photo .hero__media::after{display:none}`;
-
-/** Hero text on the page background instead of the hero color. */
-const PLAIN_HERO = `.hero{background:var(--bg);color:var(--text)}.hero h1,.hero h2{color:var(--heading)}`;
-
 export function layoutCss(t: Theme): string {
   const c = t.colors;
   const line = withAlpha(c.text, 0.18);
+  const extra = EXTRA[t.layout];
+  if (extra) return `/* layout: ${t.layout} */\n${extra.css(t, kitFor(t))}`;
   switch (t.layout) {
     case "classic":
       return "";
