@@ -923,6 +923,25 @@
     document.getElementById("regen").addEventListener("click", () => viewPitch(id, true));
   }
 
+  /* ---------- ways to pay (shared by Show plans and Plans & answers) ---------- */
+  // Mirrors billingOptions() in src/worker/db.ts: 6- and 12-month plans have no setup fee; month to month does.
+  function payTerms(s) {
+    const min = s.minMonths ?? 12;
+    const short = s.shortMonths ?? 6;
+    const commits = [short && min && short < min ? short : null, min || null].filter(Boolean);
+    return { min, short: commits.length > 1 ? short : 0, commits, flex: min ? (s.flexSetup ?? 299) : 0, free: s.annualMonthsFree ?? 2 };
+  }
+  /** "6- or 12-month" */
+  const commitWords = (t) => t.commits.length > 1 ? `${t.commits[0]}- or ${t.commits[1]}-month` : `${t.commits[0]}-month`;
+  function payWays(s, plans) {
+    const t = payTerms(s);
+    const out = t.commits.map((m) => [`${m}-month plan`, `The monthly price, no setup fee. After ${m} months, cancel any time with 30 days' notice.`]);
+    if (!t.commits.length) out.push(["Monthly", "The monthly price. Cancel any time."]);
+    if (t.flex) out.push(["Month to month", `Same monthly price plus a one-time ${money(t.flex)} setup fee. No contract, cancel any time.`]);
+    if (t.free) out.push([`Pay yearly, ${t.free} months free`, `12 months for the price of ${12 - t.free}, no setup fee. ${plans.map((p) => `${esc(p.name)} ${money(p.monthly * (12 - t.free))}/year`).join(" · ")}`]);
+    return out;
+  }
+
   /* ---------- plans to show the customer ---------- */
   // Customer-facing words for each tier; prices and "what's included" come live from Settings.
   const PLAN_TAGLINE = {
@@ -939,9 +958,7 @@
     const lead = leadId ? await api("/leads/" + leadId).catch(() => null) : null;
     const business = lead ? (lead.record ? lead.record.name : lead.name) : "";
     const company = s.companyName || "Underground Associates";
-    const min = s.minMonths ?? 12;
-    const flex = s.flexSetup ?? 299;
-    const free = s.annualMonthsFree ?? 2;
+    const t = payTerms(s);
     const perDay = (m) => money(Math.round((m * 12 / 365) * 100) / 100);
     $nav.hidden = true;
     document.body.classList.add("showing");
@@ -949,7 +966,7 @@
       <div class="show__top"><a href="${leadId ? `#/lead/${leadId}` : "#/"}" class="show__back">← Back</a><span class="show__co">${esc(company)}</span></div>
       <header class="show__head">
         <h1>${business ? `Website plans for ${esc(business)}` : "Website plans"}</h1>
-        <p>${s.plans.some((p) => p.setup) ? "Simple monthly plans." : "No setup fee. One simple monthly price."} We build your site, host it and keep it running.</p>
+        <p>${t.commits.length ? `<strong>No setup fee on ${commitWords(t)} plans.</strong>${t.flex ? ` Month to month has a one-time ${money(t.flex)} setup fee.` : ""}` : "One simple monthly price."} We build your site, host it and keep it running.</p>
       </header>
       <div class="show__plans">${plans.map((p) => {
         const items = String(p.includes || "").split("\n").map((x) => x.trim()).filter(Boolean);
@@ -959,19 +976,17 @@
           <h2>${esc(p.name)}</h2>
           <p class="show__tag">${esc(PLAN_TAGLINE[p.id] || "")}</p>
           <p class="show__price"><strong>${money(p.monthly)}</strong><span>/month</span></p>
-          <p class="show__day">${p.setup ? `${money(p.setup)} setup · ` : ""}about ${perDay(p.monthly)} a day</p>
+          <p class="show__day">${p.setup ? `${money(p.setup)} setup · ` : t.commits.length ? `No setup fee on ${commitWords(t)} plans · ` : ""}about ${perDay(p.monthly)} a day</p>
           <ul>${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
           ${leadId ? `<button class="show__choose" data-choose="${esc(p.id)}">Choose ${esc(p.name)}</button>` : ""}
         </section>`;
       }).join("")}</div>
       <section class="show__box"><h2>Every plan includes</h2><ul class="show__every">${EVERY_PLAN.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>
       <section class="show__box"><h2>Ways to pay</h2><div class="show__ways">
-        <div><h3>${min ? `${min}-month plan` : "Monthly"}</h3><p>The monthly price${s.plans.some((p) => p.setup) ? " plus any setup fee" : ", no setup fee"}.${min ? ` After ${min} months, cancel any time.` : " Cancel any time."}</p></div>
-        ${min && flex ? `<div><h3>Month to month</h3><p>Same monthly price, one-time ${money(flex)} setup. No contract, cancel any time.</p></div>` : ""}
-        ${free ? `<div><h3>Pay yearly, ${free} months free</h3><p>${plans.map((p) => `${esc(p.name)} ${money(p.monthly * (12 - free))}/year`).join(" · ")}</p></div>` : ""}
+        ${payWays(s, plans).map(([h, d]) => `<div><h3>${esc(h)}</h3><p>${d}</p></div>`).join("")}
       </div></section>
       ${s.addons && s.addons.length ? `<section class="show__box"><h2>Add-ons</h2><ul class="show__addons">${s.addons.map((a) => `<li><span>${esc(a.name)}</span><strong>${money(a.price)}${esc(UNIT_LABEL[a.unit] || "")}</strong></li>`).join("")}</ul></section>` : ""}
-      <p class="show__fine">You see your website before you pay anything, and nothing goes live until you say so. Cancel with 30 days' notice${min ? ` after the first ${min} months on the ${min}-month plan` : ""}.</p>
+      <p class="show__fine">You see your website before you pay anything, and nothing goes live until you say so. Cancel with 30 days' notice${t.commits.length ? ` once your ${commitWords(t)} plan's months are up` : ""}.</p>
     </div>`;
     $app.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
@@ -989,7 +1004,7 @@
     basic: {
       fit: "A business that just needs to be found on Google and get the phone ringing.",
       points: [
-        "No big bill up front: no setup fee on the 12-month plan. A custom website usually costs $1,500 to $5,000 before hosting.",
+        "No big bill up front: no setup fee on the 6- or 12-month plan. A custom website usually costs $1,500 to $5,000 before hosting.",
         "We handle hosting, security and updates. They never have to touch a computer.",
         "Need a change? Text us: hours, holiday closures, a new photo.",
         "Built for phones, with tap-to-call and directions on every page.",
@@ -1029,8 +1044,9 @@
   function playbookObjections(s, plans) {
     const cheapest = plans.reduce((a, p) => (p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
     const low = cheapest ? `${esc(cheapest.name)} is ${money(cheapest.monthly)} a month, about ${money(Math.round((cheapest.monthly * 12 / 365) * 100) / 100)} a day` : "Our starter plan is low monthly";
-    const min = s.minMonths ?? 12;
-    const flex = s.flexSetup ?? 299;
+    const t = payTerms(s);
+    const min = t.min;
+    const flex = t.flex;
     const us = s.companyName || "we";
     return [
       ["“I don't need a website. I get plenty of business from word of mouth.”",
@@ -1038,9 +1054,9 @@
       ["“I already have a Facebook page.”",
         "Keep it! We link to it from the site. But a lot of people aren't on Facebook, and Facebook pages don't show up well on Google. The website is yours, it shows up on Google, and it works for everybody."],
       ["“It's too expensive.” / “I can't afford it right now.”",
-        `I hear you. ${low}, with no setup fee on the ${min}-month plan. If it brings you one customer a month, it pays for itself. Want to start there? You can move up any time.`],
+        `I hear you. ${low}, with no setup fee on the ${commitWords(t)} plan. If it brings you one customer a month, it pays for itself. Want to start there? You can move up any time.`],
       ["“I don't want a contract.” / “A year is too long.”",
-        `No problem. You can go month to month: same monthly price, a one-time ${money(flex)} setup, and cancel any time with 30 days' notice.`],
+        `${t.short ? `No problem. There's a ${t.short}-month plan, same price and still no setup fee. ` : "No problem. "}${flex ? `Or go month to month: same monthly price, a one-time ${money(flex)} setup fee, and cancel any time with 30 days' notice.` : "You can cancel any time with 30 days' notice."}`],
       ["“I need to think about it.”",
         "Of course. Can I ask what you want to think over: the price, or whether it'll bring in business? (Answer that.) I'll text you the preview so you can look at it tonight. Is Thursday good for a quick call back? (Log the callback.)"],
       ["“I need to talk to my wife / husband / partner.”",
@@ -1076,25 +1092,19 @@
     setNav("home");
     const s = meta.settings;
     const plans = s.plans.length ? s.plans : SUGGESTED_PLANS;
-    const min = s.minMonths ?? 12;
-    const flex = s.flexSetup ?? 299;
-    const free = s.annualMonthsFree ?? 2;
+    const t = payTerms(s);
     const perDay = (m) => money(Math.round((m * 12 / 365) * 100) / 100);
     const planCard = (p) => {
       const pitch = PLAN_PITCH[p.id] || { fit: "", points: [], line: "" };
       const includes = String(p.includes || "").split("\n").map((x) => x.trim()).filter(Boolean);
       return `<section class="card${p.id === "plus" ? " opener" : ""}"><h2>${esc(p.name)}: ${money(p.monthly)}/month${p.id === "plus" ? " ⭐ most pick this" : ""}</h2>
-        <p class="small muted">${p.setup ? `${money(p.setup)} setup` : "No setup fee"} on the ${min ? `${min}-month` : "monthly"} plan · about ${perDay(p.monthly)} a day</p>
+        <p class="small muted">${p.setup ? `${money(p.setup)} setup` : t.commits.length ? `No setup fee on the ${commitWords(t)} plan` : "No setup fee"} · about ${perDay(p.monthly)} a day</p>
         ${pitch.fit ? `<p><strong>Good for:</strong> ${esc(pitch.fit)}</p>` : ""}
         ${includes.length ? `<p><strong>What they get</strong></p><ul class="list">${includes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         ${pitch.points.length ? `<p><strong>Why it's worth it</strong></p><ul class="list">${pitch.points.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         ${pitch.line ? `<p class="big">“${esc(pitch.line)}”</p>` : ""}</section>`;
     };
-    const ways = [
-      min ? [`${min}-month plan`, `The normal way. Monthly price, ${plans.some((p) => p.setup) ? "setup fee as listed" : "no setup fee"}, then cancel any time after ${min} months.`] : ["Monthly", "Monthly price, cancel any time."],
-      min && flex ? ["Month to month", `For people who hate contracts. Same monthly price plus a one-time ${money(flex)} setup. Cancel any time.`] : null,
-      free ? [`Pay yearly (${free} months free)`, `For people who like to pay once and save. They pay for ${12 - free} months and get 12. ${plans.map((p) => `${esc(p.name)} ${money(p.monthly * (12 - free))}/year`).join(" · ")}`] : null,
-    ].filter(Boolean);
+    const ways = payWays(s, plans);
     const objections = playbookObjections(s, plans);
     $app.innerHTML = `<p><a href="#/" id="back">← Back</a></p>
       <h1>Plans & answers</h1>
@@ -1509,10 +1519,11 @@
     return list.map((p) => `<fieldset class="plan"><legend>${p.id === "basic" ? "Plan 1" : p.id === "plus" ? "Plan 2 (recommended)" : "Plan 3"}</legend>
       <div class="row"><label class="field">Name<input name="plan_${p.id}_name" value="${esc(p.name)}" maxlength="40"></label>
       <label class="field">Monthly ($)<input name="plan_${p.id}_monthly" type="number" min="0" inputmode="decimal" value="${p.monthly}"></label>
-      <label class="field">Setup ($)<input name="plan_${p.id}_setup" type="number" min="0" inputmode="decimal" value="${p.setup || 0}"></label></div>
+      <label class="field">Setup ($) <span class="hint">Keep 0; month to month adds its own fee</span><input name="plan_${p.id}_setup" type="number" min="0" inputmode="decimal" value="${p.setup || 0}"></label></div>
       <label class="field">What's included <span class="hint">One per line</span><textarea name="plan_${p.id}_includes" rows="3">${esc(p.includes)}</textarea></label>
-      <label class="field">Payment link <span class="hint">Monthly subscription, Stripe or Square</span><input name="plan_${p.id}_pay" type="url" value="${esc(p.payLink || "")}" placeholder="https://buy.stripe.com/…"></label>
-      <details class="more"><summary>Links for month-to-month and yearly (optional)</summary>
+      <label class="field">12-month plan payment link <span class="hint">Monthly subscription, Stripe or Square</span><input name="plan_${p.id}_pay" type="url" value="${esc(p.payLink || "")}" placeholder="https://buy.stripe.com/…"></label>
+      <details class="more"><summary>Links for 6-month, month-to-month and yearly (optional)</summary>
+        <label class="field">6-month plan link<input name="plan_${p.id}_payshort" type="url" value="${esc(p.payLinkShort || "")}" placeholder="https://buy.stripe.com/…"></label>
         <label class="field">Month-to-month link <span class="hint">Includes the extra setup fee</span><input name="plan_${p.id}_payflex" type="url" value="${esc(p.payLinkFlex || "")}" placeholder="https://buy.stripe.com/…"></label>
         <label class="field">Yearly link<input name="plan_${p.id}_payannual" type="url" value="${esc(p.payLinkAnnual || "")}" placeholder="https://buy.stripe.com/…"></label>
         <p class="small muted">Without these, clients who pick those options are told you'll send an invoice.</p></details></fieldset>`).join("");
@@ -1539,7 +1550,8 @@
         <p class="small muted">${s.plans.length ? "" : "Suggested starting plans are filled in below. Change them to your prices, then Save. "}Leave a plan's name blank to hide it. For automatic monthly payment, make a <strong>Payment Link</strong> for each plan in Stripe or Square (set as a monthly subscription) and paste it here.</p>
         ${planRows(s.plans)}
         <h2 style="margin-top:18px">Ways to pay</h2>
-        <div class="row" style="flex-wrap:wrap"><label class="field" style="flex:1 1 120px">Minimum months <span class="hint">Standard plan</span><input name="minMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.minMonths ?? 12}"></label>
+        <div class="row" style="flex-wrap:wrap"><label class="field" style="flex:1 1 120px">Short plan (months) <span class="hint">No setup fee · 0 = don't offer</span><input name="shortMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.shortMonths ?? 6}"></label>
+        <label class="field" style="flex:1 1 120px">Standard plan (months) <span class="hint">No setup fee</span><input name="minMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.minMonths ?? 12}"></label>
         <label class="field" style="flex:1 1 120px">Month-to-month setup ($) <span class="hint">0 = don't offer</span><input name="flexSetup" type="number" min="0" inputmode="decimal" value="${s.flexSetup ?? 299}"></label>
         <label class="field" style="flex:1 1 120px">Yearly: months free <span class="hint">0 = don't offer</span><input name="annualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.annualMonthsFree ?? 2}"></label></div>
         <h2 style="margin-top:18px">Extras</h2>
@@ -1581,6 +1593,7 @@
           payLink: v(`plan_${id}_pay`) || undefined,
           payLinkFlex: v(`plan_${id}_payflex`) || undefined,
           payLinkAnnual: v(`plan_${id}_payannual`) || undefined,
+          payLinkShort: v(`plan_${id}_payshort`) || undefined,
         })).filter((p) => p.name);
         const addons = [];
         for (let i = 0; f.elements[`addon_${i}_name`]; i++) {
@@ -1602,6 +1615,7 @@
             callerName: v("callerName") || undefined,
             plans,
             minMonths: n(v("minMonths")),
+            shortMonths: n(v("shortMonths")),
             flexSetup: n(v("flexSetup")),
             annualMonthsFree: n(v("annualMonthsFree")),
             addons,

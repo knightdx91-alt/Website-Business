@@ -32,6 +32,13 @@ function telHref(phone: string): string {
   return `tel:+1${d}`;
 }
 
+/** "6-month or 12-month" (the commitments that come with no setup fee). */
+function commitText(s: AppSettings): string {
+  const min = s.minMonths ?? 12;
+  const short = s.shortMonths ?? 6;
+  return short && short < min ? `${short}-month or ${min}-month` : `${min}-month`;
+}
+
 function faq(s: AppSettings): Array<[string, string]> {
   const min = s.minMonths ?? 12;
   return [
@@ -40,7 +47,7 @@ function faq(s: AppSettings): Array<[string, string]> {
     [
       "Is there a contract?",
       min
-        ? `Our standard plan has a ${min}-month minimum, then you can cancel any time with 30 days' notice.${s.flexSetup ? ` Rather not commit? Month to month is available with a one-time ${money(s.flexSetup)} setup fee.` : ""}${s.annualMonthsFree ? ` Paying yearly gets you ${s.annualMonthsFree} months free.` : ""}`
+        ? `Pick a ${commitText(s)} plan with no setup fee; after that, cancel any time with 30 days' notice.${s.flexSetup ? ` Rather not commit? Month to month is available with a one-time ${money(s.flexSetup)} setup fee.` : ""}${s.annualMonthsFree ? ` Paying for a year up front gets you ${s.annualMonthsFree} months free: 12 months for the price of ${12 - s.annualMonthsFree}.` : ""}`
         : "No. Cancel any time with 30 days' notice.",
     ],
     ["Who owns my content?", "You do. Your business name, logo, photos and text belong to you. If you have your own web address, it stays in your name."],
@@ -95,7 +102,7 @@ async function home(env: Env, url: URL): Promise<Response> {
   const lowest = plans.length ? Math.min(...plans.map((p) => p.monthly)) : null;
   const sent = url.searchParams.get("sent") === "1";
   const missing = url.searchParams.get("missing") === "1";
-  const extras = plans[0] ? billingOptions(plans[0], s).filter((o) => o.id !== "standard") : [];
+  const options = plans[0] ? billingOptions(plans[0], s) : [];
   const title = `${name} | Websites for Cullman, AL Businesses`;
   const description = `Local websites for Cullman-area businesses. We build your site first, free, so you can see it before you pay.${lowest ? ` Plans from ${money(lowest)}/month with hosting and updates included.` : ""}`;
   const ld = {
@@ -123,7 +130,7 @@ async function home(env: Env, url: URL): Promise<Response> {
 <section class="hero"><div class="wrap">
 <p class="eyebrow">Websites for Cullman-area businesses</p>
 <h1>See your new website <span class="hl">before you pay</span> a dime.</h1>
-<p class="lead">We build your website first, free. If you like it, it goes live${lowest ? ` from ${money(lowest)} a month` : ""}, with hosting, updates and support included. No setup fee on our standard plan.</p>
+<p class="lead">We build your website first, free. If you like it, it goes live${lowest ? ` from ${money(lowest)} a month` : ""}, with hosting, updates and support included. No setup fee on ${commitText(s)} plans.</p>
 <div class="btns"><a class="btn" href="#contact">Get my free preview</a>${callBtn}</div>
 </div></section>
 
@@ -142,7 +149,7 @@ async function home(env: Env, url: URL): Promise<Response> {
 
 ${plans.length ? `<section class="sec" id="plans"><div class="wrap">
 <h2>Simple monthly plans</h2>
-<p class="lead">${(s.minMonths ?? 12) ? `No setup fee with our standard ${s.minMonths ?? 12}-month plan.` : "No setup fee. Cancel any time."}${extras.length ? ` Also available: ${extras.map((o) => e(o.label.toLowerCase())).join(" or ")}.` : ""}</p>
+<p class="lead">${(s.minMonths ?? 12) ? `<strong>No setup fee on ${commitText(s)} plans.</strong>${s.flexSetup ? ` Month to month has a one-time ${money(s.flexSetup)} setup fee.` : ""}` : "No setup fee. Cancel any time."}</p>
 <div class="grid plans">${plans
         .map(
           (p) => `<div class="card plan${p.id === "plus" ? " plan--pick" : ""}">${p.id === "plus" ? `<p class="tag">Most popular</p>` : ""}<h3>${e(p.name)}</h3>
@@ -150,6 +157,17 @@ ${plans.length ? `<section class="sec" id="plans"><div class="wrap">
 <ul>${p.includes.split(/\n/).map((x) => x.trim()).filter(Boolean).map((x) => `<li>${e(x)}</li>`).join("")}</ul></div>`,
         )
         .join("")}</div>
+${options.length ? `<h3 style="margin-top:28px">Ways to pay</h3><div class="grid">${options
+        .map((o) => {
+          const text =
+            o.id === "flex"
+              ? `No contract. A one-time ${money(s.flexSetup ?? 0)} setup fee, then cancel any time.`
+              : o.id === "annual"
+                ? `Pay for a year up front: 12 months for the price of ${12 - (s.annualMonthsFree ?? 0)}. No setup fee.`
+                : `No setup fee. After ${o.id === "short" ? s.shortMonths : s.minMonths} months, cancel any time with 30 days' notice.`;
+          return `<div class="card"><h3>${e(o.label)}</h3><p>${e(text)}</p></div>`;
+        })
+        .join("")}</div>` : ""}
 ${s.addons.length ? `<p class="small muted">Extras: ${s.addons.map((a) => `${e(a.name)} (${money(a.price)}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : ""})`).join(" · ")}</p>` : ""}
 </div></section>` : ""}
 

@@ -18,7 +18,7 @@ interface SignupRow {
 }
 
 /** What's stored with a signature: the plan as it was, plus the billing choice. */
-export type SignedPlan = Omit<Plan, "payLink" | "payLinkFlex" | "payLinkAnnual"> & { billing?: string; billingLabel?: string; billingDetail?: string; monthlyEquivalent?: number };
+export type SignedPlan = Omit<Plan, "payLink" | "payLinkFlex" | "payLinkAnnual" | "payLinkShort"> & { billing?: string; billingLabel?: string; billingDetail?: string; monthlyEquivalent?: number };
 
 export async function signupsFor(env: Env, leadId: string) {
   const rows = await env.DB.prepare("SELECT * FROM signups WHERE lead_id = ? ORDER BY created_at DESC").bind(leadId).all<SignupRow>();
@@ -75,12 +75,12 @@ export async function serveSignup(env: Env, req: Request, leadId: string, planId
     const title = String(form?.get("title") ?? "").trim().slice(0, 60);
     const email = String(form?.get("email") ?? "").trim().slice(0, 120);
     const agreed = form?.get("agree") === "yes";
-    const option = options.find((o) => o.id === form?.get("billing")) ?? options[0]!;
+    const option = options.find((o) => o.id === form?.get("billing")) ?? options.find((o) => o.id === "standard") ?? options[0]!;
     if (!name || !agreed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return page("Sign up", `<div class="wrap"><div class="card"><p>Please type your name and email and tick the box to agree. <a href="">Go back</a></p></div></div>`, { brand, status: 400 });
     }
     const sent = await env.DB.prepare("SELECT author FROM lead_notes WHERE lead_id = ? AND outcome = 'signup_sent' ORDER BY created_at DESC LIMIT 1").bind(leadId).first<{ author: string }>();
-    const { payLink: _a, payLinkFlex: _b, payLinkAnnual: _c, ...rest } = plan;
+    const { payLink: _a, payLinkFlex: _b, payLinkAnnual: _c, payLinkShort: _d, ...rest } = plan;
     const planSnapshot: SignedPlan = { ...rest, billing: option.id, billingLabel: option.label, billingDetail: option.detail, monthlyEquivalent: option.monthlyEquivalent };
     await env.DB.prepare(
       "INSERT INTO signups (id, lead_id, plan_json, terms, signer_name, signer_title, signer_email, sent_by, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -121,7 +121,7 @@ ${already && alreadyOption ? `<div class="card"><p class="ok">Signed by ${escHtm
 <div class="card"><h2>The agreement</h2><div class="terms">${escHtml(terms)}</div></div>
 <form class="card" method="post"><h2>${already ? "Sign again" : "Sign up"}</h2>
 <fieldset class="billing"><legend>How would you like to pay?</legend>
-${options.map((o, i) => `<label class="opt"><input type="radio" name="billing" value="${o.id}"${i === 0 ? " checked" : ""}><span><strong>${escHtml(o.label)}</strong><br><span class="small muted">${escHtml(o.detail)}</span></span></label>`).join("")}
+${options.map((o) => `<label class="opt"><input type="radio" name="billing" value="${o.id}"${o.id === "standard" ? " checked" : ""}><span><strong>${escHtml(o.label)}</strong><br><span class="small muted">${escHtml(o.detail)}</span></span></label>`).join("")}
 </fieldset>
 ${settings.addons.length ? `<p class="small muted">Optional extras, just ask: ${settings.addons.map((a) => `${escHtml(a.name)} (${money(a.price)}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : " one-time"})`).join(" · ")}</p>` : ""}
 <label>Your full name<input type="text" name="name" autocomplete="name" required maxlength="100"></label>

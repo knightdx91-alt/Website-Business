@@ -266,10 +266,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
               payLink: PAY_LINK.optional(),
               payLinkFlex: PAY_LINK.optional(),
               payLinkAnnual: PAY_LINK.optional(),
+              payLinkShort: PAY_LINK.optional(),
             }),
           )
           .max(3),
         minMonths: z.number().int().min(0).max(36).optional(),
+        shortMonths: z.number().int().min(0).max(36).optional(),
         flexSetup: z.number().min(0).max(10_000).optional(),
         annualMonthsFree: z.number().int().min(0).max(6).optional(),
         addons: z.array(z.object({ name: z.string().trim().min(1).max(60), price: z.number().min(0).max(10_000), unit: z.enum(["month", "each", "one-time"]) })).max(10).optional(),
@@ -280,7 +282,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const before = await getSettings(env);
     await setSetting(env, "app_settings", JSON.stringify(s));
     // Call guides quote these, so saved guides are rewritten on next open.
-    const sales = (x: Partial<typeof s>) => JSON.stringify([x.companyName, x.legalName, x.callerName, x.minMonths, x.flexSetup, x.annualMonthsFree, x.addons, (x.plans ?? []).map((p) => [p.name, p.setup, p.monthly, p.includes])]);
+    const sales = (x: Partial<typeof s>) => JSON.stringify([x.companyName, x.legalName, x.callerName, x.minMonths, x.shortMonths, x.flexSetup, x.annualMonthsFree, x.addons, (x.plans ?? []).map((p) => [p.name, p.setup, p.monthly, p.includes])]);
     if (sales(before) !== sales(s)) await env.DB.prepare("UPDATE leads SET pitch_json = NULL WHERE pitch_json IS NOT NULL").run();
     return json({ ok: true });
   }
@@ -713,7 +715,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         sales: {
           ...settings,
           callerName,
-          billing: settings.plans[0] ? billingOptions(settings.plans[0], settings).map((o) => `${o.label}: ${o.id === "standard" ? "the normal way" : o.id === "flex" ? `no minimum, but $${settings.flexSetup} extra setup` : `pay 12 months up front and get ${settings.annualMonthsFree} free`}`) : [],
+          billing: settings.plans[0]
+            ? billingOptions(settings.plans[0], settings).map((o) => `${o.label}: ${o.id === "short" || o.id === "standard" ? "no setup fee" : o.id === "flex" ? `no minimum, one-time $${settings.flexSetup} setup fee` : `pay for ${12 - (settings.annualMonthsFree ?? 0)} months up front, get 12 (${settings.annualMonthsFree} free)`}`)
+            : [],
           addons: settings.addons.map((a) => `${a.name}: $${a.price}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : " one-time"}`),
         },
         model: settings.copyModel,

@@ -112,8 +112,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Growth batch: plans + client sign-up page + Stripe/Square payment links, visit counter +
       monthly report, review QR cards, preview flyers, custom domains, outdated-website leads,
       food trucks / nail salons / pet groomers, nearby towns, walk-in route, sales dashboard
-- [x] Plans set from market research (Oct 2026): Basic $49, Plus $89, Pro $149; 12-mo min or $299 setup
-      month to month or yearly with 2 months free; extras $10 inbox, $35 NFC card, $149 GBP setup
+- [x] Plans set from market research (Oct 2026): Basic $49, Plus $89, Pro $149. Ways to pay (`billingOptions` in db.ts):
+      6-month or 12-month plan with NO setup fee (`shortMonths`, `minMonths`), month to month with a $299 setup fee
+      (`flexSetup`, the only setup fee), or yearly up front = 12 months for the price of 10 (`annualMonthsFree` 2; not 14
+      months). Extras $10 inbox, $35 NFC card, $149 GBP setup
 - [x] Google profile tools step 1 (AI-assisted checklist, posts, review replies)
 - [x] Company website live at undergroundassociates.com (bought on Cloudflare)
 - [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for

@@ -78,6 +78,7 @@ export interface SalesSettings {
   callerName?: string;
   plans: Array<{ name: string; setup: number; monthly: number; includes: string }>;
   minMonths?: number;
+  shortMonths?: number;
   /** Ways to pay, e.g. "Pay yearly (2 months free): pay 12 months up front and get 2 free". */
   billing?: string[];
   addons?: string[];
@@ -123,7 +124,11 @@ export async function writePitch(
     plans: s.plans.length
       ? s.plans.map((p) => ({ name: p.name, setup_fee: p.setup ? `$${p.setup}` : "none", monthly: `$${p.monthly}/month`, includes: p.includes || "(not listed)" }))
       : "(not set)",
-    minimum_term: s.plans.length ? (s.minMonths ? `${s.minMonths} months, then cancel any time` : "none, cancel any time") : "(not set)",
+    minimum_term: s.plans.length
+      ? s.minMonths
+        ? `${s.shortMonths && s.shortMonths < s.minMonths ? `${s.shortMonths} or ${s.minMonths}` : s.minMonths} months with no setup fee, then cancel any time; month to month has a setup fee`
+        : "none, cancel any time"
+      : "(not set)",
     ways_to_pay: s.billing?.length ? s.billing : "(not set)",
     optional_extras: s.addons?.length ? s.addons : "(none)",
   };

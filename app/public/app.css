@@ -191,7 +191,7 @@ body.showing { background: #fff; }
 .show__every { display: grid; gap: 0 20px; }
 @media (min-width: 720px) { .show__every { grid-template-columns: repeat(3, 1fr); } }
 .show__ways { display: grid; gap: 12px; }
-@media (min-width: 720px) { .show__ways { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 720px) { .show__ways { grid-template-columns: repeat(2, 1fr); } }
 .show__ways div { background: #fff; border-radius: 14px; padding: 14px 16px; }
 .show__ways h3 { margin: 0 0 4px; color: var(--sn); font-size: 1.05rem; }
 .show__ways p { margin: 0; color: var(--st); }
