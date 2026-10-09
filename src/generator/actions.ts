@@ -2,7 +2,7 @@ import { smsHref, telHref } from "./phone.ts";
 import type { IconName } from "./icons.ts";
 import type { BusinessRecord } from "./types.ts";
 
-export type ActionId = "call" | "text" | "directions" | "order" | "reserve" | "book" | "quote" | "menu" | "review" | "shop" | "portal";
+export type ActionId = "call" | "text" | "directions" | "order" | "reserve" | "book" | "quote" | "menu" | "review" | "shop" | "portal" | "visit" | "watch" | "give" | "donate" | "help" | "join" | "rent";
 
 export interface Action {
   id: ActionId;
@@ -90,6 +90,20 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
       if (!url) return null;
       return { id, label: r.variant === "tax_prep" ? "Upload your documents" : "Client portal", short: r.variant === "tax_prep" ? "Upload" : "Portal", href: url, external: true, icon: "clipboard" };
     }
+    case "visit":
+      return { id, label: r.ext.church?.tradition === "catholic" ? "Mass times" : "Plan a visit", short: r.ext.church?.tradition === "catholic" ? "Mass" : "Visit", href: r.ext.church?.tradition === "catholic" ? "#times" : "#plan", external: false, icon: "calendar" };
+    case "watch":
+      return r.ext.church?.liveUrl ? { id, label: "Watch live", short: "Watch", href: r.ext.church.liveUrl, external: true, icon: "arrow" } : null;
+    case "give":
+      return r.ext.church?.givingUrl ? { id, label: "Give online", short: "Give", href: r.ext.church.givingUrl, external: true, icon: "check" } : null;
+    case "donate":
+      return r.ext.church?.donateUrl ? { id, label: "Donate", short: "Donate", href: r.ext.church.donateUrl, external: true, icon: "check" } : null;
+    case "help":
+      return { id, label: "Get help", short: "Get help", href: "#help", external: false, icon: "list" };
+    case "join":
+      return r.ext.church?.joinUrl ? { id, label: "Join", short: "Join", href: r.ext.church.joinUrl, external: true, icon: "calendar" } : { id, label: "Visit a meeting", short: "Meetings", href: "#join", external: false, icon: "calendar" };
+    case "rent":
+      return { id, label: "Rent the hall", short: "Rent", href: "#hall", external: false, icon: "calendar" };
     case "review":
       return { id, label: "Leave us a review", short: "Review", href: reviewUrl(r), external: true, icon: "star" };
   }

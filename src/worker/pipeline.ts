@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { writeCopy } from "../copy/write.ts";
 import { packFor } from "../generator/packs/index.ts";
+import { churchVariant } from "../generator/packs/church.ts";
 import { financeVariant } from "../generator/packs/finance.ts";
 import { pickDesign } from "../generator/design.ts";
 import { buildSite } from "../generator/render.ts";
@@ -36,7 +37,8 @@ export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>)
 
     const builds: Job[] = [];
     let checks = 0;
-    for (const lead of qualify(places, { includeSites: job.badSites })) {
+    for (const lead of qualify(places, { includeSites: job.badSites, category })) {
+      if (category === "church" && !churchVariant(lead.place.primaryType, lead.place.types ?? [], lead.place.displayName?.text ?? "")) continue;
       if (category === "finance" && !financeVariant(lead.place.primaryType, lead.place.types ?? [], lead.place.displayName?.text ?? "")) continue;
       const exists = await env.DB.prepare("SELECT 1 FROM leads WHERE place_id = ?").bind(lead.place.id).first();
       if (exists) continue;
@@ -90,6 +92,8 @@ export async function chooseLook(env: Env, record: BusinessRecord, leadId: strin
 }
 
 export function heroFromPlace(record: BusinessRecord, place: Place): void {
+  // Google photos of churches and groups are often of people, children included: never use them, even in previews.
+  if (record.category === "church") return;
   const photo = place.photos?.[0];
   if (!photo || (record.media.hero && record.media.hero.source !== "google")) return;
   const author = photo.authorAttributions?.[0];

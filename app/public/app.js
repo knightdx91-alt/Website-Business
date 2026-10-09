@@ -18,7 +18,7 @@
     if (h < 24) return h + " hr ago";
     return Math.round(h / 24) + " days ago";
   };
-  const CATEGORY_LABEL = { restaurant: "Restaurant", contractor: "Contractor", salon: "Salon", auto: "Auto", landscaping: "Landscaping", cleaning: "Cleaning", print: "Print & signs", retail: "Shop", finance: "Tax & finance" };
+  const CATEGORY_LABEL = { restaurant: "Restaurant", contractor: "Contractor", salon: "Salon", auto: "Auto", landscaping: "Landscaping", cleaning: "Cleaning", print: "Print & signs", retail: "Shop", finance: "Tax & finance", church: "Church & nonprofit" };
   const groupLabel = (id) => ((meta && meta.categories.find((c) => c.id === id)) || {}).label || CATEGORY_LABEL[id] || id;
   const GOOGLE_PER_SEARCH = 0.064; // up to 2 pages of Text Search per search phrase
   const SALES = [["new", "New"], ["callbacks", "Callbacks"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
@@ -43,7 +43,7 @@
     return `<span class="chip ${due ? "chip--warn" : ""}">📅 ${late ? "Overdue: " : "Call back "}${esc(dayLabel(iso))}</span>`;
   };
   // Rough Claude cost per site at Opus 5.5 rates, measured on real Cullman runs.
-  const COST_PER_SITE = { restaurant: 0.04, contractor: 0.1, salon: 0.06, auto: 0.1, landscaping: 0.1, cleaning: 0.1, print: 0.1, retail: 0.06, finance: 0.1 };
+  const COST_PER_SITE = { restaurant: 0.04, contractor: 0.1, salon: 0.06, auto: 0.1, landscaping: 0.1, cleaning: 0.1, print: 0.1, retail: 0.06, finance: 0.1, church: 0.06 };
   const MODEL_FACTOR = { "claude-opus-5-5": 1, "claude-sonnet-5-5": 0.5, "claude-haiku-5-5": 0.03 };
 
   function toast(msg) {
@@ -694,6 +694,7 @@
     const isP = cat === "print";
     const isRt = cat === "retail";
     const isF = cat === "finance";
+    const isCh = cat === "church";
     const isM = isS && r.variant === "massage";
     const serviceArea = isC || isL || isK;
     const hasServices = !isR;
@@ -776,6 +777,7 @@
         ${isRt ? `${cb("giftCards", "They sell gift cards", !!ext.giftCards)}${cb("delivery", "They deliver", !!ext.delivery)}` : ""}
       </section>
       ${isF ? financeEditCard(r, ext, cb) : ""}
+      ${isCh ? churchEditCard(r, ext, cb) : ""}
       <section class="card"><h2>Links</h2>
         ${isR ? `<label class="field">Online ordering link<input name="order" type="url" value="${esc(r.links.order || "")}" placeholder="https://"></label>
         <label class="field">Reservations link<input name="reserve" type="url" value="${esc(r.links.reserve || "")}" placeholder="https://"></label>` : ""}
@@ -888,6 +890,7 @@
           ...(isP ? { email: val("email"), designHelp: on("designHelp"), proofBeforePrint: on("proofBeforePrint"), ...(r.variant === "signs" ? { install: on("install") } : {}) } : {}),
           ...(isRt ? { giftCards: on("giftCards"), delivery: on("delivery") } : {}),
           ...(isF ? { finance: financeEditValues(f, r) } : {}),
+          ...(isCh ? { church: churchEditValues(f) } : {}),
           testimonials,
           towns: hasTowns ? val("towns").split(",").map((s) => s.trim()).filter(Boolean) : undefined,
           services: hasServices ? val("services").split("\n").map((s) => s.trim()).filter(Boolean) : undefined,
@@ -1245,6 +1248,61 @@
     });
   }
 
+  /* ---------- churches & nonprofits: everything comes from the organization (research/churches-nonprofits.md §8) ---------- */
+  const CH_VARIANTS = [["church", "Church"], ["civic_post", "VFW, Legion, Lions, lodge or club"], ["charity", "Food pantry or charity"], ["community_center", "Community center"]];
+  function churchEditCard(r, x, cb) {
+    const v = r.variant;
+    const fv = x.firstVisit || {};
+    const p = x.pastor || {};
+    const ta = (name, label, value, rows, ph) => `<label class="field">${label}<textarea name="${name}" rows="${rows}" placeholder="${esc(ph || "")}">${esc(value || "")}</textarea></label>`;
+    const inp = (name, label, value, ph, type) => `<label class="field">${label}<input name="${name}" type="${type || "text"}" value="${esc(value || "")}" placeholder="${esc(ph || "")}"></label>`;
+    const lines = (x.schedule || []).map((s) => `${s.day} | ${s.time} | ${s.label}`).join("\n");
+    return `<section class="card"><h2>Church &amp; nonprofit details</h2>
+      <p class="small muted">Only their own words. We never write beliefs, history or claims for them.</p>
+      <label class="field">Kind of group<select name="chVariant">${CH_VARIANTS.map(([k, t]) => `<option value="${k}"${k === v ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+      ${v === "church" ? `${inp("chLabel", "How they describe their church <span class=\"hint\">e.g. “Missionary Baptist church”, or just “Church”</span>", x.traditionLabel)}
+        ${cb("chLabelOk", "They confirmed this wording (required)", !!x.traditionConfirmed)}
+        ${ta("chSchedule", "Service times, one per line: <code>Day | Time | What</code>", lines, 5, "Sunday | 9:45 AM | Sunday School\nSunday | 11:00 AM | Worship\nWednesday | 6:30 PM | Prayer & Bible Study")}
+        ${cb("chScheduleOk", "They confirmed the service times (required)", !!x.scheduleConfirmed)}
+        <h3>Plan a visit (their answers)</h3>
+        ${inp("chParking", "Parking and which door", fv.parking)}${inp("chDress", "What people wear", fv.dress)}${inp("chKids", "Kids and nursery", fv.kids)}
+        ${inp("chLength", "How long services last", fv.length)}${inp("chMusic", "Music", fv.music)}${inp("chAccess", "Accessibility", fv.accessibility)}
+        <h3>Pastor</h3>
+        <div class="row">${inp("chPastorName", "Name", p.name)}${inp("chPastorTitle", "Title (their words)", p.title, "Pastor, Bro., Father, Minister")}</div>
+        ${ta("chPastorBio", "About them (written or approved by the church)", p.bio, 4)}
+        ${cb("chPastorOff", "Leave the pastor section off", !!x.pastorOff)}
+        ${ta("chBeliefs", "What we believe (their statement, word for word; optional)", x.beliefs, 4)}
+        ${inp("chBeliefsUrl", "Or a link to their statement", x.beliefsUrl, "https://", "url")}
+        ${inp("chGive", "Online giving link (optional)", x.givingUrl, "https://tithe.ly/…", "url")}
+        ${inp("chLive", "Watch live link (YouTube or Facebook)", x.liveUrl, "https://", "url")}
+        ${inp("chSermons", "Past services / sermons link", x.sermonsUrl, "https://", "url")}
+        ${cb("chSpanish", "They have services in Spanish", !!x.spanish)}
+        ${inp("chFacility", "Weddings & facility use (their policy)", x.facility)}` : ""}
+      ${v === "charity" ? `${ta("chHelp", "Getting help: days, hours, who can come, what to bring (required)", x.help, 4)}` : ""}
+      ${v === "civic_post" ? `${inp("chMeetings", "When and where they meet (required)", x.meetings, "2nd Tuesday, 6:30 PM, at the post home")}
+        ${ta("chJoinText", "Who can join and how (their words)", x.joinText, 3)}${inp("chJoinUrl", "Join link (optional)", x.joinUrl, "https://", "url")}` : ""}
+      ${v === "civic_post" || v === "community_center" ? inp("chHall", "Hall rental (capacity, kitchen, how to book)", x.hall) : ""}
+      ${v !== "church" ? `${inp("chDonate", "Donate link", x.donateUrl, "https://", "url")}${inp("chNeeded", "Items they need", x.needed)}${inp("chVolunteer", "How to volunteer", x.volunteer)}
+        ${inp("chStatus", "Nonprofit status line (their words)", x.statusText, "We're a 501(c)(3); gifts are tax-deductible.")}
+        ${cb("chStatusOk", "They confirmed this status line", !!x.deductibleConfirmed)}` : ""}
+    </section>`;
+  }
+  function churchEditValues(f) {
+    const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
+    const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
+    const sched = f.elements.chSchedule ? f.elements.chSchedule.value.split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((p) => p.length >= 2 && p[0]).map((p) => (p.length === 2 ? { day: p[0], time: "", label: p[1] } : { day: p[0], time: p[1], label: p.slice(2).join(" ") || p[1] })) : undefined;
+    const out = {
+      variant: v("chVariant"), traditionLabel: v("chLabel"), traditionConfirmed: on("chLabelOk"), schedule: sched, scheduleConfirmed: on("chScheduleOk"),
+      firstVisit: f.elements.chParking ? { parking: v("chParking"), dress: v("chDress"), kids: v("chKids"), length: v("chLength"), music: v("chMusic"), accessibility: v("chAccess") } : undefined,
+      pastor: f.elements.chPastorName ? { name: v("chPastorName"), title: v("chPastorTitle"), bio: f.elements.chPastorBio.value.trim() } : undefined,
+      pastorOff: on("chPastorOff"), beliefs: f.elements.chBeliefs ? f.elements.chBeliefs.value.trim() : undefined, beliefsUrl: v("chBeliefsUrl"),
+      givingUrl: v("chGive"), liveUrl: v("chLive"), sermonsUrl: v("chSermons"), spanish: on("chSpanish"), facility: v("chFacility"),
+      help: f.elements.chHelp ? f.elements.chHelp.value.trim() : undefined, meetings: v("chMeetings"), joinText: f.elements.chJoinText ? f.elements.chJoinText.value.trim() : undefined, joinUrl: v("chJoinUrl"), hall: v("chHall"),
+      donateUrl: v("chDonate"), needed: v("chNeeded"), volunteer: v("chVolunteer"), statusText: v("chStatus"), deductibleConfirmed: on("chStatusOk"),
+    };
+    return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
+  }
+
   /* ---------- tax & finance: what the owner must confirm (research/tax-finance.md §5) ---------- */
   /** Financial advisors may not use testimonials or reviews (Alabama 830-X-3-.22, SEC/FINRA rules). */
   const noReviews = (l) => l.category === "finance" && (l.record ? l.record.variant : "") === "financial_advisor";
@@ -1308,11 +1366,21 @@
     cleaning: "Most cleaners work from home or are out on jobs: call first and ask to meet for 5 minutes, then bring the preview.",
     print: "Late morning or early afternoon on a weekday. Skip deadline days, like Fridays before games and events.",
     retail: "A weekday morning soon after opening, or mid-afternoon. Never during a sale or a busy Saturday.",
+    church: "Tuesday to Thursday mornings during office hours. Never Sunday, never during a service, and skip Wednesday afternoons. No office? Call first and leave the flyer for the pastor. Civic posts: call the commander and ask about the monthly meeting.",
     finance: "Tax offices: May through December, when they have time to talk (never January to mid-April). Insurance agencies: a weekday mid-morning or mid-afternoon. Advisors: call first.",
   };
 
   // Short answers for what owners say face to face. The full list lives in Plans & answers.
-  function walkinObjections(price) {
+  function walkinObjections(price, church) {
+    if (church) return [
+      ["“We'll have to take it to the deacons / the church.”", "Of course. Can I leave this for that meeting? It has a code that opens your site. When do you meet? I'll check back the day after. (Log the callback.)"],
+      ["“We can't afford a monthly bill.”", `Understood. ${price}. A lot of churches pay yearly so it fits one budget line, and updates are included, so nobody has to learn a website builder.`],
+      ["“A member does our Facebook.”", "Keep it! The site links to it. The site holds what Facebook buries: service times, directions, what to expect and kids. Visitors search Google first."],
+      ["“Someone built us one years ago.”", "That's common, and those sites tend to break when that person moves on. We keep it running, and the domain stays in the church's name."],
+      ["“Will you put our beliefs on it?”", "Only your own words, exactly as you give them. We never write beliefs or doctrine."],
+      ["“People find us by word of mouth.”", "That's the best way. Newcomers and young families still look you up first, and the site makes that first visit easier."],
+      ["“Not interested.”", "No problem at all. I built it for you either way. Mind if I leave this in case the church wants to look at it? (Thank them and go.)"],
+    ];
     return [
       ["“I'm busy right now.”", "Totally understand, I'll get out of your way. Can I leave this with you? The code on it opens your website. When's a better time to swing back by? (Leave the flyer, log the callback.)"],
       ["“How much is it?” (before you've shown it)", `Short answer: ${price}. But let me show you what you'd get first. It takes one minute.`],
@@ -1362,6 +1430,7 @@
       const hm = (x) => { const [h, m] = x.split(":").map(Number); const hh = h % 12 || 12; return `${hh}${m ? ":" + String(m).padStart(2, "0") : ""} ${h >= 12 && h < 24 ? "PM" : "AM"}`; };
       return iv.length ? `Open today ${iv.map((i) => `${hm(i.open)}–${hm(i.close)}`).join(", ")}` : "Closed today";
     })();
+    const isChurch = !!l && l.category === "church";
     const say = (txt) => `<p class="big say">“${esc(txt)}”</p>`;
     const step = (n, title, body, opener) => `<section class="card${opener ? " opener" : ""}"><h2><span class="stepnum">${n}</span> ${title}</h2>${body}</section>`;
     const list = (items) => `<ul class="list">${items.map((x) => `<li>${x}</li>`).join("")}</ul>`;
@@ -1393,11 +1462,12 @@
       ]))}
 
       ${step(2, "Walk in", `<p class="small muted">Wait until no customer needs them. Smile, keep it short.</p>
-        ${say("Hi! Is the owner or manager around? I'll only need a minute.")}
-        <p class="small muted">When you have the owner:</p>
+        ${say(isChurch ? "Hi! Is the pastor or the church secretary in? I'll only need a minute." : "Hi! Is the owner or manager around? I'll only need a minute.")}
+        <p class="small muted">When you have ${isChurch ? "the pastor (or whoever handles their Facebook)" : "the owner"}:</p>
         ${say(`I'm ${me} with ${co}. We're local, here in Cullman. ${why}, so I went ahead and built you one. Can I show you real quick? It's free to look at.`)}
         ${l && l.category === "finance" && r && r.variant === "financial_advisor" ? `<p class="small"><strong>Advisors: ask this first.</strong> “Does your firm let you use your own website?” Many must use the firm's site or get compliance approval. If they can't, thank them and log it.</p>` : ""}
         ${l && l.category === "finance" && r && r.variant === "tax_prep" ? `<p class="small muted">January to mid-April is their busy season. If you're there then, keep it to one minute and offer to come back in May.</p>` : ""}
+        ${isChurch ? `<p class="small muted">Churches decide together: expect “we'll take it to the deacons” (or elders, council, session). Leave the flyer for that meeting, ask when it is, and book the callback for the day after. Fall is budget season.</p>` : ""}
         <details class="obj"><summary>Owner isn't there</summary><p>“No problem. When's a good time to catch them? Could I leave this for them?” Leave the flyer, ask the owner's name and the best time, then log a callback below.</p></details>
         <details class="obj"><summary>They're slammed</summary><p>“I can see you're busy. I'll come back. Is tomorrow morning better?” Log the callback, and go.</p></details>`, true)}
 
@@ -1433,7 +1503,7 @@
         ${l && l.salesStatus !== "live" ? shareButtonsHtml() : ""}`)}
 
       <section class="card"><h2>If they say…</h2>
-        ${walkinObjections(priceShort).map(([q, a]) => `<details class="obj"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}
+        ${walkinObjections(priceShort, isChurch).map(([q, a]) => `<details class="obj"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}
         <p class="small"><a href="#/playbook">💬 All plans & common answers</a></p></section>
 
       <section class="card"><h2>Always</h2>${list([
@@ -1644,7 +1714,7 @@
   }
 
   /* ---------- add a business by hand ---------- */
-  const PACKS = [["restaurant", "Restaurant, cafe, bakery or food truck"], ["contractor", "Contractor or home service (plumbing, HVAC, painting, concrete, tree, pest…)"], ["salon", "Salon, barber, nails, massage or pet grooming"], ["auto", "Auto repair, body shop, detailing, towing or small engine"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning or pressure washing"], ["finance", "Tax preparer, accountant, insurance agency or financial advisor"], ["print", "Print shop, sign shop, screen printing or embroidery"], ["retail", "Shop: boutique, gifts, florist, antiques, thrift, feed or furniture"]];
+  const PACKS = [["restaurant", "Restaurant, cafe, bakery or food truck"], ["contractor", "Contractor or home service (plumbing, HVAC, painting, concrete, tree, pest…)"], ["salon", "Salon, barber, nails, massage or pet grooming"], ["auto", "Auto repair, body shop, detailing, towing or small engine"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning or pressure washing"], ["finance", "Tax preparer, accountant, insurance agency or financial advisor"], ["church", "Church, VFW/Legion/Lions/lodge, food pantry or community center"], ["print", "Print shop, sign shop, screen printing or embroidery"], ["retail", "Shop: boutique, gifts, florist, antiques, thrift, feed or furniture"]];
   const PRESENCE = { none: ["No website", "chip--good"], social: ["Only a social page", "chip--good"], free_builder: ["Free-builder site", "chip--warn"], has_site: ["Has a website", "chip--warn"] };
 
   async function viewAdd() {

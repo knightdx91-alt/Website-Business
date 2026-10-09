@@ -44,6 +44,12 @@ export const SEARCH_GROUPS: SearchGroup[] = [
   // for a website, so they're added by hand after asking.
   { id: "finance", label: "Tax preparers & bookkeepers", category: "finance", terms: ["tax preparation service", "income tax service", "tax preparer", "bookkeeping service", "taxes y seguros"] },
   { id: "accounting", label: "Accountants & CPAs", category: "finance", terms: ["accountant", "CPA", "payroll service", "small business accountant"] },
+  // Churches & nonprofits (research/churches-nonprofits.md §10). "church" alone hits Google's 60-result cap, so the
+  // nearby-towns option matters most here.
+  { id: "church", label: "Churches", category: "church", terms: ["church", "baptist church", "church of christ", "church of god", "non-denominational church"] },
+  { id: "civic", label: "VFW, Legion, Lions & lodges", category: "church", terms: ["VFW post", "American Legion post", "Lions Club", "Masonic lodge", "Ruritan club"] },
+  { id: "charity", label: "Food pantries & charities", category: "church", terms: ["food pantry", "food bank", "clothes closet", "ministry center"] },
+  { id: "community", label: "Community centers", category: "church", terms: ["community center", "civic center", "community club"] },
   { id: "insurance", label: "Insurance agencies", category: "finance", terms: ["insurance agency", "independent insurance agent", "auto insurance agency", "Medicare insurance agent", "seguros de auto"] },
 ];
 

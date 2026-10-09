@@ -1,4 +1,4 @@
-export type CategoryId = "restaurant" | "contractor" | "salon" | "auto" | "landscaping" | "cleaning" | "print" | "retail" | "finance";
+export type CategoryId = "restaurant" | "contractor" | "salon" | "auto" | "landscaping" | "cleaning" | "print" | "retail" | "finance" | "church";
 
 /** Where a value came from. `google` images may appear in previews only. */
 export type Source = "places" | "owner" | "ai" | "system" | "stock" | "google";
@@ -191,6 +191,39 @@ export interface FinanceExt {
   crsUrl?: string;
 }
 
+/** Churches & nonprofits (research/churches-nonprofits.md §9). Everything here is the organization's own words. */
+export interface ChurchExt {
+  /** Suggested from the name (baptist, methodist, church_of_christ, pentecostal, catholic…); drives seeds and defaults only. */
+  tradition?: string;
+  /** Display words, e.g. "Missionary Baptist church". Shown only once confirmed; otherwise plain "Church". */
+  traditionLabel?: string;
+  traditionConfirmed?: boolean;
+  schedule?: Array<{ day: string; time: string; label: string }>;
+  scheduleConfirmed?: boolean;
+  firstVisit?: { parking?: string; dress?: string; kids?: string; length?: string; music?: string; accessibility?: string };
+  pastor?: { name: string; title?: string; bio?: string };
+  pastorOff?: boolean;
+  beliefs?: string;
+  beliefsUrl?: string;
+  givingUrl?: string;
+  liveUrl?: string;
+  sermonsUrl?: string;
+  spanish?: boolean;
+  facility?: string;
+  /** Nonprofits */
+  help?: string;
+  donateUrl?: string;
+  needed?: string;
+  volunteer?: string;
+  meetings?: string;
+  joinText?: string;
+  joinUrl?: string;
+  hall?: string;
+  /** Only with deductibleConfirmed: the organization's own status line, e.g. "We're a 501(c)(3); gifts are tax-deductible." */
+  statusText?: string;
+  deductibleConfirmed?: boolean;
+}
+
 export interface CleaningExt {
   freeEstimates?: boolean;
   backgroundChecked?: boolean;
@@ -244,6 +277,7 @@ export interface BusinessRecord {
     print?: PrintExt;
     retail?: RetailExt;
     finance?: FinanceExt;
+    church?: ChurchExt;
   };
   confirmed: ConfirmableField[];
 }

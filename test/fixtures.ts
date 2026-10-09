@@ -79,9 +79,9 @@ export function categoryRecord(category: Exclude<CategoryId, "restaurant">, over
   return {
     ...base,
     placeId: `ChIJ${category}`,
-    name: ({ salon: "Sample Barber Co", auto: "Sample Auto Service", landscaping: "Sample Lawn Care", cleaning: "Sample Cleaning Co", contractor: "Sample Home Services", finance: "Sample Tax Service" } as Record<string, string>)[category] ?? "Sample Shop",
+    name: ({ salon: "Sample Barber Co", auto: "Sample Auto Service", landscaping: "Sample Lawn Care", cleaning: "Sample Cleaning Co", contractor: "Sample Home Services", finance: "Sample Tax Service", church: "Sample Baptist Church" } as Record<string, string>)[category] ?? "Sample Shop",
     category,
-    variant: ({ salon: "barber", auto: "general", landscaping: "lawn_crew", cleaning: "residential", contractor: "multi", finance: "tax_prep" } as Record<string, string>)[category] ?? "general",
+    variant: ({ salon: "barber", auto: "general", landscaping: "lawn_crew", cleaning: "residential", contractor: "multi", finance: "tax_prep", church: "church" } as Record<string, string>)[category] ?? "general",
     showStreetAddress: storefront,
     hours: storefront ? base.hours : undefined,
     serviceArea: { towns: ["Cullman", "Hanceville"], counties: ["Cullman"] },

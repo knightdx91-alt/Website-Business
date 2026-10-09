@@ -128,7 +128,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Stripe keys set as Worker secrets; live checkout + webhook verified with a $1 test
 - [x] Email: MailerSend worked in a test, then turned the account down (Oct 2026). Switched to Resend (RESEND_API_KEY secret wins over MAILERSEND_API_KEY)
 - [ ] Owner to do: our own Google Business Profile + review link
-- [x] Tax & finance pack (Oct 2026). Churches & nonprofits researched (research/churches-nonprofits.md), pack next
+- [x] Tax & finance pack and churches & nonprofits pack (Oct 2026), 25 looks each. Hand-added businesses can have a typed-in phone
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
 ## Code map
@@ -218,6 +218,18 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (verbatim, footer of every page + /disclosures/), compliance approval (who + date) and BrokerCheck/Form CRS links. Advisors get no
   reviews anywhere (site, footer, review cards). `bannedPhrases` (pack hook) stops refund/rate/credential/guarantee/"free"/notario
   wording in AI copy (copy writer retries; publish lint errors). Tax prep gets /what-to-bring/ (template list, owner-editable).
+- Churches & nonprofits (`packs/church.ts`, category `church`, research/churches-nonprofits.md): variants church / civic_post
+  (VFW, Legion, Lions, Ruritan, lodges) / charity (pantries, closets) / community_center from `churchVariant` (names first;
+  schools, daycares, cemeteries, funeral homes, other worship, Baptist associations, AA/NA, shelters, Church's Chicken and
+  multi-site churches return null). The restaurant/store chain list is skipped for this category (it would drop "Goodwill
+  Baptist"); parent-org pages (legion.org, vfw.org…) count as no website, churchcenter.com as a free builder. Google photos are
+  never used for these (people/children). Everything is the organization's words (`ext.church`, Edit → Church & nonprofit
+  details): service times (`schedule`, Day | Time | What), the tradition label ("Missionary Baptist church", suggested from the
+  name by `suggestTradition`, never a convention), pastor, beliefs (verbatim), first-visit answers, give/watch links, help hours,
+  meetings, hall rental, nonprofit status line. Required to-dos: confirm service times, the label, pastor (or turn it off); civic
+  meetings; charity help details. Google hours show only as "Office hours" (no open/closed). No forms (no prayer requests stored),
+  no reviews section. `bannedPhrases` stops doctrine, scripture refs, denominations, tax/eligibility, kids/access claims and
+  politics in AI copy. Selling notes (who decides, deacons meetings, pricing landscape) in research §14.
 - Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
   retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
   Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).

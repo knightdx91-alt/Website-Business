@@ -1,6 +1,7 @@
 import { townsWithin } from "../generator/geo.ts";
 import { autoVariant, seedAutoServices } from "../generator/packs/auto.ts";
 import { cleaningVariant, seedCleaningServices } from "../generator/packs/cleaning.ts";
+import { churchVariant, seedChurchServices, suggestTradition } from "../generator/packs/church.ts";
 import { contractorTrade, seedServices } from "../generator/packs/contractor.ts";
 import { financeAlsoOffers, financeVariant, seedFinanceServices } from "../generator/packs/finance.ts";
 import { landscapingVariant, seedLandscapingServices } from "../generator/packs/landscaping.ts";
@@ -168,6 +169,16 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
     const variant = financeVariant(p.primaryType, types, name) ?? "tax_prep";
     const alsoOffers = financeAlsoOffers(variant, name);
     return { ...base, variant, services: seedFinanceServices(variant, alsoOffers), ext: { finance: { alsoOffers, spanish: /\b(seguros|impuestos|latin[oa]s?|hispan\w*)\b/i.test(name) || undefined } } };
+  }
+  if (category === "church") {
+    const variant = churchVariant(p.primaryType, types, name) ?? "church";
+    const t = suggestTradition(name);
+    return {
+      ...base,
+      variant,
+      services: seedChurchServices(variant, name),
+      ext: { church: variant === "church" ? { tradition: t.tradition, traditionLabel: t.label, spanish: /\b(iglesia|ministerio|templo|casa de oraci[oó]n)\b/i.test(name) || undefined } : {} },
+    };
   }
   throw new Error(`Category ${category} not supported yet`);
 }

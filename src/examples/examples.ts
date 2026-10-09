@@ -388,4 +388,57 @@ Turnip greens | $3`),
       }),
     };
   })(),
+  (() => {
+    const record = base({ slug: "cedar-creek", name: "Cedar Creek Baptist Church", category: "church", variant: "church", phone: "0110", street: "2200 Example Rd NW", storefront: true });
+    record.hours = { weekly: [[], [], day("09:00", "13:00"), day("09:00", "13:00"), day("09:00", "13:00"), [], []] };
+    record.services = svc(["Sunday School & Bible classes", "Kids", "Students", "Women", "Men", "Music & choir"]);
+    record.foundedYear = 1923;
+    record.ownershipTags = [];
+    record.links.social = { facebook: "https://www.facebook.com/" };
+    record.ext.church = {
+      tradition: "baptist",
+      traditionLabel: "Missionary Baptist church",
+      traditionConfirmed: true,
+      schedule: [
+        { day: "Sunday", time: "9:45 AM", label: "Sunday School" },
+        { day: "Sunday", time: "11:00 AM", label: "Morning Worship" },
+        { day: "Sunday", time: "6:00 PM", label: "Evening Worship" },
+        { day: "Wednesday", time: "6:30 PM", label: "Prayer & Bible Study" },
+      ],
+      scheduleConfirmed: true,
+      firstVisit: {
+        parking: "Park anywhere in the front lot. The main doors face the road, and a greeter will meet you.",
+        dress: "Some folks wear a suit and some wear jeans. Come as you are comfortable.",
+        kids: "Nursery for babies through age 3 during Sunday School and worship.",
+        length: "Morning worship usually runs about an hour.",
+      },
+      pastor: { name: "Bro. Tom Hale", title: "Pastor", bio: "Bro. Tom and his wife, Carol, have served at Cedar Creek for twelve years. He loves fishing, a good church dinner on the grounds, and visiting folks in their homes." },
+      givingUrl: "https://example.com/",
+      liveUrl: "https://example.com/",
+    };
+    return {
+      slug: "cedar-creek",
+      kind: "Country church",
+      design: "church.country_chapel~letter",
+      record,
+      copy: copy({
+        heroTagline: "There's a place here for every age, from little ones to senior adults.",
+        heroSub: "A church family on the edge of Cullman. We'd love to meet you this Sunday.",
+        serviceAreaIntro: "It's normal to wonder what to expect at a new church. Here are a few answers before you come.",
+        about: ["Cedar Creek Baptist Church is a small country church just outside Cullman, where neighbors gather on Sundays and Wednesday nights.", "Whether you've been in church all your life or it's been a while, you're welcome here."],
+        serviceBlurbs: blurbs([
+          ["Sunday School & Bible classes", "Classes for every age before morning worship."],
+          ["Kids", "A place for children to learn and make friends."],
+          ["Students", "Middle and high schoolers growing together."],
+          ["Women", "Women of all ages meeting to study and serve."],
+          ["Men", "Men gathering for fellowship and service."],
+          ["Music & choir", "Anyone who loves to sing is welcome to join in."],
+        ]),
+        faq: [{ q: "Who's welcome?", a: "Everyone. Whether you're new to Cullman or just looking for a church home, we'd be glad to have you. Give us a call with any questions." }],
+        ctaTitle: "We'd love to see you",
+        ctaLine: "Join us this Sunday, or call the church office with any questions.",
+        description: "Cedar Creek Baptist Church in Cullman, AL: service times, what to expect on your first visit, ministries for every age, and directions. Join us Sunday.",
+      }),
+    };
+  })(),
 ];

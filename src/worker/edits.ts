@@ -37,6 +37,36 @@ export const EditsSchema = z.object({
       install: z.boolean().optional(),
       giftCards: z.boolean().optional(),
       delivery: z.boolean().optional(),
+      church: z
+        .object({
+          variant: z.enum(["church", "civic_post", "charity", "community_center"]),
+          traditionLabel: z.string().trim().max(80),
+          traditionConfirmed: z.boolean(),
+          schedule: z.array(z.object({ day: z.string().trim().min(1).max(30), time: z.string().trim().max(30), label: z.string().trim().min(1).max(80) })).max(20),
+          scheduleConfirmed: z.boolean(),
+          firstVisit: z.object({ parking: z.string().trim().max(300), dress: z.string().trim().max(300), kids: z.string().trim().max(300), length: z.string().trim().max(200), music: z.string().trim().max(200), accessibility: z.string().trim().max(300) }).partial(),
+          pastor: z.object({ name: z.string().trim().max(80), title: z.string().trim().max(60), bio: z.string().trim().max(1500) }).partial(),
+          pastorOff: z.boolean(),
+          beliefs: z.string().trim().max(6000),
+          beliefsUrl: url,
+          givingUrl: url,
+          liveUrl: url,
+          sermonsUrl: url,
+          spanish: z.boolean(),
+          facility: z.string().trim().max(600),
+          help: z.string().trim().max(1500),
+          donateUrl: url,
+          needed: z.string().trim().max(400),
+          volunteer: z.string().trim().max(400),
+          meetings: z.string().trim().max(300),
+          joinText: z.string().trim().max(600),
+          joinUrl: url,
+          hall: z.string().trim().max(600),
+          statusText: z.string().trim().max(200),
+          deductibleConfirmed: z.boolean(),
+        })
+        .partial()
+        .optional(),
       finance: z
         .object({
           variant: z.enum(["tax_prep", "accounting", "insurance", "financial_advisor"]),
@@ -162,6 +192,18 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
     if (e.giftCards !== undefined) x.giftCards = e.giftCards;
     if (e.delivery !== undefined) x.delivery = e.delivery;
     if (e.links?.shop !== undefined) x.shopUrl = e.links.shop || undefined;
+  }
+  if (r.category === "church" && e.church) {
+    const { variant, pastor, firstVisit, ...rest } = e.church;
+    if (variant) r.variant = variant;
+    const x: Record<string, unknown> = { ...(r.ext.church ?? {}) };
+    for (const [k, v] of Object.entries(rest)) x[k] = v === "" || (Array.isArray(v) && !v.length) ? undefined : v;
+    if (pastor) x.pastor = pastor.name ? { name: pastor.name, title: pastor.title || undefined, bio: pastor.bio || undefined } : undefined;
+    if (firstVisit) {
+      const fv = Object.fromEntries(Object.entries(firstVisit).filter(([, v]) => v));
+      x.firstVisit = Object.keys(fv).length ? fv : undefined;
+    }
+    r.ext.church = x as typeof r.ext.church;
   }
   if (r.category === "finance" && e.finance) {
     const { variant, ...rest } = e.finance;

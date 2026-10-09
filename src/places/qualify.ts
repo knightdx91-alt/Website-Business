@@ -4,7 +4,9 @@ import type { Place } from "./client.ts";
 export type WebPresence = "none" | "social" | "free_builder" | "has_site" | "outdated";
 
 const SOCIAL = /(^|\.)(facebook\.com|fb\.com|fb\.me|instagram\.com|linktr\.ee|tiktok\.com|twitter\.com|x\.com|yelp\.com|nextdoor\.com|business\.site|g\.page)$/i;
-const FREE_BUILDER = /(^|\.)(wixsite\.com|weebly\.com|godaddysites\.com|square\.site|webnode\.com|jimdosite\.com|carrd\.co|sites\.google\.com)$/i;
+const FREE_BUILDER = /(^|\.)(wixsite\.com|weebly\.com|godaddysites\.com|square\.site|webnode\.com|jimdosite\.com|carrd\.co|sites\.google\.com|churchcenter\.com|e-clubhouse\.org|keeq\.io)$/i;
+/** A national or parent organization's page (a Legion department, a church locator) isn't the group's own site. */
+const PARENT_ORG = /(^|\.)(legion\.org|legional\.org|vfw\.org|elks\.org|lionsclubs\.org|rotary\.org|churchofgod\.org|churchofjesuschrist\.org|jw\.org)$/i;
 
 export function webPresence(websiteUri: string | undefined): WebPresence {
   if (!websiteUri) return "none";
@@ -15,6 +17,7 @@ export function webPresence(websiteUri: string | undefined): WebPresence {
     return "none";
   }
   if (SOCIAL.test(host)) return "social";
+  if (PARENT_ORG.test(host)) return "none";
   if (FREE_BUILDER.test(host)) return "free_builder";
   return "has_site";
 }
@@ -58,14 +61,15 @@ export interface QualifiedLead {
 /**
  * Keeps operational, non-chain places with a phone and no real website. Ranks likely buyers first.
  * With includeSites, places that have a website come back too, for the caller to check (see site-check.ts). */
-export function qualify(places: Place[], opts: { includeFreeBuilder?: boolean; includeSites?: boolean } = {}): QualifiedLead[] {
+export function qualify(places: Place[], opts: { includeFreeBuilder?: boolean; includeSites?: boolean; category?: CategoryId } = {}): QualifiedLead[] {
   const seen = new Set<string>();
   const out: QualifiedLead[] = [];
   for (const p of places) {
     if (seen.has(p.id)) continue;
     seen.add(p.id);
     const name = p.displayName?.text ?? "";
-    if (!name || isChain(name)) continue;
+    // The chain list is restaurants and stores: "church's", "goodwill" and "denny" would drop real congregations.
+    if (!name || (opts.category !== "church" && isChain(name))) continue;
     if (p.businessStatus !== "OPERATIONAL") continue;
     if (!p.nationalPhoneNumber) continue;
     const presence = webPresence(p.websiteUri);
@@ -89,6 +93,7 @@ const TYPE_CATEGORY: Array<[RegExp, CategoryId]> = [
   [/car_repair|auto|tire|transmission|oil_change|car_dealer|car_wash/, "auto"],
   [/plumb|electric|roofing|contractor|hvac|heating|painter|locksmith|moving|handyman/, "contractor"],
   [/^(accounting|insurance_agency)$/, "finance"],
+  [/^(church|place_of_worship|community_center|non_profit_organization)$/, "church"],
   [/florist|clothing_store|gift_shop|furniture_store|thrift_store|flea_market|home_goods_store|shoe_store|garden_center/, "retail"],
 ];
 
@@ -102,6 +107,7 @@ export function guessCategory(p: Place): CategoryId | null {
   if (/screen ?print|embroider|monogram|\bsigns?\b|banners?|vinyl|decals|t-?shirts|\bprint(ing|ers)?\b|graphics/.test(n)) return "print";
   if (/\b(boutique|gifts?|antiques?|thrift|consign|flowers?|florist|floral|feed|seed|furniture|mercantile|vintage)\b/.test(n)) return "retail";
   if (/\b(paint|concrete|fenc|pest|termite|remodel|appliance|tree|stump)/.test(n)) return "contractor";
+  if (/\b(church|chapel|iglesia|tabernacle|parish|vfw|american legion|lions club|ruritan|masonic|food pantry|food bank|community center)\b/.test(n)) return "church";
   if (/\b(tax(es)?|impuestos|accounting|accountants?|bookkeep\w*|c\.?p\.?a\.?s?|insurance|seguros|financial (planning|advisors?|services))\b/.test(n)) return "finance";
   if (/\b(food truck|truck|grill|bbq|cafe|kitchen|diner|taco|pizza)/.test(n)) return "restaurant";
   for (const t of [p.primaryType ?? "", ...(p.types ?? [])]) {

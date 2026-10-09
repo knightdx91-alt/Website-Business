@@ -8,6 +8,12 @@ import { DEFAULT_COPY_MODEL } from "./write.ts";
 
 /** Why a site helps each kind of business, drawn from the category research in research/*.md. */
 const ANGLES: Record<string, string[]> = {
+  church: [
+    "Newcomers and young families look a church up on their phone before they visit: service times, where to park, what to expect, what's there for kids.",
+    "Google's hours for churches are usually office hours (or wrong), so people show up at the wrong time. The site puts the real service times first.",
+    "Facebook is great for members, but visitors who aren't on Facebook can't easily find times and directions there. The site links to their Facebook, livestream and giving page.",
+    "We never write beliefs or doctrine: the church's own words go on the site exactly as they give them.",
+  ],
   finance: [
     "People pick a tax office, accountant or insurance agent they can trust. A real website with the office, the people and the hours does that before they ever call.",
     "Most small offices' Facebook pages don't show hours, what to bring or how to get documents to them. The site answers those questions so the phone rings with ready clients.",
@@ -53,15 +59,16 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
   const f = [
     "a mobile-friendly site with tap-to-call buttons on every screen and a call bar at the bottom on phones",
     "a one-tap directions button",
-    "a reviews section with a button to their Google reviews (we never copy reviews onto the site)",
     "an About section",
     "a search-friendly page title and listing details so Google understands what they do and where",
   ];
-  if (hasAnyHours(r.hours)) f.push("their hours, with an open/closed status that updates on its own");
+  if (r.category !== "church" && !(r.category === "finance" && r.variant === "financial_advisor")) f.push("a reviews section with a button to their Google reviews (we never copy reviews onto the site)");
+  if (hasAnyHours(r.hours)) f.push(r.category === "church" ? "their office hours (labeled as office hours, not service times)" : "their hours, with an open/closed status that updates on its own");
   if (r.category === "restaurant") f.push("a menu section and a separate menu page, ready for their menu to be typed in");
-  else f.push(`a services list (${r.services.map((s) => s.name).join(", ")})`);
+  else f.push(`a ${r.category === "church" ? "ministries / programs" : "services"} list (${r.services.map((s) => s.name).join(", ")})`);
   if (r.serviceArea?.towns.length) f.push(`a service-area list of nearby towns (${r.serviceArea.towns.slice(0, 5).join(", ")}…)`);
   if (r.category === "print") f.push("a 'send us your design' section with buttons to email or text their artwork");
+  if (r.category === "church") f.push(r.variant === "church" ? "a service-times section right under the welcome, plus a 'Plan a visit' section for first-time visitors" : "a section for their meetings, help hours or hall rental, filled in with their own details");
   if (r.category === "finance" && r.variant === "tax_prep") f.push("a printable 'what to bring' checklist page for tax appointments");
   if (r.category === "finance" && r.variant === "financial_advisor") f.push("a disclosures page for the firm's required disclosure text (no reviews, as advisor rules require)");
   if (r.category === "retail") f.push("a 'what's new' section that sends shoppers to their Facebook or Instagram for new arrivals");
