@@ -47,7 +47,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
     category: "salon",
     palette: {
       bg: "#F4EFE4", surface: "#FFF9EE", band: "#EBE3D2", text: "#1B1B1B", muted: "#4F4A42", heading: "#1E3A5F",
-      link: "#1E3A5F", primary: "#1E3A5F", secondary: "#A63D2F", accent: "#A63D2F", heroBg: "#1E3A5F", onHero: "#FFF9EE",
+      link: "#1E3A5F", primary: "#A63D2F", secondary: "#1E3A5F", accent: "#A63D2F", heroBg: "#1E3A5F", onHero: "#FFF9EE",
       barBg: "#1E3A5F", onBar: "#FFF9EE", footerBg: "#1B1B1B", onFooter: "#F4EFE4", open: "#2E6B3A", closed: "#A63D2F",
     },
     fonts: { heading: font("Zilla Slab", "zilla-slab", [700], SERIF), body: font("Libre Franklin", "libre-franklin", [400, 700], SANS) },
@@ -221,7 +221,7 @@ export const MORE_LOOKS: Record<string, LookDef> = {
     palette: {
       bg: "#FAF7F2", surface: "#FFFFFF", band: "#EEF3EE", text: "#1F2723", muted: "#4D5650", heading: "#2F4B3C",
       link: "#2F4B3C", primary: "#2F4B3C", secondary: "#3E6150", accent: "#F3D67A", heroBg: "#EEF3EE", onHero: "#1F2723",
-      barBg: "#2F4B3C", onBar: "#FFFFFF", footerBg: "#1F2723", onFooter: "#EEF3EE", open: "#2E6B3A", closed: "#A8322A",
+      barBg: "#1F2723", onBar: "#FFFFFF", footerBg: "#1F2723", onFooter: "#EEF3EE", open: "#2E6B3A", closed: "#A8322A",
     },
     fonts: { heading: font("Fraunces", "fraunces", [600], SERIF), body: font("Nunito Sans", "nunito-sans", [400, 700], SANS) },
     headingWeight: 600,

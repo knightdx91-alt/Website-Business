@@ -106,7 +106,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       Cullman leads: 19 restaurant and 16 contractor leads found.
 - [x] Cloudflare app: live at https://website-business.knightdx91.workers.dev
       (Worker API + queue pipeline, D1/R2 storage, phone PWA, Pages publish, form inbox)
-- [x] Packs for salons, auto, landscaping, cleaning (24 looks total, all AA-checked).
+- [x] Packs for salons, auto, landscaping, cleaning (now 25 looks per category, all AA-checked).
       Real Cullman leads found: 14 salon, 20 auto, 11 landscaping, 6 cleaning.
 - [x] Caller logins (limited access), call log with callbacks, Android app (TWA APK)
 - [x] Growth batch: plans + client sign-up page + Stripe/Square payment links, visit counter +
@@ -195,12 +195,19 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `exterior`. "Nearby towns" runs every term of each group for Hartselle,
   Arab, Hanceville, Good Hope, Vinemont. "Outdated websites" checks up to 15 existing sites per search
   (`src/places/site-check.ts`) and keeps broken/insecure/not-phone-friendly/stale ones (presence `outdated`).
-- Looks × layouts: a look (`themes.ts`, `looks-more.ts`, `looks-shops.ts`) is colors + fonts; a layout
-  (`src/generator/layouts.ts`: classic, split, editorial, poster, soft, minimal, overlap) is page structure, CSS only on
-  shared markup. A site's design id is `<look>~<layout>` (bare look = its default layout), stored in `leads.look`.
-  `pickDesign` (`src/generator/design.ts`) gives each new site the least-used combination in its category and never a
-  sold/live client's. Lead screen → "Try another design" (`POST /api/leads/:id/restyle`); Edit has both pickers.
-  Previews from before layouts get restyled on first open if still New (`restyleOldPreview` in preview.ts).
+- Looks × layouts (Oct 2026: 25 looks per category × 25 layouts = 625 designs per category): a look is colors + fonts
+  (first 4 per category in `themes.ts`, `looks-more.ts`, `looks-shops.ts`; the other 21 in `src/generator/looks/<category>.ts`);
+  a layout is page structure, CSS only on shared markup (first 7 in `src/generator/layouts.ts`, the other 18 in
+  `layouts-a/b/c.ts` as `LayoutDef`s, helpers in `layout-kit.ts`). Fonts only from `src/generator/fonts.ts` (102 installed
+  @fontsource packages; `f(id, weights)` in `look-kit.ts`). Rules (enforced by `test/designs.test.ts`): 25 looks per category,
+  unique names, a different heading font per look within a category, AA contrast via `resolveTheme`. Packs list their 4
+  best-fit looks; `packs/index.ts` appends the rest. A site's design id is `<look>~<layout>` (bare look = its default
+  layout), stored in `leads.look`. `pickDesign` (`src/generator/design.ts`) gives each new site the least-used
+  combination in its category and never a sold/live client's (their look is also pushed back). Lead screen → "Try
+  another design" (`POST /api/leads/:id/restyle`); Edit has both pickers. Previews from before layouts get restyled on
+  first open if still New (`restyleOldPreview` in preview.ts). Checking designs by eye:
+  `npx tsx scripts/design-sheet.ts <scratchDir> "<look>~<layout>,..." [--no-photo]` (phone + desktop sheets, flags
+  overflow) and `npx tsx scripts/check-looks.ts <category>`.
 - Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
   retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
   Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).
