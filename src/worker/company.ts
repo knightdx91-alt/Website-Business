@@ -2,6 +2,7 @@ import { notify } from "./notify.ts";
 import { billingOptions, getSettings, type AppSettings } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
+import { SEARCH_GROUPS } from "../places/queries.ts";
 
 /** Underground Associates' own website, served on the company domain from live Settings (prices, phone, email). */
 export const COMPANY_HOSTS = ["undergroundassociates.com", "www.undergroundassociates.com"];
@@ -12,7 +13,8 @@ const FOUNDED = 2021;
 /** Contact form posts land in the app inbox under this pseudo lead id. */
 export const COMPANY_LEAD_ID = "company";
 
-const CATEGORIES = ["Restaurants & cafes", "Food trucks", "Contractors", "Salons & barbers", "Nail salons", "Pet groomers", "Auto repair", "Landscaping & lawn care", "Cleaning services"];
+/** Every kind of business the app searches for and builds sites for, so the list grows with new search groups. */
+const CATEGORIES = SEARCH_GROUPS.map((g) => g.label);
 
 const INCLUDED: Array<[string, string]> = [
   ["Made for phones", "Most of your customers find you on a phone. Every page is built for a small screen first."],
@@ -168,13 +170,14 @@ ${options.length ? `<h3 style="margin-top:28px">Ways to pay</h3><div class="grid
           return `<div class="card"><h3>${e(o.label)}</h3><p>${e(text)}</p></div>`;
         })
         .join("")}</div>` : ""}
-${s.addons.length ? `<p class="small muted">Extras: ${s.addons.map((a) => `${e(a.name)} (${money(a.price)}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : ""})`).join(" · ")}</p>` : ""}
+${s.addons.length ? `<p class="small muted">Extras: ${s.addons.map((a) => `${e(a.name)} (${money(a.price)}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : a.unit === "one-time" ? " one-time" : ""})`).join(" · ")}</p>` : ""}
 </div></section>` : ""}
 
 <section class="sec sec--alt" id="who"><div class="wrap">
 <h2>Who we work with</h2>
 <p class="lead">Independent local businesses in Cullman, Hanceville, Good Hope, Vinemont, Hartselle, Arab and nearby, including:</p>
 <ul class="chips">${CATEGORIES.map((c) => `<li>${e(c)}</li>`).join("")}</ul>
+<p class="small muted">Don't see yours? <a href="#contact">Ask us</a>. If you serve local customers, we can build for you.</p>
 </div></section>
 
 <section class="sec" id="faq"><div class="wrap narrow">
