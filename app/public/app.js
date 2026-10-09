@@ -1545,7 +1545,7 @@
         <div class="row"><label class="field">Business phone<input name="companyPhone" type="tel" value="${esc(s.companyPhone || "")}"></label>
         <label class="field">Business email<input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
         <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
-        <label class="field">Your name <span class="hint">Your texts say "Hi, this is ___ with ${esc(s.companyName || "your company")}". Callers' texts use their own login names.</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="e.g. Post"></label>
+        ${!meta.me.id || meta.me.id === "owner" ? `<label class="field">Your name <span class="hint">Your texts say "Hi, this is ___ with ${esc(s.companyName || "your company")}". Everyone else's texts use their own login names.</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="e.g. Post"></label>` : ""}
         <h2 style="margin-top:18px">Plans &amp; prices</h2>
         <p class="small muted">${s.plans.length ? "" : "Suggested starting plans are filled in below. Change them to your prices, then Save. "}Leave a plan's name blank to hide it. For automatic monthly payment, make a <strong>Payment Link</strong> for each plan in Stripe or Square (set as a monthly subscription) and paste it here.</p>
         ${planRows(s.plans)}
@@ -1612,7 +1612,8 @@
             companyPhone: v("companyPhone") || undefined,
             companyEmail: v("companyEmail") || undefined,
             gbpEmail: v("gbpEmail") || undefined,
-            callerName: v("callerName") || undefined,
+            // Only the owner's own login shows this field; others keep the owner's name as it is.
+            callerName: f.elements.callerName ? v("callerName") || undefined : s.callerName,
             plans,
             minMonths: n(v("minMonths")),
             shortMonths: n(v("shortMonths")),
