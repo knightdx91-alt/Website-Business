@@ -26,7 +26,11 @@ export async function translateToSpanish(
 - Translate meaning, not word for word. Keep it short and plain.
 - Keep the business name, street names, town names and brand names exactly as written.
 - Never add facts, prices, promises or claims that aren't in the English.
-- Return one service entry per service given, with the same id.`;
+- Return one service entry per service given, with the same id.${
+    r.category === "finance"
+      ? `\n- This is a tax, accounting, insurance or financial office. Never use "notario" or "notario público" (say "servicio de notaría" for notary), never mention immigration or legal services, and never add refund, rate, savings or credential claims ("reembolso máximo", "garantizado", "el más barato", "certificado").`
+      : ""
+  }`;
   const english = {
     business: r.name,
     town: `${r.address.city}, ${r.address.state}`,
@@ -40,6 +44,11 @@ export async function translateToSpanish(
     metaDescription: c.meta.description,
   };
   const { data, usage } = await ask(client, input.model ?? DEFAULT_COPY_MODEL, system, `<english>\n${JSON.stringify(english, null, 2)}\n</english>\n\nTranslate every field into Spanish.`, Schema, 6000);
+  if (r.category === "finance") {
+    const text = JSON.stringify(data).toLowerCase();
+    const bad = /\bnotario|inmigraci|abogad|reembolso (m[aá]ximo|garantizado|r[aá]pido)|garantiza|m[aá]s barat|certificad/.exec(text);
+    if (bad) throw new Error(`The Spanish text used "${bad[0]}", which a tax or finance office can't say. Try writing the Spanish page again.`);
+  }
   const known = new Set(r.services.map((s) => s.id));
   return {
     es: {

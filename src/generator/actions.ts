@@ -2,7 +2,7 @@ import { smsHref, telHref } from "./phone.ts";
 import type { IconName } from "./icons.ts";
 import type { BusinessRecord } from "./types.ts";
 
-export type ActionId = "call" | "text" | "directions" | "order" | "reserve" | "book" | "quote" | "menu" | "review" | "shop";
+export type ActionId = "call" | "text" | "directions" | "order" | "reserve" | "book" | "quote" | "menu" | "review" | "shop" | "portal";
 
 export interface Action {
   id: ActionId;
@@ -67,8 +67,12 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
     case "reserve":
       return r.links.reserve ? { id, label: "Reserve a table", short: "Reserve", href: r.links.reserve, external: true, icon: "calendar" } : null;
     case "book":
-      return r.links.booking ? { id, label: "Book online", short: "Book", href: r.links.booking, external: true, icon: "calendar" } : null;
+      return r.links.booking ? { id, label: r.category === "finance" ? "Book an appointment" : "Book online", short: "Book", href: r.links.booking, external: true, icon: "calendar" } : null;
     case "quote": {
+      if (r.category === "finance") {
+        const ins = r.variant === "insurance";
+        return { id, label: ins ? "Get a quote" : "Request a call back", short: ins ? "Quote" : "Call back", href: "#contact", external: false, icon: "clipboard" };
+      }
       const free = freeEstimates(r);
       const label = free ? (r.category === "contractor" || r.category === "auto" ? "Get a free estimate" : "Get a free quote") : r.category === "auto" ? "Request an appointment" : r.category === "contractor" ? "Request service" : r.category === "print" ? "Get a quote" : "Request a quote";
       return { id, label, short: free ? (r.category === "contractor" || r.category === "auto" ? "Estimate" : "Free quote") : r.category === "auto" ? "Request" : "Quote", href: "#contact", external: false, icon: "clipboard" };
@@ -80,6 +84,11 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
       if (!url) return null;
       const florist = r.category === "retail" && r.variant === "florist";
       return { id, label: florist ? "Order flowers" : "Shop online", short: florist ? "Order" : "Shop", href: url, external: true, icon: "bag" };
+    }
+    case "portal": {
+      const url = r.ext.finance?.portalUrl;
+      if (!url) return null;
+      return { id, label: r.variant === "tax_prep" ? "Upload your documents" : "Client portal", short: r.variant === "tax_prep" ? "Upload" : "Portal", href: url, external: true, icon: "clipboard" };
     }
     case "review":
       return { id, label: "Leave us a review", short: "Review", href: reviewUrl(r), external: true, icon: "star" };

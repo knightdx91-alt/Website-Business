@@ -346,4 +346,46 @@ Turnip greens | $3`),
       }),
     };
   })(),
+  (() => {
+    const record = base({ slug: "sycamore-tax", name: "Sycamore Tax & Bookkeeping", category: "finance", variant: "tax_prep", phone: "0109", street: "415 Example St NE", storefront: true });
+    record.hours = { weekly: [[], day("09:00", "18:00"), day("09:00", "18:00"), day("09:00", "18:00"), day("09:00", "18:00"), day("09:00", "17:00"), day("09:00", "13:00")] };
+    record.services = svc(["Individual tax returns", "Self-employed & 1099 returns", "Small business returns", "Prior-year & amended returns", "Bookkeeping", "Payroll"]);
+    record.ext.finance = {
+      credentials: "Enrolled Agent",
+      credentialsConfirmed: true,
+      ptinConfirmed: true,
+      efileProvider: true,
+      spanish: true,
+      modes: ["drop_off", "in_person", "virtual"],
+      offSeason: "After tax season we're open Monday through Thursday, 9 to 4, and by appointment.",
+      portalUrl: "https://example.com/",
+    };
+    record.testimonials = [said("They explained everything and made tax time easy.", "Brandon T."), said("Friendly, patient and they answer the phone.", "Ana R."), said("They keep my small business books straight all year.", "Dale K.")];
+    return {
+      slug: "sycamore-tax",
+      kind: "Tax office",
+      design: "finance.bright_desk~ticker",
+      record,
+      copy: copy({
+        heroTagline: "Tax returns, bookkeeping and payroll for families and small businesses around Cullman.",
+        heroSub: "Friendly help with your taxes, in English or Spanish, from people who take the time to explain.",
+        about: ["Sycamore Tax & Bookkeeping is a small office on the north side of Cullman that helps families, self-employed folks and small businesses.", "Stop by, drop off your paperwork, or send it through our client portal. We'll walk you through it."],
+        serviceBlurbs: blurbs([
+          ["Individual tax returns", "Federal and state returns for individuals and families."],
+          ["Self-employed & 1099 returns", "Returns for contractors, gig workers and side businesses."],
+          ["Small business returns", "Returns for small businesses, with your records kept organized."],
+          ["Prior-year & amended returns", "Help catching up on past years or fixing a return."],
+          ["Bookkeeping", "Monthly books kept current so tax time is simpler."],
+          ["Payroll", "Paychecks and payroll filings for small teams."],
+        ]),
+        faq: [
+          { q: "Do I need an appointment?", a: "Appointments are easiest, but you can also drop off your paperwork. Give us a call and we'll find a time that works." },
+          { q: "How long does it take?", a: "It depends on your return. We'll give you an idea when you come in, and call you when it's ready to review." },
+        ],
+        ctaTitle: "Let's get your taxes done",
+        ctaLine: "Call, stop by, or book a time that works for you.",
+        description: "Tax preparation, bookkeeping and payroll in Cullman, AL for families, self-employed folks and small businesses. Se habla español. Call or stop by.",
+      }),
+    };
+  })(),
 ];

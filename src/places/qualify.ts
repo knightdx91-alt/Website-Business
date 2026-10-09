@@ -88,6 +88,7 @@ const TYPE_CATEGORY: Array<[RegExp, CategoryId]> = [
   [/hair|barber|beauty|nail|pet_care|pet_groom|spa$|massage/, "salon"],
   [/car_repair|auto|tire|transmission|oil_change|car_dealer|car_wash/, "auto"],
   [/plumb|electric|roofing|contractor|hvac|heating|painter|locksmith|moving|handyman/, "contractor"],
+  [/^(accounting|insurance_agency)$/, "finance"],
   [/florist|clothing_store|gift_shop|furniture_store|thrift_store|flea_market|home_goods_store|shoe_store|garden_center/, "retail"],
 ];
 
@@ -101,6 +102,7 @@ export function guessCategory(p: Place): CategoryId | null {
   if (/screen ?print|embroider|monogram|\bsigns?\b|banners?|vinyl|decals|t-?shirts|\bprint(ing|ers)?\b|graphics/.test(n)) return "print";
   if (/\b(boutique|gifts?|antiques?|thrift|consign|flowers?|florist|floral|feed|seed|furniture|mercantile|vintage)\b/.test(n)) return "retail";
   if (/\b(paint|concrete|fenc|pest|termite|remodel|appliance|tree|stump)/.test(n)) return "contractor";
+  if (/\b(tax(es)?|impuestos|accounting|accountants?|bookkeep\w*|c\.?p\.?a\.?s?|insurance|seguros|financial (planning|advisors?|services))\b/.test(n)) return "finance";
   if (/\b(food truck|truck|grill|bbq|cafe|kitchen|diner|taco|pizza)/.test(n)) return "restaurant";
   for (const t of [p.primaryType ?? "", ...(p.types ?? [])]) {
     for (const [re, cat] of TYPE_CATEGORY) if (re.test(t)) return cat;

@@ -66,6 +66,8 @@ export interface LintInput {
   /** Google review texts held as AI context; must never appear on the site. */
   reviewTexts?: string[];
   assetBytes: number;
+  /** Category phrases the AI text may never use (e.g. refund or rate claims for tax and insurance offices). */
+  banned?: RegExp[];
 }
 
 export function lintSite(input: LintInput): LintResult {
@@ -103,6 +105,13 @@ export function lintSite(input: LintInput): LintResult {
     if (html.length > 120_000) warnings.push(`${path}: HTML is ${Math.round(html.length / 1024)} KB (budget ~100 KB)`);
   }
 
+  if (input.banned?.length) {
+    const aiText = [copy.heroTagline, copy.heroSub, ...copy.about, ...Object.values(copy.serviceBlurbs), ...(copy.steps ?? []).flatMap((s) => [s.title, s.body]), ...copy.faq.flatMap((f) => [f.q, f.a]), copy.serviceAreaIntro ?? "", copy.ctaTitle, copy.ctaLine, copy.meta.description].join(" \n ");
+    for (const re of input.banned) {
+      const m = re.exec(aiText);
+      if (m) errors.push(`Site text says "${m[0]}", which isn't allowed for this kind of business. Edit the text or rewrite it.`);
+    }
+  }
   if (r.businessStatus !== "OPERATIONAL") errors.push(`Business status is ${r.businessStatus}, not OPERATIONAL`);
   if (input.assetBytes > 100_000) warnings.push(`CSS + JS are ${Math.round(input.assetBytes / 1024)} KB`);
 

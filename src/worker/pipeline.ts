@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { writeCopy } from "../copy/write.ts";
 import { packFor } from "../generator/packs/index.ts";
+import { financeVariant } from "../generator/packs/finance.ts";
 import { pickDesign } from "../generator/design.ts";
 import { buildSite } from "../generator/render.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
@@ -36,6 +37,7 @@ export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>)
     const builds: Job[] = [];
     let checks = 0;
     for (const lead of qualify(places, { includeSites: job.badSites })) {
+      if (category === "finance" && !financeVariant(lead.place.primaryType, lead.place.types ?? [], lead.place.displayName?.text ?? "")) continue;
       const exists = await env.DB.prepare("SELECT 1 FROM leads WHERE place_id = ?").bind(lead.place.id).first();
       if (exists) continue;
       if (lead.presence === "has_site" || lead.presence === "free_builder") {

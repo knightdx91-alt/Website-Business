@@ -40,6 +40,11 @@ export const SEARCH_GROUPS: SearchGroup[] = [
   { id: "print", label: "Print, sign & shirt shops", category: "print", terms: ["screen printing", "sign shop", "print shop", "embroidery", "custom t-shirts"] },
   { id: "retail", label: "Boutiques & gift shops", category: "retail", terms: ["boutique", "gift shop", "florist"] },
   { id: "retail_more", label: "Antiques, thrift, feed & furniture", category: "retail", terms: ["antique store", "thrift store", "feed store", "furniture store"] },
+  // Tax & finance (research/tax-finance.md §10). Financial advisors aren't searched: most need their firm's approval
+  // for a website, so they're added by hand after asking.
+  { id: "finance", label: "Tax preparers & bookkeepers", category: "finance", terms: ["tax preparation service", "income tax service", "tax preparer", "bookkeeping service", "taxes y seguros"] },
+  { id: "accounting", label: "Accountants & CPAs", category: "finance", terms: ["accountant", "CPA", "payroll service", "small business accountant"] },
+  { id: "insurance", label: "Insurance agencies", category: "finance", terms: ["insurance agency", "independent insurance agent", "auto insurance agency", "Medicare insurance agent", "seguros de auto"] },
 ];
 
 export function groupById(id: string): SearchGroup | undefined {

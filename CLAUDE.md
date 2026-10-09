@@ -128,6 +128,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Stripe keys set as Worker secrets; live checkout + webhook verified with a $1 test
 - [x] Email: MailerSend worked in a test, then turned the account down (Oct 2026). Switched to Resend (RESEND_API_KEY secret wins over MAILERSEND_API_KEY)
 - [ ] Owner to do: our own Google Business Profile + review link
+- [x] Tax & finance pack (Oct 2026). Churches & nonprofits researched (research/churches-nonprofits.md), pack next
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
 ## Code map
@@ -208,6 +209,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   first open if still New (`restyleOldPreview` in preview.ts). Checking designs by eye:
   `npx tsx scripts/design-sheet.ts <scratchDir> "<look>~<layout>,..." [--no-photo]` (phone + desktop sheets, flags
   overflow) and `npx tsx scripts/check-looks.ts <category>`.
+- Tax & finance (`packs/finance.ts`, research/tax-finance.md): variants tax_prep / accounting / insurance / financial_advisor
+  from `financeVariant` (names decide; banks, lenders, pawn, payday, captive agents and franchise tax offices return null and are
+  skipped in runs). Search groups "Tax preparers & bookkeepers", "Accountants & CPAs", "Insurance agencies"; advisors only by hand
+  (ask first whether their firm allows their own site). Owner facts in `ext.finance` (Edit → Tax & finance details). Required
+  to-dos (block publish): confirm the credentials line if given, PTIN (tax prep), Alabama CPA firm permit whenever "CPA" appears,
+  agents licensed (insurance), CMS Medicare disclaimer pasted if they sell Medicare plans, and for advisors the firm's disclosure text
+  (verbatim, footer of every page + /disclosures/), compliance approval (who + date) and BrokerCheck/Form CRS links. Advisors get no
+  reviews anywhere (site, footer, review cards). `bannedPhrases` (pack hook) stops refund/rate/credential/guarantee/"free"/notario
+  wording in AI copy (copy writer retries; publish lint errors). Tax prep gets /what-to-bring/ (template list, owner-editable).
 - Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
   retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
   Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).

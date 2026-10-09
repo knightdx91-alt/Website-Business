@@ -621,7 +621,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         return json({ reply, problems: profileTextProblems(reply, 4000) });
       }
     }
-    if (action === "/reviewcard" && m === "GET") return reviewCards(lead.name ?? "us", lead.place_id);
+    if (action === "/reviewcard" && m === "GET") {
+      if (lead.category === "finance" && lead.record_json && (JSON.parse(lead.record_json) as BusinessRecord).variant === "financial_advisor") throw new HttpError(409, "Financial advisors can't use review cards");
+      return reviewCards(lead.name ?? "us", lead.place_id);
+    }
     if ((action === "/tents" || action === "/window") && m === "GET") {
       const siteUrl = lead.custom_domain ? `https://${lead.custom_domain}/` : lead.live_url;
       if (!siteUrl) throw new HttpError(409, "Publish the site first: the QR codes point to the live website");

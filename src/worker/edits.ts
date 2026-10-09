@@ -37,6 +37,34 @@ export const EditsSchema = z.object({
       install: z.boolean().optional(),
       giftCards: z.boolean().optional(),
       delivery: z.boolean().optional(),
+      finance: z
+        .object({
+          variant: z.enum(["tax_prep", "accounting", "insurance", "financial_advisor"]),
+          credentials: z.string().trim().max(160),
+          credentialsConfirmed: z.boolean(),
+          ptinConfirmed: z.boolean(),
+          efileProvider: z.boolean(),
+          cpaPermitConfirmed: z.boolean(),
+          cpaPermitNo: z.string().trim().max(40),
+          spanish: z.boolean(),
+          modes: z.array(z.enum(["drop_off", "in_person", "virtual"])).max(3),
+          portalUrl: url,
+          offSeason: z.string().trim().max(240),
+          whatToBring: z.array(z.string().trim().min(1).max(160)).max(25),
+          independent: z.boolean(),
+          carriers: z.array(z.string().trim().min(1).max(60)).max(30),
+          licensesConfirmed: z.boolean(),
+          licenseNo: z.string().trim().max(40),
+          medicare: z.boolean(),
+          tpmoDisclaimer: z.string().trim().max(1200),
+          disclosure: z.string().trim().max(4000),
+          complianceApprovedBy: z.string().trim().max(120),
+          complianceApprovedOn: z.string().trim().max(40),
+          brokercheckUrl: url,
+          crsUrl: url,
+        })
+        .partial()
+        .optional(),
       links: z
         .object({ order: url, reserve: url, booking: url, facebook: url, instagram: url, shop: url })
         .partial()
@@ -134,6 +162,14 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
     if (e.giftCards !== undefined) x.giftCards = e.giftCards;
     if (e.delivery !== undefined) x.delivery = e.delivery;
     if (e.links?.shop !== undefined) x.shopUrl = e.links.shop || undefined;
+  }
+  if (r.category === "finance" && e.finance) {
+    const { variant, ...rest } = e.finance;
+    if (variant) r.variant = variant;
+    const x: Record<string, unknown> = { ...(r.ext.finance ?? {}) };
+    // Empty text clears a field; everything here is the owner's own wording or confirmation.
+    for (const [k, v] of Object.entries(rest)) x[k] = v === "" || (Array.isArray(v) && !v.length) ? undefined : v;
+    r.ext.finance = x as typeof r.ext.finance;
   }
   if (r.category === "cleaning") {
     r.ext.cleaning = r.ext.cleaning ?? {};

@@ -8,6 +8,12 @@ import { DEFAULT_COPY_MODEL } from "./write.ts";
 
 /** Why a site helps each kind of business, drawn from the category research in research/*.md. */
 const ANGLES: Record<string, string[]> = {
+  finance: [
+    "People pick a tax office, accountant or insurance agent they can trust. A real website with the office, the people and the hours does that before they ever call.",
+    "Most small offices' Facebook pages don't show hours, what to bring or how to get documents to them. The site answers those questions so the phone rings with ready clients.",
+    "Tax offices get most of their year's clients from January to April: the site works for them before the rush, including a what-to-bring checklist.",
+    "The site never makes refund, rate or savings claims and keeps their credentials exactly as they confirm them, so it stays on the right side of IRS and state advertising rules.",
+  ],
   restaurant: [
     "People decide where to eat on their phone: they want hours, the menu and a phone number fast. Most local restaurant sites studied fumble this (only 20 of 63 had tap-to-call).",
     "A real text menu on its own page shows up when people search '<name> menu' and is easy to read on a phone. Photo and PDF menus don't.",
@@ -56,6 +62,8 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
   else f.push(`a services list (${r.services.map((s) => s.name).join(", ")})`);
   if (r.serviceArea?.towns.length) f.push(`a service-area list of nearby towns (${r.serviceArea.towns.slice(0, 5).join(", ")}…)`);
   if (r.category === "print") f.push("a 'send us your design' section with buttons to email or text their artwork");
+  if (r.category === "finance" && r.variant === "tax_prep") f.push("a printable 'what to bring' checklist page for tax appointments");
+  if (r.category === "finance" && r.variant === "financial_advisor") f.push("a disclosures page for the firm's required disclosure text (no reviews, as advisor rules require)");
   if (r.category === "retail") f.push("a 'what's new' section that sends shoppers to their Facebook or Instagram for new arrivals");
   if (hasForm) f.push("a request form that sends customer requests to an inbox (once live)");
   f.push("an FAQ section");

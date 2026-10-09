@@ -2,6 +2,7 @@ import { townsWithin } from "../generator/geo.ts";
 import { autoVariant, seedAutoServices } from "../generator/packs/auto.ts";
 import { cleaningVariant, seedCleaningServices } from "../generator/packs/cleaning.ts";
 import { contractorTrade, seedServices } from "../generator/packs/contractor.ts";
+import { financeAlsoOffers, financeVariant, seedFinanceServices } from "../generator/packs/finance.ts";
 import { landscapingVariant, seedLandscapingServices } from "../generator/packs/landscaping.ts";
 import { salonVariant, seedSalonServices } from "../generator/packs/salon.ts";
 import { printVariant, seedPrintServices } from "../generator/packs/print.ts";
@@ -161,6 +162,12 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
   if (category === "retail") {
     const variant = retailVariant(p.primaryType, types, name);
     return { ...base, variant, services: seedRetailCarry(variant), ext: { retail: {} } };
+  }
+  if (category === "finance") {
+    // Added by hand, a place the rules would skip still gets the most common office type.
+    const variant = financeVariant(p.primaryType, types, name) ?? "tax_prep";
+    const alsoOffers = financeAlsoOffers(variant, name);
+    return { ...base, variant, services: seedFinanceServices(variant, alsoOffers), ext: { finance: { alsoOffers, spanish: /\b(seguros|impuestos|latin[oa]s?|hispan\w*)\b/i.test(name) || undefined } } };
   }
   throw new Error(`Category ${category} not supported yet`);
 }

@@ -155,6 +155,42 @@ export interface RetailExt {
   delivery?: boolean;
 }
 
+/** Tax & finance (research/tax-finance.md §9). Every claim field is owner-entered and owner-confirmed. */
+export interface FinanceExt {
+  /** Secondary lines from the name or the owner: insurance, tax_prep, bookkeeping, payroll, notary, translation. */
+  alsoOffers?: string[];
+  /** The owner's exact credentials line, e.g. "Enrolled Agent" or "Jane Doe, CPA". Shown only once confirmed. */
+  credentials?: string;
+  credentialsConfirmed?: boolean;
+  /** tax_prep: owner confirms every paid preparer has a current PTIN (required to publish). */
+  ptinConfirmed?: boolean;
+  /** Owner confirms an EFIN; unlocks the "Authorized IRS e-file Provider" line. */
+  efileProvider?: boolean;
+  /** Required whenever "CPA" appears in the name or credentials. */
+  cpaPermitConfirmed?: boolean;
+  cpaPermitNo?: string;
+  spanish?: boolean;
+  modes?: Array<"drop_off" | "in_person" | "virtual">;
+  portalUrl?: string;
+  /** tax_prep: hours after tax season in the owner's words, e.g. "After April 15, by appointment". */
+  offSeason?: string;
+  whatToBring?: string[];
+  /** insurance */
+  independent?: boolean;
+  carriers?: string[];
+  licensesConfirmed?: boolean;
+  licenseNo?: string;
+  medicare?: boolean;
+  /** CMS third-party marketing disclaimer, pasted by the owner from their carrier or FMO. */
+  tpmoDisclaimer?: string;
+  /** financial_advisor */
+  disclosure?: string;
+  complianceApprovedBy?: string;
+  complianceApprovedOn?: string;
+  brokercheckUrl?: string;
+  crsUrl?: string;
+}
+
 export interface CleaningExt {
   freeEstimates?: boolean;
   backgroundChecked?: boolean;
@@ -207,6 +243,7 @@ export interface BusinessRecord {
     cleaning?: CleaningExt;
     print?: PrintExt;
     retail?: RetailExt;
+    finance?: FinanceExt;
   };
   confirmed: ConfirmableField[];
 }

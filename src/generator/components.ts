@@ -228,7 +228,7 @@ export function ctaBand(ctx: Ctx, acts: Action[]): Raw {
 </div></section>`;
 }
 
-export function footer(ctx: Ctx, nav: NavItem[]): Raw {
+export function footer(ctx: Ctx, nav: NavItem[], extra: { note?: Raw; reviews?: boolean } = {}): Raw {
   const r = ctx.r;
   const social = Object.entries(r.links.social).filter(([, u]) => u) as Array<[string, string]>;
   const label: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube", nextdoor: "Nextdoor" };
@@ -244,8 +244,9 @@ export function footer(ctx: Ctx, nav: NavItem[]): Raw {
   }</div>
 <div><h2>Links</h2><ul>${nav.map((n) => html`<li><a href="${n.href}">${n.label}</a></li>`)}${social.map(
     ([k, u]) => html`<li><a href="${u}" target="_blank" rel="noopener">${label[k] ?? k}<span class="sr"> (opens in new tab)</span></a></li>`,
-  )}<li><a href="${r.mapsUrl}" target="_blank" rel="noopener">Google reviews<span class="sr"> (opens in new tab)</span></a></li></ul></div>
+  )}${extra.reviews === false ? "" : html`<li><a href="${r.mapsUrl}" target="_blank" rel="noopener">Google reviews<span class="sr"> (opens in new tab)</span></a></li>`}</ul></div>
 </div>
+${extra.note ?? ""}
 <p class="ftr__legal">© <span data-year>${new Date().getFullYear()}</span> ${r.name}${ctx.hasForm ? html` · <a href="/privacy/">Privacy</a>` : ""}${
     ctx.credit ? html` · Website by <a href="${ctx.credit.url}">${ctx.credit.company}</a> · <a href="${ctx.credit.changeUrl}" rel="nofollow">Request a change</a>` : ""
   }</p>

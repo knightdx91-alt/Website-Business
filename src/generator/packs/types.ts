@@ -38,6 +38,12 @@ export interface CategoryPack {
   homeFaq(ctx: Ctx): Faq[];
   pages(ctx: Ctx): PageSpec[];
   copyBrief(r: BusinessRecord): CopyBrief;
+  /** False hides every review link (financial advisors may not show reviews). Default true. */
+  reviewsAllowed?(r: BusinessRecord): boolean;
+  /** Extra lines the footer must carry on every page (credentials, required disclosures). */
+  footerNote?(ctx: Ctx): Raw;
+  /** Phrases the AI copy may never use in this category, checked by the copy writer and the publish lint. */
+  bannedPhrases?(r: BusinessRecord): RegExp[];
 }
 
 /** Fits "{a} | {b}" into 60 chars by trying shorter variants in order. */

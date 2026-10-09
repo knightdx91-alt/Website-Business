@@ -95,12 +95,16 @@ function unsupportedNumbers(text: string, factsText: string): string[] {
   return [...new Set(nums.filter((n) => !factsText.includes(n)))];
 }
 
-function check(out: CopyOut, factsText: string, reviews: string[]): string[] {
+function check(out: CopyOut, factsText: string, reviews: string[], banned: RegExp[] = []): string[] {
   const issues: string[] = [];
   const all = [out.cuisineLabel, out.heroTagline, out.heroSub, ...out.about, ...out.serviceBlurbs.map((s) => s.text), ...out.steps.flatMap((s) => [s.title, s.body]), ...out.faq.flatMap((f) => [f.q, f.a]), out.serviceAreaIntro, out.ctaTitle, out.ctaLine, out.metaDescription].join(" \n ");
   const lower = all.toLowerCase();
   for (const p of BANNED_PHRASES) if (lower.includes(p)) issues.push(`uses banned phrase "${p}"`);
   if (SUPERLATIVE.test(all)) issues.push("uses a superlative");
+  for (const re of banned) {
+    const m = re.exec(all);
+    if (m) issues.push(`uses "${m[0]}", which this kind of business may not claim or offer`);
+  }
   for (const n of unsupportedNumbers(all, factsText)) issues.push(`mentions the number ${n}, which isn't in the facts`);
   for (const rv of reviews) if (quotesReview(all, rv)) issues.push("repeats wording from a Google review");
   return issues;
@@ -157,7 +161,7 @@ ${brief(input.pack, input.record)}`;
     if (res.stop_reason === "refusal") throw new Error(`Copy request for ${input.record.name} was declined`);
     if (!res.parsed_output) throw new Error(`Copy for ${input.record.name} didn't match the schema (stop: ${res.stop_reason})`);
     out = res.parsed_output;
-    issues = check(out, factsText, input.reviewContext);
+    issues = check(out, factsText, input.reviewContext, input.pack.bannedPhrases?.(input.record));
     if (issues.length === 0) break;
     messages.push({ role: "assistant", content: res.content });
     messages.push({ role: "user", content: `Please fix these problems and return the full copy again:\n- ${issues.join("\n- ")}` });

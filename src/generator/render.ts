@@ -69,7 +69,7 @@ ${hasAnyHours(ctx.r.hours) ? html`<script type="application/json" id="hours-data
 </head><body>
 ${header(ctx, nav)}
 ${o.body}
-${footer(ctx, nav)}
+${footer(ctx, nav, { note: pack.footerNote?.(ctx), reviews: pack.reviewsAllowed?.(ctx.r) ?? true })}
 ${actionBar(pack.actionBar(ctx))}
 </body></html>`}`;
 }
@@ -223,6 +223,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     todos: [...new Set(ctx.todos)],
     reviewTexts: input.reviewTexts,
     assetBytes: css.length + CLIENT_SCRIPT.length,
+    banned: pack.bannedPhrases?.(ctx.r),
   });
   if (input.mode === "publish" && (lint.errors.length || lint.publishBlockers.length)) {
     throw new Error(`Publish blocked:\n- ${[...lint.errors, ...lint.publishBlockers].join("\n- ")}`);

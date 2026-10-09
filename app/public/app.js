@@ -443,7 +443,7 @@
       <div id="stats"><p class="muted small"><span class="spin"></span> Loading visits…</p></div>
       <div class="btns btns--full" style="margin-top:10px">
         <button class="btn" id="report">Text monthly report</button>
-        <a class="btn" href="/api/leads/${l.id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a>
+        ${noReviews(l) ? "" : `<a class="btn" href="/api/leads/${l.id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a>`}
         <a class="btn" href="/api/leads/${l.id}/tents" target="_blank" rel="noopener">QR table tents</a>
         <a class="btn" href="/api/leads/${l.id}/window" target="_blank" rel="noopener">Window sign (QR)</a></div>
       <h3 style="margin-top:16px">Their own domain</h3>
@@ -693,6 +693,7 @@
     const isK = cat === "cleaning";
     const isP = cat === "print";
     const isRt = cat === "retail";
+    const isF = cat === "finance";
     const isM = isS && r.variant === "massage";
     const serviceArea = isC || isL || isK;
     const hasServices = !isR;
@@ -774,6 +775,7 @@
         ${isP ? `${cb("designHelp", "They help design artwork", !!ext.designHelp)}${cb("proofBeforePrint", "They send a proof before printing", !!ext.proofBeforePrint)}${r.variant === "signs" ? cb("install", "They install signs", !!ext.install) : ""}` : ""}
         ${isRt ? `${cb("giftCards", "They sell gift cards", !!ext.giftCards)}${cb("delivery", "They deliver", !!ext.delivery)}` : ""}
       </section>
+      ${isF ? financeEditCard(r, ext, cb) : ""}
       <section class="card"><h2>Links</h2>
         ${isR ? `<label class="field">Online ordering link<input name="order" type="url" value="${esc(r.links.order || "")}" placeholder="https://"></label>
         <label class="field">Reservations link<input name="reserve" type="url" value="${esc(r.links.reserve || "")}" placeholder="https://"></label>` : ""}
@@ -885,6 +887,7 @@
           hiring: (() => { const roles = (val("hiringRoles") || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 8); return roles.length ? { roles, how: val("hiringHow") || "" } : null; })(),
           ...(isP ? { email: val("email"), designHelp: on("designHelp"), proofBeforePrint: on("proofBeforePrint"), ...(r.variant === "signs" ? { install: on("install") } : {}) } : {}),
           ...(isRt ? { giftCards: on("giftCards"), delivery: on("delivery") } : {}),
+          ...(isF ? { finance: financeEditValues(f, r) } : {}),
           testimonials,
           towns: hasTowns ? val("towns").split(",").map((s) => s.trim()).filter(Boolean) : undefined,
           services: hasServices ? val("services").split("\n").map((s) => s.trim()).filter(Boolean) : undefined,
@@ -1242,6 +1245,58 @@
     });
   }
 
+  /* ---------- tax & finance: what the owner must confirm (research/tax-finance.md §5) ---------- */
+  /** Financial advisors may not use testimonials or reviews (Alabama 830-X-3-.22, SEC/FINRA rules). */
+  const noReviews = (l) => l.category === "finance" && (l.record ? l.record.variant : "") === "financial_advisor";
+  const FIN_VARIANTS = [["tax_prep", "Tax preparation"], ["accounting", "Accounting & bookkeeping"], ["insurance", "Insurance agency"], ["financial_advisor", "Financial advisor"]];
+  function financeEditCard(r, x, cb) {
+    const v = r.variant;
+    const modes = x.modes || [];
+    const ta = (name, label, value, rows, ph) => `<label class="field">${label}<textarea name="${name}" rows="${rows}" placeholder="${esc(ph || "")}">${esc(value || "")}</textarea></label>`;
+    const inp = (name, label, value, ph, type) => `<label class="field">${label}<input name="${name}" type="${type || "text"}" value="${esc(value || "")}" placeholder="${esc(ph || "")}"></label>`;
+    return `<section class="card"><h2>Tax &amp; finance details</h2>
+      <p class="small muted">Only what the owner tells you. Required checks block publishing until they're ticked.</p>
+      <label class="field">Type of office<select name="finVariant">${FIN_VARIANTS.map(([k, t]) => `<option value="${k}"${k === v ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+      ${inp("finCredentials", "Credentials line <span class=\"hint\">Their exact words, e.g. “Enrolled Agent” or “Jane Smith, CPA”</span>", x.credentials)}
+      ${cb("finCredentialsConfirmed", "Owner confirmed the credentials line is right", !!x.credentialsConfirmed)}
+      ${v === "tax_prep" ? `${cb("finPtin", "Owner confirmed every paid preparer has a current PTIN (required)", !!x.ptinConfirmed)}
+        ${cb("finEfile", "Owner confirmed they're an Authorized IRS e-file Provider (has an EFIN)", !!x.efileProvider)}
+        ${inp("finOffSeason", "Hours after tax season", x.offSeason, "After April 15, Monday to Thursday 9 to 4, or by appointment")}
+        ${ta("finBring", "What to bring (one per line; leave blank for the standard list)", (x.whatToBring || []).join("\n"), 5)}` : ""}
+      ${v === "tax_prep" || v === "accounting" ? `${cb("finCpa", "Owner confirmed an Alabama CPA firm permit (required if “CPA” appears anywhere)", !!x.cpaPermitConfirmed)}${inp("finCpaNo", "Firm permit # (optional, shown in the footer)", x.cpaPermitNo)}` : ""}
+      ${v === "insurance" ? `${cb("finIndependent", "Independent agency (works with several companies)", !!x.independent)}
+        ${ta("finCarriers", "Companies they're appointed with (one per line, names only)", (x.carriers || []).join("\n"), 4)}
+        ${cb("finLicenses", "Owner confirmed the agents shown are licensed in Alabama for these lines (required)", !!x.licensesConfirmed)}
+        ${inp("finLicenseNo", "License # or NPN (optional, shown in the footer)", x.licenseNo)}
+        ${cb("finMedicare", "They sell Medicare Advantage or Part D plans", !!x.medicare)}
+        ${ta("finTpmo", "Medicare disclaimer (required if they sell Medicare plans; paste the current wording from their carrier or FMO)", x.tpmoDisclaimer, 4)}` : ""}
+      ${v === "financial_advisor" ? `<p class="small"><strong>Ask first:</strong> does their firm let them use their own website? Most need compliance approval.</p>
+        ${ta("finDisclosure", "Firm disclosure text (required, word for word)", x.disclosure, 5, "Securities offered through …, Member FINRA/SIPC. Advisory services offered through …")}
+        <div class="row">${inp("finApprovedBy", "Compliance approved by (required)", x.complianceApprovedBy)}${inp("finApprovedOn", "Approval date", x.complianceApprovedOn, "", "date")}</div>
+        ${inp("finBrokercheck", "BrokerCheck link", x.brokercheckUrl, "https://brokercheck.finra.org/…", "url")}
+        ${inp("finCrs", "Form CRS link", x.crsUrl, "https://", "url")}
+        <p class="small muted">Advisor sites never show reviews, ratings or testimonials.</p>` : ""}
+      ${cb("finSpanish", "Se habla español", !!x.spanish)}
+      <div class="row">${cb("finDrop", "Drop-off", modes.includes("drop_off"))}${cb("finInPerson", "In person", modes.includes("in_person"))}${cb("finVirtual", "Virtual", modes.includes("virtual"))}</div>
+      ${inp("finPortal", "Client portal link (document upload)", x.portalUrl, "https://", "url")}
+    </section>`;
+  }
+  function financeEditValues(f, r) {
+    const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
+    const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
+    const lines = (n) => (f.elements[n] ? f.elements[n].value.split("\n").map((x) => x.trim()).filter(Boolean) : undefined);
+    const out = {
+      variant: v("finVariant"), credentials: v("finCredentials"), credentialsConfirmed: on("finCredentialsConfirmed"),
+      ptinConfirmed: on("finPtin"), efileProvider: on("finEfile"), offSeason: v("finOffSeason"), whatToBring: lines("finBring"),
+      cpaPermitConfirmed: on("finCpa"), cpaPermitNo: v("finCpaNo"),
+      independent: on("finIndependent"), carriers: lines("finCarriers"), licensesConfirmed: on("finLicenses"), licenseNo: v("finLicenseNo"), medicare: on("finMedicare"), tpmoDisclaimer: v("finTpmo"),
+      disclosure: f.elements.finDisclosure ? f.elements.finDisclosure.value.trim() : undefined, complianceApprovedBy: v("finApprovedBy"), complianceApprovedOn: v("finApprovedOn"), brokercheckUrl: v("finBrokercheck"), crsUrl: v("finCrs"),
+      spanish: on("finSpanish"), modes: [["finDrop", "drop_off"], ["finInPerson", "in_person"], ["finVirtual", "virtual"]].filter(([n]) => on(n)).map(([, m]) => m),
+      portalUrl: v("finPortal"),
+    };
+    return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
+  }
+
   /* ---------- in-person guide (walk-ins) ---------- */
   // The slow part of the day for each kind of business, when an owner has a few minutes.
   const WALKIN_TIMING = {
@@ -1253,6 +1308,7 @@
     cleaning: "Most cleaners work from home or are out on jobs: call first and ask to meet for 5 minutes, then bring the preview.",
     print: "Late morning or early afternoon on a weekday. Skip deadline days, like Fridays before games and events.",
     retail: "A weekday morning soon after opening, or mid-afternoon. Never during a sale or a busy Saturday.",
+    finance: "Tax offices: May through December, when they have time to talk (never January to mid-April). Insurance agencies: a weekday mid-morning or mid-afternoon. Advisors: call first.",
   };
 
   // Short answers for what owners say face to face. The full list lives in Plans & answers.
@@ -1340,6 +1396,8 @@
         ${say("Hi! Is the owner or manager around? I'll only need a minute.")}
         <p class="small muted">When you have the owner:</p>
         ${say(`I'm ${me} with ${co}. We're local, here in Cullman. ${why}, so I went ahead and built you one. Can I show you real quick? It's free to look at.`)}
+        ${l && l.category === "finance" && r && r.variant === "financial_advisor" ? `<p class="small"><strong>Advisors: ask this first.</strong> “Does your firm let you use your own website?” Many must use the firm's site or get compliance approval. If they can't, thank them and log it.</p>` : ""}
+        ${l && l.category === "finance" && r && r.variant === "tax_prep" ? `<p class="small muted">January to mid-April is their busy season. If you're there then, keep it to one minute and offer to come back in May.</p>` : ""}
         <details class="obj"><summary>Owner isn't there</summary><p>“No problem. When's a good time to catch them? Could I leave this for them?” Leave the flyer, ask the owner's name and the best time, then log a callback below.</p></details>
         <details class="obj"><summary>They're slammed</summary><p>“I can see you're busy. I'll come back. Is tomorrow morning better?” Log the callback, and go.</p></details>`, true)}
 
@@ -1487,7 +1545,7 @@
         services: st.kit
           ? `<div class="kit">${st.kit.services.map((x) => `<div class="svc"><strong>${esc(x.name)}</strong> ${copyBtn(x.name, "Copy name")}<p class="small">${esc(x.description)}</p>${copyBtn(x.description, "Copy description")}</div>`).join("")}</div>`
           : "",
-        reviewcards: `<div class="kit"><a class="btn btn--small" href="/api/leads/${id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a></div>`,
+        reviewcards: noReviews(l) ? `<p class="small muted">Not for financial advisors: no review cards or review requests.</p>` : `<div class="kit"><a class="btn btn--small" href="/api/leads/${id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a></div>`,
       };
       $app.innerHTML = `<p><a href="#/lead/${id}">← ${esc(r ? r.name : l.name)}</a></p>
         <h1>Google profile: ${esc(r ? r.name : l.name)}</h1>
@@ -1586,7 +1644,7 @@
   }
 
   /* ---------- add a business by hand ---------- */
-  const PACKS = [["restaurant", "Restaurant, cafe, bakery or food truck"], ["contractor", "Contractor or home service (plumbing, HVAC, painting, concrete, tree, pest…)"], ["salon", "Salon, barber, nails, massage or pet grooming"], ["auto", "Auto repair, body shop, detailing, towing or small engine"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning or pressure washing"], ["print", "Print shop, sign shop, screen printing or embroidery"], ["retail", "Shop: boutique, gifts, florist, antiques, thrift, feed or furniture"]];
+  const PACKS = [["restaurant", "Restaurant, cafe, bakery or food truck"], ["contractor", "Contractor or home service (plumbing, HVAC, painting, concrete, tree, pest…)"], ["salon", "Salon, barber, nails, massage or pet grooming"], ["auto", "Auto repair, body shop, detailing, towing or small engine"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning or pressure washing"], ["finance", "Tax preparer, accountant, insurance agency or financial advisor"], ["print", "Print shop, sign shop, screen printing or embroidery"], ["retail", "Shop: boutique, gifts, florist, antiques, thrift, feed or furniture"]];
   const PRESENCE = { none: ["No website", "chip--good"], social: ["Only a social page", "chip--good"], free_builder: ["Free-builder site", "chip--warn"], has_site: ["Has a website", "chip--warn"] };
 
   async function viewAdd() {
