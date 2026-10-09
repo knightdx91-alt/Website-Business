@@ -12,12 +12,12 @@ import { profileTextProblems, socialTextProblems, writeMonthlyPosts, writeProfil
 import { reviewTexts } from "../places/to-record.ts";
 import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
-import { addCaller, checkPassword, clearCookie, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyShare, verifySignup } from "./auth.ts";
+import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
 import { salesDashboard } from "./sales.ts";
-import { serveSignup, signupsFor } from "./signup.ts";
+import { purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
@@ -219,6 +219,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const settings = await getSettings(env);
     return json({
       me: { role: session.role, name: session.name, id: session.userId },
+      checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET },
       categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
       defaultTerms: defaultTerms(settings),
       models: Object.entries(MODEL_PRICES).map(([id, p]) => ({ id, label: p.label })),
@@ -374,7 +375,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
 
   if (path === "/sales" && m === "GET") {
     ownerOnly();
-    return json(await salesDashboard(env));
+    return json({ ...(await salesDashboard(env)), websiteOrders: await websiteOrders(env) });
   }
 
   // Look up one business by name to add it by hand (owner and callers; one Google request per search).
@@ -481,10 +482,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const action = leadMatch[2] ?? "";
     const sub = leadMatch[3];
     const lead = await requireLead(env, id);
-    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/flyer"].includes(action);
+    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/flyer", "/extraslink"].includes(action);
     if (!callerSafe) ownerOnly();
 
-    if (action === "" && m === "GET") return json({ ...detail(lead), notes: await notesFor(env, id), signups: await signupsFor(env, id) });
+    if (action === "" && m === "GET") return json({ ...detail(lead), notes: await notesFor(env, id), signups: await signupsFor(env, id), purchases: await purchasesFor(env, id) });
+    if (action === "/extraslink" && m === "POST") {
+      if (!["sold", "live"].includes(lead.sales_status)) throw new HttpError(409, "Extras links are for clients who've signed up");
+      const token = await extrasToken(env, id);
+      return json({ url: `${url.origin}/x/${token}`, expiresInDays: 30 });
+    }
     if (action === "/signup" && m === "POST") {
       const { plan } = await body(req, z.object({ plan: z.enum(["basic", "plus", "pro"]) }));
       const settings = await getSettings(env);
@@ -963,6 +969,14 @@ export default {
         return await serveSignup(env, req, leadId, plan, url.origin);
       }
       if (url.pathname === "/stripe/webhook" && req.method === "POST") return await stripeWebhook(env, req);
+      const extras = /^\/x\/([a-z0-9]+)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(url.pathname);
+      if (extras && (req.method === "GET" || req.method === "POST")) {
+        const [, leadId, exp, sig] = extras as unknown as [string, string, string, string];
+        if (!(await verifyExtras(env, leadId, exp, sig))) {
+          return new Response("This link has expired. Ask us for a new one.", { status: 410, headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex" } });
+        }
+        return await serveExtras(env, req, leadId, url.origin);
+      }
       const hit = /^\/t\/([a-z0-9]+)$/.exec(url.pathname);
       if (hit && req.method === "POST") return await recordHit(env, req, hit[1]!, url.searchParams.get("e"));
       const form = /^\/f\/([a-z0-9]+)$/.exec(url.pathname);

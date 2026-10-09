@@ -401,8 +401,11 @@
     return `<section class="card" id="signupcard"><h2>${signed ? "Signed up" : "Sign them up"}</h2>
       ${(l.signups || []).map((x) => `<div class="signed"><strong>✍️ ${esc(x.plan.name)}${x.plan.billingLabel ? ` · ${esc(x.plan.billingLabel)}` : ""}</strong>
         <p class="small">${esc(x.plan.billingDetail || `${money(x.plan.monthly)}/month${x.plan.setup ? ` + ${money(x.plan.setup)} setup` : ""}`)}</p>
+        ${x.extras && (x.extras.extras.length || x.extras.quotes.length) ? `<p class="small">Extras: ${esc([...x.extras.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...x.extras.quotes.map((q) => `${q} (quote)`)].join(", "))}</p>` : ""}
+        ${x.dueCents ? `<p class="small">Due at sign-up: <strong>${money(x.dueCents / 100)}</strong></p>` : ""}
         <p class="small muted">${esc(x.signerName)}${x.signerTitle ? ", " + esc(x.signerTitle) : ""} · ${esc(x.signerEmail || "")} · ${ago(x.createdAt)}${x.sentBy ? ` · sent by ${esc(x.sentBy)}` : ""}</p>
         ${isOwner() ? `<label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label>` : x.paid ? `<p class="chip chip--good">Paid</p>` : ""}</div>`).join("")}
+      ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)}</li>`).join("")}</ul>` : ""}
       ${plans.length
         ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
           <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a></p>
@@ -546,6 +549,8 @@
       ${ready ? signupCardHtml(l) : ""}
       ${l.salesStatus === "live" && owner ? liveCardHtml(l) : ""}
       ${(l.salesStatus === "live" || l.salesStatus === "sold") && owner && ready ? gbpCardHtml(l) : ""}
+      ${l.salesStatus === "live" || l.salesStatus === "sold" ? `<section class="card"><h2>🛒 Extras</h2><p class="small muted">Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${meta.checkout && meta.checkout.online ? " online" : ""}. Good for 30 days.</p>
+        <div class="btns btns--full"><button class="btn" type="button" data-extraslink>💬 Text “Buy extras” link</button></div></section>` : ""}
       ${l.salesStatus === "live" || l.salesStatus === "sold" ? reviewAskHtml() : ""}
       ${l.salesStatus !== "live" ? logCardHtml(l) : ""}
       ${ready && owner ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
@@ -1275,6 +1280,16 @@
   }
 
   function bindReviewAsk(l) {
+    const xb = $app.querySelector("[data-extraslink]");
+    if (xb) xb.addEventListener("click", async () => {
+      xb.disabled = true;
+      try {
+        const { url } = await api(`/leads/${l.id}/extraslink`, { method: "POST" });
+        const name = l.record ? l.record.name : l.name;
+        const digits = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+        location.href = `sms:+1${digits}?body=${encodeURIComponent(`${greeting()} Here's where you can add extras to the ${name} website, like a photo shoot, a Spanish page or social media posts: ${url}`)}`;
+      } catch (err) { toast(err.message); } finally { xb.disabled = false; }
+    });
     const b = $app.querySelector("[data-askreview]");
     if (!b) return;
     const name = l.record ? l.record.name : l.name;
@@ -1574,6 +1589,12 @@
         ? `<ul class="list">${d.clients.map((c) => `<li><div class="row"><a href="#/lead/${c.id}"><strong>${esc(c.name)}</strong></a>${c.status === "live" ? '<span class="chip chip--good" style="flex:none">● Live</span>' : '<span class="chip" style="flex:none">Sold</span>'}</div>
             <p class="small muted" style="margin:4px 0 0">${c.plan ? `${esc(c.plan)} · ${money(c.monthly)}/mo · ${c.paid ? "paid" : "<strong>payment not set up</strong>"}` : "No sign-up on file"}${c.seller ? ` · sold by ${esc(c.seller)}` : ""}</p></li>`).join("")}</ul>`
         : `<p class="muted small">No clients yet. They show up here once someone signs up or is marked Sold.</p>`}</section>
+      <section class="card"><h2>🛒 Website orders</h2>${(d.websiteOrders || []).length
+        ? `<ul class="list">${d.websiteOrders.map((o) => `<li><div class="row"><strong>${esc(o.business || "")}</strong>${o.paid ? '<span class="chip chip--good" style="flex:none">Paid</span>' : '<span class="chip chip--warn" style="flex:none">Not paid</span>'}</div>
+            <p class="small" style="margin:4px 0 0">${esc(o.plan)}${o.extras.length ? ` + ${esc(o.extras.join(", "))}` : ""} · ${money((o.dueCents || 0) / 100)} due</p>
+            <p class="small muted" style="margin:2px 0 0">${esc(o.name)} · <a href="${telHref(String(o.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, ""))}">${esc(o.phone || "")}</a> · ${esc(o.email || "")} · ${ago(o.createdAt)}</p></li>`).join("")}</ul>
+           <p class="small muted">People who bought from “Get started” on your website. Find their business with <a href="#/add">➕ Add a business</a> to build their site.</p>`
+        : `<p class="muted small">None yet. People who buy from “Get started” on your website show up here.</p>`}</section>
       <p class="small muted">Calls are logged outcomes. Reached means someone answered. A sale counts for whoever sent the sign-up link, or whoever marked it Sold.</p>`;
   }
 
@@ -1722,7 +1743,11 @@
         <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
         ${!meta.me.id || meta.me.id === "owner" ? `<label class="field">Your name <span class="hint">Your texts say "Hi, this is ___ with ${esc(s.companyName || "your company")}". Everyone else's texts use their own login names.</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="e.g. Post"></label>` : ""}
         <h2 style="margin-top:18px">Plans &amp; prices</h2>
-        <p class="small muted">${s.plans.length ? "" : "Suggested starting plans are filled in below. Change them to your prices, then Save. "}Leave a plan's name blank to hide it. For automatic monthly payment, make a <strong>Payment Link</strong> for each plan in Stripe or Square (set as a monthly subscription) and paste it here.</p>
+        <div class="card small" style="margin:8px 0">${meta.checkout && meta.checkout.online
+          ? `✅ <strong>Online checkout is on.</strong> Sign-up links, “Buy now” on your website and “Buy extras” links all go to a Stripe checkout with exactly what the client picked. The payment links below aren't needed.`
+          : `<strong>Online checkout isn't on yet.</strong> Add your Stripe key as the Cloudflare secret <code>STRIPE_SECRET_KEY</code> and clients can pick a plan, way to pay and extras and pay in one checkout. Until then, the payment links below are used (plan only).`}
+          ${meta.checkout && !meta.checkout.webhook ? `<br>⚠️ Payments won't mark clients Paid by themselves until the Stripe webhook secret (<code>STRIPE_WEBHOOK_SECRET</code>) is added.` : ""}</div>
+        <p class="small muted">${s.plans.length ? "" : "Suggested starting plans are filled in below. Change them to your prices, then Save. "}Leave a plan's name blank to hide it.</p>
         ${planRows(s.plans)}
         <h2 style="margin-top:18px">Ways to pay</h2>
         <div class="row" style="flex-wrap:wrap"><label class="field" style="flex:1 1 120px">Short plan (months) <span class="hint">No setup fee · 0 = don't offer</span><input name="shortMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.shortMonths ?? 6}"></label>

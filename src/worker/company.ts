@@ -1,5 +1,7 @@
 import { notify } from "./notify.ts";
 import { addonPrice, billingOptions, defaultTerms, getSettings, type AppSettings } from "./db.ts";
+import { dollars, pickerHtml, picksFromForm, priceSignup } from "./checkout.ts";
+import { orderSummary, saveOrder } from "./signup.ts";
 import { newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
 import { SEARCH_GROUPS } from "../places/queries.ts";
@@ -70,6 +72,8 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   const path = url.pathname;
   if (path === "/contact" && req.method === "POST") return contactPost(env, req);
   if (path === "/change") return changeRequest(env, req, url);
+  if (path === "/start" && (req.method === "GET" || req.method === "POST")) return startOrder(env, req, url);
+  if (path === "/start/thanks") return startThanks(env);
   if (path === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`, { headers: { "content-type": "text/plain" } });
   if (path === "/sitemap.xml") {
     return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url><url><loc>${ORIGIN}/terms</loc></url><url><loc>${ORIGIN}/privacy</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
@@ -128,6 +132,96 @@ ${s.companyPhone ? `<p class="direct">Or text or call <a href="${telHref(s.compa
 <main id="main" class="sec sec--dark"><div class="wrap narrow">${body}</div></main>
 ${footer(s.legalName || name)}</body></html>`;
   return new Response(html, { status: lead ? 200 : 404, headers: { ...HEADERS, "cache-control": "no-store" } });
+}
+
+/** Website "Buy now": pick a plan, way to pay and extras, give business details, sign, and pay online. */
+async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const legal = s.legalName || name;
+  const terms = s.terms?.trim() || defaultTerms(s);
+  const planId = url.searchParams.get("plan") ?? "plus";
+  let note = url.searchParams.get("canceled") === "1" ? `<p class="note note--warn" role="status">Your payment wasn't finished, so nothing was charged. You can try again below.</p>` : "";
+  if (req.method === "POST") {
+    const form = await req.formData().catch(() => null);
+    const field = (k: string, max = 200) => String(form?.get(k) ?? "").trim().slice(0, max);
+    const d = { business: field("business", 120), name: field("name", 100), title: field("title", 60), phone: field("phone", 40), email: field("email", 120), town: field("town", 80), kind: field("kind", 80), web: field("web", 300), notes: field("notes", 1500) };
+    if (field("website")) return Response.redirect(`${ORIGIN}/start/thanks`, 303);
+    if (!d.business || !d.name || !d.phone || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email) || form?.get("agree") !== "yes") {
+      note = `<p class="note note--warn" role="alert">Please fill in your business name, your name, phone and email, and tick the box to agree.</p>`;
+    } else {
+      const picks = picksFromForm(form, s.addons);
+      const order = priceSignup(s, field("plan", 20) || planId, field("billing", 20) || "standard", picks);
+      const saved = await saveOrder(env, req, {
+        leadId: "web",
+        order,
+        picks,
+        terms,
+        name: d.name,
+        title: d.title,
+        email: d.email,
+        source: "website",
+        business: d.business,
+        phone: d.phone,
+        successUrl: `${ORIGIN}/start/thanks`,
+        cancelUrl: `${ORIGIN}/start?plan=${encodeURIComponent(order.plan!.id)}&canceled=1`,
+      });
+      const summary = orderSummary(order);
+      const message = [`Order: ${summary}`, `Due today: ${dollars(order.dueToday)}${order.renews ? `, then ${dollars(order.renews.amount)}/${order.renews.interval}` : ""}`, d.kind && `Type: ${d.kind}`, d.town && `Town: ${d.town}`, d.web && `Current site/Facebook: ${d.web}`, d.notes && `Notes: ${d.notes}`]
+        .filter(Boolean)
+        .join("\n");
+      await env.DB.prepare("INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)")
+        .bind(newId(), COMPANY_LEAD_ID, now(), JSON.stringify({ name: d.name, phone: d.phone, email: d.email, service: `🛒 Website order: ${d.business}`, message }), req.headers.get("cf-connecting-ip") ?? "")
+        .run();
+      await notify(env, { kind: "signed", actorName: d.name, text: `🛒 New website order: ${d.business} (${d.name}) · ${summary} · ${dollars(order.dueToday)} due${saved.checkoutUrl ? ", paying now" : ""}` });
+      return Response.redirect(saved.checkoutUrl ?? `${ORIGIN}/start/thanks`, 303);
+    }
+  }
+  const types = [...new Set(SEARCH_GROUPS.map((g) => g.label))];
+  const body = `<h1>Get started</h1>
+<p class="lead">Pick your plan and we'll start building your site. You'll still look it over and approve every detail before it goes live.</p>
+${note}
+<form method="post" class="form light">
+${pickerHtml(s, { planId, esc: e })}
+<h2 style="font-size:1.3rem;margin-top:8px">About your business</h2>
+<label>Business name<input name="business" required maxlength="120" autocomplete="organization"></label>
+<label>What kind of business?<select name="kind" style="min-height:50px;border-radius:10px;border:2px solid #3b4a6b;padding:10px;font:inherit"><option value="">Choose one</option>${types.map((t) => `<option>${e(t)}</option>`).join("")}<option>Something else</option></select></label>
+<label>Town<input name="town" maxlength="80" placeholder="Cullman"></label>
+<label>Your current website or Facebook page <span class="opt">(optional)</span><input name="web" maxlength="300"></label>
+<label>Your name<input name="name" required maxlength="100" autocomplete="name"></label>
+<label>Your title <span class="opt">(optional)</span><input name="title" maxlength="60" placeholder="Owner"></label>
+<label>Phone<input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
+<label>Email for receipts<input name="email" type="email" required maxlength="120" autocomplete="email"></label>
+<label>Anything we should know? <span class="opt">(optional)</span><textarea name="notes" rows="3" maxlength="1500"></textarea></label>
+<div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
+<details><summary>Read the agreement</summary><div class="terms">${e(terms)}</div></details>
+<label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="checkbox" name="agree" value="yes" required style="width:22px;min-height:22px;margin-top:3px"> I'm authorized to sign for this business, and I agree to the plan and agreement. Typing my name counts as my signature.</label>
+<p class="small muted">See our <a href="/terms#refunds">cancellation &amp; refund policy</a> and <a href="/privacy">privacy policy</a>.</p>
+<button class="btn" type="submit">${env.STRIPE_SECRET_KEY ? "Sign and continue to payment" : "Sign and send my order"}</button>
+${env.STRIPE_SECRET_KEY ? `<p class="small muted">Payment is handled securely by Stripe. We never see your card number.</p>` : `<p class="small muted">We'll send you an invoice by email.</p>`}
+</form>
+<p class="small muted" style="margin-top:20px">Rather see it before you pay? <a href="/#contact">Get a free preview</a> instead.</p>`;
+  return policyShell(name, legal, "Get started", body, { script: true });
+}
+
+async function startThanks(env: Env): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const body = `<h1>Thank you! 🎉</h1><p class="lead">We got your order. ${s.companyPhone ? `We'll call you within one business day from ${e(s.companyPhone)}` : "We'll be in touch within one business day"} to get your photos, hours and details.</p>
+<p>If you paid online, a receipt is on its way from our payment provider. Nothing goes live until you've approved your site.</p>
+<p><a class="btn" href="/">Back to the home page</a></p>`;
+  return policyShell(name, s.legalName || name, "Thank you", body, {});
+}
+
+/** Simple light page in the company style (header, narrow column, footer). */
+function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean }): Response {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${e(title)} | ${e(name)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
+<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a></div></header>
+<main id="main" class="sec"><div class="wrap narrow">${body}</div></main>
+${footer(legal)}</body></html>`;
+  const csp = `default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:;${o.script ? " script-src 'unsafe-inline';" : ""} form-action 'self' https://checkout.stripe.com; base-uri 'none'; frame-ancestors 'none'`;
+  return new Response(html, { headers: { ...HEADERS, "cache-control": "no-store", "content-security-policy": csp } });
 }
 
 async function contactPost(env: Env, req: Request): Promise<Response> {
@@ -221,9 +315,11 @@ ${plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap">
         .map(
           (p) => `<div class="card plan${p.id === "plus" ? " plan--pick" : ""}">${p.id === "plus" ? `<p class="tag">Most popular</p>` : ""}<h3>${e(p.name)}</h3>
 <p class="price">${money(p.monthly)}<span>/month</span></p>${p.setup ? `<p class="small">${money(p.setup)} setup</p>` : ""}
-<ul>${p.includes.split(/\n/).map((x) => x.trim()).filter(Boolean).map((x) => `<li>${e(x)}</li>`).join("")}</ul></div>`,
+<ul>${p.includes.split(/\n/).map((x) => x.trim()).filter(Boolean).map((x) => `<li>${e(x)}</li>`).join("")}</ul>
+<p style="margin-top:14px"><a class="btn btn--small" href="/start?plan=${p.id}">Buy ${e(p.name)}</a></p></div>`,
         )
         .join("")}</div>
+<p class="small muted" style="margin-top:14px">Rather see your site first? <a href="#contact">Get a free preview</a> and pay only if you like it.</p>
 ${options.length ? `<h3 style="margin-top:28px">Ways to pay</h3><div class="grid">${options
         .map((o) => {
           const text =
@@ -419,6 +515,8 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .opt{font-weight:400;color:#c9d1e0}.hp{position:absolute;left:-9999px}
 .note{background:#e8f5ec;color:#0f5132;border-radius:10px;padding:12px 14px;font-weight:700}.note--warn{background:#fff4e0;color:var(--goldtext)}
 .direct{margin-top:18px}
+.btn--small{min-height:44px;padding:8px 18px;font-size:.98rem}
+.light .form label{color:var(--ink)}.light .opt{color:var(--ink)}.light details{margin:6px 0 10px}.light .terms{white-space:pre-line;background:var(--alt);border-radius:12px;padding:14px;font-size:.92rem}
 .extras .card h3{margin-bottom:4px}.xprice{color:var(--goldtext)!important;font-weight:700;margin:0 0 8px!important}
 .examples{list-style:none;padding:0;margin:24px 0 0;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}@media (min-width:760px){.examples{grid-template-columns:repeat(4,1fr)}}
 .examples a{display:block;text-decoration:none;color:var(--ink)}.examples img{display:block;width:100%;height:auto;aspect-ratio:1/2;object-fit:cover;object-position:top;border-radius:16px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(20,33,61,.12)}

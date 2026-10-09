@@ -45,7 +45,28 @@ export async function stripeWebhook(env: Env, req: Request): Promise<Response> {
   if (!fresh.meta.changes) return new Response("ok");
   const o = event.data.object;
 
-  if (event.type === "checkout.session.completed") {
+  const meta = (o.metadata ?? {}) as Record<string, string>;
+  if (event.type === "checkout.session.completed" && meta.kind === "signup" && meta.signupId) {
+    // Checkout made by the app for a sign-up (from a sign-up link, or a Buy now order on the website).
+    await env.DB.prepare("UPDATE signups SET paid = 1, stripe_customer = ?, stripe_subscription = ? WHERE id = ?").bind(o.customer ?? null, o.subscription ?? null, meta.signupId).run();
+    const row = await env.DB.prepare("SELECT s.lead_id, s.business, s.signer_name, l.name FROM signups s LEFT JOIN leads l ON l.id = s.lead_id WHERE s.id = ?")
+      .bind(meta.signupId)
+      .first<{ lead_id: string; business: string | null; signer_name: string; name: string | null }>();
+    const who = row?.name ?? row?.business ?? row?.signer_name ?? "A client";
+    await notify(env, {
+      kind: "paid",
+      actorName: "Stripe",
+      leadId: row && row.lead_id !== "web" ? row.lead_id : null,
+      text: `💵 ${who} paid ${money(o.amount_total)}${row?.lead_id === "web" ? " (website order: add them with ➕ Add a business)" : ""}`,
+    });
+  } else if (event.type === "checkout.session.completed" && meta.kind === "extras" && meta.purchaseId) {
+    await env.DB.prepare("UPDATE purchases SET paid = 1, stripe_customer = ? WHERE id = ?").bind(o.customer ?? null, meta.purchaseId).run();
+    const row = await env.DB.prepare("SELECT p.lead_id, p.items_json, l.name FROM purchases p LEFT JOIN leads l ON l.id = p.lead_id WHERE p.id = ?")
+      .bind(meta.purchaseId)
+      .first<{ lead_id: string; items_json: string; name: string | null }>();
+    const items = row ? (JSON.parse(row.items_json) as { extras: Array<{ name: string; qty: number }> }).extras.map((x) => (x.qty > 1 ? `${x.name} x${x.qty}` : x.name)) : [];
+    await notify(env, { kind: "paid", actorName: "Stripe", leadId: row?.lead_id ?? null, text: `💵 ${row?.name ?? "A client"} bought extras: ${items.join(", ") || "see Stripe"} (${money(o.amount_total)})` });
+  } else if (event.type === "checkout.session.completed") {
     const leadId = typeof o.client_reference_id === "string" && /^[a-z0-9]+$/.test(o.client_reference_id) ? o.client_reference_id : null;
     const lead = leadId ? await getLead(env, leadId) : null;
     const who = lead?.name ?? o.customer_details?.name ?? o.customer_details?.email ?? "A client";

@@ -12,6 +12,8 @@ export interface Env {
   VAPID_PRIVATE_JWK?: string;
   /** Stripe webhook signing secret (whsec_…). Optional: without it, payments are ticked by hand. */
   STRIPE_WEBHOOK_SECRET?: string;
+  /** Stripe secret or restricted key (Checkout Sessions: write). Optional: without it, sign-ups use the payment links. */
+  STRIPE_SECRET_KEY?: string;
 }
 
 export type Job =

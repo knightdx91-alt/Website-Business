@@ -196,3 +196,14 @@ export async function verifySignup(env: Env, leadId: string, planId: string, exp
   if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
   return safeEqual(sig, await hmac(env.APP_SECRET, `signup.${leadId}.${planId}.${exp}`));
 }
+
+/** "Buy extras" link for an existing client. Expires; rotating APP_SECRET revokes every link. */
+export async function extrasToken(env: Env, leadId: string, days = 30): Promise<string> {
+  const exp = Date.now() + days * 86_400_000;
+  return `${leadId}.${exp}.${await hmac(env.APP_SECRET, `extras.${leadId}.${exp}`)}`;
+}
+
+export async function verifyExtras(env: Env, leadId: string, exp: string, sig: string): Promise<boolean> {
+  if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
+  return safeEqual(sig, await hmac(env.APP_SECRET, `extras.${leadId}.${exp}`));
+}

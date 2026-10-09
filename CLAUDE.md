@@ -124,7 +124,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Plans & answers screen for callers; 7 page layouts; print/sign and retail packs; more search groups
 - [x] Preview-opened alerts, policies, example sites, Stripe webhook, follow-up texts, change requests, review asks, and
       the extras batch (gallery, hiring, Spanish page, social posts, listings checklist, QR table tents/window sign)
-- [ ] Owner to do: Stripe webhook (add endpoint + STRIPE_WEBHOOK_SECRET), our own Google Business Profile + review link
+- [x] Online checkout: sign-up links, website Buy now, Buy extras links (Stripe Checkout)
+- [ ] Owner to do: STRIPE_SECRET_KEY + Stripe webhook (STRIPE_WEBHOOK_SECRET), our own Google Business Profile + review link
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
 ## Code map
@@ -242,6 +243,18 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   link opens undergroundassociates.com/change?b=<lead> (sold/live leads only), which posts to the app Inbox and notifies.
 - Review asks: Settings → "Our Google review link" (`companyReviewUrl`) adds "Ask for a review" (text) on sold/live
   leads and a "Review us on Google" link in the company site footer.
+- Online checkout (`src/worker/checkout.ts`, migration 0010): with Worker secret STRIPE_SECRET_KEY, orders go to a Stripe
+  Checkout Session built from Settings (`priceSignup` / `priceExtras`; the browser only sends picks, never prices):
+  plan as a monthly subscription (yearly = 12 − annualMonthsFree months, interval year), the month-to-month setup fee and
+  one-time/per-item extras on the first payment, monthly extras on the same subscription (×12 on a yearly plan), "priced
+  per job" extras noted as quotes. `pickerHtml` (plan, way to pay, extras, live total) is shared by: the sign-up link page
+  (`/a/…`, `saveOrder` → redirect to Stripe, back with ?paid=1), "Buy now" on the company site (`/start?plan=…`, saves a
+  sign-up with lead_id 'web' + business/phone, adds an Inbox item and notifies; listed under Sales → Website orders), and
+  the "Buy extras" link for sold/live clients (`/x/<lead>.<exp>.<hmac>`, 30 days, from the client screen; rows in
+  `purchases`, monthly extras become their own subscription, reuses the Stripe customer). Checkout metadata kind
+  signup/extras lets the webhook mark the exact sign-up or purchase paid. Without the key, everything still records the
+  order and says "we'll send an invoice" (sign-up links fall back to the plan payment links). Pages that post to Stripe
+  allow form-action https://checkout.stripe.com in their CSP.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.
