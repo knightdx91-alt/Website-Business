@@ -17,7 +17,7 @@ import { previewFlyer, reviewCards, tableTents, windowSign } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
 import { salesDashboard } from "./sales.ts";
-import { purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
+import { agreementPage, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
@@ -25,6 +25,7 @@ import { HttpError, json, localDate, newId, now, type Env, type Job } from "./en
 import { handleFormPost } from "./forms.ts";
 import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
 import { stripeWebhook } from "./stripe.ts";
+import { extraTerms } from "./contract.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
 import { chooseLook, renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
@@ -220,6 +221,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json({
       me: { role: session.role, name: session.name, id: session.userId },
       checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET },
+      extraTerms: settings.addons.map((a) => extraTerms(a)),
       categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
       defaultTerms: defaultTerms(settings),
       models: Object.entries(MODEL_PRICES).map(([id, p]) => ({ id, label: p.label })),
@@ -288,7 +290,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         flexSetup: z.number().min(0).max(10_000).optional(),
         annualMonthsFree: z.number().int().min(0).max(6).optional(),
         addons: z
-          .array(z.object({ name: z.string().trim().min(1).max(60), price: z.number().min(0).max(10_000), unit: z.enum(["month", "each", "one-time", "quote"]), about: z.string().trim().max(200).optional() }))
+          .array(z.object({ name: z.string().trim().min(1).max(60), price: z.number().min(0).max(10_000), unit: z.enum(["month", "each", "one-time", "quote"]), about: z.string().trim().max(200).optional(), terms: z.string().trim().max(1500).optional() }))
           .max(20)
           .optional(),
         terms: z.string().trim().max(6000).optional(),
@@ -372,6 +374,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     await removeCaller(env, callerMatch[1]!);
     return json({ ok: true });
   }
+
+  // A signed agreement, opened from the app (any team member who can see the lead).
+  const agreement = /^\/agreements\/([sp])\/([a-z0-9]+)$/.exec(path);
+  if (agreement && m === "GET") return agreementPage(env, "", { kind: agreement[1] as "s" | "p", id: agreement[2]! });
 
   if (path === "/sales" && m === "GET") {
     ownerOnly();
@@ -971,6 +977,7 @@ export default {
         return await serveSignup(env, req, leadId, plan, url.origin);
       }
       if (url.pathname === "/stripe/webhook" && req.method === "POST") return await stripeWebhook(env, req);
+      if (url.pathname.startsWith("/agreement/") && req.method === "GET") return await agreementPage(env, url.pathname.slice("/agreement/".length));
       const extras = /^\/x\/([a-z0-9]+)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(url.pathname);
       if (extras && (req.method === "GET" || req.method === "POST")) {
         const [, leadId, exp, sig] = extras as unknown as [string, string, string, string];

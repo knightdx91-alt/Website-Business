@@ -403,9 +403,10 @@
         <p class="small">${esc(x.plan.billingDetail || `${money(x.plan.monthly)}/month${x.plan.setup ? ` + ${money(x.plan.setup)} setup` : ""}`)}</p>
         ${x.extras && (x.extras.extras.length || x.extras.quotes.length) ? `<p class="small">Extras: ${esc([...x.extras.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...x.extras.quotes.map((q) => `${q} (quote)`)].join(", "))}</p>` : ""}
         ${x.dueCents ? `<p class="small">Due at sign-up: <strong>${money(x.dueCents / 100)}</strong></p>` : ""}
+        <p class="small"><a href="/api/agreements/s/${x.id}" target="_blank" rel="noopener">📄 Signed agreement</a></p>
         <p class="small muted">${esc(x.signerName)}${x.signerTitle ? ", " + esc(x.signerTitle) : ""} · ${esc(x.signerEmail || "")} · ${ago(x.createdAt)}${x.sentBy ? ` · sent by ${esc(x.sentBy)}` : ""}</p>
         ${isOwner() ? `<label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label>` : x.paid ? `<p class="chip chip--good">Paid</p>` : ""}</div>`).join("")}
-      ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)}</li>`).join("")}</ul>` : ""}
+      ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)} · <a href="/api/agreements/p/${p.id}" target="_blank" rel="noopener">📄 agreement</a></li>`).join("")}</ul>` : ""}
       ${plans.length
         ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
           <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a></p>
@@ -1592,7 +1593,7 @@
       <section class="card"><h2>🛒 Website orders</h2>${(d.websiteOrders || []).length
         ? `<ul class="list">${d.websiteOrders.map((o) => `<li><div class="row"><strong>${esc(o.business || "")}</strong>${o.paid ? '<span class="chip chip--good" style="flex:none">Paid</span>' : '<span class="chip chip--warn" style="flex:none">Not paid</span>'}</div>
             <p class="small" style="margin:4px 0 0">${esc(o.plan)}${o.extras.length ? ` + ${esc(o.extras.join(", "))}` : ""} · ${money((o.dueCents || 0) / 100)} due</p>
-            <p class="small muted" style="margin:2px 0 0">${esc(o.name)} · <a href="${telHref(String(o.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, ""))}">${esc(o.phone || "")}</a> · ${esc(o.email || "")} · ${ago(o.createdAt)}</p></li>`).join("")}</ul>
+            <p class="small muted" style="margin:2px 0 0">${esc(o.name)} · <a href="${telHref(String(o.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, ""))}">${esc(o.phone || "")}</a> · ${esc(o.email || "")} · ${ago(o.createdAt)} · <a href="/api/agreements/s/${o.id}" target="_blank" rel="noopener">📄 agreement</a></p></li>`).join("")}</ul>
            <p class="small muted">People who bought from “Get started” on your website. Find their business with <a href="#/add">➕ Add a business</a> to build their site.</p>`
         : `<p class="muted small">None yet. People who buy from “Get started” on your website show up here.</p>`}</section>
       <p class="small muted">Calls are logged outcomes. Reached means someone answered. A sale counts for whoever sent the sign-up link, or whoever marked it Sold.</p>`;
@@ -1759,7 +1760,8 @@
         ${[...s.addons, { name: "", price: "", unit: "one-time" }].map((a, i) => `<div class="addon"><div class="row"><label class="field" style="flex:2"><span class="sr-only">Extra ${i + 1}</span><input name="addon_${i}_name" value="${esc(a.name)}" placeholder="New extra" maxlength="60"></label>
           <label class="field"><span class="sr-only">Price</span><input name="addon_${i}_price" type="number" min="0" inputmode="decimal" value="${a.price}" placeholder="$"></label>
           <label class="field"><span class="sr-only">Per</span><select name="addon_${i}_unit">${Object.entries(UNIT_LABEL).map(([k, v]) => `<option value="${k}"${a.unit === k ? " selected" : ""}>${k === "quote" ? "quote per job" : v.trim().replace("/", "per ")}</option>`).join("")}</select></label></div>
-          <label class="field"><span class="sr-only">What they get</span><input name="addon_${i}_about" value="${esc(a.about || "")}" placeholder="One sentence on what they get" maxlength="200"></label></div>`).join("")}
+          <label class="field"><span class="sr-only">What they get</span><input name="addon_${i}_about" value="${esc(a.about || "")}" placeholder="One sentence on what they get" maxlength="200"></label>
+          ${a.name ? `<details class="more"><summary>Contract terms for this extra</summary><label class="field"><span class="sr-only">Contract terms</span><textarea name="addon_${i}_terms" rows="4" maxlength="1500">${esc(a.terms || (meta.extraTerms || [])[i] || "")}</textarea></label><p class="small muted">Shown in the agreement customers sign when they pick this extra.</p></details>` : `<input type="hidden" name="addon_${i}_terms" value="">`}</div>`).join("")}
         <h2 style="margin-top:18px">Caller commission</h2>
         <label class="field">Commission per sale ($)<input name="commission" type="number" min="0" inputmode="decimal" value="${s.commission ?? ""}"></label>
         <label class="field">Client agreement <span class="hint">Plain-language starting point, not legal advice. Have a lawyer look it over once.</span><textarea name="terms" rows="10">${esc(s.terms || meta.defaultTerms)}</textarea></label>
@@ -1799,7 +1801,7 @@
         const addons = [];
         for (let i = 0; f.elements[`addon_${i}_name`]; i++) {
           const name = v(`addon_${i}_name`);
-          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value, about: v(`addon_${i}_about`) || undefined });
+          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value, about: v(`addon_${i}_about`) || undefined, terms: v(`addon_${i}_terms`) || undefined });
         }
         if (plans.some((p) => !p.monthly)) return toast("Give every plan a monthly price");
         const terms = v("terms");

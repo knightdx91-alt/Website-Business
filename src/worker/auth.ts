@@ -207,3 +207,15 @@ export async function verifyExtras(env: Env, leadId: string, exp: string, sig: s
   if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
   return safeEqual(sig, await hmac(env.APP_SECRET, `extras.${leadId}.${exp}`));
 }
+
+/** Permanent link to one signed agreement: "s" = sign-up, "p" = extras purchase. */
+export async function agreementToken(env: Env, kind: "s" | "p", id: string): Promise<string> {
+  return `${kind}${id}.${await hmac(env.APP_SECRET, `agreement.${kind}.${id}`)}`;
+}
+
+export async function verifyAgreement(env: Env, token: string): Promise<{ kind: "s" | "p"; id: string } | null> {
+  const m = /^([sp])([a-z0-9]+)\.([A-Za-z0-9_-]+)$/.exec(token);
+  if (!m) return null;
+  const [, kind, id, sig] = m as unknown as [string, "s" | "p", string, string];
+  return safeEqual(sig, await hmac(env.APP_SECRET, `agreement.${kind}.${id}`)) ? { kind, id } : null;
+}

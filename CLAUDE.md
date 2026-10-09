@@ -220,8 +220,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Example sites (`src/examples/examples.ts`): 8 made-up businesses (555-01xx numbers, "Example" streets), one per pack,
   each a different look~layout. `npm run prepare:app && npm run examples` builds them (publish mode, fonts pointed at
   /fonts/) into app/public/examples/<slug>/ with an "Example website" banner + noindex, screenshots each (clock frozen at
-  a weekday morning) and renders app/public/og.png (company link preview). Shown in "See a few examples" on the company
-  site; /examples/* is served with x-robots-tag noindex and their forms post to a harmless /examples/form page.
+  a weekday morning) and renders app/public/og.png (company link preview). Shown on the company site's Portfolio page
+  (`/portfolio`, linked as "Our work" in the header, with type + design names) and a 4-site "Our work" teaser on the home
+  page; /examples/* is served with x-robots-tag noindex and their forms post to a harmless /examples/form page.
 - Stripe webhook (`src/worker/stripe.ts`, migration 0009): POST /stripe/webhook, signature checked with Worker secret
   STRIPE_WEBHOOK_SECRET. checkout.session.completed (client_reference_id = lead id) marks the lead's latest sign-up paid
   and stores the Stripe customer/subscription; invoice.payment_failed and customer.subscription.deleted notify (and a
@@ -258,6 +259,16 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   allow form-action https://checkout.stripe.com in their CSP. Payment test: insert a lead with place_id 'paytest' and
   sales_status 'sold'; its Buy extras page (open /api/leads/<id>/extraslink while logged in) offers only a $1 item.
   Verified end to end in Oct 2026 (checkout → webhook → purchase marked paid → notification); refund it in Stripe after.
+- Contracts + e-signature (`src/worker/contract.ts`, `src/worker/esign.ts`, migration 0011): every order is signed before
+  it can go further. The agreement is built from what was picked: order summary, plan and what it includes, way to pay,
+  the main service agreement (Settings → agreement), terms for each extra picked (Settings → Extras → "Contract terms
+  for this extra", else `STANDARD_EXTRA_TERMS` by name) and an electronic-signature clause; extras-only agreements say they
+  add to the existing service agreement. Ticking "I've read the agreement" opens a pop-up (`<dialog>`) showing only the
+  picked sections; the customer types their full name, draws a signature and consents; the form won't submit until
+  signed, and changing the order (or business name) clears the signature. Server re-checks with `readSignature` and
+  rebuilds the text with `contractText`; stored in signups.terms/signature (+ ip, user agent, time) or purchases.
+  Signed copies: `/agreement/<s|p><id>.<hmac>` (permanent link, both hosts; shown on thank-you/paid pages and passed in
+  Stripe's success URL as ?a=) and `/api/agreements/<s|p>/<id>` from the app (sign-up card, extras list, website orders).
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.

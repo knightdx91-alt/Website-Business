@@ -1,11 +1,15 @@
 import { notify } from "./notify.ts";
 import { addonPrice, billingOptions, defaultTerms, getSettings, type AppSettings } from "./db.ts";
 import { dollars, pickerHtml, picksFromForm, priceSignup } from "./checkout.ts";
-import { orderSummary, saveOrder } from "./signup.ts";
+import { agreementPage, orderSummary, saveOrder } from "./signup.ts";
+import { contractSectionsHtml, contractText } from "./contract.ts";
+import { esignHtml, readSignature } from "./esign.ts";
 import { newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
 import { SEARCH_GROUPS } from "../places/queries.ts";
 import { EXAMPLES } from "../examples/examples.ts";
+import { LAYOUTS } from "../generator/layouts.ts";
+import { LOOKS, parseDesign } from "../generator/themes.ts";
 
 /** Underground Associates' own website, served on the company domain from live Settings (prices, phone, email). */
 export const COMPANY_HOSTS = ["undergroundassociates.com", "www.undergroundassociates.com"];
@@ -73,10 +77,12 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   if (path === "/contact" && req.method === "POST") return contactPost(env, req);
   if (path === "/change") return changeRequest(env, req, url);
   if (path === "/start" && (req.method === "GET" || req.method === "POST")) return startOrder(env, req, url);
-  if (path === "/start/thanks") return startThanks(env);
+  if (path === "/start/thanks") return startThanks(env, url);
+  if (path.startsWith("/agreement/") && req.method === "GET") return agreementPage(env, path.slice("/agreement/".length));
+  if (path === "/portfolio" && req.method === "GET") return portfolio(env);
   if (path === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`, { headers: { "content-type": "text/plain" } });
   if (path === "/sitemap.xml") {
-    return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url><url><loc>${ORIGIN}/terms</loc></url><url><loc>${ORIGIN}/privacy</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
+    return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url><url><loc>${ORIGIN}/portfolio</loc></url><url><loc>${ORIGIN}/terms</loc></url><url><loc>${ORIGIN}/privacy</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
   }
   // Fonts and icons come from the app's static assets.
   if (path.startsWith("/fonts/") || path.startsWith("/icons/") || path === "/og.png") return null;
@@ -128,7 +134,7 @@ ${s.companyPhone ? `<p class="direct">Or text or call <a href="${telHref(s.compa
     : `<h1>Request a change</h1><p>This link doesn't match one of our client websites. ${s.companyPhone ? `Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : `<a href="/#contact">Contact us</a>`} and we'll help.</p>`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Request a change | ${e(name)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
-<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a></div></header>
+${header(name, s.companyPhone)}
 <main id="main" class="sec sec--dark"><div class="wrap narrow">${body}</div></main>
 ${footer(s.legalName || name)}</body></html>`;
   return new Response(html, { status: lead ? 200 : 404, headers: { ...HEADERS, "cache-control": "no-store" } });
@@ -139,7 +145,6 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
   const legal = s.legalName || name;
-  const terms = s.terms?.trim() || defaultTerms(s);
   const planId = url.searchParams.get("plan") ?? "plus";
   let note = url.searchParams.get("canceled") === "1" ? `<p class="note note--warn" role="status">Your payment wasn't finished, so nothing was charged. You can try again below.</p>` : "";
   if (req.method === "POST") {
@@ -147,8 +152,9 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
     const field = (k: string, max = 200) => String(form?.get(k) ?? "").trim().slice(0, max);
     const d = { business: field("business", 120), name: field("name", 100), title: field("title", 60), phone: field("phone", 40), email: field("email", 120), town: field("town", 80), kind: field("kind", 80), web: field("web", 300), notes: field("notes", 1500) };
     if (field("website")) return Response.redirect(`${ORIGIN}/start/thanks`, 303);
-    if (!d.business || !d.name || !d.phone || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email) || form?.get("agree") !== "yes") {
-      note = `<p class="note note--warn" role="alert">Please fill in your business name, your name, phone and email, and tick the box to agree.</p>`;
+    const signed = readSignature(form);
+    if (!d.business || !d.name || !d.phone || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email) || !signed) {
+      note = `<p class="note note--warn" role="alert">Please fill in your business name, your name, phone and email, then open the agreement and sign it.</p>`;
     } else {
       const picks = picksFromForm(form, s.addons);
       const order = priceSignup(s, field("plan", 20) || planId, field("billing", 20) || "standard", picks);
@@ -156,8 +162,9 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
         leadId: "web",
         order,
         picks,
-        terms,
-        name: d.name,
+        terms: contractText(s, order, { business: d.business, kind: "signup" }),
+        name: signed.name,
+        signature: signed.signature,
         title: d.title,
         email: d.email,
         source: "website",
@@ -174,7 +181,7 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
         .bind(newId(), COMPANY_LEAD_ID, now(), JSON.stringify({ name: d.name, phone: d.phone, email: d.email, service: `🛒 Website order: ${d.business}`, message }), req.headers.get("cf-connecting-ip") ?? "")
         .run();
       await notify(env, { kind: "signed", actorName: d.name, text: `🛒 New website order: ${d.business} (${d.name}) · ${summary} · ${dollars(order.dueToday)} due${saved.checkoutUrl ? ", paying now" : ""}` });
-      return Response.redirect(saved.checkoutUrl ?? `${ORIGIN}/start/thanks`, 303);
+      return Response.redirect(saved.checkoutUrl ?? `${ORIGIN}/start/thanks?a=${saved.agreementUrl.split("/agreement/")[1]}`, 303);
     }
   }
   const types = [...new Set(SEARCH_GROUPS.map((g) => g.label))];
@@ -194,31 +201,35 @@ ${pickerHtml(s, { planId, esc: e })}
 <label>Email for receipts<input name="email" type="email" required maxlength="120" autocomplete="email"></label>
 <label>Anything we should know? <span class="opt">(optional)</span><textarea name="notes" rows="3" maxlength="1500"></textarea></label>
 <div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
-<details><summary>Read the agreement</summary><div class="terms">${e(terms)}</div></details>
-<label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="checkbox" name="agree" value="yes" required style="width:22px;min-height:22px;margin-top:3px"> I'm authorized to sign for this business, and I agree to the plan and agreement. Typing my name counts as my signature.</label>
+${esignHtml({ sectionsHtml: contractSectionsHtml(s, { business: "your business", kind: "signup", esc: e }), esc: e, businessField: "business", title: "Your agreement" })}
 <p class="small muted">See our <a href="/terms#refunds">cancellation &amp; refund policy</a> and <a href="/privacy">privacy policy</a>.</p>
 <button class="btn" type="submit">${env.STRIPE_SECRET_KEY ? "Sign and continue to payment" : "Sign and send my order"}</button>
 ${env.STRIPE_SECRET_KEY ? `<p class="small muted">Payment is handled securely by Stripe. We never see your card number.</p>` : `<p class="small muted">We'll send you an invoice by email.</p>`}
 </form>
 <p class="small muted" style="margin-top:20px">Rather see it before you pay? <a href="/#contact">Get a free preview</a> instead.</p>`;
-  return policyShell(name, legal, "Get started", body, { script: true });
+  return policyShell(name, legal, "Get started", body, { script: true, phone: s.companyPhone });
 }
 
-async function startThanks(env: Env): Promise<Response> {
+async function startThanks(env: Env, url: URL): Promise<Response> {
   const s = await getSettings(env);
+  const a = url.searchParams.get("a") ?? "";
+  const copy = /^[sp][a-z0-9]+\.[A-Za-z0-9_-]+$/.test(a) ? `<p><a href="/agreement/${e(a)}" target="_blank" rel="noopener">📄 View or print your signed agreement</a></p>` : "";
   const name = s.companyName || "Underground Associates";
   const body = `<h1>Thank you! 🎉</h1><p class="lead">We got your order. ${s.companyPhone ? `We'll call you within one business day from ${e(s.companyPhone)}` : "We'll be in touch within one business day"} to get your photos, hours and details.</p>
-<p>If you paid online, a receipt is on its way from our payment provider. Nothing goes live until you've approved your site.</p>
+<p>If you paid online, a receipt is on its way from our payment provider. Nothing goes live until you've approved your site.</p>${copy}
 <p><a class="btn" href="/">Back to the home page</a></p>`;
-  return policyShell(name, s.legalName || name, "Thank you", body, {});
+  return policyShell(name, s.legalName || name, "Thank you", body, { phone: s.companyPhone });
 }
 
 /** Simple light page in the company style (header, narrow column, footer). */
-function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean }): Response {
+function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean; wide?: boolean; phone?: string; description?: string }): Response {
+  const meta = o.description
+    ? `<meta name="description" content="${e(o.description)}"><link rel="canonical" href="${ORIGIN}/portfolio"><meta property="og:image" content="${ORIGIN}/og.png">`
+    : `<meta name="robots" content="noindex">`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${e(title)} | ${e(name)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
-<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a></div></header>
-<main id="main" class="sec"><div class="wrap narrow">${body}</div></main>
+<title>${e(title)} | ${e(name)}</title>${meta}<meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
+${header(name, o.phone)}
+<main id="main" class="sec"><div class="wrap${o.wide ? "" : " narrow"}">${body}</div></main>
 ${footer(legal)}</body></html>`;
   const csp = `default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:;${o.script ? " script-src 'unsafe-inline';" : ""} form-action 'self' https://checkout.stripe.com; base-uri 'none'; frame-ancestors 'none'`;
   return new Response(html, { headers: { ...HEADERS, "cache-control": "no-store", "content-security-policy": csp } });
@@ -279,14 +290,14 @@ async function home(env: Env, url: URL): Promise<Response> {
 <link rel="preload" href="/fonts/bricolage-grotesque-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>${CSS}</style><script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script></head><body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a>${phone ? `<a class="hdr__call" href="${telHref(phone)}">Call</a>` : `<a class="hdr__call" href="#contact">Contact</a>`}</div></header>
+${header(name, phone)}
 <main id="main">
 <section class="hero"><div class="wrap">
 <p class="eyebrow">Websites for Cullman-area businesses</p>
 <h1>See your new website <span class="hl">before you pay</span> a dime.</h1>
 <p class="lead">We build your website first, free. If you like it, it goes live${lowest ? ` from ${money(lowest)} a month` : ""}, with hosting, updates and support included. No setup fee on ${commitText(s)} plans.</p>
 <div class="btns"><a class="btn" href="#contact">Get my free preview</a>${callBtn}</div>
-<p style="margin:18px 0 0"><a href="#examples" style="color:#fff">See example sites</a></p>
+<p style="margin:18px 0 0"><a href="/portfolio" style="color:#fff">See our work</a></p>
 </div></section>
 
 <section class="sec" id="how"><div class="wrap">
@@ -302,10 +313,11 @@ async function home(env: Env, url: URL): Promise<Response> {
 <div class="grid">${INCLUDED.map(([t, b]) => `<div class="card"><h3>${e(t)}</h3><p>${e(b)}</p></div>`).join("")}</div>
 </div></section>
 
-<section class="sec" id="examples"><div class="wrap">
-<h2>See a few examples</h2>
-<p class="lead">Every business gets its own look. These are made-up businesses so you can see the range. Tap one to try it.</p>
-<ul class="examples">${EXAMPLES.map((x) => `<li><a href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>${e(x.kind)}</span></a></li>`).join("")}</ul>
+<section class="sec" id="work"><div class="wrap">
+<h2>Our work</h2>
+<p class="lead">Every business gets its own look. Here are a few examples, made-up businesses so you can see the range.</p>
+<ul class="examples">${EXAMPLES.slice(0, 4).map((x) => exampleCard(x, false)).join("")}</ul>
+<p style="margin-top:22px"><a class="btn btn--line" href="/portfolio">See the full portfolio (${EXAMPLES.length} sites)</a></p>
 </div></section>
 
 ${plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap">
@@ -376,6 +388,38 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
       "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
     },
   });
+}
+
+/** Site header: name, Our work, Plans, and a Call (or Contact) button. */
+function header(name: string, phone?: string): string {
+  return `<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a><nav class="hdr__nav" aria-label="Main"><a href="/portfolio">Our work</a><a class="hdr__plans" href="/#plans">Plans</a>${
+    phone ? `<a class="hdr__call" href="${telHref(phone)}">Call</a>` : `<a class="hdr__call" href="/#contact">Contact</a>`
+  }</nav></div></header>`;
+}
+
+/** "Garden Table look · Split layout" for an example's design id. */
+function designName(id: string): string {
+  const d = parseDesign(id);
+  const look = LOOKS[d.look]?.name;
+  const layout = d.layout ? LAYOUTS[d.layout]?.name : undefined;
+  return [look && `${look} look`, layout && `${layout} layout`].filter(Boolean).join(" · ");
+}
+
+function exampleCard(x: (typeof EXAMPLES)[number], withDesign: boolean): string {
+  return `<li><a href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>${e(x.kind)}${withDesign ? `<em>${e(designName(x.design))}</em>` : ""}<b>View the site →</b></span></a></li>`;
+}
+
+/** Portfolio: every example site, with its type and design. */
+async function portfolio(env: Env): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const body = `<p class="eyebrow" style="color:var(--goldtext)">Our work</p>
+<h1>Portfolio</h1>
+<p class="lead">Every business gets its own design: colors, fonts and page layout picked for what you do, built for phones first. These are made-up businesses so you can see the range. Tap any one to try the full site.</p>
+<ul class="examples examples--full">${EXAMPLES.map((x) => exampleCard(x, true)).join("")}</ul>
+<div class="card" style="margin-top:32px"><h2 style="font-size:1.4rem">Want to see yours?</h2><p>We'll build a free preview of your website first. You only pay if you like it.</p>
+<div class="btns"><a class="btn" href="/#contact">Get my free preview</a><a class="btn btn--line" href="/#plans">See plans</a></div></div>`;
+  return policyShell(name, s.legalName || name, "Portfolio", body, { wide: true, phone: s.companyPhone, description: `Example websites by ${name} for Cullman-area businesses: restaurants, contractors, salons, auto shops, lawn care, cleaning, print shops and boutiques.` });
 }
 
 function footer(legal: string, reviewUrl?: string): string {
@@ -466,7 +510,7 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
 <title>${e(title)} | ${e(name)}</title><meta name="description" content="${e(`${title} for ${legal}, Cullman, Alabama.`)}"><link rel="canonical" href="${ORIGIN}/${kind}">
 <meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a>${phone ? `<a class="hdr__call" href="${telHref(phone)}">Call</a>` : `<a class="hdr__call" href="/#contact">Contact</a>`}</div></header>
+${header(name, phone)}
 <main id="main" class="sec"><div class="wrap narrow legal"><h1>${e(title)}</h1><p class="small muted">Last updated ${POLICIES_UPDATED}</p>${body}</div></main>
 ${footer(legal)}
 </body></html>`;
@@ -489,7 +533,13 @@ h1{font-size:clamp(2.2rem,7vw,3.8rem)}h2{font-size:clamp(1.6rem,4.5vw,2.4rem)}h3
 .hdr{position:sticky;top:0;z-index:5;background:var(--navy)}
 .hdr__in{display:flex;align-items:center;justify-content:space-between;min-height:60px}
 .brand{color:#fff;text-decoration:none;font-family:"Bricolage",system-ui,sans-serif;font-weight:800;font-size:1.15rem}
-.hdr__call{color:var(--navy);background:var(--gold);text-decoration:none;font-weight:700;padding:10px 18px;border-radius:999px}
+.hdr__call{color:var(--navy)!important;background:var(--gold);text-decoration:none;font-weight:700;padding:10px 18px;border-radius:999px}
+.hdr__nav{display:flex;align-items:center;gap:16px}.hdr__nav a{color:#fff;text-decoration:none;font-weight:700}.hdr__nav a:not(.hdr__call):hover{text-decoration:underline}
+.hdr__nav a{white-space:nowrap}
+@media (max-width:520px){.hdr__plans{display:none}.brand{font-size:.98rem;line-height:1.15}.hdr__nav{gap:12px}.hdr__call{padding:8px 14px}}
+.btn--line{background:transparent;color:var(--navy);border:2px solid var(--navy)}
+.examples span em{display:block;font-style:normal;font-size:.85rem;color:var(--muted);margin-top:2px}.examples span b{display:block;color:var(--blue);margin-top:4px;font-size:.92rem}
+@media (min-width:760px){.examples--full{grid-template-columns:repeat(4,1fr)}}
 .hero{background:var(--navy);color:#fff;padding:56px 0 72px}
 .eyebrow{color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:.85rem;margin:0 0 12px}
 .hl{color:var(--gold)}

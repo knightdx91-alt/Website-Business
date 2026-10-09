@@ -82,6 +82,8 @@ export interface AddOn {
   unit: "month" | "each" | "one-time" | "quote";
   /** One customer-facing sentence on what they get. */
   about?: string;
+  /** Contract terms for this extra; blank uses the standard terms in contract.ts. */
+  terms?: string;
 }
 
 /** "$49 one-time", "$129/month", "$35 each", or "priced per job". */
