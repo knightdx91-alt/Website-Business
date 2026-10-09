@@ -36,7 +36,7 @@ const RULES = `Rules for all Google Business Profile text:
 - No phone numbers, no URLs or web addresses, no email addresses, no hashtags, no emoji, no ALL CAPS.
 - No superlatives or hype ("best", "#1", "finest", "top-rated") and no keyword stuffing.`;
 
-async function ask<T>(client: Anthropic, model: string, system: string, prompt: string, schema: z.ZodType<T>, maxTokens = 4000): Promise<{ data: T; usage: Usage }> {
+export async function ask<T>(client: Anthropic, model: string, system: string, prompt: string, schema: z.ZodType<T>, maxTokens = 4000): Promise<{ data: T; usage: Usage }> {
   const res = await client.beta.messages.parse({
     model,
     max_tokens: maxTokens,

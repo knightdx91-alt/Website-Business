@@ -161,6 +161,9 @@ export async function runBuild(env: Env, job: Extract<Job, { type: "build" }>): 
         costMicro: Math.round(result.usage.input * price.input + result.usage.output * price.output),
       });
       copy = result.copy;
+      // Keep a Spanish page across an English rewrite; the owner can rewrite it from Edit.
+      const old = lead.copy_json ? (JSON.parse(lead.copy_json) as Copy) : undefined;
+      if (old?.es) copy.es = old.es;
     }
     const look = lead.look ?? (await chooseLook(env, record, lead.id));
     await renderPreview(env, lead, record, copy, look);

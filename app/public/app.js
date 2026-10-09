@@ -732,6 +732,10 @@
         <label class="field">Describe them <span class="hint">Used for every photo in this batch</span><input id="galleryAlt" placeholder="e.g. Fresh fade at the shop"></label>
         <button class="btn btn--small" type="button" id="gupload">Add to gallery</button>
       </section>
+      <section class="card"><h2>Spanish page</h2>
+        <p class="small muted">${c.es ? "This site has a Spanish page at /es/, linked as “Español” in the menu. Rewrite it after big text changes." : "Optional extra. AI translates the site's text into a Spanish page with Spanish buttons and hours (about 20 seconds)."}</p>
+        <div class="btns"><button class="btn btn--small" type="button" id="es-write">${c.es ? "Rewrite Spanish page" : "Write Spanish page"}</button>${c.es ? `<a class="btn btn--small" href="/p/${id}/es/" target="_blank" rel="noopener">See it</a><button class="btn btn--small" type="button" id="es-remove">Remove</button>` : ""}</div>
+      </section>
       <section class="card"><h2>We're hiring</h2>
         <p class="small muted">Optional. Adds a “We're hiring” section with Call/Text buttons. Leave the jobs empty to remove it.</p>
         <label class="field">Jobs open (one per line)<textarea name="hiringRoles" rows="3" placeholder="Line cook&#10;Server">${esc(((r.hiring || {}).roles || []).join("\n"))}</textarea></label>
@@ -807,6 +811,17 @@
       } catch (err) { toast(err.message); } finally { e.target.disabled = false; }
     });
 
+    $app.querySelector("#es-write").addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      e.target.textContent = "Writing… (about 20 seconds)";
+      try { await api(`/leads/${id}/spanish`, { method: "POST" }); toast("Spanish page ready"); viewEdit(id); }
+      catch (err) { toast(err.message); e.target.disabled = false; e.target.textContent = "Write Spanish page"; }
+    });
+    const esRemove = $app.querySelector("#es-remove");
+    if (esRemove) esRemove.addEventListener("click", async () => {
+      if (!confirm("Remove the Spanish page?")) return;
+      try { await api(`/leads/${id}/spanish`, { method: "DELETE" }); toast("Spanish page removed"); viewEdit(id); } catch (err) { toast(err.message); }
+    });
     $app.querySelector("#gupload").addEventListener("click", async (e) => {
       const files = [...$app.querySelector("#gallery").files];
       if (!files.length) return toast("Choose photos first");

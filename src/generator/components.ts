@@ -180,10 +180,10 @@ ${ctx.copy.approved ? "" : todo(ctx, "Tell us your story", "Who started it, when
 </div></section>`;
 }
 
-export function faq(items: Faq[], band = false): Raw {
+export function faq(items: Faq[], band = false, label = "FAQ", title = "Questions we get a lot"): Raw {
   if (items.length < 3) return raw("");
   return html`<section class="section${band ? " section--band" : ""}" id="faq" aria-labelledby="faq-title"><div class="wrap narrow">
-<span class="section__label">FAQ</span><h2 class="section__title" id="faq-title">Questions we get a lot</h2>
+<span class="section__label">${label}</span><h2 class="section__title" id="faq-title">${title}</h2>
 <div class="faq">${items.map((f) => html`<details><summary>${f.q}</summary><p>${f.a}</p></details>`)}</div>
 </div></section>`;
 }

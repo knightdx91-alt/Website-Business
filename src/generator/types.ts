@@ -230,6 +230,20 @@ export interface Copy {
   cuisineLabel?: string;
   meta: { title: string; description: string };
   approved: boolean;
+  /** The Spanish page (extra), translated from the text above and owner-reviewed like the rest. */
+  es?: SpanishCopy;
+}
+
+export interface SpanishCopy {
+  heroTagline: string;
+  heroSub: string;
+  about: string[];
+  /** Service names in Spanish, by service id. */
+  services: Record<string, string>;
+  faq: Faq[];
+  ctaTitle: string;
+  ctaLine: string;
+  metaDescription: string;
 }
 
 export interface Site {

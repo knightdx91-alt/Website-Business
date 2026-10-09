@@ -33,3 +33,25 @@ test("owner gallery photos and hiring show on the home page", async () => {
   assert.ok(home.indexOf('id="photos"') < home.indexOf('id="reviews"'), "gallery sits before reviews");
   assert.ok(home.indexOf('id="jobs"') < home.indexOf('class="cta"'), "hiring sits before the closing call to action");
 });
+
+test("a Spanish page renders at /es/ with Spanish hours and a menu link", async () => {
+  const ex = EXAMPLES[0]!;
+  const copy = structuredClone(ex.copy);
+  copy.es = {
+    heroTagline: "Bisquets caseros y comida sureña.",
+    heroSub: "Desayuno y almuerzo en el centro de Cullman.",
+    about: ["Cocinamos como nuestras abuelas."],
+    services: {},
+    faq: [],
+    ctaTitle: "Venga con hambre",
+    ctaLine: "Pase a desayunar o llame para pedir para llevar.",
+    metaDescription: "Comida sureña casera para desayuno y almuerzo en el centro de Cullman, AL. Bisquets, platos del día y cena los viernes. Llame para pedir.",
+  };
+  const out = await buildSite({ record: ex.record, copy, site: { slug: ex.slug, look: ex.design, origin: "https://example.test" }, mode: "publish" });
+  const es = String(out.files.get("es/index.html"));
+  assert.match(es, /<html lang="es"/);
+  assert.match(es, /Martes/);
+  assert.match(es, /Llamar \(256\) 555-0101/);
+  assert.match(String(out.files.get("index.html")), /href="\/es\/">Español/);
+  assert.match(String(out.files.get("index.html")), /hreflang="es"/);
+});

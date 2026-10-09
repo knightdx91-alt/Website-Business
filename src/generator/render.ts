@@ -7,6 +7,7 @@ import { lintSite, type LintResult } from "./lint.ts";
 import { packFor } from "./packs/index.ts";
 import type { CategoryPack } from "./packs/types.ts";
 import { businessNode, faqNode, graph, originFor, webPageNode, websiteNode } from "./schema.ts";
+import { spanishPage } from "./spanish.ts";
 import { resolveTheme } from "./themes.ts";
 import type { BuildMode, BusinessRecord, Copy, Site } from "./types.ts";
 
@@ -40,19 +41,22 @@ interface DocOpts {
   description: string;
   body: Raw;
   jsonLd: Record<string, unknown>;
+  lang?: "en" | "es";
 }
 
 function doc(ctx: Ctx, pack: CategoryPack, o: DocOpts): string {
   const origin = originFor(ctx);
   const preview = ctx.mode === "preview";
   const headingFont = ctx.theme.fonts.heading;
-  const nav = pack.nav(ctx);
-  return `<!doctype html>${html`<html lang="en" class="no-js"><head>
+  const nav = ctx.copy.es ? [...pack.nav(ctx), { label: "Español", href: "/es/" }] : pack.nav(ctx);
+  const alternates = ctx.copy.es && (o.path === "/" || o.path === "/es/") && !preview;
+  return `<!doctype html>${html`<html lang="${o.lang ?? "en"}" class="no-js"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${o.title}</title>
 <meta name="description" content="${o.description}">
 ${preview ? html`<meta name="robots" content="noindex, nofollow">` : html`<link rel="canonical" href="${origin}${o.path}">`}
+${alternates ? html`<link rel="alternate" hreflang="en" href="${origin}/"><link rel="alternate" hreflang="es" href="${origin}/es/">` : ""}
 <meta name="theme-color" content="${ctx.theme.colors.heroBg}">
 ${ctx.statsEndpoint ? html`<meta name="wb-stats" content="${ctx.statsEndpoint}">` : ""}
 <meta property="og:type" content="website"><meta property="og:title" content="${o.title}"><meta property="og:description" content="${o.description}"><meta property="og:url" content="${origin}${o.path}">
@@ -127,6 +131,14 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     jsonLd: homeLd,
   });
   pages.push({ path: "/", html: home });
+
+  const spanish = spanishPage(ctx);
+  if (spanish) {
+    pages.push({
+      path: "/es/",
+      html: doc(ctx, pack, { path: "/es/", title: spanish.title, description: spanish.description, body: spanish.body, jsonLd: graph(webPageNode(ctx, "/es/", spanish.title, "Español")), lang: "es" }),
+    });
+  }
 
   for (const p of pack.pages(ctx)) {
     const page = doc(ctx, pack, {

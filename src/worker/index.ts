@@ -25,6 +25,7 @@ import { HttpError, json, localDate, newId, now, type Env, type Job } from "./en
 import { handleFormPost } from "./forms.ts";
 import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
 import { stripeWebhook } from "./stripe.ts";
+import { translateToSpanish } from "../copy/spanish.ts";
 import { chooseLook, renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
 import { publishLead, zipLead } from "./publish.ts";
@@ -720,6 +721,21 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       record.media.gallery = record.media.gallery.filter((p) => !gone.includes(p));
       for (const p of gone) await env.BUCKET.delete(`owner/${id}/${p.src.slice("/assets/owner/".length)}`);
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), lead.look ?? "");
+      return json(detail((await getLead(env, id))!));
+    }
+    // Spanish page (extra): AI translation of the current text, stored in copy.es; DELETE removes the page.
+    if (action === "/spanish" && (m === "POST" || m === "DELETE")) {
+      if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      const copy = JSON.parse(lead.copy_json) as Copy;
+      if (m === "DELETE") delete copy.es;
+      else {
+        const settings = await getSettings(env);
+        const { es, usage } = await translateToSpanish(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }), { record, copy, model: settings.copyModel });
+        await chargeAi(env, settings.copyModel, usage);
+        copy.es = es;
+      }
+      await renderPreview(env, lead, record, copy, lead.look ?? "");
       return json(detail((await getLead(env, id))!));
     }
     if (action === "/rewrite" && m === "POST") {
