@@ -165,6 +165,11 @@ async function deletePrefix(env: Env, prefix: string): Promise<void> {
   } while (cursor);
 }
 
+/** Showing someone their preview books a check-in 2 days out, unless a callback is already coming up. */
+function autoCallback(lead: LeadRow): { follow_up: string } | Record<string, never> {
+  return lead.follow_up && lead.follow_up >= localDate() ? {} : { follow_up: localDate(2) };
+}
+
 async function requireLead(env: Env, id: string): Promise<LeadRow> {
   const lead = await getLead(env, id);
   if (!lead) throw new HttpError(404, "Lead not found");
@@ -497,7 +502,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const days = 60;
       const token = await shareToken(env, id, days);
       // Leaving a flyer counts as showing them, which also keeps the preview around longer.
-      if (lead.sales_status === "new") await updateLead(env, id, { sales_status: "shown" });
+      if (lead.sales_status === "new") await updateLead(env, id, { sales_status: "shown", ...autoCallback(lead) });
       const settings = await getSettings(env);
       return previewFlyer({
         business: lead.name ?? "your business",
@@ -604,6 +609,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       else if (input.outcome === "sold" || input.outcome === "not_interested") fields.follow_up = null;
       const status = OUTCOME_STATUS[input.outcome] ?? (input.outcome === "callback" && lead.sales_status === "new" ? "shown" : undefined);
       if (status && lead.sales_status !== "live") fields.sales_status = status;
+      if (fields.sales_status === "shown" && lead.sales_status !== "shown" && input.followUp === undefined) Object.assign(fields, autoCallback(lead));
       await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(newId(), id, session.name, input.outcome === "note" ? null : input.outcome, input.note, now())
         .run();
@@ -646,7 +652,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (action === "/status" && m === "POST") {
       const { salesStatus } = await body(req, z.object({ salesStatus: z.enum(["new", "shown", "sold", "not_interested"]) }));
       if (lead.sales_status === "live") throw new HttpError(409, "This site is already live");
-      await updateLead(env, id, { sales_status: salesStatus });
+      await updateLead(env, id, { sales_status: salesStatus, ...(salesStatus === "shown" && lead.sales_status === "new" ? autoCallback(lead) : {}) });
       if (salesStatus !== lead.sales_status) {
         const label = { new: "New", shown: "Shown", sold: "Sold 🎉", not_interested: "Not interested" }[salesStatus];
         await notify(env, { kind: "status", actor: session, leadId: id, text: `${session.name} marked ${lead.name} as ${label}` });

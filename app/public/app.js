@@ -881,8 +881,17 @@
   // "Text preview link" / "Copy preview link": a 14-day link that opens the preview without logging in.
   function shareButtonsHtml() {
     return `<div class="btns btns--full" data-share><button class="btn" type="button" data-share-sms>💬 Text preview link</button><button class="btn" type="button" data-share-copy>🔗 Copy message + link</button></div>
-      <p class="small muted">Only text the link after they say it's OK. It works for 14 days, no login needed.</p>`;
+      <p class="small muted">Only text the link after they say it's OK. It works for 14 days, no login needed.</p>
+      <details class="more"><summary>Follow-up texts</summary><div class="btns btns--full">${FOLLOW_UPS.map((f, i) => `<button class="btn btn--small" type="button" data-follow="${i}">${esc(f.label)}</button>`).join("")}</div>
+        <p class="small muted">Each one opens a text with a fresh preview link. Send it yourself; skip it if they asked you to stop.</p></details>`;
   }
+
+  // Ready-to-send follow-ups after a preview was shown or texted.
+  const FOLLOW_UPS = [
+    { label: "👀 Did you get a look?", text: (g, name, url) => `${g} Just checking in: did you get a chance to look at the website preview for ${name}? Here it is again: ${url}` },
+    { label: "🙋 Any questions?", text: (g, name, url) => `${g} Any questions about the website for ${name}? Happy to change anything, add your own photos, or walk you through it: ${url}` },
+    { label: "👋 Last check-in", text: (g, name, url) => `${g} Last check-in on the website preview for ${name}. I'll keep it ready for you a little longer. If now's not a good time, no worries at all. ${url}` },
+  ];
 
   function bindShareButtons(l) {
     const name = l.record ? l.record.name : l.name;
@@ -893,6 +902,13 @@
       try {
         const url = await shareLink(l.id);
         location.href = `sms:+1${phoneDigits}?body=${encodeURIComponent(smsBody(url))}`;
+      } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+    $app.querySelectorAll("[data-follow]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        const url = await shareLink(l.id);
+        location.href = `sms:+1${phoneDigits}?body=${encodeURIComponent(FOLLOW_UPS[Number(b.dataset.follow)].text(greeting(), name, url))}`;
       } catch (err) { toast(err.message); } finally { b.disabled = false; }
     }));
     $app.querySelectorAll("[data-share-copy]").forEach((b) => b.addEventListener("click", async () => {
