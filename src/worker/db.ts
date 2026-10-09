@@ -117,7 +117,8 @@ export function billingOptions(plan: Plan, s: Pick<AppSettings, "minMonths" | "s
       label: `${short}-month plan`,
       detail: `${dollars(plan.monthly)}/month · ${setup} · ${short}-month minimum, then cancel any time`,
       monthlyEquivalent: plan.monthly,
-      payLink: plan.payLinkShort,
+      // Same monthly price as the 12-month plan, so its link works too; the signed agreement sets the term.
+      payLink: plan.payLinkShort || plan.payLink,
     });
   }
   out.push(

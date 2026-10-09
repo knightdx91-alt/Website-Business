@@ -1521,9 +1521,9 @@
       <label class="field">Monthly ($)<input name="plan_${p.id}_monthly" type="number" min="0" inputmode="decimal" value="${p.monthly}"></label>
       <label class="field">Setup ($) <span class="hint">Keep 0; month to month adds its own fee</span><input name="plan_${p.id}_setup" type="number" min="0" inputmode="decimal" value="${p.setup || 0}"></label></div>
       <label class="field">What's included <span class="hint">One per line</span><textarea name="plan_${p.id}_includes" rows="3">${esc(p.includes)}</textarea></label>
-      <label class="field">12-month plan payment link <span class="hint">Monthly subscription, Stripe or Square</span><input name="plan_${p.id}_pay" type="url" value="${esc(p.payLink || "")}" placeholder="https://buy.stripe.com/…"></label>
+      <label class="field">Monthly payment link <span class="hint">Monthly subscription, Stripe or Square. Used for 12-month and 6-month plans</span><input name="plan_${p.id}_pay" type="url" value="${esc(p.payLink || "")}" placeholder="https://buy.stripe.com/…"></label>
       <details class="more"><summary>Links for 6-month, month-to-month and yearly (optional)</summary>
-        <label class="field">6-month plan link<input name="plan_${p.id}_payshort" type="url" value="${esc(p.payLinkShort || "")}" placeholder="https://buy.stripe.com/…"></label>
+        <label class="field">6-month plan link <span class="hint">Leave empty to use the 12-month link (same monthly price)</span><input name="plan_${p.id}_payshort" type="url" value="${esc(p.payLinkShort || "")}" placeholder="https://buy.stripe.com/…"></label>
         <label class="field">Month-to-month link <span class="hint">Includes the extra setup fee</span><input name="plan_${p.id}_payflex" type="url" value="${esc(p.payLinkFlex || "")}" placeholder="https://buy.stripe.com/…"></label>
         <label class="field">Yearly link<input name="plan_${p.id}_payannual" type="url" value="${esc(p.payLinkAnnual || "")}" placeholder="https://buy.stripe.com/…"></label>
         <p class="small muted">Without these, clients who pick those options are told you'll send an invoice.</p></details></fieldset>`).join("");
