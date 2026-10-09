@@ -8,7 +8,7 @@ import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import { groupById, MARKET, SEARCH_GROUPS, searchesFor } from "../places/queries.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { writePitch } from "../copy/pitch.ts";
-import { profileTextProblems, writeMonthlyPosts, writeProfileKit, writeReviewReply, type GbpPost, type ProfileKit } from "../copy/gbp.ts";
+import { profileTextProblems, socialTextProblems, writeMonthlyPosts, writeProfileKit, writeReviewReply, writeSocialPosts, type GbpPost, type ProfileKit, type SocialPost } from "../copy/gbp.ts";
 import { reviewTexts } from "../places/to-record.ts";
 import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
@@ -127,6 +127,8 @@ interface GbpState {
   kit?: ProfileKit & { createdAt: number; problems: string[] };
   posts: Array<GbpPost & { id: string; month: string; status: "draft" | "posted"; createdAt: number; problems: string[] }>;
   notes?: string;
+  /** Social media posts extra: Facebook/Instagram drafts. */
+  social?: Array<SocialPost & { id: string; month: string; status: "draft" | "posted"; createdAt: number; problems: string[] }>;
 }
 
 function gbpState(l: LeadRow): GbpState {
@@ -530,12 +532,22 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       if (m === "PUT" && !sub) {
         const input = await body(
           req,
-          z.object({ check: z.string().regex(/^[a-z_]+$/).optional(), done: z.boolean().optional(), postId: z.string().regex(/^[a-z0-9]+$/).optional(), posted: z.boolean().optional(), removePost: z.boolean().optional(), notes: z.string().max(1000).optional() }),
+          z.object({
+            check: z.string().regex(/^[a-z_]+$/).optional(),
+            done: z.boolean().optional(),
+            postId: z.string().regex(/^[a-z0-9]+$/).optional(),
+            posted: z.boolean().optional(),
+            removePost: z.boolean().optional(),
+            notes: z.string().max(1000).optional(),
+          }),
         );
         if (input.check) state.checks[input.check] = !!input.done;
         if (input.postId) {
-          if (input.removePost) state.posts = state.posts.filter((p) => p.id !== input.postId);
-          else for (const p of state.posts) if (p.id === input.postId) p.status = input.posted ? "posted" : "draft";
+          // Google posts and social posts share the post controls; ids are unique across both.
+          if (input.removePost) {
+            state.posts = state.posts.filter((p) => p.id !== input.postId);
+            state.social = (state.social ?? []).filter((p) => p.id !== input.postId);
+          } else for (const p of [...state.posts, ...(state.social ?? [])]) if (p.id === input.postId) p.status = input.posted ? "posted" : "draft";
         }
         if (input.notes !== undefined) state.notes = input.notes;
         await save(state);
@@ -564,6 +576,26 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         if (notes !== undefined) state.notes = notes;
         state.posts.push(...posts.map((p) => ({ ...p, id: newId(), month, status: "draft" as const, createdAt: now(), problems: profileTextProblems(p.text, 1500) })));
         state.posts = state.posts.slice(-30);
+        await save(state);
+        return json(state);
+      }
+      if (m === "POST" && sub === "social") {
+        const { count, notes } = await body(req, z.object({ count: z.number().int().min(1).max(12).default(8), notes: z.string().trim().max(1000).optional() }));
+        const month = new Date().toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "long", year: "numeric" });
+        const social = state.social ?? [];
+        const { posts, usage } = await writeSocialPosts(ai(), {
+          record,
+          pack: packFor(record.category),
+          month,
+          count,
+          recentTopics: social.slice(-12).map((p) => p.topic),
+          ownerNotes: notes ?? state.notes,
+          website,
+          model: settings.copyModel,
+        });
+        await chargeAi(env, settings.copyModel, usage);
+        if (notes !== undefined) state.notes = notes;
+        state.social = [...social, ...posts.map((p) => ({ ...p, id: newId(), month, status: "draft" as const, createdAt: now(), problems: socialTextProblems(p.text) }))].slice(-40);
         await save(state);
         return json(state);
       }

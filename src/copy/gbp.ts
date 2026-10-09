@@ -116,3 +116,42 @@ export async function writeReviewReply(
   const { data, usage } = await ask(client, model, system, prompt, z.object({ reply: z.string() }), 1500);
   return { reply: data.reply, usage };
 }
+
+const SocialSchema = z.object({
+  posts: z.array(
+    z.object({
+      topic: z.string().describe("2-5 word label"),
+      text: z.string().describe("The post, 120-600 characters, ending with up to 3 hashtags"),
+      photo: z.string().describe("One short line suggesting what photo to post with it"),
+    }),
+  ),
+});
+export type SocialPost = z.infer<typeof SocialSchema>["posts"][number];
+
+/** Facebook and Instagram posts for the Social media posts extra. The owner approves each before it goes up. */
+export async function writeSocialPosts(
+  client: Anthropic,
+  input: { record: BusinessRecord; pack: CategoryPack; month: string; count: number; recentTopics: string[]; ownerNotes?: string; website?: string; model?: string },
+): Promise<{ posts: SocialPost[]; usage: Usage }> {
+  const model = input.model ?? DEFAULT_COPY_MODEL;
+  const system = `You write Facebook and Instagram posts for a small local business in and around Cullman, Alabama.
+- Write as the business ("we"), warm and neighborly, like the owner wrote it. Short sentences. At most 2 emoji per post.
+- Use only the facts given. Never invent sales, discounts, events, prices, staff, awards or history unless the owner's notes give them.
+- Mix it up across the month: a service spotlight, a seasonal tip, a behind-the-scenes or team post, a thank-you to customers, a reminder of hours or how to book, and anything in the owner's notes.
+- No superlatives or hype ("best", "#1"). End each post with up to 3 relevant hashtags, at least one local (e.g. #CullmanAL).
+- Don't put a phone number or link in the text; the business adds those when posting.
+- Each post is different from each other and from recent topics.`;
+  const prompt = `<facts>\n${JSON.stringify(facts(input.record, input.pack, input.website), null, 2)}\n</facts>\n<month>${input.month}</month>\n<recent_topics>${input.recentTopics.join("; ") || "none"}</recent_topics>\n<owner_notes>${input.ownerNotes || "none"}</owner_notes>\n\nWrite ${input.count} posts for this month.`;
+  const { data, usage } = await ask(client, model, system, prompt, SocialSchema, 8000);
+  return { posts: data.posts.slice(0, input.count), usage };
+}
+
+/** Problems in a social post: phone numbers, links, hype, length. Empty when clean. */
+export function socialTextProblems(text: string): string[] {
+  const out: string[] = [];
+  if (text.length > 900) out.push("over 900 characters");
+  if (PHONE.test(text)) out.push("has a phone number");
+  if (LINK.test(text)) out.push("has a link");
+  if (SUPERLATIVE.test(text)) out.push("has a superlative");
+  return out;
+}

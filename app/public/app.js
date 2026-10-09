@@ -1248,6 +1248,17 @@
     ["reviewcards", "Review cards printed and on the counter"],
   ];
 
+  // "Get listed everywhere" extra: the free directories worth claiming, with the same name, address, phone and hours.
+  const LISTINGS = [
+    ["listing_apple", "Apple Maps (Apple Business Connect)", "https://businessconnect.apple.com/"],
+    ["listing_bing", "Bing Places", "https://www.bingplaces.com/"],
+    ["listing_yelp", "Yelp for Business", "https://biz.yelp.com/"],
+    ["listing_facebook", "Facebook page: hours, phone and website filled in", "https://www.facebook.com/"],
+    ["listing_nextdoor", "Nextdoor business page", "https://business.nextdoor.com/"],
+    ["listing_bbb", "Better Business Bureau", "https://www.bbb.org/get-listed"],
+    ["listing_chamber", "Cullman Area Chamber of Commerce directory (if they're members)", "https://www.cullmanchamber.org/"],
+  ];
+
   function accessSteps(l, email) {
     const name = l.record ? l.record.name : l.name;
     return `Here's how to let us manage your Google listing for ${name}. It takes a minute and you stay the owner:\n1. On your phone or computer, go to business.google.com and sign in.\n2. Open ${name}, tap the 3-dot menu, then Business Profile settings, then People and access.\n3. Tap Add, enter ${email}, choose Manager, and tap Invite.\nThat's it. We never need your password.`;
@@ -1275,7 +1286,7 @@
   function gbpCardHtml(l) {
     return `<section class="card"><h2>Google profile</h2>
       <p class="small muted">Tune up their Google listing and keep it fresh each month.</p>
-      <div class="btns btns--full"><a class="btn btn--primary" href="#/gbp/${l.id}">Open Google profile tools</a></div></section>`;
+      <div class="btns btns--full"><a class="btn btn--primary" href="#/gbp/${l.id}">Google, social &amp; listings tools</a></div></section>`;
   }
 
   async function viewGbp(id) {
@@ -1287,6 +1298,11 @@
     const render = (st) => {
       const done = GBP_CHECKS.filter(([k]) => st.checks[k]).length;
       const drafts = st.posts.filter((p) => p.status === "draft");
+      const social = st.social || [];
+      const sDrafts = social.filter((p) => p.status === "draft");
+      const sPosted = social.filter((p) => p.status === "posted").slice(-8).reverse();
+      const listed = LISTINGS.filter(([k]) => st.checks[k]).length;
+      const addr = r ? [r.address.street, `${r.address.city}, ${r.address.state} ${r.address.zip || ""}`.trim()].filter(Boolean).join(", ") : "";
       const posted = st.posts.filter((p) => p.status === "posted").slice(-6).reverse();
       const helper = {
         website: g.website ? `<div class="kit">${esc(g.website)} ${copyBtn(g.website)}</div>` : `<p class="small muted">Publish the site first.</p>`,
@@ -1333,6 +1349,20 @@
           <label class="field">Stars<select id="rstars">${[5, 4, 3, 2, 1].map((n) => `<option value="${n}">${"★".repeat(n)}</option>`).join("")}</select></label></div>
           <button class="btn btn--primary" type="button" data-reply>Write reply</button>
           <div id="rout"></div>
+        </section>
+        <section class="card"><h2>5. Facebook &amp; Instagram posts</h2>
+          <p class="small muted">Social media posts extra: 8–12 a month. Send them to the owner to approve, then post them (or they post them). Uses the notes box above.</p>
+          <div class="btns"><button class="btn btn--primary" type="button" data-social="8">Write 8 posts with AI</button><button class="btn" type="button" data-social="4">Write 4 more</button></div>
+          ${sDrafts.map((p) => `<div class="post"><strong>${esc(p.topic)}</strong>
+            <p style="white-space:pre-line">${esc(p.text)}</p><p class="small muted">📷 ${esc(p.photo)} · ${esc(p.month)}${p.problems.length ? ` · ⚠️ ${esc(p.problems.join(", "))}` : ""}</p>
+            <div class="btns">${copyBtn(p.text)}<button class="btn btn--small btn--good" type="button" data-posted="${p.id}">Mark posted</button><button class="btn btn--small" type="button" data-delpost="${p.id}">Delete</button></div></div>`).join("")}
+          ${sDrafts.length ? `<div class="btns btns--full" style="margin-top:10px"><a class="btn" href="sms:+1${phone}?body=${encodeURIComponent(`${greeting()} Here are this month's posts for ${r ? r.name : l.name}. Reply OK or tell me what to change:\n\n${sDrafts.map((p, i) => `${i + 1}. ${p.text}`).join("\n\n")}`)}">Text the drafts to the owner to approve</a></div>` : ""}
+          ${sPosted.length ? `<h3 style="margin-top:14px">Posted</h3><ul class="list small">${sPosted.map((p) => `<li>✓ ${esc(p.topic)} <span class="muted">· ${esc(p.month)}</span></li>`).join("")}</ul>` : ""}
+        </section>
+        <section class="card"><h2>6. Listed everywhere <span class="chip">${listed}/${LISTINGS.length}</span></h2>
+          <p class="small muted">Get listed everywhere extra. Use exactly the same name, address, phone and hours on every one.</p>
+          ${r ? `<div class="kit small">${esc(r.name)} ${copyBtn(r.name)}<br>${esc(addr)} ${copyBtn(addr)}<br>${esc(r.phone.display)} ${copyBtn(r.phone.display)}${g.website ? `<br>${esc(g.website)} ${copyBtn(g.website)}` : ""}</div>` : ""}
+          <ul class="list checks">${LISTINGS.map(([k, label, href]) => `<li><label class="check"><input type="checkbox" data-check="${k}"${st.checks[k] ? " checked" : ""}> ${esc(label)}</label> <a class="small" href="${href}" target="_blank" rel="noopener">Open</a></li>`).join("")}</ul>
         </section></div></div>`;
       bind();
     };
@@ -1361,6 +1391,10 @@
         if (b.dataset.delpost && !confirm("Delete this draft?")) return;
         try { Object.assign(g, await api(`/leads/${id}/gbp`, { method: "PUT", json: b.dataset.posted ? { postId, posted: true } : { postId, removePost: true } })); render(g); } catch (err) { toast(err.message); }
       }));
+      $app.querySelectorAll("[data-social]").forEach((b) => b.addEventListener("click", () => busy(b, "Writing posts… (about 30 seconds)", async () => {
+        Object.assign(g, await api(`/leads/${id}/gbp/social`, { method: "POST", json: { count: Number(b.dataset.social), notes: $app.querySelector("#pnotes").value.trim() } }));
+        render(g);
+      })));
       const replyBtn = $app.querySelector("[data-reply]");
       replyBtn.addEventListener("click", () => {
         const review = $app.querySelector("#rtext").value.trim();
