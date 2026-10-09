@@ -199,7 +199,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
   retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
   Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).
-- Notifications (`#/notifications`, 🔔 in the top bar with an unread count; owner and full-access only):
+- Notifications (`#/notifications`, 🔔 in the top bar with an unread count; everything for owner and full access, callers only preview opens):
   `notify()` in `src/worker/notify.ts` records an `events` row (actor, kind, lead, text) for call logs/notes, status
   changes, sign-up links sent, client sign-ups, paid, publish, leads added by hand, search runs, and website/company
   form messages. Each person sees everyone else's events; `notif_seen` holds when they last looked. Phone pushes use
@@ -210,7 +210,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Preview opened (migration 0008, `leads.preview_opens` / `preview_opened_at`): share pages (`/s/…`) carry a tiny script that,
   after 3 s on a visible page and once per browser session, beacons `POST /s/<token>/opened`. Link-preview bots don't run it;
   logged-in team members don't count; at most one count per 30 min. Each count notifies everyone ("👀 X just opened their
-  preview (2nd time)"). Home shows "Looked at their preview" (`/api/leads?opened=recent`, last 7 days, not yet sold), the lead
+  preview (2nd time)"), callers included: `CALLER_KINDS` in notify.ts is the only kind callers get (their 🔔 list, count
+  and pushes are filtered to it). Home shows "Looked at their preview" (`/api/leads?opened=recent`, last 7 days, not yet sold), the lead
   screen shows the count. Home also asks once to turn on phone alerts (`pushAsk`, dismiss stored in localStorage).
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`

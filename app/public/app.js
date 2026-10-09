@@ -88,8 +88,7 @@
     $nav.hidden = active === "login";
     $nav.querySelector("[data-nav=inbox]").hidden = !isOwner();
     $nav.querySelector("[data-nav=sales]").hidden = !isOwner();
-    $nav.querySelector("[data-nav=notifications]").hidden = !isOwner();
-    if (isOwner() && active !== "login") refreshNotifCount();
+    if (active !== "login") refreshNotifCount();
     $nav.querySelectorAll("a").forEach((a) => a.classList.toggle("is-active", a.dataset.nav === active));
   }
 
@@ -261,15 +260,15 @@
     await refreshHome();
   }
 
-  /** Asks once on the home screen to turn on phone notifications (owner and full access), until done or dismissed. */
+  /** Asks once on the home screen to turn on phone notifications, until done or dismissed. */
   async function pushAsk() {
     const el = document.getElementById("pushask");
-    if (!el || !isOwner()) return;
+    if (!el) return;
     let dismissed = false;
     try { dismissed = localStorage.getItem("wb_push_ask") === "no"; } catch (e) { /* storage blocked */ }
     const ps = await pushState().catch(() => ({ supported: false }));
     if (dismissed || !ps.supported || ps.permission === "denied" || (ps.permission === "granted" && ps.sub)) { el.innerHTML = ""; return; }
-    el.innerHTML = `<section class="card due"><h2>🔔 Turn on phone alerts?</h2><p class="small muted">Get a notification when a prospect opens their preview, or a teammate logs a call, makes a sale or gets a sign-up.</p>
+    el.innerHTML = `<section class="card due"><h2>🔔 Turn on phone alerts?</h2><p class="small muted">${isOwner() ? "Get a notification when a prospect opens their preview, or a teammate logs a call, makes a sale or gets a sign-up." : "Get a notification when a prospect opens the preview link you sent, so you can call while it's fresh."}</p>
       <div class="btns"><button class="btn btn--primary btn--small" id="pask-on">Turn on</button><button class="btn btn--small" id="pask-no">Not now</button></div></section>`;
     el.querySelector("#pask-on").addEventListener("click", async (e) => {
       e.target.disabled = true;
@@ -1677,8 +1676,8 @@
       if ("setAppBadge" in navigator) { unread ? navigator.setAppBadge(unread).catch(() => {}) : navigator.clearAppBadge().catch(() => {}); }
     } catch (e) { /* offline or logged out */ }
   }
-  setInterval(() => { if (!document.hidden && meta && isOwner()) refreshNotifCount(); }, 60000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && meta && isOwner()) refreshNotifCount(); });
+  setInterval(() => { if (!document.hidden && meta) refreshNotifCount(); }, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && meta) refreshNotifCount(); });
 
   const b64ToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
 
@@ -1724,10 +1723,10 @@
     $app.innerHTML = `<h1>Notifications</h1>
       <section class="card"><h2>Phone notifications</h2>
         ${!ps.supported ? `<p class="small muted">This browser can't show phone notifications. Use the installed app or Chrome on Android.</p>`
-          : on ? `<p class="small">✅ On for this phone. You'll get a notification whenever someone else makes a change.</p><div class="btns"><button class="btn btn--small" id="ptest">Send a test</button><button class="btn btn--small" id="poff">Turn off on this phone</button></div>`
-          : `<p class="small muted">Get a notification on this phone when a prospect opens their preview, someone adds a note, logs a call, makes a sale, a client signs up, or a website gets a message.</p><button class="btn btn--primary" id="pon">🔔 Turn on phone notifications</button>`}
+          : on ? `<p class="small">✅ On for this phone. ${isOwner() ? "You'll get a notification whenever someone else makes a change." : "You'll get a notification when a prospect opens their preview."}</p><div class="btns"><button class="btn btn--small" id="ptest">Send a test</button><button class="btn btn--small" id="poff">Turn off on this phone</button></div>`
+          : `<p class="small muted">${isOwner() ? "Get a notification on this phone when a prospect opens their preview, someone adds a note, logs a call, makes a sale, a client signs up, or a website gets a message." : "Get a notification on this phone when a prospect opens the preview link you sent, so you can call while it's fresh."}</p><button class="btn btn--primary" id="pon">🔔 Turn on phone notifications</button>`}
       </section>
-      <ul class="list notifs">${rows || `<li class="muted">Nothing yet. When someone else adds a note, logs a call, makes a sale, or a client signs up, it shows here.</li>`}</ul>`;
+      <ul class="list notifs">${rows || `<li class="muted">${isOwner() ? "Nothing yet. When someone else adds a note, logs a call, makes a sale, or a client signs up, it shows here." : "Nothing yet. When a prospect opens their preview, it shows here."}</li>`}</ul>`;
     const pon = $app.querySelector("#pon");
     if (pon) pon.addEventListener("click", async () => { pon.disabled = true; try { await turnOnPush(); toast("Phone notifications are on"); viewNotifications(); } catch (err) { toast(err.message); pon.disabled = false; } });
     const ptest = $app.querySelector("#ptest");

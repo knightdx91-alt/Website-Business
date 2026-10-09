@@ -217,15 +217,14 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     });
   }
 
-  // Notifications (owner and full-access team): what everyone else did.
-  if (path === "/notifications/count" && m === "GET") return json({ unread: isOwner ? await unreadCount(env, session.userId) : 0 });
-  if (path.startsWith("/notifications") || path.startsWith("/push/")) ownerOnly();
-  if (path === "/notifications" && m === "GET") return json(await listEvents(env, session.userId));
+  // Notifications: the owner and full-access team see what everyone else did; callers only see preview opens.
+  if (path === "/notifications/count" && m === "GET") return json({ unread: await unreadCount(env, session.userId, !isOwner) });
+  if (path === "/notifications" && m === "GET") return json(await listEvents(env, session.userId, 100, !isOwner));
   if (path === "/notifications/seen" && m === "POST") {
     await markSeen(env, session.userId);
     return json({ ok: true });
   }
-  if (path === "/notifications/latest" && m === "GET") return json(await latestForPush(env, session.userId));
+  if (path === "/notifications/latest" && m === "GET") return json(await latestForPush(env, session.userId, !isOwner));
   if (path === "/push/key" && m === "GET") return json({ key: vapidPublicKey(env) });
   if (path === "/push/subscribe" && (m === "POST" || m === "DELETE")) {
     const { endpoint } = await body(req, z.object({ endpoint: z.string().url().max(1000) }));
