@@ -205,7 +205,7 @@
     meta = meta || (await api("/meta"));
     if (!document.getElementById("leads")) {
       $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="opened"></div><div id="due"></div><div id="runs"></div></div><div><section>
-        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a></div>
+        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
@@ -517,7 +517,8 @@
         ${l.rating ? `<p><span class="stars">★ ${l.rating.toFixed(1)}</span> on Google</p>` : ""}
         <p>${esc(l.address || "")}</p>
         <div class="btns btns--full">
-          ${ready ? `<a class="btn btn--primary" href="#/pitch/${l.id}">Call guide</a>` : ""}
+          ${ready ? `<a class="btn btn--primary" href="#/pitch/${l.id}">📞 Call guide</a>` : ""}
+          ${ready && open ? `<a class="btn btn--primary" href="#/walkin/${l.id}">🚶 In-person guide</a>` : ""}
           <a class="btn${ready ? "" : " btn--primary"}" href="${telHref(r ? r.phone.e164.slice(2) : l.phone)}">📞 Call ${esc(r ? r.phone.display : l.phone)}</a>
           ${r ? `<a class="btn" href="${esc(r.mapsUrl)}" target="_blank" rel="noopener">Google listing</a>` : ""}
           ${open ? `<a class="btn" href="#/playbook">💬 Plans & answers</a>` : ""}
@@ -994,7 +995,7 @@
         <a class="btn btn--primary" href="${telHref(phoneDigits)}">📞 Call ${esc(r.phone.display)}</a>
       </div>
       ${shareButtonsHtml()}
-      <p><a class="btn btn--small" href="#/playbook">💬 Plans & answers</a></p>
+      <p><a class="btn btn--small" href="#/playbook">💬 Plans & answers</a> <a class="btn btn--small" href="#/walkin/${id}">🚶 Going in person?</a></p>
       ${isOwner() && (!s.companyName || !s.monthlyPrice) ? `<div class="card small">Add your company name, your name and your prices in <a href="#/settings">Settings</a> so the guide can use them.</div>` : ""}
       ${l.notes.length ? `<section class="card"><h2>Earlier calls</h2>${l.followUp ? `<p>${followChip(l.followUp)}</p>` : ""}${notesHtml(l, 3)}</section>` : ""}
       <div id="guide"><div class="card"><span class="spin"></span> Writing the call guide for ${esc(r.name)}… (about 20 seconds)</div></div>`;
@@ -1239,6 +1240,160 @@
         d.open = !!q && hit;
       });
     });
+  }
+
+  /* ---------- in-person guide (walk-ins) ---------- */
+  // The slow part of the day for each kind of business, when an owner has a few minutes.
+  const WALKIN_TIMING = {
+    restaurant: "Between lunch and dinner, about 2 to 4 PM. Never during a rush, at opening or right before closing.",
+    salon: "A weekday mid-morning, between appointments. If they're with a client, ask when they get a break and come back.",
+    contractor: "Early morning (7 to 8 AM) at the shop before crews head out, or late afternoon when they're back. Many work from a truck: call first and ask for 5 minutes.",
+    auto: "Mid-morning or mid-afternoon on a weekday. Skip opening (drop-offs) and closing (pick-ups).",
+    landscaping: "Early morning before crews leave, or a rainy day when they're not out. Most are on jobs midday. If there's no shop, call first.",
+    cleaning: "Most cleaners work from home or are out on jobs: call first and ask to meet for 5 minutes, then bring the preview.",
+    print: "Late morning or early afternoon on a weekday. Skip deadline days, like Fridays before games and events.",
+    retail: "A weekday morning soon after opening, or mid-afternoon. Never during a sale or a busy Saturday.",
+  };
+
+  // Short answers for what owners say face to face. The full list lives in Plans & answers.
+  function walkinObjections(price) {
+    return [
+      ["“I'm busy right now.”", "Totally understand, I'll get out of your way. Can I leave this with you? The code on it opens your website. When's a better time to swing back by? (Leave the flyer, log the callback.)"],
+      ["“How much is it?” (before you've shown it)", `Short answer: ${price}. But let me show you what you'd get first. It takes one minute.`],
+      ["“I need to think about it.”", "Of course. What's the part you want to think over, the price or whether it'll bring in business? (Answer that.) I'll text you the link so you can look tonight. Can I check back Thursday?"],
+      ["“I need to talk to my husband / wife / partner.”", "Makes sense. I'll text you the link so you can show them on your phone. When's a good time for me to come back or call after you've both looked?"],
+      ["“I already have a Facebook page.”", "Keep it! The site links to it. But a lot of people aren't on Facebook, and Facebook pages don't show up well on Google. This is yours and it shows up for everybody."],
+      ["“We don't need it. Word of mouth keeps us busy.”", "That's the best kind of business. When someone hears about you, the first thing they do is look you up on their phone. This makes sure they find your number and hours, not the place down the road."],
+      ["“Is this a scam?”", "Fair question. We're local, here in Cullman. You can see your site before paying anything, nothing goes live until you say so, and you sign up through a secure page. I never take card numbers by hand."],
+      ["“Not interested.”", "No problem at all. I built it for you either way. Mind if I leave this in case you change your mind? (Thank them and go. Never push past a second no.)"],
+    ];
+  }
+
+  async function viewWalkin(id) {
+    setNav("home");
+    const l = id ? await api("/leads/" + id) : null;
+    if (l && l.status !== "ready") return go("#/lead/" + id);
+    const r = l ? l.record : null;
+    const s = meta.settings;
+    const plans = s.plans.length ? s.plans : SUGGESTED_PLANS;
+    const t = payTerms(s);
+    const storedName = () => { try { return localStorage.getItem("wb-owner-name") || ""; } catch (e) { return ""; } };
+    const me = (!isOwner() || (meta.me && meta.me.id && meta.me.id !== "owner") ? meta.me.name : s.callerName || storedName()) || "[your name]";
+    const co = s.companyName || "[company name]";
+    const biz = r ? r.name : "[their business]";
+    // Why we're there, in their words.
+    const why = !l ? `I noticed ${biz} doesn't have a website`
+      : l.presence === "social" ? `I noticed ${biz} is on Facebook but doesn't have its own website`
+      : l.presence === "outdated" || l.presence === "free_builder" ? `I pulled up your website on my phone and it was hard to use`
+      : `I noticed ${biz} doesn't have a website`;
+    const mid = plans.find((p) => p.id === "plus") || plans[Math.floor(plans.length / 2)] || plans[0];
+    const cheapest = plans.reduce((a, p) => (p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
+    const noSetup = t.commits.length ? ` with no setup fee on the ${commitWords(t)} plan` : "";
+    const priceShort = cheapest ? `plans start at ${money(cheapest.monthly)} a month${noSetup}` : "it's a low monthly price";
+    // What to point at on the preview: only things the preview really has.
+    const services = r && r.services ? r.services.slice(0, 3).map((x) => x.name) : [];
+    const hasHours = !!(r && r.hours && r.hours.weekly && r.hours.weekly.some((d) => d.length));
+    const show = [
+      "Their name up top, and the call button: “One tap and they're calling you.”",
+      hasHours || !r ? "Their hours, with open or closed right now: “No more calls just to ask if you're open.”" : null,
+      "The directions button: “Takes them right to your door.”",
+      r && r.category === "restaurant" ? "The menu section: “Send me your menu and I'll type it in.”" : services.length ? `The services (${services.join(", ")}): “Tell me if I missed anything.”` : "The services list: “Tell me if I missed anything.”",
+      "The reviews button: “Sends people to your Google reviews.”",
+    ].filter(Boolean);
+    const today = (() => {
+      if (!hasHours) return "";
+      const iv = r.hours.weekly[new Date().getDay()] || [];
+      const hm = (x) => { const [h, m] = x.split(":").map(Number); const hh = h % 12 || 12; return `${hh}${m ? ":" + String(m).padStart(2, "0") : ""} ${h >= 12 && h < 24 ? "PM" : "AM"}`; };
+      return iv.length ? `Open today ${iv.map((i) => `${hm(i.open)}–${hm(i.close)}`).join(", ")}` : "Closed today";
+    })();
+    const say = (txt) => `<p class="big say">“${esc(txt)}”</p>`;
+    const step = (n, title, body, opener) => `<section class="card${opener ? " opener" : ""}"><h2><span class="stepnum">${n}</span> ${title}</h2>${body}</section>`;
+    const list = (items) => `<ul class="list">${items.map((x) => `<li>${x}</li>`).join("")}</ul>`;
+    const questions = [
+      "How do most new customers find you right now?",
+      "Do people ever call just to ask your hours or where you are?",
+      "Who takes care of your Facebook or Google listing?",
+      r && r.category === "restaurant" ? "Do you have a menu I could snap a photo of? I'll add it to the site." : "Is that list of services right? Anything you'd add?",
+      "Got a few photos of your place or your work? Real photos make a big difference.",
+    ];
+    $app.innerHTML = `<p><a href="${l ? `#/lead/${id}` : "#/"}" id="back">← ${l ? "Details" : "Back"}</a></p>
+      <h1>In-person guide${l ? `: ${esc(biz)}` : ""}</h1>
+      ${l ? `<p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}</p>
+        <p>${esc(l.address || "")}${today ? `<br><strong>${esc(today)}</strong>` : ""}</p>
+        <div class="btns btns--full">
+          <a class="btn btn--primary" href="#/preview/${id}">📱 Open their preview</a>
+          ${r ? `<a class="btn" href="${esc(r.mapsUrl)}" target="_blank" rel="noopener">🗺️ Directions</a>` : ""}
+          <a class="btn" href="/api/leads/${id}/flyer" target="_blank" rel="noopener">🖨️ Flyer to leave</a>
+        </div>`
+        : `<p class="muted">What to say and do when you walk into a business, start to finish. Open it from a lead (or a stop on your walk-in route) and it fills in their name, what to show them and the best time to go.</p>
+        <p><a class="btn btn--primary" href="#/route">🗺️ Plan a walk-in route</a></p>`}
+
+      ${step(1, "Before you walk in", list([
+        `<strong>Best time:</strong> ${esc(l ? WALKIN_TIMING[l.category] || "A slow part of their day, never during a rush." : "A slow part of their day, never during a rush. Restaurants 2 to 4 PM, shops and salons mid-morning, trades early morning.")}`,
+        `Open their preview before you go in so it's loaded. Turn your brightness up and silence your phone.`,
+        `Bring the printed flyer. It has a code that opens their website for 60 days, so you can leave it behind.`,
+        `Look at their Google listing first: the owner's name is often in replies to reviews. Using it helps.`,
+        `See a “No soliciting” sign? Don't go in. Call instead.`,
+      ]))}
+
+      ${step(2, "Walk in", `<p class="small muted">Wait until no customer needs them. Smile, keep it short.</p>
+        ${say("Hi! Is the owner or manager around? I'll only need a minute.")}
+        <p class="small muted">When you have the owner:</p>
+        ${say(`I'm ${me} with ${co}. We're local, here in Cullman. ${why}, so I went ahead and built you one. Can I show you real quick? It's free to look at.`)}
+        <details class="obj"><summary>Owner isn't there</summary><p>“No problem. When's a good time to catch them? Could I leave this for them?” Leave the flyer, ask the owner's name and the best time, then log a callback below.</p></details>
+        <details class="obj"><summary>They're slammed</summary><p>“I can see you're busy. I'll come back. Is tomorrow morning better?” Log the callback, and go.</p></details>`, true)}
+
+      ${step(3, "Show them their website", `${list([
+        "Hand them your phone <strong>folded</strong> (phone view). Let them hold it.",
+        `Say: “This is what people see when they look you up on their phone.”`,
+        `Point at a few things:<ul>${show.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`,
+        `Then <strong>unfold</strong> it and tap Desktop view: “And here's how it looks on a computer.”`,
+        "Let them scroll. <strong>Stop talking</strong> for a bit.",
+      ])}
+        ${say("What do you think? Anything you'd change?")}
+        <p class="small muted">Anything they'd change means they're picturing it as theirs. Write it in the notes below.</p>`)}
+
+      ${step(4, "Ask a few questions", `${list(questions.map(esc))}<p class="small muted">Their answers tell you which plan fits, and fill in what the site still needs.</p>`)}
+
+      ${step(5, "Talk price, once they like it", `${mid ? say(`Most folks go with ${mid.name}. It's ${money(mid.monthly)} a month${noSetup}. We host it, keep it running, and make changes whenever you text us.`) : ""}
+        <p class="small muted">Lead with the middle plan. Go down if price is the worry, up if they want everything done for them.</p>
+        <p><a class="btn" href="${l ? `#/plans/${id}` : "#/plans"}">📋 Show them the plans</a> <a class="btn btn--small" href="#/playbook">💬 Plans & answers</a></p>`)}
+
+      ${step(6, "Ask for the yes", `${say("Want me to get it live for you this week?")}
+        ${list([
+          `If yes: tap <strong>Show them the plans</strong>, let them pick, then hand them your phone. They choose how to pay, read and sign the agreement, and type their own card on the secure page.`,
+          "Never write down or type in a card number for them.",
+          "Once they've signed, mark them Sold below.",
+        ])}`, true)}
+
+      ${step(7, "If it's not a yes today", `${say("No pressure at all. Can I text you the link so you can look at it tonight?")}
+        ${list([
+          "Only text it after they say OK. It works for 14 days, no login needed.",
+          "Leave the flyer either way.",
+          "Set a callback for 2 or 3 days out, then follow up.",
+        ])}
+        ${l && l.salesStatus !== "live" ? shareButtonsHtml() : ""}`)}
+
+      <section class="card"><h2>If they say…</h2>
+        ${walkinObjections(priceShort).map(([q, a]) => `<details class="obj"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}
+        <p class="small"><a href="#/playbook">💬 All plans & common answers</a></p></section>
+
+      <section class="card"><h2>Always</h2>${list([
+        "Keep it under 5 minutes unless they keep the conversation going.",
+        "Step aside when a customer walks up. Their customers come first.",
+        "Be a friendly neighbor, not a salesperson. Never push past a second no.",
+        "Don't knock their current site or whoever made it.",
+        "Never promise rankings, more customers or a date you can't keep.",
+        "Leave on good terms. Plenty of people say yes on the second visit.",
+      ])}</section>
+
+      ${l && l.salesStatus !== "live" ? signupCardHtml(l) + logCardHtml(l) : ""}`;
+    $app.querySelector("#back").addEventListener("click", (e) => { if (!l && history.length > 1) { e.preventDefault(); history.back(); } });
+    if (l && l.salesStatus !== "live") {
+      bindShareButtons(l);
+      bindLog(l, () => go("#/lead/" + id));
+      bindSignup(l, () => go("#/lead/" + id));
+    }
   }
 
   /* ---------- Google Business Profile ---------- */
@@ -1544,7 +1699,7 @@
             <span style="flex:1"><span class="row" style="align-items:baseline"><strong>${esc(l.name)}</strong><span class="dist" style="flex:none">${d.toFixed(1)} mi</span></span>
             <span class="small muted">${esc(CATEGORY_LABEL[l.category] || l.category)} · ${esc(l.reason || "")}</span><br><span class="small">${esc(l.address || "")}</span>
             ${l.followUp ? `<br>${followChip(l.followUp)}` : ""}</span></label>
-            <div class="btns" style="margin:6px 0 0 36px"><a class="btn btn--small" href="#/preview/${l.id}">Preview</a><a class="btn btn--small" href="/api/leads/${l.id}/flyer" target="_blank" rel="noopener">Flyer</a></div></li>`).join("")
+            <div class="btns" style="margin:6px 0 0 36px"><a class="btn btn--small btn--primary" href="#/walkin/${l.id}">🚶 Guide</a><a class="btn btn--small" href="#/preview/${l.id}">Preview</a><a class="btn btn--small" href="/api/leads/${l.id}/flyer" target="_blank" rel="noopener">Flyer</a></div></li>`).join("")
         : `<li class="muted">No open leads with a location${category ? " in this category" : ""}.</li>`;
       list.querySelectorAll("input[data-pick]").forEach((c) => c.addEventListener("change", () => {
         if (c.checked) picked.add(c.dataset.pick); else picked.delete(c.dataset.pick);
@@ -1944,6 +2099,7 @@
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/playbook") return await viewPlaybook();
+      if ((m = /^#\/walkin(?:\/([a-z0-9]+))?$/.exec(h))) return await viewWalkin(m[1]);
       if ((m = /^#\/plans(?:\/([a-z0-9]+))?$/.exec(h))) return await viewShowPlans(m[1]);
       if (h === "#/route") return await viewRoute();
       if (h === "#/add") return await viewAdd();

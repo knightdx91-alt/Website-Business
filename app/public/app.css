@@ -121,6 +121,8 @@ h3 { font-size: 1rem; margin: 0 0 6px; }
 .top__brand .short { display: none; }
 @media (max-width: 420px) { .top__brand .long { display: none; } .top__brand .short { display: inline; } }
 .opener { border-left: 6px solid var(--accent); }
+.stepnum { display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; border-radius: 50%; background: var(--accent); color: #14213d; font-size: .8em; margin-right: 4px; vertical-align: 2px; }
+.say { margin: 8px 0 12px; }
 .big { font-size: 1.15rem; line-height: 1.5; margin: 0; }
 .obj { border-top: 1px solid var(--line); padding: 10px 0; }
 .obj summary { font-weight: 700; cursor: pointer; min-height: 40px; display: flex; align-items: center; }

@@ -310,6 +310,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Printables (worker-rendered HTML, `cards.ts`): `/api/leads/:id/reviewcard` (4 Google review QR cards) and
   `/api/leads/:id/flyer` (60-day preview link QR; marks a New lead Shown). Custom domains go through the
   Pages domains API (`addDomain` in pages.ts); the lead screen shows the CNAME to add.
+- In-person guide (`#/walkin` general, `#/walkin/<leadId>` filled in; owner and callers; `viewWalkin` in app.js): a walk-in
+  script with no AI cost: best time to visit by category (`WALKIN_TIMING`), the opener (built from `presence`), what to
+  point at on the preview (only features it really has), questions, the middle-plan price line from Settings, asking for
+  the yes (Show plans → they sign and pay on the phone), "not today" (text link + flyer + callback), short face-to-face
+  objections (`walkinObjections`), plus the sign-up and log cards. Linked from home, the lead screen (open leads), each
+  walk-in route stop and the call guide.
 - Walk-in route (`#/route`): open leads sorted by distance (leads.lat/lng, cleared on expiry), up to 9 stops,
   nearest-next order, opens a Google Maps directions link.
 - Google Business Profile, step 1 (`#/gbp/:id`, `src/copy/gbp.ts`, `leads.gbp_json`): owner-only tools for sold/live
