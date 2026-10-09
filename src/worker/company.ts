@@ -1,12 +1,12 @@
 import { notify } from "./notify.ts";
-import { addonPrice, billingOptions, defaultTerms, getSettings, type AppSettings } from "./db.ts";
-import { dollars, pickerHtml, picksFromForm, priceSignup } from "./checkout.ts";
-import { agreementPage, orderSummary, saveOrder } from "./signup.ts";
+import { addonPrice, billingOptions, defaultTerms, getSettings, GO_LIVE_TEXT, type AppSettings } from "./db.ts";
+import { dollars, pickerHtml, picksFromForm, priceSignup, type PricedOrder } from "./checkout.ts";
+import { agreementPage, manageBillingHtml, orderSummary, saveOrder } from "./signup.ts";
 import { contractSectionsHtml, contractText } from "./contract.ts";
 import { esignHtml, readSignature } from "./esign.ts";
 import { extrasToken } from "./auth.ts";
 import { mailReady, maskEmail, sendEmail } from "./mail.ts";
-import { newId, now, type Env } from "./env.ts";
+import { HttpError, newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
 import { SEARCH_GROUPS } from "../places/queries.ts";
 import { EXAMPLES } from "../examples/examples.ts";
@@ -20,7 +20,7 @@ export const COMPANY_ORIGIN = ORIGIN;
 /** Year Underground Associates LLC started, for the copyright line. */
 const FOUNDED = 2021;
 
-/** Shown on the Terms and Privacy pages; bump when either changes. */
+/** Shown on the Terms and Privacy pages; bump when either changes (last: minimum-term, renewal, late-payment and church-rate lines). */
 const POLICIES_UPDATED = "October 9, 2026";
 
 /** Contact form posts land in the app inbox under this pseudo lead id. */
@@ -28,6 +28,23 @@ export const COMPANY_LEAD_ID = "company";
 
 /** Every kind of business the app searches for and builds sites for, so the list grows with new search groups. */
 const CATEGORIES = SEARCH_GROUPS.map((g) => g.label);
+
+/** The short list on the Get started form: one entry per template pack, in plain words. */
+const BUSINESS_TYPES = [
+  "Restaurant, cafe or food truck",
+  "Contractor or home services",
+  "Salon, barber or spa",
+  "Auto repair, body shop or towing",
+  "Landscaping or lawn care",
+  "Cleaning or pressure washing",
+  "Print, sign or shirt shop",
+  "Shop or boutique",
+  "Tax, accounting or insurance",
+  "Church or nonprofit",
+];
+
+/** One line under the example sites, so nobody mistakes them for client work. */
+const EXAMPLES_NOTE = "These are example sites we built to show the styles. Your preview will be built for your business, free.";
 
 const INCLUDED: Array<[string, string]> = [
   ["Made for phones", "Most of your customers find you on a phone. Every page is built for a small screen first."],
@@ -89,6 +106,11 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   }
   // Fonts and icons come from the app's static assets.
   if (path.startsWith("/fonts/") || path.startsWith("/icons/") || path === "/og.png") return null;
+  if (path === "/owner.jpg" && req.method === "GET") {
+    // The owner's photo, when app/public/owner.jpg exists; the assets fallback page is not it.
+    const res = await env.ASSETS.fetch(req);
+    return res.ok && /^image\//.test(res.headers.get("content-type") ?? "") ? res : new Response("Not found", { status: 404 });
+  }
   if (path === "/examples/form" && req.method === "POST") {
     return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Example site</title><body style="font:17px/1.5 system-ui;max-width:560px;margin:40px auto;padding:0 20px"><h1>This is an example site</h1><p>Forms on example sites don't send anywhere. On your real site, requests go straight to you.</p><p><a href="${ORIGIN}/#contact">Get a free preview of your own site</a></p>`, { headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex" } });
   }
@@ -160,7 +182,13 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
       note = `<p class="note note--warn" role="alert">Please fill in your business name, your name, phone and email, then open the agreement and sign it.</p>`;
     } else {
       const picks = picksFromForm(form, s.addons);
-      const order = priceSignup(s, field("plan", 20) || planId, field("billing", 20) || "standard", picks);
+      let order: PricedOrder;
+      try {
+        order = priceSignup(s, field("plan", 20) || planId, field("billing", 20) || "standard", picks);
+      } catch (err) {
+        if (!(err instanceof HttpError)) throw err;
+        return policyShell(name, legal, "Get started", `<h1>Get started</h1><p class="note note--warn" role="alert">${e(err.message)}. <a href="/start">Pick a plan again</a>.</p>`, { phone: s.companyPhone, status: err.status });
+      }
       const saved = await saveOrder(env, req, {
         leadId: "web",
         order,
@@ -187,16 +215,15 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
       return Response.redirect(saved.checkoutUrl ?? `${ORIGIN}/start/thanks?a=${saved.agreementUrl.split("/agreement/")[1]}`, 303);
     }
   }
-  const types = [...new Set(SEARCH_GROUPS.map((g) => g.label))];
   const body = `<p class="note" style="margin:0 0 18px">Already a client? You don't need to sign up again. <a href="/extras">Add extras to your website here</a>.</p>
 <h1>Get started</h1>
 <p class="lead">Pick your plan and we'll start building your site. You'll still look it over and approve every detail before it goes live.</p>
 ${note}
 <form method="post" class="form light">
-${pickerHtml(s, { planId, esc: e })}
+${pickerHtml(s, { planId, esc: e, showPlans: false })}
 <h2 style="font-size:1.3rem;margin-top:8px">About your business</h2>
 <label>Business name<input name="business" required maxlength="120" autocomplete="organization"></label>
-<label>What kind of business?<select name="kind" style="min-height:50px;border-radius:10px;border:2px solid #3b4a6b;padding:10px;font:inherit"><option value="">Choose one</option>${types.map((t) => `<option>${e(t)}</option>`).join("")}<option>Something else</option></select></label>
+<label>What kind of business?<select name="kind" style="min-height:50px;border-radius:10px;border:2px solid #3b4a6b;padding:10px;font:inherit"><option value="">Choose one</option>${BUSINESS_TYPES.map((t) => `<option>${e(t)}</option>`).join("")}<option>Something else</option></select></label>
 <label>Town<input name="town" maxlength="80" placeholder="Cullman"></label>
 <label>Your current website or Facebook page <span class="opt">(optional)</span><input name="web" maxlength="300"></label>
 <label>Your name<input name="name" required maxlength="100" autocomplete="name"></label>
@@ -207,6 +234,7 @@ ${pickerHtml(s, { planId, esc: e })}
 <div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
 ${esignHtml({ sectionsHtml: contractSectionsHtml(s, { business: "your business", kind: "signup", esc: e }), esc: e, businessField: "business", title: "Your agreement" })}
 <p class="small muted">See our <a href="/terms#refunds">cancellation &amp; refund policy</a> and <a href="/privacy">privacy policy</a>.</p>
+<p><strong>${GO_LIVE_TEXT}</strong></p>
 <button class="btn" type="submit">${env.STRIPE_SECRET_KEY ? "Sign and continue to payment" : "Sign and send my order"}</button>
 ${env.STRIPE_SECRET_KEY ? `<p class="small muted">Payment is handled securely by Stripe. We never see your card number.</p>` : `<p class="small muted">We'll send you an invoice by email.</p>`}
 </form>
@@ -220,7 +248,9 @@ async function startThanks(env: Env, url: URL): Promise<Response> {
   const copy = /^[sp][a-z0-9]+\.[A-Za-z0-9_-]+$/.test(a) ? `<p><a href="/agreement/${e(a)}" target="_blank" rel="noopener">📄 View or print your signed agreement</a></p>` : "";
   const name = s.companyName || "Underground Associates";
   const body = `<h1>Thank you! 🎉</h1><p class="lead">We got your order. ${s.companyPhone ? `We'll call you within one business day from ${e(s.companyPhone)}` : "We'll be in touch within one business day"} to get your photos, hours and details.</p>
-<p>If you paid online, a receipt is on its way from our payment provider. Nothing goes live until you've approved your site.</p>${copy}
+<p>If you paid online, a receipt is on its way from our payment provider. Nothing goes live until you've approved your site.</p>
+<p><strong>${GO_LIVE_TEXT}</strong></p>${copy}
+${manageBillingHtml(s)}
 <p><a class="btn" href="/">Back to the home page</a></p>`;
   return policyShell(name, s.legalName || name, "Thank you", body, { phone: s.companyPhone });
 }
@@ -340,17 +370,28 @@ ${s.addons.map((a, i) => `<label class="xopt"><input type="checkbox" name="x_${i
 }
 
 /** Simple light page in the company style (header, narrow column, footer). */
-function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean; wide?: boolean; phone?: string; description?: string }): Response {
+function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean; wide?: boolean; phone?: string; description?: string; status?: number; from?: number | null }): Response {
   const meta = o.description
     ? `<meta name="description" content="${e(o.description)}"><link rel="canonical" href="${ORIGIN}/portfolio"><meta property="og:image" content="${ORIGIN}/og.png">`
     : `<meta name="robots" content="noindex">`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${e(title)} | ${e(name)}</title>${meta}<meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
-${header(name, o.phone)}
+${header(name, o.phone, o.from)}
 <main id="main" class="sec"><div class="wrap${o.wide ? "" : " narrow"}">${body}</div></main>
 ${footer(legal)}</body></html>`;
   const csp = `default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:;${o.script ? " script-src 'unsafe-inline';" : ""} form-action 'self' https://checkout.stripe.com; base-uri 'none'; frame-ancestors 'none'`;
-  return new Response(html, { headers: { ...HEADERS, "cache-control": "no-store", "content-security-policy": csp } });
+  return new Response(html, { status: o.status ?? 200, headers: { ...HEADERS, "cache-control": "no-store", "content-security-policy": csp } });
+}
+
+/** True when the owner has added app/public/owner.jpg (served as /owner.jpg); the About strip then shows it. */
+async function ownerPhotoExists(env: Env): Promise<boolean> {
+  try {
+    // Missing files fall back to the app page (single-page-application handling), so the type must be an image.
+    const res = await env.ASSETS.fetch(new Request(`${ORIGIN}/owner.jpg`, { method: "HEAD" }));
+    return res.ok && /^image\//.test(res.headers.get("content-type") ?? "");
+  } catch {
+    return false;
+  }
 }
 
 async function contactPost(env: Env, req: Request): Promise<Response> {
@@ -400,6 +441,8 @@ async function home(env: Env, url: URL): Promise<Response> {
     description,
   };
   const callBtn = phone ? `<a class="btn btn--ghost" href="${telHref(phone)}">Call ${e(phone)}</a>` : "";
+  const owner = (s.callerName || "Post").split(" ")[0]!;
+  const ownerPhoto = await ownerPhotoExists(env);
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${e(title)}</title><meta name="description" content="${e(description)}"><link rel="canonical" href="${ORIGIN}/">
 <meta property="og:type" content="website"><meta property="og:title" content="${e(title)}"><meta property="og:description" content="${e(description)}"><meta property="og:url" content="${ORIGIN}/">
@@ -408,7 +451,7 @@ async function home(env: Env, url: URL): Promise<Response> {
 <link rel="preload" href="/fonts/bricolage-grotesque-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>${CSS}</style><script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script></head><body>
 <a class="skip" href="#main">Skip to content</a>
-${header(name, phone)}
+${header(name, phone, lowest)}
 <main id="main">
 <section class="hero"><div class="wrap">
 <p class="eyebrow">Websites for Cullman-area businesses</p>
@@ -435,12 +478,21 @@ ${header(name, phone)}
 <h2>Our work</h2>
 <p class="lead">Every business gets its own look. Here are a few examples, made-up businesses so you can see the range.</p>
 <ul class="examples">${EXAMPLES.slice(0, 4).map((x) => exampleCard(x, false)).join("")}</ul>
-<p style="margin-top:22px"><a class="btn btn--line" href="/portfolio">See the full portfolio (${EXAMPLES.length} sites)</a></p>
+<p class="small muted" style="margin-top:14px">${e(EXAMPLES_NOTE)}</p>
+<p style="margin-top:14px"><a class="btn btn--line" href="/portfolio">See the full portfolio (${EXAMPLES.length} sites)</a></p>
+</div></section>
+
+<section class="sec about" id="about"><div class="wrap about__in">
+<!-- Owner photo: add app/public/owner.jpg (a square headshot, about 400px) and it shows here automatically. -->
+${ownerPhoto ? `<img class="about__photo" src="/owner.jpg" alt="${e(owner)}, owner of ${e(name)}" width="128" height="128" loading="lazy" decoding="async">` : ""}
+<div><h2>Hi, I'm ${e(owner)}.</h2>
+<p class="lead">${e(name)} is a Cullman company — I build the site, show it to you in person, and keep it running.${phone ? ` Call or text me: <a href="${telHref(phone)}">${e(phone)}</a>.` : ""}</p>
+${legal !== name ? `<p class="small muted">${e(legal)} · Cullman, Alabama</p>` : `<p class="small muted">Cullman, Alabama</p>`}</div>
 </div></section>
 
 ${plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap">
 <h2>Simple monthly plans</h2>
-<p class="lead">${(s.minMonths ?? 12) ? `<strong>No setup fee on ${commitText(s)} plans.</strong>${s.flexSetup ? ` Month to month has a one-time ${money(s.flexSetup)} setup fee.` : ""}` : "No setup fee. Cancel any time."}</p>
+<p class="lead">${(s.minMonths ?? 12) ? `<strong>No setup fee on ${commitText(s)} plans.</strong>${s.flexSetup ? ` Month to month has a one-time ${money(s.flexSetup)} setup fee.` : ""}` : "No setup fee. Cancel any time."} ${e(GO_LIVE_TEXT)}</p>
 <div class="grid plans">${plans
         .map(
           (p) => `<div class="card plan${p.id === "plus" ? " plan--pick" : ""}">${p.id === "plus" ? `<p class="tag">Most popular</p>` : ""}<h3>${e(p.name)}</h3>
@@ -508,9 +560,9 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
   });
 }
 
-/** Site header: name, Our work, Plans, and a Call (or Contact) button. */
-function header(name: string, phone?: string): string {
-  return `<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a><nav class="hdr__nav" aria-label="Main"><a href="/portfolio">Our work</a><a class="hdr__plans" href="/#plans">Plans</a>${
+/** Site header: name, Our work, Plans (with the lowest monthly price), and a Call (or Contact) button. */
+function header(name: string, phone?: string, from?: number | null): string {
+  return `<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a><nav class="hdr__nav" aria-label="Main"><a href="/portfolio">Our work</a><a class="hdr__plans" href="/#plans">Plans${from ? ` <small>from ${money(from)}/mo</small>` : ""}</a>${
     phone ? `<a class="hdr__call" href="${telHref(phone)}">Call</a>` : `<a class="hdr__call" href="/#contact">Contact</a>`
   }</nav></div></header>`;
 }
@@ -533,11 +585,13 @@ async function portfolio(env: Env): Promise<Response> {
   const name = s.companyName || "Underground Associates";
   const body = `<p class="eyebrow" style="color:var(--goldtext)">Our work</p>
 <h1>Portfolio</h1>
-<p class="lead">Every business gets its own design: colors, fonts and page layout picked for what you do, built for phones first. These are made-up businesses so you can see the range. Tap any one to try the full site.</p>
+<p class="lead">Every business gets its own design: colors, fonts and page layout picked for what you do, built for phones first. Tap any one to try the full site.</p>
+<p class="small muted">${e(EXAMPLES_NOTE)}</p>
 <ul class="examples examples--full">${EXAMPLES.map((x) => exampleCard(x, true)).join("")}</ul>
 <div class="card" style="margin-top:32px"><h2 style="font-size:1.4rem">Want to see yours?</h2><p>We'll build a free preview of your website first. You only pay if you like it.</p>
 <div class="btns"><a class="btn" href="/#contact">Get my free preview</a><a class="btn btn--line" href="/#plans">See plans</a></div></div>`;
-  return policyShell(name, s.legalName || name, "Portfolio", body, { wide: true, phone: s.companyPhone, description: `Example websites by ${name} for Cullman-area businesses: restaurants, contractors, salons, auto shops, lawn care, cleaning, print shops and boutiques.` });
+  const from = s.plans.length ? Math.min(...s.plans.map((p) => p.monthly)) : null;
+  return policyShell(name, s.legalName || name, "Portfolio", body, { wide: true, phone: s.companyPhone, from, description: `Example websites by ${name} for Cullman-area businesses: restaurants, contractors, salons, auto shops, lawn care, cleaning, print shops and boutiques.` });
 }
 
 function footer(legal: string, reviewUrl?: string): string {
@@ -583,22 +637,27 @@ async function policyPage(env: Env, kind: "terms" | "privacy"): Promise<Response
               ? `pay 12 months up front for the price of ${12 - (s.annualMonthsFree ?? 0)}. No setup fee. Renews each year unless you cancel.`
               : `the monthly price, no setup fee. ${o.id === "short" ? short : min}-month minimum, then cancel any time with 30 days' notice.`,
         )}`))}
+${s.churchAnnualMonthsFree ? `<p>Churches and nonprofits: yearly plans are 12 months for the price of ${12 - s.churchAnnualMonthsFree}.</p>` : ""}
 ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPrice(a))})`).join(", ")}.</p>` : ""}
 <p>The prices in your signed agreement are the ones you pay. We'll give you at least 30 days' notice before any price change.</p>`)
         : "",
-      sec("Signing up and paying", `<p>You sign up by reading and accepting your plan and our service agreement on your personal sign-up page. Payments are processed by Stripe and charged automatically to the card you choose; we never see or store your full card number. If a payment fails, we'll reach out. A site may be taken offline if a payment is more than 30 days late.</p>`),
+      sec("Signing up and paying", `<p>You sign up by reading and accepting your plan and our service agreement on your personal sign-up page. Payments are processed by Stripe and charged automatically to the card you choose; we never see or store your full card number. Churches, nonprofits and anyone who asks can pay by check or bank transfer against an invoice instead.</p>
+<p>${e(GO_LIVE_TEXT)} A same-day build, if bought, goes live the same business day you approve it.</p>
+<p>If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up. To update your card or cancel, ${reach} or use the billing link we send you.</p>`),
       sec("Cancellation and refund policy", `${ul([
         "Previews are always free. You never pay anything unless you sign up.",
-        min ? `Plans with a minimum (${short && short < min ? `${short} or ${min} months` : `${min} months`}): after the minimum, cancel any time with 30 days' notice.` : "",
+        min ? `Plans with a minimum (${short && short < min ? `${short} or ${min} months` : `${min} months`}): after the minimum, cancel any time with 30 days' notice. If you cancel before the end of your plan's minimum term, the remaining months of the minimum are due.` : "",
         s.flexSetup ? "Month to month: cancel any time with 30 days' notice." : "",
         "Monthly charges are billed in advance and aren't refunded for part of a month.",
         s.flexSetup ? `The month-to-month setup fee (${money(s.flexSetup)}) is refunded in full if you cancel before your site goes live. After it goes live, it isn't refundable.` : "",
         s.annualMonthsFree ? "Yearly plans: cancel within 30 days of paying and we refund what you paid, minus the regular monthly price for each month started. After 30 days, yearly payments aren't refunded; your site stays up through the year you paid for and the plan won't renew." : "",
+        s.annualMonthsFree ? "Yearly plans renew each year. We'll email you at least 30 days before a yearly renewal, and you can cancel before it renews." : "",
         "If we ever charge you by mistake, we refund it in full.",
         `To cancel or ask for a refund, ${reach}. Refunds go back to your original card, usually within 5 to 10 business days.`,
+        "This cancellation and refund policy is part of your signed agreement as of the day you sign.",
       ].filter(Boolean))}`, "refunds"),
       sec("Service agreement", `<p>This is the agreement you accept when you sign up:</p><div class="terms">${e(terms)}</div>`),
-      sec("Limits", `<p>We work to keep your site online and correct, but we can't promise it will never be down or error-free, and no one can guarantee search rankings, visitors or sales. To the extent the law allows, we aren't liable for lost profits or indirect damages, and our total liability is limited to what you paid us in the 3 months before the claim.</p>`),
+      sec("Limits", `<p>We work to keep your site online and correct, but we can't promise it will never be down or error-free, and no one can guarantee search rankings, visitors or sales. To the extent the law allows, we aren't liable for lost profits or indirect damages, and our total liability to you is limited to what you paid us in the 3 months before the problem.</p>`),
       sec("The law that applies", `<p>These terms are governed by the laws of the State of Alabama.</p>`),
     ].join("");
   } else {
@@ -653,7 +712,9 @@ h1{font-size:clamp(2.2rem,7vw,3.8rem)}h2{font-size:clamp(1.6rem,4.5vw,2.4rem)}h3
 .brand{color:#fff;text-decoration:none;font-family:"Bricolage",system-ui,sans-serif;font-weight:800;font-size:1.15rem}
 .hdr__call{color:var(--navy)!important;background:var(--gold);text-decoration:none;font-weight:700;padding:10px 18px;border-radius:999px}
 .hdr__nav{display:flex;align-items:center;gap:16px}.hdr__nav a{color:#fff;text-decoration:none;font-weight:700}.hdr__nav a:not(.hdr__call):hover{text-decoration:underline}
-.hdr__nav a{white-space:nowrap}
+.hdr__nav a{white-space:nowrap}.hdr__plans small{font-weight:400;color:#dfe4ee;font-size:.82rem}
+.about__in{display:flex;gap:22px;align-items:center}.about__photo{width:128px;height:128px;border-radius:50%;object-fit:cover;flex:none;border:3px solid var(--gold)}
+.about h2{font-size:clamp(1.5rem,4.5vw,2.1rem)}.about .lead{margin-bottom:6px}@media (max-width:520px){.about__in{flex-direction:column;align-items:flex-start;gap:14px}.about__photo{width:96px;height:96px}}
 @media (max-width:520px){.hdr__plans{display:none}.brand{font-size:.98rem;line-height:1.15}.hdr__nav{gap:12px}.hdr__call{padding:8px 14px}}
 .btn--line{background:transparent;color:var(--navy);border:2px solid var(--navy)}
 .examples span em{display:block;font-style:normal;font-size:.85rem;color:var(--muted);margin-top:2px}.examples span b{display:block;color:var(--blue);margin-top:4px;font-size:.92rem}

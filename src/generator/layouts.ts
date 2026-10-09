@@ -163,7 +163,7 @@ ${INFLOW_MEDIA}
 .hdr.is-hidden{transform:translateY(calc(-100% - 24px))}
 .hdr__in{padding:0 8px 0 20px}
 .hdr__call{border-radius:999px}
-.js .nav{inset:84px 12px auto 12px;max-height:calc(100vh - 110px);border-radius:24px;box-shadow:0 12px 40px ${withAlpha(c.text, 0.2)}}
+.js .nav{inset:calc(var(--hdr-h,66px) + 18px) 12px auto 12px;max-height:calc(100vh - 110px);border-radius:24px;box-shadow:0 12px 40px ${withAlpha(c.text, 0.2)}}
 .hero{margin:14px 12px 0;border-radius:28px;display:grid}
 ${INFLOW_MEDIA}
 .hero--photo .hero__media{margin:12px 12px 0;border-radius:20px;overflow:hidden;aspect-ratio:16/11}

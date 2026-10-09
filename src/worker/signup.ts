@@ -1,8 +1,8 @@
 import { notify } from "./notify.ts";
 import { shareToken } from "./auth.ts";
-import { checkoutParams, createCheckout, dollars, pickerHtml, picksFromForm, priceExtras, priceSignup, type Pick, type PricedOrder } from "./checkout.ts";
-import { addonPrice, defaultTerms, getLead, getSettings, updateLead, type BillingOption, type Plan } from "./db.ts";
-import { newId, now, type Env } from "./env.ts";
+import { checkoutParams, createCheckout, dollars, INVOICE_BILLING, pickerHtml, picksFromForm, priceExtras, priceSignup, type Pick, type PricedOrder } from "./checkout.ts";
+import { addonPrice, defaultTerms, getLead, getSettings, GO_LIVE_TEXT, updateLead, type BillingOption, type Plan } from "./db.ts";
+import { HttpError, localDate, newId, now, type Env } from "./env.ts";
 import { escHtml, page } from "./page.ts";
 import { agreementToken, verifyAgreement } from "./auth.ts";
 import { contractSectionsHtml, contractText } from "./contract.ts";
@@ -123,8 +123,15 @@ export async function saveOrder(
   },
 ): Promise<{ signupId: string; agreementUrl: string; checkoutUrl: string | null; error?: string }> {
   const { plan, option } = o.order;
+  const invoice = !!o.order.invoice;
   const { payLink: _a, payLinkFlex: _b, payLinkAnnual: _c, payLinkShort: _d, ...rest } = plan!;
-  const planSnapshot: SignedPlan = { ...rest, billing: option!.id, billingLabel: option!.label, billingDetail: option!.detail, monthlyEquivalent: option!.monthlyEquivalent };
+  const planSnapshot: SignedPlan = {
+    ...rest,
+    billing: option!.id,
+    billingLabel: invoice ? `${option!.label}, invoiced` : option!.label,
+    billingDetail: invoice ? `${option!.detail} · paid by check or bank transfer against our invoice` : option!.detail,
+    monthlyEquivalent: option!.monthlyEquivalent,
+  };
   const signupId = newId();
   await env.DB.prepare(
     `INSERT INTO signups (id, lead_id, plan_json, terms, signer_name, signer_title, signer_email, sent_by, ip, user_agent, created_at, extras_json, due_cents, source, business, phone, signature)
@@ -133,11 +140,13 @@ export async function saveOrder(
     .bind(
       signupId, o.leadId, JSON.stringify(planSnapshot), o.terms, o.name, o.title || null, o.email, o.sentBy ?? null,
       req.headers.get("cf-connecting-ip"), (req.headers.get("user-agent") ?? "").slice(0, 300), now(),
-      JSON.stringify({ picks: o.picks, extras: o.order.extras, quotes: o.order.quotes, renews: o.order.renews }), o.order.dueToday, o.source, o.business ?? null, o.phone ?? null, o.signature,
+      JSON.stringify({ picks: o.picks, extras: o.order.extras, quotes: o.order.quotes, renews: o.order.renews, ...(invoice ? { billing: INVOICE_BILLING, invoice: true } : {}) }),
+      o.order.dueToday, o.source, o.business ?? null, o.phone ?? null, o.signature,
     )
     .run();
   const agreementUrl = `${new URL(o.successUrl).origin}/agreement/${await agreementToken(env, "s", signupId)}`;
-  if (!env.STRIPE_SECRET_KEY) return { signupId, agreementUrl, checkoutUrl: null };
+  // Invoice orders are billed by hand (the owner sends a Stripe invoice); nothing is charged online.
+  if (!env.STRIPE_SECRET_KEY || invoice) return { signupId, agreementUrl, checkoutUrl: null };
   const success = new URL(o.successUrl);
   success.searchParams.set("a", agreementUrl.split("/agreement/")[1]!);
   try {
@@ -161,7 +170,12 @@ export function orderSummary(order: PricedOrder): string {
 
 function orderLinesHtml(order: PricedOrder): string {
   return `<ul>${order.lines.map((l) => `<li>${escHtml(l.name)}${l.qty > 1 ? ` x${l.qty}` : ""}: ${dollars(l.amount * l.qty)}${l.interval ? ` per ${l.interval}` : " one-time"}</li>`).join("")}${order.quotes.map((q) => `<li>${escHtml(q)}: we'll call with a price</li>`).join("")}</ul>
-<p><strong>Due today: ${dollars(order.dueToday)}</strong>${order.renews ? `<br><span class="small muted">Then ${dollars(order.renews.amount)} per ${order.renews.interval}, charged automatically.</span>` : ""}</p>`;
+<p><strong>${order.invoice ? "On your first invoice" : "Due today"}: ${dollars(order.dueToday)}</strong>${order.renews ? `<br><span class="small muted">Then ${dollars(order.renews.amount)} per ${order.renews.interval}, ${order.invoice ? "invoiced" : "charged automatically"}.</span>` : ""}</p>`;
+}
+
+/** Shown on the paid page and the signed agreement, so clients know how to change their card or cancel. */
+export function manageBillingHtml(settings: { companyPhone?: string }): string {
+  return `<p class="small muted">To update your card or cancel, call us${settings.companyPhone ? ` at ${escHtml(settings.companyPhone)}` : ""} or use the billing link we send you.</p>`;
 }
 
 /** The page a business owner opens from a sign-up link: pick plan, way to pay and extras, sign, then pay. */
@@ -176,9 +190,14 @@ export async function serveSignup(env: Env, req: Request, leadId: string, planId
   const business = lead.name ?? "your business";
   const url = new URL(req.url);
   const here = `${origin}${url.pathname}`;
+  // Churches and nonprofits can pay against an invoice; anyone else can when the link carries ?invoice=1.
+  const allowInvoice = lead.category === "church" || url.searchParams.get("invoice") === "1";
+  const pricing = { category: lead.category, invoice: allowInvoice };
 
   if (req.method === "POST") {
     const form = await req.formData().catch(() => null);
+    // Same honeypot as the website forms: a filled-in "website" field is a bot, dropped without a word.
+    if (String(form?.get("website") ?? "").trim()) return page("Thank you", `<div class="wrap"><div class="card"><h1>Thank you</h1><p>We got it.</p></div></div>`, { brand });
     const signed = readSignature(form);
     const title = String(form?.get("title") ?? "").trim().slice(0, 60);
     const email = String(form?.get("email") ?? "").trim().slice(0, 120);
@@ -187,48 +206,75 @@ export async function serveSignup(env: Env, req: Request, leadId: string, planId
     }
     const name = signed.name;
     const picks = picksFromForm(form, settings.addons);
-    const order = priceSignup(settings, String(form?.get("plan") ?? planId), String(form?.get("billing") ?? "standard"), picks);
+    let order: PricedOrder;
+    try {
+      order = priceSignup(settings, String(form?.get("plan") ?? planId), String(form?.get("billing") ?? "standard"), picks, pricing);
+    } catch (err) {
+      if (!(err instanceof HttpError)) throw err;
+      return page("Sign up", `<div class="wrap"><div class="card"><p>${escHtml(err.message)}. <a href="">Go back</a> and pick again${settings.companyPhone ? `, or call us at ${escHtml(settings.companyPhone)}` : ""}.</p></div></div>`, { brand, status: err.status });
+    }
     const terms = contractText(settings, order, { business, kind: "signup" });
     const sent = await env.DB.prepare("SELECT author FROM lead_notes WHERE lead_id = ? AND outcome = 'signup_sent' ORDER BY created_at DESC LIMIT 1").bind(leadId).first<{ author: string }>();
     const saved = await saveOrder(env, req, { leadId, order, picks, terms, name, signature: signed.signature, title, email, sentBy: sent?.author, source: "link", successUrl: `${here}?paid=1`, cancelUrl: `${here}?canceled=1` });
     await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, 'signed', ?, ?)")
-      .bind(newId(), leadId, name, `Signed up: ${orderSummary(order)}. Due today ${dollars(order.dueToday)}${title ? `. Signed as ${title}` : ""}. Email: ${email}`, now())
+      .bind(newId(), leadId, name, `Signed up: ${orderSummary(order)}. ${order.invoice ? "On first invoice" : "Due today"} ${dollars(order.dueToday)}${title ? `. Signed as ${title}` : ""}. Email: ${email}`, now())
       .run();
-    await notify(env, { kind: "signed", actorName: name, leadId, text: `✍️ ${name} signed ${lead.name} up: ${orderSummary(order)}${sent?.author ? `, from ${sent.author}'s link` : ""}` });
-    await updateLead(env, leadId, { sales_status: lead.sales_status === "live" ? "live" : "sold", follow_up: null, last_contact: now() });
+    // The payment itself isn't done yet (Stripe confirms it through the webhook, which clears the callback and notes "Paid").
+    await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, 'Website', NULL, ?, ?)")
+      .bind(newId(), leadId, order.invoice ? "Signed; wants an invoice (check or bank transfer)" : "Signed the agreement; payment not finished yet. If they don't pay today, call.", now())
+      .run();
+    await notify(env, { kind: "signed", actorName: name, leadId, text: `✍️ ${name} signed ${lead.name} up: ${orderSummary(order)}${order.invoice ? " (wants an invoice)" : ""}${sent?.author ? `, from ${sent.author}'s link` : ""}` });
+    await updateLead(env, leadId, { sales_status: lead.sales_status === "live" ? "live" : "sold", follow_up: localDate(1), last_contact: now() });
     if (saved.checkoutUrl) return Response.redirect(saved.checkoutUrl, 303);
     const option = order.option!;
     return page(
       "Thank you",
       `<div class="wrap"><div class="card"><h1>Thank you, ${escHtml(name.split(" ")[0]!)}!</h1>
 <p class="ok">You're signed up for ${escHtml(business)}.</p>${orderLinesHtml(order)}
-${order.extras.length || order.quotes.length || saved.error ? `<p>We'll send you an invoice shortly${settings.companyPhone ? `. Questions? Call ${escHtml(settings.companyPhone)}` : ""}.</p>` : payBlock(option, leadId, email, settings)}
+${
+  order.invoice
+    ? `<p>We'll email an invoice to <strong>${escHtml(email)}</strong>; nothing is charged online. Pay it by check or bank transfer${settings.companyPhone ? `. Questions? Call ${escHtml(settings.companyPhone)}` : ""}.</p>`
+    : order.extras.length || order.quotes.length || saved.error
+      ? `<p>We'll send you an invoice shortly${settings.companyPhone ? `. Questions? Call ${escHtml(settings.companyPhone)}` : ""}.</p>`
+      : payBlock(option, leadId, email, settings)
+}
 <p><a href="${escHtml(saved.agreementUrl)}" target="_blank" rel="noopener">📄 View or print your signed agreement</a></p>
+<p><strong>${GO_LIVE_TEXT}</strong></p>
 <p class="small muted" style="margin-top:16px">Next, we'll go over your photos, hours and details with you before anything goes live.</p></div></div>`,
       { brand },
     );
   }
 
-  const already = await env.DB.prepare("SELECT signer_name, paid, created_at FROM signups WHERE lead_id = ? ORDER BY created_at DESC LIMIT 1")
+  const already = await env.DB.prepare("SELECT id, signer_name, paid, created_at FROM signups WHERE lead_id = ? ORDER BY created_at DESC LIMIT 1")
     .bind(leadId)
-    .first<{ signer_name: string; paid: number; created_at: number }>();
+    .first<{ id: string; signer_name: string; paid: number; created_at: number }>();
   const paidNow = url.searchParams.get("paid") === "1";
   const canceled = url.searchParams.get("canceled") === "1";
+  if (canceled && already && !already.paid) {
+    // Stripe sent them back from the card screen without paying: note it once per sign-up so the caller follows up.
+    const marker = `Backed out at the card screen (sign-up ${already.id})`;
+    const noted = await env.DB.prepare("SELECT id FROM lead_notes WHERE lead_id = ? AND body = ? LIMIT 1").bind(leadId, marker).first<{ id: string }>();
+    if (!noted) {
+      await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, 'Website', NULL, ?, ?)").bind(newId(), leadId, marker, now()).run();
+    }
+  }
   const preview = lead.status === "ready" ? `${origin}/s/${await shareToken(env, leadId, 30)}/` : null;
   const signedOn = already ? new Date(already.created_at).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "long", day: "numeric", year: "numeric" }) : "";
   const body = `<div class="wrap">
-${paidNow ? `<div class="card"><h1>You're all set! 🎉</h1><p class="ok">Thanks for your payment. You'll get a receipt by email from our payment provider.</p>${/^[sp][a-z0-9]+\.[A-Za-z0-9_-]+$/.test(url.searchParams.get("a") ?? "") ? `<p><a href="${origin}/agreement/${escHtml(url.searchParams.get("a")!)}" target="_blank" rel="noopener">📄 View or print your signed agreement</a></p>` : ""}<p>Next, we'll go over your photos, hours and details with you before anything goes live.</p></div>` : ""}
+${paidNow ? `<div class="card"><h1>You're all set! 🎉</h1><p class="ok">Thanks for your payment. You'll get a receipt by email from our payment provider.</p>${/^[sp][a-z0-9]+\.[A-Za-z0-9_-]+$/.test(url.searchParams.get("a") ?? "") ? `<p><a href="${origin}/agreement/${escHtml(url.searchParams.get("a")!)}" target="_blank" rel="noopener">📄 View or print your signed agreement</a></p>` : ""}<p><strong>${GO_LIVE_TEXT}</strong></p><p>Next, we'll go over your photos, hours and details with you before anything goes live.</p>${manageBillingHtml(settings)}</div>` : ""}
 ${canceled ? `<div class="card"><p><strong>Your payment wasn't finished.</strong> Nothing was charged. You can pick again and continue below, or call us${settings.companyPhone ? ` at ${escHtml(settings.companyPhone)}` : ""}.</p></div>` : ""}
 <div class="card"><p class="muted small" style="margin:0">Website plan for</p><h1>${escHtml(business)}</h1>
 ${preview ? `<a class="btn btn--ghost" href="${escHtml(preview)}" target="_blank" rel="noopener">See your website preview</a>` : ""}</div>
 ${already && !paidNow ? `<div class="card"><p class="ok">Signed by ${escHtml(already.signer_name)} on ${signedOn}${already.paid ? ", and paid. Thank you!" : "."}</p></div>` : ""}
 ${paidNow ? "" : `<form class="card" method="post"><h2>${already ? "Sign again" : "Sign up"}</h2>
-${pickerHtml(settings, { planId, esc: escHtml })}
+${pickerHtml(settings, { planId, esc: escHtml, showPlans: false, category: lead.category, invoice: allowInvoice })}
 <label>Your title <span class="muted small" style="font-weight:400">(optional)</span><input type="text" name="title" placeholder="Owner" maxlength="60"></label>
 <label>Email for receipts<input type="email" name="email" autocomplete="email" required maxlength="120"></label>
+<div style="position:absolute;left:-9999px" aria-hidden="true"><label>Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
 ${esignHtml({ sectionsHtml: contractSectionsHtml(settings, { business, kind: "signup", esc: escHtml }), esc: escHtml, title: "Your agreement" })}
 <p class="small muted">See also our <a href="https://undergroundassociates.com/terms#refunds" target="_blank" rel="noopener">cancellation &amp; refund policy</a> and <a href="https://undergroundassociates.com/privacy" target="_blank" rel="noopener">privacy policy</a>.</p>
-<button class="btn" type="submit">${env.STRIPE_SECRET_KEY ? "Sign and continue to payment" : "Accept and continue"}</button>
+<p><strong>${GO_LIVE_TEXT}</strong></p>
+<button class="btn" type="submit" id="pk-go" data-pay="${env.STRIPE_SECRET_KEY ? "Sign and continue to payment" : "Accept and continue"}" data-invoice="Sign and request an invoice">${env.STRIPE_SECRET_KEY ? "Sign and continue to payment" : "Accept and continue"}</button>
 ${env.STRIPE_SECRET_KEY ? `<p class="small muted">Payment is handled securely by Stripe. We never see your card number.</p>` : ""}
 <p class="small muted" style="margin-bottom:0">${escHtml(settings.legalName || settings.companyName || "")}${settings.companyPhone ? ` · ${escHtml(settings.companyPhone)}` : ""}${settings.companyEmail ? ` · ${escHtml(settings.companyEmail)}` : ""}</p>
 </form>`}</div>`;
@@ -324,6 +370,7 @@ export async function agreementPage(env: Env, token: string, byId?: { kind: "s" 
 ${signature}
 <p><strong>${escHtml(row.signer_name ?? "")}</strong>${row.signer_title ? `, ${escHtml(row.signer_title)}` : ""}${row.business ? ` for ${escHtml(row.business)}` : ""}<br>
 <span class="small muted">${when} Central${row.signer_email ? ` · ${escHtml(row.signer_email)}` : ""}${row.ip ? ` · IP ${escHtml(row.ip)}` : ""}</span></p>
-<p class="small muted">Accepted for ${escHtml(settings.legalName || settings.companyName || "")}${row.paid ? " · Payment received" : ""}</p></div></div>`;
+<p class="small muted">Accepted for ${escHtml(settings.legalName || settings.companyName || "")}${row.paid ? " · Payment received" : ""}</p>
+${ref.kind === "s" ? manageBillingHtml(settings) : ""}</div></div>`;
   return page(`Signed agreement${row.business ? `: ${row.business}` : ""}`, body, { brand, css: "@media print{.top{display:none}.card{border:0}}" });
 }

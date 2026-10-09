@@ -78,7 +78,7 @@ body{--frame:10px;--mat:-9px;background:var(--secondary);padding:var(--frame) va
 body::before{content:"";position:fixed;left:0;right:0;top:0;height:var(--frame);background:var(--secondary);z-index:45;pointer-events:none}
 .hdr{top:var(--frame);margin-bottom:var(--frame);border-bottom:0}
 .hdr.is-hidden{transform:translateY(calc(-100% - var(--frame)))}
-.js .nav{inset:calc(56px + var(--frame)) var(--frame) var(--frame) var(--frame)}
+.js .nav{inset:var(--hdr-h,calc(56px + var(--frame))) var(--frame) var(--frame) var(--frame)}
 .hero,.strip,.section,.cta{margin-bottom:var(--frame)}
 .section{background:var(--bg)}
 .section--band{background:var(--band)}

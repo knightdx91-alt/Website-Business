@@ -15,7 +15,7 @@ export const LAYOUTS_B = {
       return `.hdr{background:var(--bg);border-top:6px solid var(--text);border-bottom:1px solid var(--text)}
 .hdr::after{content:"";display:block;height:3px;border-bottom:1px solid var(--text)}
 .brand{font-size:1.35rem;letter-spacing:-.01em}
-.js .nav{inset:66px 0 0 0;background:var(--bg)}
+.js .nav{inset:var(--hdr-h,66px) 0 0 0;background:var(--bg)}
 @media (min-width:900px){
  .hdr__in{display:grid;grid-template-columns:1fr auto;padding-top:12px}
  .brand{grid-column:1/-1;justify-self:stretch;text-align:center;max-width:none;margin:0;font-size:clamp(2.4rem,4.2vw,3.5rem);line-height:1.05;padding:4px 0 12px;border-bottom:1px solid var(--text)}

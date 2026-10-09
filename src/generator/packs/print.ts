@@ -71,7 +71,7 @@ function artwork(ctx: Ctx) {
   const subject = encodeURIComponent(`Artwork for a quote: ${r.name}`);
   const what = r.variant === "signs" ? "a photo of the wall, window, truck or trailer" : "your logo or a photo of your design";
   return html`<section class="section" id="artwork" aria-labelledby="art-title"><div class="wrap narrow">
-${sectionHead("Artwork", "Send us your design", `Have a file? ${r.email ? "Email it to us." : "Send it our way."} Have a sketch, an old shirt or a photo? ${r.smsEnabled ? "Text us" : "Show us"} ${what}. No design yet? Call and tell us what you have in mind.`)}
+${sectionHead("Artwork", "Send us your design", `Have a file? ${r.email ? "Email it to us." : "Send it our way."} Have a sketch, an old shirt or a photo? ${r.smsEnabled ? "Text us" : "Show us"} ${what}. No design yet? Call and tell us what you have in mind.`, "art-title")}
 <div class="btns">${r.email ? html`<a class="btn btn--secondary" href="mailto:${r.email}?subject=${subject}"><span>Email your artwork</span></a>` : ""}${text ? html`<a class="btn btn--ghost" href="${text.href}"><span>Text us a photo</span></a>` : ""}<a class="btn btn--ghost" href="${action(r, "call")!.href}"><span>Call ${r.phone.display}</span></a></div>
 ${r.email ? "" : todo(ctx, "Add an email for artwork", "Customers will want to email you their logo or design files. Tell us which email to use.")}
 ${r.smsEnabled ? "" : todo(ctx, "Can customers text this number?", "If your shop number takes texts, we'll add a Text us a photo button. Most folks find it easier than email.")}
@@ -115,7 +115,7 @@ ${r.confirmed.includes("services") ? "" : todo(ctx, "Check what you make", "We g
 </div></section>`;
     const photos = gallery(ctx, "Send photos of your work", "Three to nine photos of shirts, signs or prints you've made. Real work is what sells a shop like yours. (We can't use Google's photos on the live site.)");
     const who = html`<section class="section section--band" id="who" aria-labelledby="who-title"><div class="wrap">
-${sectionHead("Who we work with", "Made for local folks", undefined)}
+${sectionHead("Who we work with", "Made for local folks", undefined, "who-title")}
 <ul class="towns">${(WHO[r.variant] ?? WHO.print_shop!).map((w) => html`<li class="chip">${w}</li>`)}</ul>
 </div></section>`;
     const how = html`<section class="section" id="how" aria-labelledby="how-title"><div class="wrap">

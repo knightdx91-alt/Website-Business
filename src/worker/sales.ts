@@ -10,7 +10,49 @@ function startOf(day: string): number {
   return Date.parse(`${day}T00:00:00-06:00`);
 }
 
-const CALL_OUTCOMES = ["no_answer", "callback", "shown", "sold", "not_interested"];
+const CALL_OUTCOMES = ["no_answer", "reached", "callback", "shown", "sold", "not_interested"];
+
+/** Why a prospect said no: the app logs "not_interested" with a body starting "Reason: <word>". */
+export const LOST_REASONS = ["price", "has_someone", "no_need", "timing", "other"] as const;
+export type LostReason = (typeof LOST_REASONS)[number];
+
+/** Tallies lost reasons from call-log bodies ("Reason: price · said it's too much" → price). */
+export function tallyLostReasons(bodies: Iterable<string>): Record<LostReason, number> {
+  const out = Object.fromEntries(LOST_REASONS.map((r) => [r, 0])) as Record<LostReason, number>;
+  for (const body of bodies) {
+    const m = /^\s*Reason:\s*([a-z_]+)/i.exec(body);
+    const word = m?.[1]?.toLowerCase();
+    if (word && (LOST_REASONS as readonly string[]).includes(word)) out[word as LostReason]++;
+  }
+  return out;
+}
+
+/* ---------- Follow-up cadence after a preview was shown ---------- */
+
+export type NextStep = "call" | "text" | "walk_in" | "last_text";
+
+/** Day 2 call, day 5 text, day 10 walk in with the flyer, day 21 last check-in text; after that, mark Not interested. */
+export const CADENCE: ReadonlyArray<{ day: number; next: NextStep; label: string }> = [
+  { day: 2, next: "call", label: "Call" },
+  { day: 5, next: "text", label: "Text: any questions?" },
+  { day: 10, next: "walk_in", label: "Walk in with the flyer" },
+  { day: 21, next: "last_text", label: "Last check-in text" },
+];
+
+export const CADENCE_DONE = "Mark Not interested";
+
+/** The next step after `daysSinceShown` days (the first step whose day is still ahead), or null once the cadence is finished. */
+export function nextCadenceStep(daysSinceShown: number): { day: number; next: NextStep; label: string } | null {
+  const d = Math.max(0, Math.floor(daysSinceShown));
+  return CADENCE.find((s) => s.day > d) ?? null;
+}
+
+/** What the lead screen shows: how long since they were shown and what to do next. */
+export function cadenceFor(shownAt: number | null | undefined, at = Date.now()): { day: number; next: string } | null {
+  if (!shownAt) return null;
+  const day = Math.max(0, Math.floor((at - shownAt) / 86_400_000));
+  return { day, next: nextCadenceStep(day)?.label ?? CADENCE_DONE };
+}
 
 interface Row {
   person: string;
@@ -70,6 +112,10 @@ export async function salesDashboard(env: Env) {
     const plan = s.plan_json ? (JSON.parse(s.plan_json) as Plan & { monthlyEquivalent?: number; billingLabel?: string }) : null;
     return { id: s.id, name: s.name, status: s.sales_status, plan: plan ? [plan.name, plan.billingLabel].filter(Boolean).join(", ") : null, monthly: plan?.monthlyEquivalent ?? plan?.monthly ?? 0, paid: !!s.paid, seller: s.sent_by ?? s.sold_by ?? null };
   });
+  const lost = await env.DB.prepare("SELECT body FROM lead_notes WHERE outcome = 'not_interested' AND body LIKE 'Reason:%'").all<{ body: string }>();
+  const shownCount = (await env.DB.prepare("SELECT COUNT(*) AS n FROM leads WHERE sales_status = 'shown' AND status != 'expired'").first<{ n: number }>())?.n ?? 0;
+  // What the prospects we've shown would be worth on the Plus plan (else the middle plan).
+  const plusPlan = settings.plans.find((p) => p.id === "plus") ?? settings.plans[Math.floor((settings.plans.length - 1) / 2)];
   const commission = settings.commission ?? 0;
   // Full-access team members aren't paid commission; callers are.
   const admins = new Set((await env.DB.prepare("SELECT name FROM users WHERE admin = 1").all<{ name: string }>()).results.map((u) => u.name));
@@ -82,5 +128,7 @@ export async function salesDashboard(env: Env) {
     clients,
     monthlyRevenue: clients.filter((c) => c.paid).reduce((sum, c) => sum + c.monthly, 0),
     signedRevenue: clients.reduce((sum, c) => sum + c.monthly, 0),
+    lostReasons: tallyLostReasons(lost.results.map((r) => r.body)) as Record<string, number>,
+    pipeline: { shown: shownCount, monthlyIfPlus: shownCount * (plusPlan?.monthly ?? 0) },
   };
 }

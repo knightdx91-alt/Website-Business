@@ -7,7 +7,7 @@ import { lintSite, type LintResult } from "./lint.ts";
 import { packFor } from "./packs/index.ts";
 import type { CategoryPack } from "./packs/types.ts";
 import { businessNode, faqNode, graph, originFor, webPageNode, websiteNode } from "./schema.ts";
-import { spanishPage } from "./spanish.ts";
+import { spanishNav, spanishPage } from "./spanish.ts";
 import { resolveTheme } from "./themes.ts";
 import type { BuildMode, BusinessRecord, Copy, Site } from "./types.ts";
 
@@ -44,12 +44,23 @@ interface DocOpts {
   lang?: "en" | "es";
 }
 
+/** A tiny favicon with the business initial in the hero colors, inline so the site needs no extra request or file. */
+export function faviconDataUrl(name: string, bg: string, fg: string): string {
+  const initial = (/[A-Za-z0-9]/.exec(name)?.[0] ?? "•").toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="${bg}"/><text x="32" y="45" text-anchor="middle" font-family="system-ui,Arial,sans-serif" font-size="38" font-weight="700" fill="${fg}">${initial}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg).replace(/%20/g, " ")}`;
+}
+
 function doc(ctx: Ctx, pack: CategoryPack, o: DocOpts): string {
   const origin = originFor(ctx);
   const preview = ctx.mode === "preview";
   const headingFont = ctx.theme.fonts.heading;
-  const nav = ctx.copy.es ? [...pack.nav(ctx), { label: "Español", href: "/es/" }] : pack.nav(ctx);
+  const baseNav = ctx.copy.es ? [...pack.nav(ctx), { label: "Español", href: "/es/" }] : pack.nav(ctx);
+  const nav = o.lang === "es" ? spanishNav(baseNav, ctx.copy.es) : baseNav;
   const alternates = ctx.copy.es && (o.path === "/" || o.path === "/es/") && !preview;
+  // Link previews (texts, Facebook) get the hero photo when it's one we may show; Google photos stay out of the HTML.
+  const heroImg = ctx.r.media.hero;
+  const ogImage = heroImg && heroImg.source !== "google" ? new URL(heroImg.src, origin).toString() : undefined;
   return `<!doctype html>${html`<html lang="${o.lang ?? "en"}" class="no-js"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -60,7 +71,9 @@ ${alternates ? html`<link rel="alternate" hreflang="en" href="${origin}/"><link 
 <meta name="theme-color" content="${ctx.theme.colors.heroBg}">
 ${ctx.statsEndpoint ? html`<meta name="wb-stats" content="${ctx.statsEndpoint}">` : ""}
 <meta property="og:type" content="website"><meta property="og:title" content="${o.title}"><meta property="og:description" content="${o.description}"><meta property="og:url" content="${origin}${o.path}">
-<meta name="twitter:card" content="summary_large_image">
+${ogImage ? html`<meta property="og:image" content="${ogImage}">${heroImg!.width && heroImg!.height ? html`<meta property="og:image:width" content="${heroImg!.width}"><meta property="og:image:height" content="${heroImg!.height}">` : ""}` : ""}
+<meta name="twitter:card" content="${ogImage ? "summary_large_image" : "summary"}">
+<link rel="icon" href="${faviconDataUrl(ctx.r.name, ctx.theme.colors.heroBg, ctx.theme.colors.onHero)}">
 <link rel="preload" href="/assets/fonts/${fontFileName(headingFont, headingFont.weights[0]!)}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/site.css">
 <script defer src="/assets/site.js"></script>
@@ -209,7 +222,8 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     );
     files.set(
       "_headers",
-      `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()\n/assets/*\n  Cache-Control: public, max-age=604800\n`,
+      // Pages serves ETags, so CSS/JS revalidate on every visit (a redeploy shows up at once); font files are immutable per name.
+      `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()\n/assets/*\n  Cache-Control: public, max-age=0, must-revalidate\n/assets/fonts/*\n  Cache-Control: public, max-age=604800\n`,
     );
   } else {
     files.set("robots.txt", "User-agent: *\nDisallow: /\n");

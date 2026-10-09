@@ -127,7 +127,7 @@ function schedule(ctx: Ctx): Raw {
   const days = [...new Set(lines.map((l) => l.day))].sort((a, b) => (DAYS.indexOf(a) + 7) % 7 - (DAYS.indexOf(b) + 7) % 7);
   const isCatholic = c.tradition === "catholic";
   return html`<section class="section section--band" id="times" aria-labelledby="times-title"><div class="wrap narrow">
-${sectionHead(isCatholic ? "Mass times" : "Service times", "Join us", c.spanish ? "Servicios en español también. Pregúntenos." : undefined)}
+${sectionHead(isCatholic ? "Mass times" : "Service times", "Join us", c.spanish ? "Servicios en español también. Pregúntenos." : undefined, "times-title")}
 <div class="schedule">${days.map(
     (d) => html`<div class="schedule__day"><h3>${d}</h3><ul>${lines.filter((l) => l.day === d).map((l) => html`<li><span class="schedule__time">${l.time || "Time?"}</span><span>${l.label}</span></li>`)}</ul></div>`,
   )}</div>
@@ -201,13 +201,13 @@ function variantBlock(ctx: Ctx): Raw {
   const c = r.ext.church ?? {};
   if (r.variant === "charity")
     return html`<section class="section section--band" id="help" aria-labelledby="help-title"><div class="wrap narrow">
-${sectionHead("Get help", "If you need help")}
+${sectionHead("Get help", "If you need help", undefined, "help-title")}
 ${c.help ? c.help.split(/\n+/).map((x) => html`<p>${x}</p>`) : todo(ctx, "When and how people can get help", "Your days and hours, where to come, who can come, what to bring and how often. We show your words exactly.", true)}
 <div class="btns">${button(action(r, "call")!, "primary")}${button(action(r, "directions")!, "ghost")}</div>
 </div></section>`;
   if (r.variant === "civic_post")
     return html`<section class="section section--band" id="join" aria-labelledby="join-title"><div class="wrap narrow">
-${sectionHead("Meetings", "Come to a meeting")}
+${sectionHead("Meetings", "Come to a meeting", undefined, "join-title")}
 ${c.meetings ? html`<p class="big">${c.meetings}</p>` : todo(ctx, "When and where you meet", "For example “2nd Tuesday of the month, 6:30 PM, at the post home”. Guests welcome?", true)}
 ${c.joinText ? html`<p>${c.joinText}</p>` : todo(ctx, "Who can join", "Who's eligible and how to join, in your words (membership rules come from your charter, so we don't guess).")}
 <div class="btns">${c.joinUrl ? button(action(r, "join")!, "primary") : ""}${button(action(r, "call")!, c.joinUrl ? "ghost" : "primary")}</div>
@@ -215,7 +215,7 @@ ${c.hall ? html`<h3>Hall rental</h3><p>${c.hall}</p>` : ""}
 </div></section>`;
   if (r.variant === "community_center")
     return html`<section class="section section--band" id="hall" aria-labelledby="hall-title"><div class="wrap narrow">
-${sectionHead("Rent the hall", "Have your event here")}
+${sectionHead("Rent the hall", "Have your event here", undefined, "hall-title")}
 ${c.hall ? html`<p>${c.hall}</p>` : todo(ctx, "Tell people about renting the hall", "How many people it holds, the kitchen, tables and chairs, and how to book. Rates only if you want them shown; otherwise “call for rates”.")}
 <div class="btns">${button(action(r, "call")!, "primary")}</div>
 </div></section>`;
@@ -227,7 +227,8 @@ function visitUs(ctx: Ctx): Raw {
   const c = r.ext.church ?? {};
   return html`<section class="section" id="visit" aria-labelledby="visit-title"><div class="wrap">
 <span class="section__label">Find us</span><h2 class="section__title" id="visit-title">${r.variant === "church" ? "Visit us" : "Where we are"}</h2>
-<div class="visit"><div>${hasAnyHours(r.hours) ? html`<h3>Office hours</h3>${hoursTable(ctx)}` : ""}${c.facility ? html`<h3>Weddings &amp; facility use</h3><p>${c.facility}</p>` : ""}</div>
+${hasAnyHours(r.hours) ? "" : todo(ctx, "Add your office hours (optional)", "If someone's usually in the office, tell us the days and hours and we'll list them here.")}
+<div class="visit${hasAnyHours(r.hours) || c.facility ? "" : " visit--solo"}">${hasAnyHours(r.hours) || c.facility ? html`<div>${hasAnyHours(r.hours) ? html`<h3>Office hours</h3>${hoursTable(ctx)}` : ""}${c.facility ? html`<h3>Weddings &amp; facility use</h3><p>${c.facility}</p>` : ""}</div>` : ""}
 <div><address class="addr">${r.name}<br>${r.showStreetAddress && r.address.street ? html`${r.address.street}<br>` : ""}${r.address.city}, ${r.address.state} ${r.address.zip ?? ""}</address>
 <p><a href="${action(r, "call")!.href}">${r.phone.display}</a>${r.email ? html`<br><a href="mailto:${r.email}">${r.email}</a>` : ""}</p>
 <div class="btns">${button(action(r, "directions")!, "primary")}${button(action(r, "call")!, "ghost")}</div></div></div>
@@ -325,7 +326,7 @@ ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
 ${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, r.variant === "church" ? "Tick your ministries" : "Tick what you do", "We started with the usual list. Tell us what to keep, remove or add, and when groups meet.", true)}
 </div></section>
-${c.liveUrl || c.sermonsUrl ? html`<section class="section" id="watch" aria-labelledby="watch-title"><div class="wrap narrow">${sectionHead("Watch", "Join us online")}<div class="btns">${c.liveUrl ? button(action(r, "watch")!, "primary") : ""}${c.sermonsUrl ? html`<a class="btn btn--ghost" href="${c.sermonsUrl}" target="_blank" rel="noopener"><span>Past services</span><span class="sr"> (opens in new tab)</span></a>` : ""}</div></div></section>` : ""}
+${c.liveUrl || c.sermonsUrl ? html`<section class="section" id="watch" aria-labelledby="watch-title"><div class="wrap narrow">${sectionHead("Watch", "Join us online", undefined, "watch-title")}<div class="btns">${c.liveUrl ? button(action(r, "watch")!, "primary") : ""}${c.sermonsUrl ? html`<a class="btn btn--ghost" href="${c.sermonsUrl}" target="_blank" rel="noopener"><span>Past services</span><span class="sr"> (opens in new tab)</span></a>` : ""}</div></div></section>` : ""}
 ${r.variant === "church" ? pastor(ctx) : ""}
 ${r.variant === "church" ? beliefs(ctx) : ""}
 ${give(ctx)}
@@ -356,10 +357,16 @@ ${r.variant === "church" && !c.traditionConfirmed ? html`<section class="section
   }),
 };
 
+/** The 66 books and their usual abbreviations, so "John 3:16" is caught but "Sunday 11:00" and "Wednesday 6:30" never are. */
+const BIBLE_BOOKS =
+  "Genesis|Gen|Exodus|Exod|Ex|Leviticus|Lev|Numbers|Num|Deuteronomy|Deut|Dt|Joshua|Josh|Judges|Judg|Ruth|Samuel|Sam|Kings|Kgs|Chronicles|Chron|Chr|Ezra|Nehemiah|Neh|Esther|Esth|Job|Psalms|Psalm|Pss|Ps|Proverbs|Prov|Pr|Ecclesiastes|Eccles|Eccl|Song of Solomon|Song of Songs|Song|Isaiah|Isa|Jeremiah|Jer|Lamentations|Lam|Ezekiel|Ezek|Daniel|Dan|Hosea|Hos|Joel|Amos|Obadiah|Obad|Jonah|Jon|Micah|Mic|Nahum|Nah|Habakkuk|Hab|Zephaniah|Zeph|Haggai|Hag|Zechariah|Zech|Malachi|Mal|Matthew|Matt|Mt|Mark|Mk|Luke|Lk|John|Jn|Acts|Romans|Rom|Corinthians|Cor|Galatians|Gal|Ephesians|Eph|Philippians|Phil|Colossians|Col|Thessalonians|Thess|Timothy|Tim|Titus|Philemon|Phlm|Hebrews|Heb|James|Jas|Peter|Pet|Jude|Revelation|Rev";
+/** A scripture reference like "John 3:16", "1 Cor. 13:4" or "Ps 23:1" (case-sensitive on the book name). */
+export const SCRIPTURE_REF = new RegExp(`(?<![A-Za-z])(?:[1-3] ?)?(?:${BIBLE_BOOKS})\\.? ?\\d{1,3}:\\d{1,3}\\b`);
+
 /** Faith, money and eligibility claims the AI may never make (§8). Owner fields render separately and aren't checked here. */
 export function churchBannedPhrases(r: BusinessRecord): RegExp[] {
   const out = [
-    /\b(?:[1-3] )?[A-Z][a-z]+\.? \d{1,3}:\d{1,3}\b/,
+    SCRIPTURE_REF,
     /\b(bible[- ]believing|spirit[- ]filled|christ[- ]centered|gospel[- ]centered|reformed|kjv|full gospel|non-?denominational|independent|southern baptist|sbc|united methodist|global methodist|assembl(y|ies) of god|diocese|convention)\b/i,
     /\b(doctrine|salvation|saved|sin|scripture|verse|sermon|creed|baptism|communion|sacrament)\b/i,
     /\b(tax[- ]deductible|501\s?\(c\)|ein|100% of)\b/i,

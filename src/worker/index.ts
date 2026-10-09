@@ -13,13 +13,15 @@ import { profileTextProblems, socialTextProblems, writeMonthlyPosts, writeProfil
 import { reviewTexts } from "../places/to-record.ts";
 import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
-import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup } from "./auth.ts";
+import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
-import { salesDashboard } from "./sales.ts";
+import { cadenceFor, nextCadenceStep, salesDashboard } from "./sales.ts";
+import { portalSession } from "./checkout.ts";
 import { agreementPage, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
+import { EXPIRE_SQL } from "./expire.ts";
 import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
 import { HttpError, json, localDate, newId, now, type Env, type Job } from "./env.ts";
@@ -51,6 +53,16 @@ const ASSET_LINKS = [
 
 const PLACES_COST_PER_REQUEST = 0.04;
 const PHOTO_COST = 0.007;
+/** Weekly R2 backups kept (_backup/<date>.json). */
+const BACKUP_KEEP = 8;
+/** A build still "queued"/"building" after this long is stuck (the queue gave up) and may be retried. */
+const STUCK_BUILD_MS = 20 * 60_000;
+/** Which scheduled trigger fired (wrangler.jsonc): the daily housekeeping run and the weekly backup. */
+const CRON_WEEKLY_BACKUP = "0 9 * * 0";
+
+
+/** Only web addresses: zod's url() alone would let a javascript: link through. */
+const WEB_URL = (max: number) => z.string().trim().url().max(max).refine((u) => u.startsWith("https://") || u.startsWith("http://"), "Links must start with https://");
 
 async function body<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
   let data: unknown;
@@ -64,8 +76,9 @@ async function body<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
   return parsed.data;
 }
 
-function summary(l: LeadRow) {
-  const lint = l.lint_json ? (JSON.parse(l.lint_json) as { publishBlockers: string[]; errors: string[]; todos: string[] }) : null;
+/** `latest_signup_paid` comes from the list query (the newest sign-up's paid flag); lead GET passes it from signupsFor. */
+function summary(l: LeadRow & { latest_signup_paid?: number | null }) {
+  const lint = l.lint_json ? (JSON.parse(l.lint_json) as { publishBlockers?: string[]; errors?: string[]; todos?: string[] }) : null;
   return {
     id: l.id,
     runId: l.run_id,
@@ -92,8 +105,12 @@ function summary(l: LeadRow) {
     customDomain: l.custom_domain,
     previewOpens: l.preview_opens ?? 0,
     previewOpenedAt: l.preview_opened_at,
-    todos: lint?.todos.length ?? 0,
-    blockers: lint ? lint.publishBlockers.length + lint.errors.length : null,
+    contact: l.contact ?? null,
+    bestTime: l.best_time ?? null,
+    /** The newest sign-up exists and hasn't been paid: chase the payment. */
+    unpaidSignup: l.latest_signup_paid === 0,
+    todos: lint?.todos?.length ?? 0,
+    blockers: lint ? (lint.publishBlockers?.length ?? 0) + (lint.errors?.length ?? 0) : null,
     createdAt: l.created_at,
   };
 }
@@ -107,7 +124,8 @@ interface NoteRow {
   created_at: number;
 }
 
-const OUTCOMES = ["note", "no_answer", "callback", "shown", "sold", "not_interested"] as const;
+// link_sent: a preview link was texted or copied (counts as contact, nothing else). reached: someone answered (no status change).
+const OUTCOMES = ["note", "no_answer", "reached", "link_sent", "callback", "shown", "sold", "not_interested"] as const;
 const OUTCOME_STATUS: Partial<Record<(typeof OUTCOMES)[number], LeadRow["sales_status"]>> = { shown: "shown", sold: "sold", not_interested: "not_interested" };
 const PAY_LINK = z.string().trim().url().max(500).refine((u) => u.startsWith("https://"), "Payment links must start with https://");
 const CALLER_NAME = z.string().trim().min(1).max(60).regex(/^[^\u0000-\u001f"\\<>]+$/, "Use letters and spaces only");
@@ -143,7 +161,7 @@ async function chargeAi(env: Env, model: string, usage: { input: number; output:
   await addUsage(env, { aiIn: usage.input, aiOut: usage.output, costMicro: Math.round(usage.input * price.input + usage.output * price.output) });
 }
 
-function detail(l: LeadRow) {
+function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
   const record = l.record_json ? (JSON.parse(l.record_json) as BusinessRecord) : null;
   const copy = l.copy_json ? (JSON.parse(l.copy_json) as Copy) : null;
   const lint = l.lint_json ? JSON.parse(l.lint_json) : null;
@@ -159,6 +177,8 @@ function detail(l: LeadRow) {
     layouts: LAYOUT_IDS.map((id) => ({ id, name: LAYOUTS[id].name, about: LAYOUTS[id].about })),
     layout: l.look ? layoutOf(l.look) : null,
     lookBase: l.look ? parseDesign(l.look).look : null,
+    /** Shown leads: days since they were shown and the next follow-up step; null otherwise. */
+    cadence: l.sales_status === "shown" ? cadenceFor(l.shown_at ?? l.last_contact ?? l.updated_at) : null,
   };
 }
 
@@ -174,6 +194,16 @@ async function deletePrefix(env: Env, prefix: string): Promise<void> {
 /** Showing someone their preview books a check-in 2 days out, unless a callback is already coming up. */
 function autoCallback(lead: LeadRow): { follow_up: string } | Record<string, never> {
   return lead.follow_up && lead.follow_up >= localDate() ? {} : { follow_up: localDate(2) };
+}
+
+/** Fields set the moment a lead becomes Shown: the day-2 callback and the cadence clock. */
+function markShown(lead: LeadRow): Partial<LeadRow> {
+  return { sales_status: "shown", shown_at: now(), last_contact: now(), ...autoCallback(lead) };
+}
+
+/** Days since a Shown lead was shown (whole days). */
+function daysSinceShown(lead: LeadRow): number {
+  return Math.max(0, Math.floor((now() - (lead.shown_at ?? lead.last_contact ?? lead.updated_at)) / 86_400_000));
 }
 
 async function requireLead(env: Env, id: string): Promise<LeadRow> {
@@ -199,11 +229,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json({ ok: true }, 200, { "set-cookie": await sessionCookie(env, { role: "owner", userId: "owner", name: "Owner" }) });
   }
   if (path === "/auth/login" && m === "POST") {
-    if (!(await loginAllowed(env))) throw new HttpError(429, "Too many tries. Wait 15 minutes and try again.");
+    const ip = req.headers.get("cf-connecting-ip");
+    if (!(await loginAllowed(env, ip))) throw new HttpError(429, "Too many tries. Wait 15 minutes and try again.");
     const { password } = await body(req, z.object({ password: z.string().max(200) }));
     const who = await checkPassword(env, password);
     if (!who) {
-      await recordLoginFailure(env);
+      await recordLoginFailure(env, ip);
       throw new HttpError(401, "Wrong password");
     }
     return json({ ok: true, role: who.role }, 200, { "set-cookie": await sessionCookie(env, who) });
@@ -220,14 +251,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
 
   if (path === "/meta" && m === "GET") {
     const settings = await getSettings(env);
+    // Callers see prices and plan names (Show plans, Plans & answers) but not commission, private addresses,
+    // payment links or the agreement text.
+    const { commission: _commission, directEmail: _direct, gbpEmail: _gbp, terms: _terms, ...shared } = settings;
+    const forCaller = { ...shared, plans: shared.plans.map(({ payLink: _a, payLinkFlex: _b, payLinkAnnual: _c, payLinkShort: _d, ...p }) => p), addons: shared.addons.map(({ terms: _t, ...a }) => a) };
     return json({
       me: { role: session.role, name: session.name, id: session.userId },
       checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: mailReady(env) },
-      extraTerms: settings.addons.map((a) => extraTerms(a)),
+      extraTerms: isOwner ? settings.addons.map((a) => extraTerms(a)) : [],
       categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
-      defaultTerms: defaultTerms(settings),
+      defaultTerms: isOwner ? defaultTerms(settings) : "",
       models: Object.entries(MODEL_PRICES).map(([id, p]) => ({ id, label: p.label })),
-      settings,
+      settings: isOwner ? settings : forCaller,
     });
   }
 
@@ -241,7 +276,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/notifications/latest" && m === "GET") return json(await latestForPush(env, session.userId, !isOwner));
   if (path === "/push/key" && m === "GET") return json({ key: vapidPublicKey(env) });
   if (path === "/push/subscribe" && (m === "POST" || m === "DELETE")) {
-    const { endpoint } = await body(req, z.object({ endpoint: z.string().url().max(1000) }));
+    const { endpoint } = await body(req, z.object({ endpoint: WEB_URL(1000) }));
     if (m === "DELETE") await env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(endpoint).run();
     else {
       if (!allowedEndpoint(endpoint)) throw new HttpError(400, "That push service isn't supported");
@@ -269,7 +304,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         companyPhone: z.string().trim().max(30).optional(),
         companyEmail: z.string().trim().email().max(120).optional(),
         directEmail: z.string().trim().email().max(120).optional(),
-        companyReviewUrl: z.string().trim().url().max(500).optional(),
+        companyReviewUrl: WEB_URL(500).optional(),
         gbpEmail: z.string().trim().email().max(120).optional(),
         callerName: z.string().trim().max(60).optional(),
         plans: z
@@ -297,6 +332,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           .optional(),
         terms: z.string().trim().max(6000).optional(),
         commission: z.number().min(0).max(10_000).optional(),
+        /** Calls per day the team aims for (home screen progress). */
+        dailyCalls: z.number().int().min(0).max(200).optional(),
+        /** Months free for churches and nonprofits paying yearly. */
+        churchAnnualMonthsFree: z.number().int().min(0).max(11).optional(),
       }),
     );
     const before = await getSettings(env);
@@ -313,6 +352,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (!apk) throw new HttpError(404, "The Android app hasn't been uploaded yet");
     return new Response(apk.body, {
       headers: { "content-type": "application/vnd.android.package-archive", "content-disposition": 'attachment; filename="website-business.apk"', "cache-control": "no-store" },
+    });
+  }
+
+  // Everything in the database as one JSON file (the weekly cron writes the same to R2 _backup/).
+  if (path === "/backup" && m === "GET") {
+    ownerOnly();
+    const data = await backupData(env);
+    return new Response(JSON.stringify(data), {
+      headers: { "content-type": "application/json; charset=utf-8", "content-disposition": `attachment; filename="website-business-${data.day}.json"`, "cache-control": "no-store" },
     });
   }
 
@@ -486,9 +534,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       where.push("category = ?");
       binds.push(category);
     }
-    const rows = await env.DB.prepare(`SELECT * FROM leads WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT 500`)
+    const rows = await env.DB.prepare(
+      `SELECT leads.*, (SELECT s.paid FROM signups s WHERE s.lead_id = leads.id ORDER BY s.created_at DESC LIMIT 1) AS latest_signup_paid FROM leads WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT 500`,
+    )
       .bind(...binds)
-      .all<LeadRow>();
+      .all<LeadRow & { latest_signup_paid: number | null }>();
     return json({ leads: rows.results.map(summary) });
   }
 
@@ -497,11 +547,37 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const id = leadMatch[1]!;
     const action = leadMatch[2] ?? "";
     const sub = leadMatch[3];
-    const lead = await requireLead(env, id);
-    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/flyer", "/extraslink"].includes(action);
+    const lead: LeadRow = await requireLead(env, id);
+    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/flyer", "/extraslink", "/contact"].includes(action);
     if (!callerSafe) ownerOnly();
 
-    if (action === "" && m === "GET") return json({ ...detail(lead), notes: await notesFor(env, id), signups: await signupsFor(env, id), purchases: await purchasesFor(env, id) });
+    if (action === "" && m === "GET") {
+      const signups = await signupsFor(env, id);
+      return json({
+        ...detail({ ...lead, latest_signup_paid: signups[0] ? (signups[0].paid ? 1 : 0) : null }),
+        notes: await notesFor(env, id),
+        // Callers see that a sign-up exists and whether it's paid, not the signer's email or what is owed.
+        signups: isOwner ? signups : signups.map(({ signerEmail: _e, dueCents: _d, ...rest }) => rest),
+        purchases: await purchasesFor(env, id),
+      });
+    }
+    // Who to ask for and when to catch them (callers too).
+    if (action === "/contact" && m === "PUT") {
+      const input = await body(req, z.object({ contact: z.string().trim().max(80).optional(), bestTime: z.string().trim().max(120).optional() }));
+      const fields: Partial<LeadRow> = {};
+      if (input.contact !== undefined) fields.contact = input.contact || null;
+      if (input.bestTime !== undefined) fields.best_time = input.bestTime || null;
+      if (Object.keys(fields).length) await updateLead(env, id, fields);
+      return json(summary((await getLead(env, id))!));
+    }
+    // The client's Stripe billing portal (update card, see invoices), opened from the client screen.
+    if (action === "/portal" && m === "GET") {
+      const row = await env.DB.prepare("SELECT stripe_customer FROM signups WHERE lead_id = ? AND stripe_customer IS NOT NULL ORDER BY created_at DESC LIMIT 1").bind(id).first<{ stripe_customer: string }>();
+      if (!row?.stripe_customer) throw new HttpError(409, "No Stripe customer yet");
+      const portal = await portalSession(env, row.stripe_customer, `${url.origin}/#/lead/${id}`);
+      if (!portal) throw new HttpError(409, "Online checkout isn't set up (STRIPE_SECRET_KEY)");
+      return Response.redirect(portal, 303);
+    }
     if (action === "/extraslink" && (m === "POST" || m === "GET")) {
       if (!["sold", "live"].includes(lead.sales_status)) throw new HttpError(409, "Extras links are for clients who've signed up");
       const token = await extrasToken(env, id);
@@ -528,12 +604,20 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await notify(env, { kind: "paid", actor: session, leadId: id, text: paid ? `${session.name} marked ${lead.name}'s payment as set up 💵` : `${session.name} marked ${lead.name} as not paid` });
       return json({ ok: true });
     }
+    // Leaving a flyer counts as showing them (keeps the preview around longer): the app POSTs first, then opens the GET,
+    // which only renders the printable.
+    if (action === "/flyer" && m === "POST") {
+      if (lead.status !== "ready") throw new HttpError(409, "The preview isn't ready yet");
+      if (lead.sales_status === "new") {
+        await updateLead(env, id, markShown(lead));
+        await notify(env, { kind: "status", actor: session, leadId: id, text: `${session.name} left ${lead.name} a preview flyer (marked Shown)` });
+      }
+      return json(summary((await getLead(env, id))!));
+    }
     if (action === "/flyer" && m === "GET") {
       if (lead.status !== "ready") throw new HttpError(409, "The preview isn't ready yet");
       const days = 60;
       const token = await shareToken(env, id, days);
-      // Leaving a flyer counts as showing them, which also keeps the preview around longer.
-      if (lead.sales_status === "new") await updateLead(env, id, { sales_status: "shown", ...autoCallback(lead) });
       const settings = await getSettings(env);
       return previewFlyer({
         business: lead.name ?? "your business",
@@ -652,18 +736,28 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         error: d?.verification_data?.error_message ?? d?.validation_data?.error_message ?? null,
         target: `${lead.pages_project}.pages.dev`,
       });
+      // The site's canonical links, sitemap and schema carry its address, so a domain change rebuilds and redeploys it.
+      const republish = async (): Promise<Record<string, string>> => {
+        if (lead.sales_status !== "live" || !lead.live_url) return {};
+        try {
+          await publishLead(env, (await getLead(env, id))!, url.origin);
+          return { republish: "ok" };
+        } catch (err) {
+          return { republish: `failed: ${(err as Error).message}` };
+        }
+      };
       if (m === "GET") return json(describe(lead.custom_domain ? await getDomain(auth, lead.pages_project, lead.custom_domain) : null));
       if (m === "PUT") {
         const { domain } = await body(req, z.object({ domain: z.string().trim().toLowerCase().max(253).regex(/^(?!-)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/, "Type a domain like www.example.com") }));
         if (lead.custom_domain && lead.custom_domain !== domain) await removeDomain(auth, lead.pages_project, lead.custom_domain);
         const d = await addDomain(auth, lead.pages_project, domain);
         await updateLead(env, id, { custom_domain: domain });
-        return json(describe(d));
+        return json({ ...describe(d), ...(lead.custom_domain === domain ? {} : await republish()) });
       }
       if (m === "DELETE") {
         if (lead.custom_domain) await removeDomain(auth, lead.pages_project, lead.custom_domain);
         await updateLead(env, id, { custom_domain: null });
-        return json({ ok: true });
+        return json({ ok: true, ...(lead.custom_domain ? await republish() : {}) });
       }
     }
     if (action === "/log" && m === "POST") {
@@ -675,13 +769,21 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       if (input.outcome === "callback" && !input.followUp) throw new HttpError(400, "Pick a day to call back");
       if (input.followUp && input.followUp < localDate()) throw new HttpError(400, "Pick today or a later day");
       const fields: Partial<LeadRow> = {};
+      let nextStep: ReturnType<typeof nextCadenceStep> = null;
       if (input.outcome !== "note") fields.last_contact = now();
-      if (input.followUp !== undefined) fields.follow_up = input.followUp;
-      else if (input.outcome === "no_answer") fields.follow_up = localDate(1);
-      else if (input.outcome === "sold" || input.outcome === "not_interested") fields.follow_up = null;
       const status = OUTCOME_STATUS[input.outcome] ?? (input.outcome === "callback" && lead.sales_status === "new" ? "shown" : undefined);
       if (status && lead.sales_status !== "live") fields.sales_status = status;
-      if (fields.sales_status === "shown" && lead.sales_status !== "shown" && input.followUp === undefined) Object.assign(fields, autoCallback(lead));
+      const becomesShown = fields.sales_status === "shown" && lead.sales_status !== "shown";
+      if (becomesShown) fields.shown_at = now();
+      if (input.followUp !== undefined) fields.follow_up = input.followUp;
+      else if (becomesShown) Object.assign(fields, autoCallback(lead));
+      else if ((input.outcome === "no_answer" || input.outcome === "reached") && lead.sales_status === "shown") {
+        // Already shown: the next step on the cadence (day 5 text, day 10 walk-in, day 21 last text), dated from the day shown.
+        const days = daysSinceShown(lead);
+        nextStep = nextCadenceStep(days);
+        if (nextStep) fields.follow_up = localDate(Math.max(1, nextStep.day - days));
+      } else if (input.outcome === "no_answer") fields.follow_up = localDate(1);
+      else if (input.outcome === "sold" || input.outcome === "not_interested") fields.follow_up = null;
       await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(newId(), id, session.name, input.outcome === "note" ? null : input.outcome, input.note, now())
         .run();
@@ -689,13 +791,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const what = {
         note: `added a note on ${lead.name}`,
         no_answer: `called ${lead.name}: no answer`,
+        reached: `reached ${lead.name}`,
+        link_sent: `sent ${lead.name} their preview link`,
         callback: `called ${lead.name}: call back ${fields.follow_up ?? ""}`.trim(),
         shown: `called ${lead.name}: they're interested 👍`,
         sold: `SOLD ${lead.name}! 🎉`,
         not_interested: `called ${lead.name}: not interested`,
       }[input.outcome];
       await notify(env, { kind: input.outcome === "note" ? "note" : "call", actor: session, leadId: id, text: `${session.name} ${what}${input.note ? `: "${input.note.slice(0, 160)}"` : ""}` });
-      return json({ ok: true, followUp: fields.follow_up === undefined ? lead.follow_up : fields.follow_up });
+      return json({ ok: true, followUp: fields.follow_up === undefined ? lead.follow_up : fields.follow_up, nextStep: nextStep?.next ?? null });
     }
     if (action === "/followup" && m === "PUT") {
       const { date } = await body(req, z.object({ date: DATE.nullable() }));
@@ -724,7 +828,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (action === "/status" && m === "POST") {
       const { salesStatus } = await body(req, z.object({ salesStatus: z.enum(["new", "shown", "sold", "not_interested"]) }));
       if (lead.sales_status === "live") throw new HttpError(409, "This site is already live");
-      await updateLead(env, id, { sales_status: salesStatus, ...(salesStatus === "shown" && lead.sales_status === "new" ? autoCallback(lead) : {}) });
+      await updateLead(env, id, salesStatus === "shown" && lead.sales_status !== "shown" ? markShown(lead) : { sales_status: salesStatus, ...(salesStatus === "new" ? { shown_at: null } : {}) });
       if (salesStatus !== lead.sales_status) {
         const label = { new: "New", shown: "Shown", sold: "Sold 🎉", not_interested: "Not interested" }[salesStatus];
         await notify(env, { kind: "status", actor: session, leadId: id, text: `${session.name} marked ${lead.name} as ${label}` });
@@ -811,7 +915,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       return json({ ok: true });
     }
     if (action === "/retry" && m === "POST") {
-      if (lead.status !== "failed") throw new HttpError(409, "Only failed builds can be retried");
+      const stuck = (lead.status === "queued" || lead.status === "building") && now() - lead.updated_at > STUCK_BUILD_MS;
+      if (lead.status !== "failed" && !stuck) throw new HttpError(409, "Only failed builds (or builds stuck for over 20 minutes) can be retried");
       await updateLead(env, id, { status: "queued", error: null });
       await env.JOBS.send({ type: "build", leadId: id });
       return json({ ok: true });
@@ -942,10 +1047,7 @@ async function previewOpened(env: Env, req: Request, leadId: string): Promise<Re
 async function expireStaleLeads(env: Env): Promise<void> {
   const cutoffNew = now() - 30 * 86_400_000;
   const cutoffShown = now() - 60 * 86_400_000;
-  const stale = await env.DB.prepare(
-    `SELECT id FROM leads WHERE status != 'expired' AND ((sales_status = 'new' AND created_at < ?) OR (sales_status = 'shown' AND created_at < ?))
-     AND NOT (COALESCE(follow_up, '') >= ? AND created_at >= ?) LIMIT 200`,
-  )
+  const stale = await env.DB.prepare(EXPIRE_SQL)
     // A scheduled callback keeps a lead around, but never past 90 days of Google data.
     .bind(cutoffNew, cutoffShown, localDate(), now() - 90 * 86_400_000)
     .all<{ id: string }>();
@@ -955,6 +1057,51 @@ async function expireStaleLeads(env: Env): Promise<void> {
     // Keep only the Place ID (allowed indefinitely) so the lead isn't re-found as new.
     await updateLead(env, id, { status: "expired", place_json: null, record_json: null, copy_json: null, lint_json: null, name: null, phone: null, address: null, lat: null, lng: null });
   }
+}
+
+/** Housekeeping: old notifications and handled Stripe event ids, and login counters whose window has passed. */
+async function pruneOldRows(env: Env): Promise<void> {
+  await env.DB.prepare("DELETE FROM events WHERE created_at < ?").bind(now() - 180 * 86_400_000).run();
+  await env.DB.prepare("DELETE FROM stripe_events WHERE created_at < ?").bind(now() - 90 * 86_400_000).run();
+  await pruneLoginFailures(env);
+}
+
+/* ---------- Backups ---------- */
+
+const BACKUP_TABLES = ["users", "leads", "lead_notes", "signups", "purchases", "submissions", "site_stats", "usage", "stripe_events"] as const;
+
+/** Every row of a table, read in pages so one big table (leads carry whole sites) can't blow a single response. */
+async function allRows(env: Env, sql: string, binds: unknown[] = [], page = 200): Promise<Record<string, unknown>[]> {
+  const out: Record<string, unknown>[] = [];
+  for (let offset = 0; ; offset += page) {
+    const rows = await env.DB.prepare(`${sql} LIMIT ? OFFSET ?`)
+      .bind(...binds, page, offset)
+      .all<Record<string, unknown>>();
+    out.push(...rows.results);
+    if (rows.results.length < page) return out;
+  }
+}
+
+/** Everything needed to rebuild the database (the owner's password hash left out). */
+async function backupData(env: Env): Promise<{ day: string; at: number; tables: Record<string, Record<string, unknown>[]> }> {
+  const tables: Record<string, Record<string, unknown>[]> = {};
+  tables.settings = await allRows(env, "SELECT key, value FROM settings WHERE key != 'owner_password' AND key NOT LIKE 'login_failures%' ORDER BY key");
+  for (const t of BACKUP_TABLES) tables[t] = await allRows(env, `SELECT * FROM ${t} ORDER BY rowid`);
+  tables.events = await allRows(env, "SELECT * FROM events WHERE created_at >= ? ORDER BY created_at", [now() - 90 * 86_400_000]);
+  return { day: localDate(), at: now(), tables };
+}
+
+/** Weekly cron: _backup/<date>.json in R2, keeping the newest BACKUP_KEEP. */
+async function writeBackup(env: Env): Promise<void> {
+  const data = await backupData(env);
+  await env.BUCKET.put(`_backup/${data.day}.json`, JSON.stringify(data), { httpMetadata: { contentType: "application/json" } });
+  const list = await env.BUCKET.list({ prefix: "_backup/" });
+  const old = list.objects
+    .map((o) => o.key)
+    .sort()
+    .reverse()
+    .slice(BACKUP_KEEP);
+  if (old.length) await env.BUCKET.delete(old);
 }
 
 export default {
@@ -1017,14 +1164,23 @@ export default {
       try {
         if (msg.body.type === "search") await runSearch(env, msg.body);
         else if (msg.body.type === "build") await runBuild(env, msg.body);
+        msg.ack();
       } catch (err) {
         console.error("job failed", msg.body, err);
+        // A build that blew up outside runBuild's own catch (e.g. D1 hiccup) gets another go (max_retries in wrangler.jsonc);
+        // a search job isn't worth re-running against Google.
+        if (msg.body.type === "build") msg.retry();
+        else msg.ack();
       }
-      msg.ack();
     }
   },
 
-  async scheduled(_event: ScheduledController, env: Env): Promise<void> {
+  async scheduled(event: ScheduledController, env: Env): Promise<void> {
+    if (event.cron === CRON_WEEKLY_BACKUP) {
+      await writeBackup(env);
+      return;
+    }
     await expireStaleLeads(env);
+    await pruneOldRows(env);
   },
 } satisfies ExportedHandler<Env, Job>;

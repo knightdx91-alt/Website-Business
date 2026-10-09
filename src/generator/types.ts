@@ -303,6 +303,8 @@ export interface Copy {
   approved: boolean;
   /** The Spanish page (extra), translated from the text above and owner-reviewed like the rest. */
   es?: SpanishCopy;
+  /** Problems the copy writer still saw after its retries (hype, invented numbers). Shown as a lint warning; never blocks. */
+  issues?: string[];
 }
 
 export interface SpanishCopy {
@@ -315,6 +317,8 @@ export interface SpanishCopy {
   ctaTitle: string;
   ctaLine: string;
   metaDescription: string;
+  /** Menu labels in Spanish, by the English label ("Services" → "Servicios"). Missing ones fall back to the generator's defaults. */
+  nav?: Record<string, string>;
 }
 
 export interface Site {

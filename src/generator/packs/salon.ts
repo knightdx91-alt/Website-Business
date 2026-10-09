@@ -116,7 +116,7 @@ export const salonPack: CategoryPack = {
 ${infoStrip(ctx, walk ? [WALK_IN_TEXT[walk]] : [])}
 <main id="main">
 <section class="section section--surface" id="services" aria-labelledby="services-title"><div class="wrap">
-${sectionHead("Services", r.variant === "barber" ? "Cuts & prices" : "Services")}
+${sectionHead("Services", r.variant === "barber" ? "Cuts & prices" : "Services", undefined, "services-title")}
 ${ctx.copy.heroSub ? html`<p class="lead">${ctx.copy.heroSub}</p>` : ""}
 ${cardGrid(r.services.map((s, i) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], price: prices[i] })))}
 ${confirmed ? "" : todo(ctx, "Send us your services and prices", "List what you offer and what you charge (or \"from $\" prices). We'll set it up so people can see it on their phones.", true)}

@@ -7,7 +7,14 @@ import { normalizeUsPhone } from "../generator/phone.ts";
 import type { BusinessRecord, ConfirmableField, Copy, Service } from "../generator/types.ts";
 import { HttpError } from "./env.ts";
 
-const url = z.string().trim().url().max(500).or(z.literal(""));
+// z.string().url() alone accepts javascript: links; only web addresses may go on a site.
+const url = z
+  .string()
+  .trim()
+  .url()
+  .max(500)
+  .refine((u) => u.startsWith("https://") || u.startsWith("http://"), "Links must start with https://")
+  .or(z.literal(""));
 
 /** Everything the owner can change from the edit screen. Validated at the API boundary. */
 export const EditsSchema = z.object({

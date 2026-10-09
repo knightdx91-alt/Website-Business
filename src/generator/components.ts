@@ -42,10 +42,17 @@ export function todo(ctx: Ctx, title: string, body: string, required = false): R
   return html`<div class="todo" data-todo><strong>${title}</strong>${body}</div>`;
 }
 
-export function sectionHead(label: string | undefined, title: string, intro?: string): Raw {
-  return html`${label ? html`<span class="section__label">${label}</span>` : ""}<h2 class="section__title">${title}</h2>${
+/** Label, heading and intro of a section. Pass the id a section's aria-labelledby points at so the heading carries it. */
+export function sectionHead(label: string | undefined, title: string, intro?: string, id?: string): Raw {
+  return html`${label ? html`<span class="section__label">${label}</span>` : ""}<h2 class="section__title"${id ? raw(` id="${id}"`) : ""}>${title}</h2>${
     intro ? html`<p class="lead">${intro}</p>` : ""
   }`;
+}
+
+/** A to-do in its own `.wrap`, or nothing at all when it isn't rendered (published sites get no empty wrapper). */
+export function todoBlock(ctx: Ctx, title: string, body: string, required = false): Raw {
+  const t = todo(ctx, title, body, required);
+  return t.value ? html`<div class="wrap">${t}</div>` : raw("");
 }
 
 export function header(ctx: Ctx, nav: NavItem[]): Raw {
@@ -128,13 +135,20 @@ export function hoursTable(ctx: Ctx): Raw {
   )}</tbody></table>${h.note ? html`<p class="muted">${h.note}</p>` : ""}`;
 }
 
+/**
+ * Hours and address for storefront businesses. Hours are required before publishing (every caller is a shop people
+ * drive to); until they're in, the section is a single column so no empty box ships.
+ */
 export function visit(ctx: Ctx, title = "Visit us"): Raw {
   const r = ctx.r;
   const dir = action(r, "directions")!;
   const call = action(r, "call")!;
+  const hasHours = hasAnyHours(r.hours);
+  const hoursTodo = hasHours ? raw("") : todo(ctx, "Add your hours", "Google doesn't list hours for you yet. Tell us your hours and we'll add them here.", true);
+  const left = hasHours ? hoursTable(ctx) : hoursTodo;
   return html`<section class="section" id="visit" aria-labelledby="visit-title"><div class="wrap">
 <span class="section__label">Hours &amp; location</span><h2 class="section__title" id="visit-title">${title}</h2>
-<div class="visit"><div>${hoursTable(ctx)}${hasAnyHours(r.hours) ? "" : todo(ctx, "Add your hours", "Google doesn't list hours for you yet. Tell us your hours and we'll add them here.")}</div>
+<div class="visit${left.value ? "" : " visit--solo"}">${left.value ? html`<div>${left}</div>` : ""}
 <div><address class="addr">${r.name}<br>${r.showStreetAddress && r.address.street ? html`${r.address.street}<br>` : ""}${r.address.city}, ${r.address.state} ${r.address.zip ?? ""}</address>
 <p><a href="${call.href}">${r.phone.display}</a></p>
 <div class="btns">${button(dir, "primary")}${button(call, "ghost")}</div></div></div>
@@ -146,10 +160,11 @@ export function serviceArea(ctx: Ctx): Raw {
   if (!sa || sa.towns.length === 0) return raw("");
   const county = sa.counties.length ? `${sa.counties.join(" & ")} ${sa.counties.length > 1 ? "counties" : "County"}` : undefined;
   return html`<section class="section section--band" id="area" aria-labelledby="area-title"><div class="wrap">
-${sectionHead("Service area", county ? `Serving ${county}` : `Serving ${ctx.r.address.city} and nearby`, ctx.copy.serviceAreaIntro)}
+${sectionHead("Service area", county ? `Serving ${county}` : `Serving ${ctx.r.address.city} and nearby`, ctx.copy.serviceAreaIntro, "area-title")}
 <ul class="towns">${sa.towns.map((t) => html`<li class="chip">${icon("pin", 16)}${t}</li>`)}</ul>
 <p>Not sure if we cover your area? <a href="${action(ctx.r, "call")!.href}">Call ${ctx.r.phone.display}</a> and ask.</p>
 ${ctx.r.confirmed.includes("service_area") ? "" : todo(ctx, "Confirm your service area", "We listed towns near you. Tell us which ones you actually cover.", true)}
+${hasAnyHours(ctx.r.hours) ? "" : todo(ctx, "Add your hours", "Tell us the days and hours you take calls and we'll show them in the footer and on Google.")}
 </div></section>`;
 }
 
@@ -157,8 +172,18 @@ export function reviews(ctx: Ctx, band = false): Raw {
   const r = ctx.r;
   const t = r.testimonials.slice(0, 3);
   const seeAll = r.mapsUrl;
+  const intro = r.reputation.displayMode === "owner_stated" && r.reputation.ownerStatedText ? r.reputation.ownerStatedText : undefined;
+  const btns = html`<div class="btns"><a class="btn btn--secondary" href="${seeAll}" target="_blank" rel="noopener">${icon("star")}<span>See our reviews on Google</span><span class="sr"> (opens in new tab)</span></a>
+<a class="btn btn--ghost" href="${reviewUrl(r)}" target="_blank" rel="noopener"><span>Leave us a review</span><span class="sr"> (opens in new tab)</span></a></div>`;
+  if (!t.length && ctx.mode === "publish") {
+    // No quotes yet on a live site: a short band that sends people to Google instead of an empty grid.
+    return html`<section class="section${band ? " section--band" : ""}" id="reviews" aria-labelledby="reviews-title"><div class="wrap narrow">
+${sectionHead("Reviews", "Read our reviews on Google", intro ?? "See what customers say about us, and tell us how we did.", "reviews-title")}
+${btns}
+</div></section>`;
+  }
   return html`<section class="section${band ? " section--band" : ""}" id="reviews" aria-labelledby="reviews-title"><div class="wrap">
-${sectionHead("Reviews", "What customers say", r.reputation.displayMode === "owner_stated" && r.reputation.ownerStatedText ? r.reputation.ownerStatedText : undefined)}
+${sectionHead("Reviews", "What customers say", intro, "reviews-title")}
 ${
   t.length
     ? html`<ul class="quotes">${t.map(
@@ -166,8 +191,7 @@ ${
       )}</ul>`
     : todo(ctx, "Add 3 customer quotes", "Send us a few kind words from customers (with their OK) and we'll feature them here. We never copy Google reviews onto your site.")
 }
-<div class="btns"><a class="btn btn--secondary" href="${seeAll}" target="_blank" rel="noopener">${icon("star")}<span>See our reviews on Google</span><span class="sr"> (opens in new tab)</span></a>
-<a class="btn btn--ghost" href="${reviewUrl(r)}" target="_blank" rel="noopener"><span>Leave us a review</span><span class="sr"> (opens in new tab)</span></a></div>
+${btns}
 </div></section>`;
 }
 
@@ -200,7 +224,7 @@ export function contactForm(ctx: Ctx, services: string[], towns: string[], extra
   const endpoint = ctx.formEndpoint ?? "/__preview/form";
   const q = action(r, "quote")!;
   return html`<section class="section section--band" id="contact" aria-labelledby="contact-title"><div class="wrap narrow">
-${sectionHead("Contact", q.label, intro)}
+${sectionHead("Contact", q.label, intro, "contact-title")}
 <form class="form" method="post" action="${endpoint}">
 <input type="hidden" name="place_id" value="${r.placeId}">
 <label>Your name<input name="name" autocomplete="name" required></label>
@@ -267,10 +291,10 @@ export function actionBar(acts: Action[]): Raw {
 /** Owner photos in a grid, or (with none yet) the pack's "send us photos" to-do in its place. */
 export function gallery(ctx: Ctx, todoTitle?: string, todoBody?: string): Raw {
   const photos = ctx.r.media.gallery.filter((p) => ctx.mode === "preview" || p.source !== "google");
-  if (!photos.length) return todoTitle ? html`<div class="wrap">${todo(ctx, todoTitle, todoBody ?? "")}</div>` : raw("");
+  if (!photos.length) return todoTitle ? todoBlock(ctx, todoTitle, todoBody ?? "") : raw("");
   ctx.galleryShown = true;
   return html`<section class="section" id="photos" aria-labelledby="photos-title"><div class="wrap">
-${sectionHead("Photos", "Take a look", undefined)}
+${sectionHead("Photos", "Take a look", undefined, "photos-title")}
 <ul class="gallery">${photos.map((p) => html`<li>${imageTag(p)}</li>`)}</ul>
 </div></section>`;
 }
@@ -282,7 +306,7 @@ export function hiring(ctx: Ctx): Raw {
   const r = ctx.r;
   const text = action(r, "text");
   return html`<section class="section section--band" id="jobs" aria-labelledby="jobs-title"><div class="wrap narrow">
-${sectionHead("Jobs", "We're hiring", h.how || "Want to work with us? Get in touch.")}
+${sectionHead("Jobs", "We're hiring", h.how || "Want to work with us? Get in touch.", "jobs-title")}
 <ul class="towns">${h.roles.map((role) => html`<li class="chip">${icon("check", 16)}${role}</li>`)}</ul>
 <div class="btns"><a class="btn btn--secondary" href="${action(r, "call")!.href}">${icon("phone")}<span>Call about a job</span></a>${
     text ? html`<a class="btn btn--ghost" href="${text.href}"><span>Text us</span></a>` : ""

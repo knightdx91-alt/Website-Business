@@ -230,6 +230,40 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   meetings; charity help details. Google hours show only as "Office hours" (no open/closed). No forms (no prayer requests stored),
   no reviews section. `bannedPhrases` stops doctrine, scripture refs, denominations, tax/eligibility, kids/access claims and
   politics in AI copy. Selling notes (who decides, deacons meetings, pricing landscape) in research §14.
+- Review fixes (Oct 2026, migration 0012: `leads.contact`, `best_time`, `shown_at`, `purchases.stripe_subscription`):
+  Stripe webhook records an event id only after handling it (a failure is retried); subscription cancels match by
+  subscription id (an extras cancel never unmarks the plan); paying clears `follow_up` and notes "Paid through Stripe".
+  Signing sets `follow_up` tomorrow + a "Signed; payment not finished" note (Home card "Signed, payment not finished",
+  `unpaidSignup` in summaries); `?canceled=1` notes "Backed out at the card screen". Login lockout is per IP (10/15 min)
+  plus a global cap (50). URL fields only accept http(s). Publishing uses the custom domain as the site origin and
+  republishes when a domain is added/removed; `pages_project` is saved before the deploy; publish passes Google review
+  texts to lint. `/retry` also unsticks queued/building leads older than 20 min. Daily cron also expires
+  `not_interested` 30 days after last contact and prunes events (180 d) / stripe_events (90 d); a Sunday cron writes
+  `_backup/<day>.json` to R2 (keeps 8) and `GET /api/backup` (owner, Settings → Team) downloads the same. Callers get a
+  trimmed `/meta` (no commission, pay links, agreement) and no signer emails. `GET /flyer` is side-effect free; `POST
+  /flyer` marks Shown. `PUT /api/leads/:id/contact` {contact, bestTime} ("Ask for: …" on cards, walk-in guide).
+  Outcomes gained `reached` and `link_sent` (the app logs every preview link texted/copied). Log card: outcome is a
+  required tap; Not interested asks a reason (`Reason: price|has_someone|no_need|timing|other.` note prefix, tallied in
+  `/api/sales` `lostReasons`; `pipeline` = shown × Plus). Cadence from `shown_at` (`sales.ts` nextCadenceStep: day 2 call,
+  5 text, 10 walk-in, 21 last text; `/log` books the next step for no_answer/reached on shown leads; `detail().cadence`).
+  Home "Today" card (callbacks → opened previews → best untouched New; `settings.dailyCalls` goal). `settings.
+  churchAnnualMonthsFree` (default 4): churches pay 12 months for the price of 8 on yearly (`billingOptions(plan, s,
+  {category})`); church sign-up links (or `?invoice=1`) offer "Pay by check or bank transfer" which skips Stripe and
+  notes it. Sign-up page: plan pre-picked (`showPlans:false`, "change plan"), 2 ways to pay + "Other ways", 5 featured
+  extras + "More extras", no Stripe phone prompt; `GO_LIVE_TEXT` ("live within 3 business days") on buying pages and a
+  TIMING section in the agreement; "Rush build" is now "Same-day build". `defaultTerms` adds early-cancel, late-payment,
+  liability/Alabama law, policy-by-reference and yearly-renewal-reminder lines (`CORE_TERMS`, appended to custom terms).
+  `portalSession()` + `GET /api/leads/:id/portal` (owner) → Stripe billing portal. App: render sequence guards stale
+  loads; Edit refreshes single cards and keeps drafts in sessionStorage with a leave guard; log card moves under the
+  header on phones; status tabs confirm; `phoneDigits()` helper; sw.js v34 only falls back to the shell for `/`.
+  Generator: banned phrases checked on AI text only (whole words), `--hdr-h` keeps the open menu below tall headers,
+  chain list per category with whole-name matching (`isChain(name, category)`), booking/ordering pages count as no
+  website, 40 km cut + phone dedupe in `qualify` (pipeline passes `center`), 6 new search groups (septic/dirt work, doors/
+  gutters/welding, floors/drywall, glass/muffler, seafood/hibachi/wings, hardware) with new contractor/auto/retail
+  variants, hours required for storefront packs, no empty visit/reviews sections, SVG favicon + og:image, assets
+  `must-revalidate`, finance/church banned lists fixed for everyday phrases (`SCRIPTURE_REF` needs a book name),
+  `copy.issues` + loose-number warnings in lint, `sectionHead(..., id)` for aria-labelledby, Spanish nav labels + a. m./
+  p. m. hours, bot-challenge 503s aren't "down". `test/fixes.test.ts`, `test/worker/review-fixes.test.ts`.
 - Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
   retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
   Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).

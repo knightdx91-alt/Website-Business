@@ -36,7 +36,8 @@ export function businessNode(ctx: Ctx, type: string | string[], extras: Record<s
   }
   const images = [r.media.hero, r.media.logo].filter((i) => i && i.source !== "google");
   if (images.length) node.image = images.map((i) => new URL(i!.src, origin).toString());
-  if (r.services.length) {
+  // A church's "services" are ministries, not offers for sale.
+  if (r.services.length && r.category !== "church") {
     node.hasOfferCatalog = {
       "@type": "OfferCatalog",
       name: "Services",

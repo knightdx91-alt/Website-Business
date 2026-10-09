@@ -59,11 +59,12 @@ function txt(el){return el?el.textContent.replace(/\\s+/g," ").trim():""}
 function signed(){return f.elements.agree.value==="yes"}
 function reset(msg){f.elements.agree.value="";f.elements.signature.value="";f.elements.signer_name.value="";box.checked=false;st.className="es-status warn";st.textContent=msg||"";}
 function fill(){
- var plan=q('[name="plan"]:checked')||q('input[type=hidden][name="plan"]');
+ var plan=q('[name="plan"]:checked:enabled')||q('input[type=hidden][name="plan"]');
  dlg.querySelectorAll("[data-plan]").forEach(function(s){s.hidden=!plan||s.getAttribute("data-plan")!==plan.value});
  dlg.querySelectorAll("[data-extra]").forEach(function(s){var c=q('[name="x_'+s.getAttribute("data-extra")+'"]');s.hidden=!(c&&c.checked)});
  var b=q('[name="billing"]:checked'),bt=dlg.querySelector("[data-billing-text]");
  if(bt){var lab=b&&b.closest("label");bt.textContent=lab?txt(lab.querySelector("strong"))+": "+txt(lab.querySelector("small")):"";}
+ var it=dlg.querySelector("[data-invoice-text]");if(it)it.hidden=!(b&&b.value==="invoice");
  var items=[];
  if(plan&&plan.type==="radio"){items.push(txt(plan.closest("label").querySelector("strong"))+" plan"+(b?" ("+txt(b.closest("label").querySelector("strong"))+")":""));}
  f.querySelectorAll('input[type=checkbox][name^="x_"]').forEach(function(c){if(!c.checked)return;var lab=c.closest("label"),n=txt(lab.querySelector("strong")),qn=lab.querySelector('input[name^="q_"]'),pr=lab.querySelector(".pk-price");items.push(n+(qn&&+qn.value>1?" x"+qn.value:"")+(pr?" · "+txt(pr):""));});

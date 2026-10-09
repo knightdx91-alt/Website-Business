@@ -7,9 +7,20 @@
   let pollTimer = null;
   let installPrompt = null;
   const filters = { sales: "new", category: "" };
+  // Every route() bumps this; async views compare their copy after each await and stop if another screen took over.
+  let renderSeq = 0;
+  const stale = (my) => my !== renderSeq;
+  // Per-view cleanup (event listeners on window, media queries): route() runs them before the next screen.
+  const cleanups = [];
+  const onLeave = (fn) => cleanups.push(fn);
+  // A view with unsaved typing sets this; render() asks before leaving.
+  let leaveGuard = null;
+  let ignoreHashOnce = false;
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const telHref = (phone) => "tel:+1" + String(phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+  /** A lead's 10 phone digits, from the built record when there is one, else the Google/typed-in number. */
+  const phoneDigits = (l) => (l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, ""));
   const ago = (ms) => {
     const m = Math.round((Date.now() - ms) / 60000);
     if (m < 1) return "just now";
@@ -22,7 +33,9 @@
   const groupLabel = (id) => ((meta && meta.categories.find((c) => c.id === id)) || {}).label || CATEGORY_LABEL[id] || id;
   const GOOGLE_PER_SEARCH = 0.064; // up to 2 pages of Text Search per search phrase
   const SALES = [["new", "New"], ["callbacks", "Callbacks"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
-  const OUTCOME_LABEL = { no_answer: "📵 No answer", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested", signup_sent: "📝 Sent sign-up link", signed: "✍️ Signed up" };
+  const OUTCOME_LABEL = { no_answer: "📵 No answer", reached: "📞 Reached", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested", link_sent: "📲 Preview link texted", signup_sent: "📝 Sent sign-up link", signed: "✍️ Signed up" };
+  const LOST_REASONS = [["price", "Price"], ["has_someone", "Has someone"], ["no_need", "No need"], ["timing", "Timing"], ["other", "Other"]];
+  const NO_CONNECTION = "No connection. Check your signal and try again.";
   const money = (n) => "$" + (Number.isInteger(n) ? n : Number(n).toFixed(2));
   const isOwner = () => !meta || !meta.me || meta.me.role === "owner";
 
@@ -55,6 +68,7 @@
 
   async function api(path, opts = {}) {
     const init = { method: opts.method || "GET", headers: { "x-wb": "1" }, credentials: "same-origin" };
+    if (opts.keepalive) init.keepalive = true;
     if (opts.json !== undefined) {
       init.headers["content-type"] = "application/json";
       init.body = JSON.stringify(opts.json);
@@ -62,7 +76,13 @@
       init.headers["content-type"] = opts.type;
       init.body = opts.body;
     }
-    const res = await fetch("/api" + path, init);
+    let res;
+    try { res = await fetch("/api" + path, init); } catch (e) {
+      // fetch only throws when the request never got through: no signal, airplane mode, server unreachable.
+      const err = new Error(NO_CONNECTION);
+      err.offline = true;
+      throw err;
+    }
     if (opts.raw && res.ok) return res;
     let data = {};
     try { data = await res.json(); } catch (e) { /* empty */ }
@@ -192,6 +212,7 @@
       <div class="lead__top"><a class="lead__name" href="#/lead/${l.id}">${esc(l.name)}</a>${statusChip(l)}</div>
       <div class="lead__meta">${esc(CATEGORY_LABEL[l.category] || l.category)} · ${esc(l.reason || "")} ${rating ? "· " + rating : ""}</div>
       <div class="lead__meta">${esc(l.address || "")}</div>
+      ${contactLine(l) ? `<div class="lead__meta">${contactLine(l)}</div>` : ""}
       ${l.followUp && (l.salesStatus === "new" || l.salesStatus === "shown") ? `<div>${followChip(l.followUp)}</div>` : ""}
       <div class="btns btns--full">
         ${l.status === "ready" ? `<a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a>` : `<a class="btn btn--small" href="${telHref(l.phone)}">📞 Call</a>`}
@@ -202,9 +223,11 @@
 
   async function viewHome() {
     setNav("home");
+    const my = renderSeq;
     meta = meta || (await api("/meta"));
+    if (stale(my)) return;
     if (!document.getElementById("leads")) {
-      $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="opened"></div><div id="due"></div><div id="runs"></div></div><div><section>
+      $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="today"></div><div id="unpaid"></div><div id="runs"></div></div><div><section>
         <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
@@ -256,8 +279,61 @@
         refreshHome();
       });
     }
-    pushAsk();
+    await pushAsk();
     await refreshHome();
+  }
+
+  /** "👤 Ask for: Maria · mornings" when the lead has a contact person or best time on file. */
+  function contactLine(l) {
+    const bits = [l.contact ? `Ask for: <strong>${esc(l.contact)}</strong>` : "", l.bestTime ? esc(l.bestTime) : ""].filter(Boolean);
+    return bits.length ? `👤 ${bits.join(" · ")}` : "";
+  }
+
+  // How many calls this person logged today, counted on this phone (the server has no per-day count yet).
+  const loggedKey = () => `wb_logged_${(meta && meta.me && meta.me.id) || "owner"}_${dayFromNow(0)}`;
+  const loggedToday = () => { try { return Number(localStorage.getItem(loggedKey()) || 0); } catch (e) { return 0; } };
+  const bumpLogged = () => { try { localStorage.setItem(loggedKey(), String(loggedToday() + 1)); } catch (e) { /* storage blocked */ } };
+
+  /** Today's call list: callbacks due, then prospects who just opened their preview, then the best untouched new leads. */
+  function todayHtml(due, opened, fresh) {
+    const weekAgo = Date.now() - 7 * 86400000;
+    const rows = [];
+    const seen = new Set();
+    const add = (l, why, cls) => { if (seen.has(l.id) || rows.length >= 15) return; seen.add(l.id); rows.push({ l, why, cls }); };
+    due.forEach((l) => add(l, l.followUp < dayFromNow(0) ? "Overdue" : "Callback", "chip--warn"));
+    opened.filter((l) => l.salesStatus !== "sold" && l.salesStatus !== "live" && l.previewOpenedAt > weekAgo).forEach((l) => add(l, `Opened preview${l.previewOpens > 1 ? ` ${l.previewOpens}×` : ""} · ${ago(l.previewOpenedAt)}`, "chip--good"));
+    fresh.filter((l) => l.status === "ready" && l.salesStatus === "new" && (!l.lastContact || l.lastContact < weekAgo)).sort((a, b) => (b.score || 0) - (a.score || 0)).forEach((l) => add(l, "New", ""));
+    const goal = Number(meta.settings.dailyCalls) || 0;
+    const done = loggedToday();
+    const head = `Today: ${rows.length} call${rows.length === 1 ? "" : "s"}${done ? ` · you've logged ${done} so far today` : ""}`;
+    if (!rows.length && !goal) return "";
+    return `<section class="card due today"><h2>📋 ${esc(head)}</h2>
+      ${goal ? `<div class="goal" role="progressbar" aria-valuenow="${Math.min(done, goal)}" aria-valuemin="0" aria-valuemax="${goal}" aria-label="Calls logged today"><i style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></i></div><p class="small muted" style="margin:0 0 6px">${done >= goal ? `Goal of ${goal} reached 🎉` : `${goal - done} more to reach today's goal of ${goal}`}</p>` : ""}
+      ${rows.length ? `<ul class="list">${rows.map(({ l, why, cls }) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a><span class="chip why ${cls}">${esc(why)}</span></div>
+        ${contactLine(l) ? `<p class="small muted" style="margin:2px 0 0">${contactLine(l)}</p>` : ""}
+        <div class="btns" style="margin-top:6px">${l.status === "ready" ? `<a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a><a class="btn btn--small" href="#/walkin/${l.id}">🚶 In-person</a>` : `<a class="btn btn--small btn--primary" href="${telHref(l.phone)}">📞 Call</a>`}</div></li>`).join("")}</ul>`
+        : `<p class="small muted">Nothing due. Pick a New lead below and make a call.</p>`}</section>`;
+  }
+
+  /** Sold leads whose sign-up isn't paid yet: call them, or send the sign-up link again. */
+  function unpaidHtml(sold) {
+    const rows = sold.filter((l) => l.unpaidSignup);
+    if (!rows.length) return "";
+    return `<section class="card due"><h2>✍️ Signed, payment not finished (${rows.length})</h2><p class="small muted">They signed the agreement but didn't finish paying. A quick call usually sorts it out.</p>
+      <ul class="list">${rows.map((l) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a></div>
+        <div class="btns" style="margin-top:6px"><a class="btn btn--small btn--primary" href="${telHref(l.phone)}">📞 Call</a><button class="btn btn--small" type="button" data-resend="${l.id}">Send sign-up link again</button></div></li>`).join("")}</ul></section>`;
+  }
+
+  async function resendSignup(id, btn) {
+    btn.disabled = true;
+    try {
+      const l = await api("/leads/" + id);
+      const last = (l.signups || [])[0];
+      if (!last) { go("#/lead/" + id); return; }
+      const res = await api(`/leads/${id}/signup`, { method: "POST", json: { plan: last.plan.id || "plus" } });
+      const name = l.record ? l.record.name : l.name;
+      location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(`${greeting()} Here's the sign-up link again for the ${name} website (${res.plan} plan), in case the payment step didn't go through: ${res.url}`)}`;
+    } catch (err) { toast(err.message); } finally { btn.disabled = false; }
   }
 
   /** Asks once on the home screen to turn on phone notifications, until done or dismissed. */
@@ -267,6 +343,7 @@
     let dismissed = false;
     try { dismissed = localStorage.getItem("wb_push_ask") === "no"; } catch (e) { /* storage blocked */ }
     const ps = await pushState().catch(() => ({ supported: false }));
+    if (!document.getElementById("pushask")) return;
     if (dismissed || !ps.supported || ps.permission === "denied" || (ps.permission === "granted" && ps.sub)) { el.innerHTML = ""; return; }
     el.innerHTML = `<section class="card due"><h2>🔔 Turn on phone alerts?</h2><p class="small muted">${isOwner() ? "Get a notification when a prospect opens their preview, or a teammate logs a call, makes a sale or gets a sign-up." : "Get a notification when a prospect opens the preview link you sent, so you can call while it's fresh."}</p>
       <div class="btns"><button class="btn btn--primary btn--small" id="pask-on">Turn on</button><button class="btn btn--small" id="pask-no">Not now</button></div></section>`;
@@ -284,35 +361,33 @@
   async function refreshHome() {
     stopPolling();
     if (!location.hash.match(/^#?\/?$/)) return;
+    const my = renderSeq;
     const q = new URLSearchParams();
     if (filters.sales === "callbacks") q.set("callbacks", "all");
     else if (filters.sales) q.set("sales", filters.sales);
     if (filters.category) q.set("category", filters.category);
+    const leadsEl0 = document.getElementById("leads");
     try {
-      const [{ runs }, { leads }, { leads: due }, { leads: opened }] = await Promise.all([
+      const [{ runs }, { leads }, { leads: due }, { leads: opened }, { leads: fresh }, { leads: sold }] = await Promise.all([
         isOwner() ? api("/runs") : Promise.resolve({ runs: [] }),
         api("/leads?" + q),
         api("/leads?callbacks=due"),
         api("/leads?opened=recent"),
+        filters.sales === "new" && !filters.category ? Promise.resolve({ leads: null }) : api("/leads?sales=new"),
+        api("/leads?sales=sold"),
       ]);
+      if (stale(my)) return;
       const runsEl = document.getElementById("runs");
       const leadsEl = document.getElementById("leads");
-      const dueEl = document.getElementById("due");
       if (!runsEl || !leadsEl) return;
       runsEl.innerHTML = runsHtml(runs);
-      const openedEl = document.getElementById("opened");
-      if (openedEl) openedEl.innerHTML = opened.length
-        ? `<section class="card due"><h2>👀 Looked at their preview (${opened.length})</h2><p class="small muted">They opened the link you sent in the last 7 days. Call while it's fresh.</p><ul class="list">${opened
-            .map((l) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a><span class="small muted" style="flex:none">${l.previewOpens > 1 ? `${l.previewOpens}× · ` : ""}${ago(l.previewOpenedAt)}</span></div>
-              <div class="btns" style="margin-top:6px"><a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a><a class="btn btn--small" href="#/lead/${l.id}">Notes</a></div></li>`)
-            .join("")}</ul></section>`
-        : "";
-      dueEl.innerHTML = due.length
-        ? `<section class="card due"><h2>📅 Call back today (${due.length})</h2><ul class="list">${due
-            .map((l) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a>${l.followUp < dayFromNow(0) ? `<span class="chip chip--warn" style="flex:none">Overdue</span>` : ""}</div>
-              <div class="btns" style="margin-top:6px"><a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a><a class="btn btn--small" href="#/lead/${l.id}">Notes</a></div></li>`)
-            .join("")}</ul></section>`
-        : "";
+      const todayEl = document.getElementById("today");
+      if (todayEl) todayEl.innerHTML = todayHtml(due, opened, fresh || leads);
+      const unpaidEl = document.getElementById("unpaid");
+      if (unpaidEl) {
+        unpaidEl.innerHTML = unpaidHtml(sold);
+        unpaidEl.querySelectorAll("[data-resend]").forEach((b) => b.addEventListener("click", () => resendSignup(b.dataset.resend, b)));
+      }
       const empty = {
         new: isOwner() ? "No new leads yet. Pick a category and tap Run." : "No new leads right now. Check back after the next run.",
         callbacks: "No callbacks scheduled. Use “Call back…” after a call to schedule one.",
@@ -321,20 +396,26 @@
       const busy = runs.some((r) => !r.done) || leads.some((l) => l.status === "queued" || l.status === "building");
       if (busy) pollTimer = setTimeout(refreshHome, 5000);
     } catch (err) {
-      if (err.status !== 401) toast(err.message);
+      if (stale(my) || err.status === 401) return;
+      if (leadsEl0) {
+        leadsEl0.innerHTML = `<li class="card offline"><p>${esc(err.message)}</p><button class="btn btn--primary" type="button" id="retryhome">Try again</button></li>`;
+        leadsEl0.querySelector("#retryhome").addEventListener("click", () => { leadsEl0.innerHTML = `<li class="muted">Loading…</li>`; refreshHome(); });
+      } else toast(err.message);
     }
   }
 
   /* ---------- call log ---------- */
-  function notesHtml(l, limit) {
+  // limit: a short read-only list (call guide). collapse: the full list with the rest behind "Show all N".
+  function notesHtml(l, limit, collapse) {
     const notes = limit ? l.notes.slice(0, limit) : l.notes;
     if (!notes.length) return `<p class="muted small">No calls logged yet.</p>`;
     const me = meta.me || {};
+    const hidden = collapse && notes.length > 3 ? notes.length - 3 : 0;
     return `<ul class="list notes">${notes
-      .map((n) => `<li><div class="row"><strong>${esc(n.outcome ? OUTCOME_LABEL[n.outcome] || n.outcome : "📝 Note")}</strong>
+      .map((n, i) => `<li${hidden && i >= 3 ? " hidden" : ""}><div class="row"><strong>${esc(n.outcome ? OUTCOME_LABEL[n.outcome] || n.outcome : "📝 Note")}</strong>
         ${!limit && (isOwner() || n.author === me.name) ? `<button class="linkbtn" data-delnote="${n.id}" aria-label="Delete note">Delete</button>` : ""}</div>
         ${n.body ? `<p>${esc(n.body)}</p>` : ""}<p class="small muted">${esc(n.author)} · ${ago(n.createdAt)}</p></li>`)
-      .join("")}</ul>`;
+      .join("")}</ul>${hidden ? `<button class="linkbtn" type="button" data-act="allnotes">Show all ${notes.length}</button>` : ""}`;
   }
 
   function logCardHtml(l) {
@@ -344,15 +425,19 @@
       <div class="field"><span>Call back on <span class="hint">${current ? "Now set for " + esc(dayLabel(current)) : "Not set"}</span></span>
         <div class="chips">${[[1, "Tomorrow"], [3, "In 3 days"], [7, "Next week"]].map(([n, t]) => `<button type="button" class="pick" data-days="${n}">${t}</button>`).join("")}</div>
         <input type="date" name="follow" min="${dayFromNow(0)}" value="${current}"></div>
-      <div class="btns btns--full">
-        <button class="btn" data-out="no_answer">📵 No answer</button>
-        <button class="btn" data-out="callback">📅 Call back</button>
-        <button class="btn" data-out="shown">👍 Interested</button>
-        <button class="btn btn--good" data-out="sold">🎉 Sold!</button>
-        <button class="btn" data-out="not_interested">✋ Not interested</button>
-        <button class="btn btn--small" data-out="note">Save note only</button>
+      <p style="margin:0 0 6px"><strong>How did it go?</strong> <span class="small muted">Tap one to save.</span></p>
+      <div class="btns btns--full" id="outcomes">
+        <button class="btn" type="button" data-out="no_answer">📵 No answer</button>
+        <button class="btn" type="button" data-out="reached">📞 Reached</button>
+        <button class="btn" type="button" data-out="shown">👍 Interested (shown)</button>
+        <button class="btn" type="button" data-out="callback">📅 Call back</button>
+        <button class="btn btn--good" type="button" data-out="sold">🎉 Sold</button>
+        <button class="btn" type="button" data-out="not_interested">✋ Not interested</button>
       </div>
-      <p class="small muted" style="margin-top:10px">No answer schedules a callback for tomorrow unless you pick a day. Sold and Not interested clear the callback. If they ask not to be called again, tap Not interested.</p></section>`;
+      <div id="lostwhy" hidden style="margin-top:10px"><p style="margin:0 0 6px"><strong>Why not?</strong> <span class="small muted">Tap one to save.</span></p>
+        <div class="chips">${LOST_REASONS.map(([k, t]) => `<button type="button" class="pick" data-why="${k}">${t}</button>`).join("")}<button type="button" class="linkbtn" data-why-cancel>Cancel</button></div></div>
+      <p style="margin:10px 0 0"><button class="linkbtn" type="button" data-out="note">Just save a note</button></p>
+      <p class="small muted" style="margin-top:6px">No answer schedules a callback for tomorrow unless you pick a day. Sold and Not interested clear the callback. If they ask not to be called again, tap Not interested.</p></section>`;
   }
 
   function bindLog(l, after) {
@@ -366,21 +451,36 @@
       dirty = true;
       card.querySelectorAll("[data-days]").forEach((x) => x.classList.toggle("is-on", x === b));
     }));
-    card.querySelectorAll("[data-out]").forEach((b) => b.addEventListener("click", async () => {
-      const outcome = b.dataset.out;
-      const note = card.querySelector("[name=note]").value.trim();
+    const lost = card.querySelector("#lostwhy");
+    const save = async (b, outcome, reason) => {
+      let note = card.querySelector("[name=note]").value.trim();
       const picked = date.value || null;
       if (outcome === "callback" && !picked) return toast("Pick a day to call back");
       if (outcome === "note" && !note) return toast("Write a note first");
+      if (reason) note = `Reason: ${reason}. ${note}`.trim();
       const payload = { outcome, note };
       if (dirty || outcome === "callback") payload.followUp = picked;
       b.disabled = true;
       try {
         const res = await api(`/leads/${l.id}/log`, { method: "POST", json: payload });
-        toast(outcome === "sold" ? "Nice! Marked as sold." : res.followUp ? `Saved. Call back ${dayLabel(res.followUp)}.` : "Saved");
+        if (outcome !== "note") bumpLogged();
+        toast(res.nextStep ? `Saved. Next: ${res.nextStep}` : outcome === "sold" ? "Nice! Marked as sold." : res.followUp ? `Saved. Call back ${dayLabel(res.followUp)}.` : "Saved");
         after();
       } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    };
+    card.querySelectorAll("[data-out]").forEach((b) => b.addEventListener("click", () => {
+      if (b.dataset.out === "not_interested") {
+        // Ask why first; the reason chip saves.
+        lost.hidden = false;
+        lost.querySelector("[data-why]").focus();
+        return;
+      }
+      lost.hidden = true;
+      save(b, b.dataset.out);
     }));
+    card.querySelectorAll("[data-why]").forEach((b) => b.addEventListener("click", () => save(b, "not_interested", b.dataset.why)));
+    const cancel = card.querySelector("[data-why-cancel]");
+    if (cancel) cancel.addEventListener("click", () => { lost.hidden = true; });
   }
 
   function bindNotes(l, after) {
@@ -388,6 +488,8 @@
       if (!confirm("Delete this note?")) return;
       try { await api(`/leads/${l.id}/notes/${b.dataset.delnote}`, { method: "DELETE" }); after(); } catch (err) { toast(err.message); }
     }));
+    const all = $app.querySelector("[data-act=allnotes]");
+    if (all) all.addEventListener("click", () => { $app.querySelectorAll(".notes li[hidden]").forEach((li) => (li.hidden = false)); all.remove(); });
     const clear = $app.querySelector("[data-act=clearfollow]");
     if (clear) clear.addEventListener("click", async () => {
       try { await api(`/leads/${l.id}/followup`, { method: "PUT", json: { date: null } }); toast("Callback cleared"); after(); } catch (err) { toast(err.message); }
@@ -426,7 +528,7 @@
       b.disabled = true;
       try {
         const res = await api(`/leads/${l.id}/signup`, { method: "POST", json: { plan: b.dataset.plan } });
-        const phone = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "");
+        const phone = phoneDigits(l);
         const sms = `${greeting()} Here's the sign-up page for your new website (${res.plan} plan) for ${l.record ? l.record.name : l.name}: ${res.url}`;
         card.querySelector("#signuplink").innerHTML = `<div class="linkbox"><p class="small"><strong>${esc(res.plan)}</strong> sign-up link ready (works ${res.expiresInDays} days).</p>
           <div class="btns btns--full"><a class="btn btn--primary" href="${esc(res.url)}" target="_blank" rel="noopener">Open here</a>
@@ -469,8 +571,7 @@
       const name = l.record ? l.record.name : l.name;
       const from = meta.settings.companyName ? ` from ${meta.settings.companyName}` : "";
       const msg = `Hi! Your website report for ${name}, ${label}${from}: ${t.views} visits, ${t.calls} people tapped Call, ${t.directions} got directions${t.requests ? `, and ${t.requests} sent a request through the site` : ""}. Let us know if you'd like anything updated!`;
-      const phone = l.record ? l.record.phone.e164.slice(2) : "";
-      location.href = `sms:+1${phone}?body=${encodeURIComponent(msg)}`;
+      location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(msg)}`;
     });
     const domEl = document.getElementById("domain");
     const renderDomain = (d) => {
@@ -499,9 +600,62 @@
   }
 
   /* ---------- lead detail ---------- */
+  /** Stripe billing portal for a sold/live client. The route redirects to Stripe; peek first so a missing customer shows a message, not a JSON page. */
+  async function openPortal(id) {
+    let res;
+    try { res = await fetch(`/api/leads/${id}/portal`, { headers: { "x-wb": "1" }, credentials: "same-origin", redirect: "manual" }); } catch (e) { throw new Error(NO_CONNECTION); }
+    if (res.type === "opaqueredirect" || res.ok || res.status === 0) { location.href = `/api/leads/${id}/portal`; return; }
+    let data = {}; try { data = await res.json(); } catch (e) { /* empty */ }
+    throw new Error(res.status === 404 ? "The billing portal isn't available yet." : data.error || "No Stripe customer on file for this client yet.");
+  }
+
+  /** The cadence's next step as one button: Call guide / Follow-up text / In-person guide / Last check-in / Not interested. */
+  function cadenceAction(l, next) {
+    const t = String(next || "").toLowerCase();
+    if (/not interested|close|give up|let .*go/.test(t)) return `<button class="btn btn--small" type="button" data-act="lost">✋ Not interested</button>`;
+    if (/last check/.test(t)) return `<button class="btn btn--small" type="button" data-follow="2">👋 Last check-in text</button>`;
+    if (/in person|visit|walk|stop by|drop by/.test(t)) return `<a class="btn btn--small" href="#/walkin/${l.id}">🚶 In-person guide</a>`;
+    if (/text|follow/.test(t)) return `<button class="btn btn--small" type="button" data-follow="0">💬 Follow-up text</button>`;
+    return `<a class="btn btn--small" href="#/pitch/${l.id}">📞 Call guide</a>`;
+  }
+
+  /** "👤 Ask for: Maria · mornings" with an inline edit (saved with PUT /contact). */
+  function contactHtml(l, editing) {
+    if (editing) return `<form class="ask" id="askform"><label class="field">Ask for <input name="contact" maxlength="80" value="${esc(l.contact || "")}" placeholder="Owner's name"></label>
+      <label class="field">Best time <input name="bestTime" maxlength="80" value="${esc(l.bestTime || "")}" placeholder="e.g. weekday mornings"></label>
+      <button class="btn btn--small btn--primary" type="submit">Save</button><button class="btn btn--small" type="button" data-act="askcancel">Cancel</button></form>`;
+    return `<p class="ask">${contactLine(l) || `<span class="muted">👤 Who should you ask for?</span>`} <button class="linkbtn" type="button" data-act="askedit">${l.contact || l.bestTime ? "Edit" : "Add"}</button></p>`;
+  }
+
+  function bindContact(l) {
+    const box = document.getElementById("askbox");
+    if (!box) return;
+    const draw = (editing) => {
+      box.innerHTML = contactHtml(l, editing);
+      const edit = box.querySelector("[data-act=askedit]");
+      if (edit) edit.addEventListener("click", () => { draw(true); box.querySelector("[name=contact]").focus(); });
+      const cancel = box.querySelector("[data-act=askcancel]");
+      if (cancel) cancel.addEventListener("click", () => draw(false));
+      const f = box.querySelector("#askform");
+      if (f) f.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const json = { contact: f.contact.value.trim(), bestTime: f.bestTime.value.trim() };
+        try {
+          const res = await api(`/leads/${l.id}/contact`, { method: "PUT", json });
+          Object.assign(l, { contact: res.contact ?? json.contact, bestTime: res.bestTime ?? json.bestTime });
+          toast("Saved");
+          draw(false);
+        } catch (err) { toast(err.status === 404 ? "Saving a contact isn't available yet. Put it in a note for now." : err.message); }
+      });
+    };
+    draw(false);
+  }
+
   async function viewLead(id) {
     setNav("home");
+    const my = renderSeq;
     const l = await api("/leads/" + id);
+    if (stale(my)) return;
     const r = l.record;
     const lint = l.lint || { publishBlockers: [], errors: [], warnings: [], todos: [], suggestions: [] };
     const blockers = [...lint.errors, ...lint.publishBlockers];
@@ -516,28 +670,32 @@
         <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}</p>
         ${l.rating ? `<p><span class="stars">★ ${l.rating.toFixed(1)}</span> on Google</p>` : ""}
         <p>${esc(l.address || "")}</p>
+        <div id="askbox"></div>
         <div class="btns btns--full">
           ${ready ? `<a class="btn btn--primary" href="#/pitch/${l.id}">📞 Call guide</a>` : ""}
           ${ready && open ? `<a class="btn btn--primary" href="#/walkin/${l.id}">🚶 In-person guide</a>` : ""}
-          <a class="btn${ready ? "" : " btn--primary"}" href="${telHref(r ? r.phone.e164.slice(2) : l.phone)}">📞 Call ${esc(r ? r.phone.display : l.phone)}</a>
+          <a class="btn${ready ? "" : " btn--primary"}" href="${telHref(phoneDigits(l))}">📞 Call ${esc(r ? r.phone.display : l.phone)}</a>
           ${r ? `<a class="btn" href="${esc(r.mapsUrl)}" target="_blank" rel="noopener">Google listing</a>` : ""}
           ${open ? `<a class="btn" href="#/playbook">💬 Plans & answers</a>` : ""}
         </div>
       </section>
+      <div id="logslot-top"></div>
       <section class="card"><h2>Sales status</h2>
         ${l.salesStatus === "live"
           ? `<p class="chip chip--good">● Live</p>`
-          : `<div class="tabs">${[["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["not_interested", "Not interested"]].map(([k, t]) => `<button type="button" data-status="${k}" class="${l.salesStatus === k ? "is-on" : ""}">${t}</button>`).join("")}</div>`}
+          : owner ? `<div class="tabs">${[["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["not_interested", "Not interested"]].map(([k, t]) => `<button type="button" data-status="${k}" class="${l.salesStatus === k ? "is-on" : ""}">${t}</button>`).join("")}</div>`
+          : `<p class="chip${l.salesStatus === "sold" ? " chip--good" : ""}">${esc({ new: "New", shown: "Shown", sold: "Sold", not_interested: "Not interested" }[l.salesStatus] || l.salesStatus)}</p><p class="small muted" style="margin:6px 0 0">Log the call below to update it.</p>`}
+        ${l.cadence && open && ready ? `<div class="cadence"><p><strong>Day ${Number(l.cadence.day)} since shown</strong> · Next: ${esc(l.cadence.next || "")}</p><div class="btns">${cadenceAction(l, l.cadence.next)}</div></div>` : ""}
       </section>
       <section class="card"><h2>Website</h2>
-        ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p><button class="btn" data-act="retry">Try again</button>` : ""}
+        ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p>${owner ? `<button class="btn" data-act="retry">Try again</button>` : `<p class="small muted">The owner can rebuild it.</p>`}` : ""}
         ${l.status === "queued" || l.status === "building" ? `<p><span class="spin"></span> Building… this takes about a minute.</p>` : ""}
         ${ready ? `<p class="muted small">Design: ${esc(lookName)}${owner && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="restyle">🎨 Try another design</button>` : ""}</p>
           <div class="btns btns--full">
             <a class="btn btn--primary" href="#/preview/${l.id}">Preview</a>
             <a class="btn" href="#/full/${l.id}">Open full screen</a>
             ${owner ? `<a class="btn" href="#/edit/${l.id}">Edit</a>` : ""}
-            ${l.salesStatus !== "live" ? `<a class="btn" href="/api/leads/${l.id}/flyer" target="_blank" rel="noopener">Leave-behind flyer (QR)</a>` : ""}
+            ${l.salesStatus !== "live" ? `<button class="btn" type="button" data-flyer="${l.id}">Leave-behind flyer (QR)</button>` : ""}
           </div>
           ${l.salesStatus !== "live" ? `<div style="margin-top:10px">${shareButtonsHtml()}</div>` : ""}
           ${l.previewOpens ? `<p class="small" style="margin-top:8px">👀 They opened their preview ${l.previewOpens === 1 ? "once" : `${l.previewOpens} times`}, last ${ago(l.previewOpenedAt)}.</p>` : ""}` : ""}
@@ -545,7 +703,7 @@
       </section>
       <section class="card"><h2>Calls &amp; notes</h2>
         ${l.followUp && open ? `<div class="row" style="margin-bottom:8px">${followChip(l.followUp)}<button class="linkbtn" data-act="clearfollow" style="flex:none">Clear</button></div>` : ""}
-        ${notesHtml(l)}
+        ${notesHtml(l, 0, true)}
       </section>
       </div><div>
       ${ready ? signupCardHtml(l) : ""}
@@ -554,7 +712,9 @@
       ${l.salesStatus === "live" || l.salesStatus === "sold" ? `<section class="card"><h2>🛒 Extras</h2><p class="small muted">Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${meta.checkout && meta.checkout.online ? " online" : ""}. Good for 30 days.</p>
         <div class="btns btns--full"><button class="btn" type="button" data-extraslink>💬 Text “Buy extras” link</button></div></section>` : ""}
       ${l.salesStatus === "live" || l.salesStatus === "sold" ? reviewAskHtml() : ""}
-      ${l.salesStatus !== "live" ? logCardHtml(l) : ""}
+      ${(l.salesStatus === "live" || l.salesStatus === "sold") && owner ? `<section class="card"><h2>💳 Billing</h2><p class="small muted">Their Stripe billing portal: update the card, see invoices, change or cancel the subscription.</p>
+        <div class="btns btns--full"><button class="btn" type="button" data-act="portal">Open billing portal</button></div></section>` : ""}
+      <div id="logslot-side">${l.salesStatus !== "live" ? logCardHtml(l) : ""}</div>
       ${ready && owner ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
         ${blockers.length ? `<ul class="list small">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul><p class="small muted">Fill these in from Edit.</p>` : `<p class="muted">Everything's confirmed. Publishing puts the site on the internet.</p>`}
         ${(lint.suggestions || []).length ? `<h3 style="margin-top:12px">Good to add (talking points)</h3><ul class="list small">${lint.suggestions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
@@ -570,10 +730,28 @@
     bindLog(l, reload);
     bindNotes(l, reload);
     bindSignup(l, reload);
+    bindContact(l);
+    bindFlyer();
     if (l.salesStatus === "live" && owner) bindLive(l);
+    // Phones: the log card goes right under the header so a call can be logged without scrolling past everything.
+    // Unfolded: it stays in the right column. Moving the node keeps anything already typed.
+    if (viewLead.unplace) viewLead.unplace();
+    const mql = matchMedia("(max-width: 759px)");
+    const placeLog = () => {
+      const card = document.getElementById("logcard");
+      const slot = document.getElementById(mql.matches ? "logslot-top" : "logslot-side");
+      if (card && slot && card.parentElement !== slot) slot.appendChild(card);
+    };
+    placeLog();
+    mql.addEventListener("change", placeLog);
+    viewLead.unplace = () => { mql.removeEventListener("change", placeLog); viewLead.unplace = null; };
+    onLeave(() => viewLead.unplace && viewLead.unplace());
 
+    const STATUS_ASK = { sold: "Mark this lead as Sold? (Normally you'd log the call instead.)", not_interested: "Mark as Not interested? They drop off the call lists.", new: "Move this lead back to New?" };
     $app.querySelectorAll("[data-status]").forEach((b) =>
       b.addEventListener("click", async () => {
+        if (b.dataset.status === l.salesStatus) return;
+        if (STATUS_ASK[b.dataset.status] && !confirm(STATUS_ASK[b.dataset.status])) return;
         try {
           await api(`/leads/${id}/status`, { method: "POST", json: { salesStatus: b.dataset.status } });
           viewLead(id);
@@ -584,15 +762,23 @@
       const el = $app.querySelector(`[data-act=${name}]`);
       if (el) el.addEventListener("click", async () => {
         el.disabled = true;
+        const label = el.innerHTML;
         try { await fn(el); } catch (err) {
           toast(err.data && err.data.blockers ? "Not ready: " + err.data.blockers[0] : err.message);
-        } finally { el.disabled = false; }
+        } finally { el.disabled = false; if (el.isConnected) el.innerHTML = label; }
       });
     };
     if (ready && l.salesStatus !== "live") bindShareButtons(l);
     bindReviewAsk(l);
+    act("lost", async () => {
+      const card = document.getElementById("logcard");
+      if (!card) return;
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+      card.querySelector("[data-out=not_interested]").click();
+    });
+    act("portal", () => openPortal(id));
     act("restyle", async () => { await api(`/leads/${id}/restyle`, { method: "POST" }); toast("New design ready"); viewLead(id); });
-    act("retry", async () => { await api(`/leads/${id}/retry`, { method: "POST" }); toast("Rebuilding…"); setTimeout(() => viewLead(id), 1500); });
+    if (owner) act("retry", async () => { await api(`/leads/${id}/retry`, { method: "POST" }); toast("Rebuilding…"); setTimeout(() => viewLead(id), 1500); });
     act("rewrite", async () => {
       if (!confirm("Write new text with AI? Your text edits will be replaced. Facts, photos and menu stay.")) return;
       await api(`/leads/${id}/rewrite`, { method: "POST" });
@@ -610,8 +796,8 @@
       el.innerHTML = '<span class="spin"></span> Publishing…';
       const res = await api(`/leads/${id}/publish`, { method: "POST" });
       toast("Published! It can take a minute to appear.");
-      viewLead(id);
       window.open(res.url, "_blank", "noopener");
+      viewLead(id);
     });
     act("zip", async () => {
       const res = await api(`/leads/${id}/zip`, { raw: true });
@@ -623,6 +809,18 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     });
     if (l.status === "queued" || l.status === "building") pollTimer = setTimeout(() => location.hash === `#/lead/${id}` && viewLead(id), 5000);
+  }
+
+  // Flyer: POST marks the lead Shown (callers may), then the printable page opens in a new tab (GET has no side effects).
+  // Older servers mark Shown on the GET itself, so a 404 on the POST is fine.
+  function bindFlyer() {
+    $app.querySelectorAll("[data-flyer]").forEach((b) => b.addEventListener("click", async () => {
+      const id = b.dataset.flyer;
+      const w = window.open("", "_blank");
+      try { await api(`/leads/${id}/flyer`, { method: "POST" }); } catch (e) { /* not available yet, or no connection: the page still prints */ }
+      const url = `/api/leads/${id}/flyer`;
+      if (w) w.location.href = url; else window.open(url, "_blank", "noopener");
+    }));
   }
 
   /* ---------- preview ---------- */
@@ -646,9 +844,10 @@
         <a class="btn btn--small" href="#/full/${id}" style="flex:none">Full screen</a></div>
       <div class="frame-wrap" id="fw"><iframe id="pf" title="Site preview" src="/p/${id}/"></iframe></div>
       <div id="previewshare" style="margin-top:12px"></div>`;
+    const my = renderSeq;
     api("/leads/" + id).then((l) => {
       const box = document.getElementById("previewshare");
-      if (!box || l.status !== "ready" || l.salesStatus === "live") return;
+      if (stale(my) || !box || l.status !== "ready" || l.salesStatus === "live") return;
       box.innerHTML = shareButtonsHtml();
       bindShareButtons(l);
     }).catch(() => {});
@@ -667,7 +866,8 @@
       }
     };
     $app.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => { mode = b.dataset.mode; layout(); }));
-    addEventListener("resize", layout, { once: false });
+    addEventListener("resize", layout);
+    onLeave(() => removeEventListener("resize", layout));
     layout();
   }
 
@@ -689,9 +889,54 @@
     });
   }
 
+  // Edit-screen cards that other actions (photo upload, gallery, Spanish page) change: each is re-rendered on its own
+  // from a fresh lead, so the rest of the form keeps whatever's been typed.
+  function photoCardHtml(r) {
+    return `<section class="card" id="card-photo"><h2>Photo</h2>
+        <p class="small muted">${r.media.hero && r.media.hero.source === "google" ? "Using a Google photo (fine for the preview, but it must be replaced before publishing)." : r.media.hero ? "Using the owner's photo." : "No photo yet."}</p>
+        <label class="field">Main photo<input type="file" id="photo" accept="image/*"></label>
+        <label class="field">Describe the photo<input id="photoAlt" placeholder="e.g. Freshly mowed front lawn in Cullman"></label>
+        <button class="btn btn--small" type="button" data-eact="upload">Upload photo</button>
+      </section>`;
+  }
+  function galleryCardHtml(id, r) {
+    return `<section class="card" id="card-gallery"><h2>Photo gallery</h2>
+        <p class="small muted">Up to 12 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site.</p>
+        ${r.media.gallery.length ? `<ul class="thumbs">${r.media.gallery.map((p) => `<li><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy"><button class="linkbtn" type="button" data-eact="delphoto" data-photo="${esc(p.src.split("/").pop().split(".")[0])}">Remove</button></li>`).join("")}</ul>` : ""}
+        <label class="field">Add photos<input type="file" id="gallery" accept="image/*" multiple></label>
+        <label class="field">Describe them <span class="hint">Used for every photo in this batch</span><input id="galleryAlt" placeholder="e.g. Fresh fade at the shop"></label>
+        <button class="btn btn--small" type="button" data-eact="gupload">Add to gallery</button>
+      </section>`;
+  }
+  function esCardHtml(id, c) {
+    return `<section class="card" id="card-es"><h2>Spanish page</h2>
+        <p class="small muted">${c.es ? "This site has a Spanish page at /es/, linked as “Español” in the menu. Rewrite it after big text changes." : "Optional extra. AI translates the site's text into a Spanish page with Spanish buttons and hours (about 20 seconds)."}</p>
+        <div class="btns"><button class="btn btn--small" type="button" data-eact="es-write">${c.es ? "Rewrite Spanish page" : "Write Spanish page"}</button>${c.es ? `<a class="btn btn--small" href="#/full/${id}/es">See it</a><button class="btn btn--small" type="button" data-eact="es-remove">Remove</button>` : ""}</div>
+      </section>`;
+  }
+
+  // Unsaved edits survive a reload (fold/unfold can recreate the Android activity): the form's values, keyed by lead.
+  const draftKey = (id) => `wb_draft_${id}`;
+  function formValues(f) {
+    const out = {};
+    for (const el of f.elements) {
+      if (!el.name || el.type === "file" || el.type === "submit" || el.type === "button") continue;
+      out[el.name] = el.type === "checkbox" ? !!el.checked : el.value;
+    }
+    return out;
+  }
+  function applyValues(f, vals) {
+    for (const el of f.elements) {
+      if (!el.name || !(el.name in vals) || el.type === "file") continue;
+      if (el.type === "checkbox") el.checked = !!vals[el.name]; else el.value = vals[el.name];
+    }
+  }
+
   async function viewEdit(id) {
     setNav("home");
+    const my = renderSeq;
     const l = await api("/leads/" + id);
+    if (stale(my)) return;
     if (!l.record) return go("#/lead/" + id);
     const r = l.record;
     const c = l.copy;
@@ -741,23 +986,9 @@
         <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
         ${confirmable.map(([k, label]) => cb("confirm_" + k, label, conf.has(k))).join("")}
       </section>
-      <section class="card"><h2>Photo</h2>
-        <p class="small muted">${r.media.hero && r.media.hero.source === "google" ? "Using a Google photo (fine for the preview, but it must be replaced before publishing)." : r.media.hero ? "Using the owner's photo." : "No photo yet."}</p>
-        <label class="field">Main photo<input type="file" id="photo" accept="image/*"></label>
-        <label class="field">Describe the photo<input id="photoAlt" placeholder="e.g. Freshly mowed front lawn in Cullman"></label>
-        <button class="btn btn--small" type="button" id="upload">Upload photo</button>
-      </section>
-      <section class="card"><h2>Photo gallery</h2>
-        <p class="small muted">Up to 12 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site.</p>
-        ${r.media.gallery.length ? `<ul class="thumbs">${r.media.gallery.map((p) => `<li><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy"><button class="linkbtn" type="button" data-delphoto="${esc(p.src.split("/").pop().split(".")[0])}">Remove</button></li>`).join("")}</ul>` : ""}
-        <label class="field">Add photos<input type="file" id="gallery" accept="image/*" multiple></label>
-        <label class="field">Describe them <span class="hint">Used for every photo in this batch</span><input id="galleryAlt" placeholder="e.g. Fresh fade at the shop"></label>
-        <button class="btn btn--small" type="button" id="gupload">Add to gallery</button>
-      </section>
-      <section class="card"><h2>Spanish page</h2>
-        <p class="small muted">${c.es ? "This site has a Spanish page at /es/, linked as “Español” in the menu. Rewrite it after big text changes." : "Optional extra. AI translates the site's text into a Spanish page with Spanish buttons and hours (about 20 seconds)."}</p>
-        <div class="btns"><button class="btn btn--small" type="button" id="es-write">${c.es ? "Rewrite Spanish page" : "Write Spanish page"}</button>${c.es ? `<a class="btn btn--small" href="#/full/${id}/es">See it</a><button class="btn btn--small" type="button" id="es-remove">Remove</button>` : ""}</div>
-      </section>
+      ${photoCardHtml(r)}
+      ${galleryCardHtml(id, r)}
+      ${esCardHtml(id, c)}
       <section class="card"><h2>We're hiring</h2>
         <p class="small muted">Optional. Adds a “We're hiring” section with Call/Text buttons. Leave the jobs empty to remove it.</p>
         <label class="field">Jobs open (one per line)<textarea name="hiringRoles" rows="3" placeholder="Line cook&#10;Server">${esc(((r.hiring || {}).roles || []).join("\n"))}</textarea></label>
@@ -822,51 +1053,77 @@
     <div class="sticky-save btns btns--full"><button class="btn btn--primary" type="submit">Save &amp; update preview</button><a class="btn" href="#/preview/${id}">Preview</a></div>
     </form>`;
 
-    $app.querySelector("#upload").addEventListener("click", async (e) => {
-      const file = $app.querySelector("#photo").files[0];
-      if (!file) return toast("Choose a photo first");
-      e.target.disabled = true;
-      try {
-        const { blob, w: pw, h: ph } = await resizeImage(file);
-        const alt = $app.querySelector("#photoAlt").value || r.name;
-        await api(`/leads/${id}/photo?w=${pw}&h=${ph}&alt=${encodeURIComponent(alt)}`, { method: "POST", body: blob, type: "image/jpeg" });
-        toast("Photo saved");
-        viewEdit(id);
-      } catch (err) { toast(err.message); } finally { e.target.disabled = false; }
+    const form = $app.querySelector("#ef");
+    // Unsaved typing: remembered on this phone, guarded on the way out.
+    let dirty = false;
+    try {
+      const saved = sessionStorage.getItem(draftKey(id));
+      if (saved) { applyValues(form, JSON.parse(saved)); dirty = true; toast("Restored what you'd typed before"); }
+    } catch (e) { /* storage blocked or bad draft */ }
+    form.addEventListener("input", () => {
+      dirty = true;
+      try { sessionStorage.setItem(draftKey(id), JSON.stringify(formValues(form))); } catch (e) { /* storage blocked */ }
     });
+    leaveGuard = () => !dirty || confirm("Leave without saving? Your changes to the text and facts aren't saved yet.");
+    const onUnload = (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } };
+    addEventListener("beforeunload", onUnload);
+    onLeave(() => removeEventListener("beforeunload", onUnload));
 
-    $app.querySelector("#es-write").addEventListener("click", async (e) => {
-      e.target.disabled = true;
-      e.target.textContent = "Writing… (about 20 seconds)";
-      try { await api(`/leads/${id}/spanish`, { method: "POST" }); toast("Spanish page ready"); viewEdit(id); }
-      catch (err) { toast(err.message); e.target.disabled = false; e.target.textContent = "Write Spanish page"; }
-    });
-    const esRemove = $app.querySelector("#es-remove");
-    if (esRemove) esRemove.addEventListener("click", async () => {
-      if (!confirm("Remove the Spanish page?")) return;
-      try { await api(`/leads/${id}/spanish`, { method: "DELETE" }); toast("Spanish page removed"); viewEdit(id); } catch (err) { toast(err.message); }
-    });
-    $app.querySelector("#gupload").addEventListener("click", async (e) => {
-      const files = [...$app.querySelector("#gallery").files];
-      if (!files.length) return toast("Choose photos first");
-      e.target.disabled = true;
+    // Replace just the cards an action changed, from a fresh copy of the lead.
+    const refreshCards = async (...ids) => {
+      const fresh = await api("/leads/" + id);
+      if (stale(my)) return;
+      const html = { "card-photo": () => photoCardHtml(fresh.record), "card-gallery": () => galleryCardHtml(id, fresh.record), "card-es": () => esCardHtml(id, fresh.copy) };
+      for (const cid of ids) { const el = document.getElementById(cid); if (el) el.outerHTML = html[cid](); }
+    };
+    form.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-eact]");
+      if (!b) return;
+      const act = b.dataset.eact;
+      const label = b.textContent;
+      const busy = (t) => { b.disabled = true; b.textContent = t; };
+      const idle = () => { if (b.isConnected) { b.disabled = false; b.textContent = label; } };
       try {
-        const alt = $app.querySelector("#galleryAlt").value || `Photo of ${r.name}`;
-        for (const [i, file] of files.entries()) {
-          e.target.textContent = `Uploading ${i + 1} of ${files.length}…`;
+        if (act === "upload") {
+          const file = $app.querySelector("#photo").files[0];
+          if (!file) return toast("Choose a photo first");
+          busy("Uploading…");
           const { blob, w: pw, h: ph } = await resizeImage(file);
-          await api(`/leads/${id}/gallery?w=${pw}&h=${ph}&alt=${encodeURIComponent(alt)}`, { method: "POST", body: blob, type: "image/jpeg" });
+          const alt = $app.querySelector("#photoAlt").value || r.name;
+          await api(`/leads/${id}/photo?w=${pw}&h=${ph}&alt=${encodeURIComponent(alt)}`, { method: "POST", body: blob, type: "image/jpeg" });
+          toast("Photo saved");
+          await refreshCards("card-photo");
+        } else if (act === "gupload") {
+          const files = [...$app.querySelector("#gallery").files];
+          if (!files.length) return toast("Choose photos first");
+          const alt = $app.querySelector("#galleryAlt").value || `Photo of ${r.name}`;
+          for (const [i, file] of files.entries()) {
+            busy(`Uploading ${i + 1} of ${files.length}…`);
+            const { blob, w: pw, h: ph } = await resizeImage(file);
+            await api(`/leads/${id}/gallery?w=${pw}&h=${ph}&alt=${encodeURIComponent(alt)}`, { method: "POST", body: blob, type: "image/jpeg" });
+          }
+          toast(files.length === 1 ? "Photo added" : `${files.length} photos added`);
+          await refreshCards("card-gallery");
+        } else if (act === "delphoto") {
+          if (!confirm("Remove this photo from the site?")) return;
+          await api(`/leads/${id}/gallery/${b.dataset.photo}`, { method: "DELETE" });
+          toast("Photo removed");
+          await refreshCards("card-gallery");
+        } else if (act === "es-write") {
+          busy("Writing… (about 20 seconds)");
+          await api(`/leads/${id}/spanish`, { method: "POST" });
+          toast("Spanish page ready");
+          await refreshCards("card-es");
+        } else if (act === "es-remove") {
+          if (!confirm("Remove the Spanish page?")) return;
+          await api(`/leads/${id}/spanish`, { method: "DELETE" });
+          toast("Spanish page removed");
+          await refreshCards("card-es");
         }
-        toast(files.length === 1 ? "Photo added" : `${files.length} photos added`);
-        viewEdit(id);
-      } catch (err) { toast(err.message); e.target.disabled = false; e.target.textContent = "Add to gallery"; }
+      } catch (err) { toast(err.message); } finally { idle(); }
     });
-    $app.querySelectorAll("[data-delphoto]").forEach((b) => b.addEventListener("click", async () => {
-      if (!confirm("Remove this photo from the site?")) return;
-      try { await api(`/leads/${id}/gallery/${b.dataset.delphoto}`, { method: "DELETE" }); toast("Photo removed"); viewEdit(id); } catch (err) { toast(err.message); }
-    }));
 
-    $app.querySelector("#ef").addEventListener("submit", async (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const f = e.target;
       const val = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
@@ -923,6 +1180,8 @@
       btn.disabled = true;
       try {
         await api(`/leads/${id}/edits`, { method: "PUT", json: edits });
+        dirty = false;
+        try { sessionStorage.removeItem(draftKey(id)); } catch (e) { /* storage blocked */ }
         toast("Saved. Preview updated.");
         go("#/lead/" + id);
       } catch (err) { toast(err.message); } finally { btn.disabled = false; }
@@ -971,26 +1230,31 @@
 
   function bindShareButtons(l) {
     const name = l.record ? l.record.name : l.name;
-    const phoneDigits = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+    const digits = phoneDigits(l);
     const smsBody = (url) => `${greeting()} Here's the free website preview I made for ${name}: ${url}`;
+    // Every link made here goes in the call log by itself (fire and forget; the sms: hand-off doesn't wait).
+    const logSent = (which) => api(`/leads/${l.id}/log`, { method: "POST", json: { outcome: "link_sent", note: which }, keepalive: true }).catch(() => {});
     $app.querySelectorAll("[data-share-sms]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try {
         const url = await shareLink(l.id);
-        location.href = `sms:+1${phoneDigits}?body=${encodeURIComponent(smsBody(url))}`;
+        logSent("Text preview link");
+        location.href = `sms:+1${digits}?body=${encodeURIComponent(smsBody(url))}`;
       } catch (err) { toast(err.message); } finally { b.disabled = false; }
     }));
     $app.querySelectorAll("[data-follow]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try {
         const url = await shareLink(l.id);
-        location.href = `sms:+1${phoneDigits}?body=${encodeURIComponent(FOLLOW_UPS[Number(b.dataset.follow)].text(greeting(), name, url))}`;
+        logSent(`Follow-up: ${FOLLOW_UPS[Number(b.dataset.follow)].label}`);
+        location.href = `sms:+1${digits}?body=${encodeURIComponent(FOLLOW_UPS[Number(b.dataset.follow)].text(greeting(), name, url))}`;
       } catch (err) { toast(err.message); } finally { b.disabled = false; }
     }));
     $app.querySelectorAll("[data-share-copy]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try {
         const url = await shareLink(l.id);
+        logSent("Copy message + link");
         const msg = smsBody(url);
         try { await navigator.clipboard.writeText(msg); toast("Message with the preview link copied. Paste it anywhere."); }
         catch (e) { prompt("Copy this message:", msg); }
@@ -1000,16 +1264,18 @@
 
   async function viewPitch(id, regenerate) {
     setNav("home");
+    const my = renderSeq;
     const l = await api("/leads/" + id);
+    if (stale(my)) return;
     if (l.status !== "ready") return go("#/lead/" + id);
     const r = l.record;
     const s = meta.settings;
-    const phoneDigits = r.phone.e164.slice(2);
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p>
       <h1>Call guide: ${esc(r.name)}</h1>
       <p class="muted">${esc(l.variantLabel || "")} · ${esc(l.reason || "")}</p>
+      ${contactLine(l) ? `<p>${contactLine(l)}</p>` : ""}
       <div class="btns btns--full" style="margin-bottom:8px">
-        <a class="btn btn--primary" href="${telHref(phoneDigits)}">📞 Call ${esc(r.phone.display)}</a>
+        <a class="btn btn--primary" href="${telHref(phoneDigits(l))}">📞 Call ${esc(r.phone.display)}</a>
       </div>
       ${shareButtonsHtml()}
       <p><a class="btn btn--small" href="#/playbook">💬 Plans & answers</a> <a class="btn btn--small" href="#/walkin/${id}">🚶 Going in person?</a></p>
@@ -1026,7 +1292,7 @@
       document.getElementById("guide").innerHTML = `<div class="card">${esc(err.message)}</div>`;
       return;
     }
-    if (location.hash !== `#/pitch/${id}`) return;
+    if (stale(my) || location.hash !== `#/pitch/${id}`) return;
     const list = (items) => `<ul class="list">${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
     document.getElementById("guide").innerHTML = `
       <section class="card opener"><h2>Open with</h2><p class="big">${esc(pitch.opener)}</p></section>
@@ -1047,20 +1313,22 @@
 
   /* ---------- ways to pay (shared by Show plans and Plans & answers) ---------- */
   // Mirrors billingOptions() in src/worker/db.ts: 6- and 12-month plans have no setup fee; month to month does.
-  function payTerms(s) {
+  // church: churches and nonprofits get a bigger yearly discount (Settings → churchAnnualMonthsFree, default 4).
+  function payTerms(s, church) {
     const min = s.minMonths ?? 12;
     const short = s.shortMonths ?? 6;
     const commits = [short && min && short < min ? short : null, min || null].filter(Boolean);
-    return { min, short: commits.length > 1 ? short : 0, commits, flex: min ? (s.flexSetup ?? 299) : 0, free: s.annualMonthsFree ?? 2 };
+    const free = church ? (s.churchAnnualMonthsFree ?? 4) : (s.annualMonthsFree ?? 2);
+    return { min, short: commits.length > 1 ? short : 0, commits, flex: min ? (s.flexSetup ?? 299) : 0, free, church: !!church };
   }
   /** "6- or 12-month" */
   const commitWords = (t) => t.commits.length > 1 ? `${t.commits[0]}- or ${t.commits[1]}-month` : `${t.commits[0]}-month`;
-  function payWays(s, plans) {
-    const t = payTerms(s);
+  function payWays(s, plans, church) {
+    const t = payTerms(s, church);
     const out = t.commits.map((m) => [`${m}-month plan`, `The monthly price, no setup fee. After ${m} months, cancel any time with 30 days' notice.`]);
     if (!t.commits.length) out.push(["Monthly", "The monthly price. Cancel any time."]);
     if (t.flex) out.push(["Month to month", `Same monthly price plus a one-time ${money(t.flex)} setup fee. No contract, cancel any time.`]);
-    if (t.free) out.push([`Pay yearly, ${t.free} months free`, `12 months for the price of ${12 - t.free}, no setup fee. ${plans.map((p) => `${esc(p.name)} ${money(p.monthly * (12 - t.free))}/year`).join(" · ")}`]);
+    if (t.free) out.push([`Pay yearly, ${t.free} months free`, `12 months for the price of ${12 - t.free}${t.church ? " for churches and nonprofits" : ""}, no setup fee. ${plans.map((p) => `${esc(p.name)} ${money(p.monthly * (12 - t.free))}/year`).join(" · ")}`]);
     return out;
   }
 
@@ -1075,12 +1343,15 @@
 
   async function viewShowPlans(leadId) {
     stopPolling();
+    const my = renderSeq;
     const s = meta.settings;
     const plans = (s.plans.length ? s.plans : SUGGESTED_PLANS).filter((p) => p.monthly);
     const lead = leadId ? await api("/leads/" + leadId).catch(() => null) : null;
+    if (stale(my)) return;
     const business = lead ? (lead.record ? lead.record.name : lead.name) : "";
     const company = s.companyName || "Underground Associates";
-    const t = payTerms(s);
+    const church = !!lead && lead.category === "church";
+    const t = payTerms(s, church);
     const perDay = (m) => money(Math.round((m * 12 / 365) * 100) / 100);
     $nav.hidden = true;
     document.body.classList.add("showing");
@@ -1105,7 +1376,7 @@
       }).join("")}</div>
       <section class="show__box"><h2>Every plan includes</h2><ul class="show__every">${EVERY_PLAN.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>
       <section class="show__box"><h2>Ways to pay</h2><div class="show__ways">
-        ${payWays(s, plans).map(([h, d]) => `<div><h3>${esc(h)}</h3><p>${d}</p></div>`).join("")}
+        ${payWays(s, plans, church).map(([h, d]) => `<div><h3>${esc(h)}</h3><p>${d}</p></div>`).join("")}
       </div></section>
       ${s.addons && s.addons.length ? `<section class="show__box"><h2>Add-ons</h2><ul class="show__addons">${s.addons.map((a) => `<li><span>${esc(a.name)}${a.about ? `<small>${esc(a.about)}</small>` : ""}</span><strong>${esc(addonPrice(a))}</strong></li>`).join("")}</ul></section>` : ""}
       <p class="show__fine">You see your website before you pay anything, and nothing goes live until you say so. Cancel with 30 days' notice${t.commits.length ? ` once your ${commitWords(t)} plan's months are up` : ""}.</p>
@@ -1239,6 +1510,10 @@
       ${plans.map(planCard).join("")}
       <section class="card"><h2>Ways to pay</h2><ul class="list">${ways.map(([t, d]) => `<li><strong>${esc(t)}:</strong> ${d}</li>`).join("")}</ul>
         <p class="small muted">Send the sign-up link from the call guide. They pick the plan and the way to pay, read the agreement, and pay by a secure link. Never take card numbers over the phone.</p></section>
+      ${(() => { const ct = payTerms(s, true); return ct.free ? `<section class="card"><h2>⛪ Churches &amp; nonprofits</h2><ul class="list">
+        <li><strong>Yearly rate:</strong> 12 months for the price of ${12 - ct.free} (${ct.free} months free), so it fits one budget line. ${plans.filter((p) => p.monthly).map((p) => `${esc(p.name)} ${money(p.monthly * (12 - ct.free))}/year`).join(" · ")}.</li>
+        <li><strong>Expect a check or an invoice:</strong> many pay from the church account, not a card. Say yes to that; the owner sends the invoice.</li>
+        <li><strong>Decisions take a meeting:</strong> deacons, elders, a board or the post. Leave the flyer for it, ask when it is, and set the callback for the day after.</li></ul></section>` : ""; })()}
       ${s.addons && s.addons.length ? `<section class="card"><h2>Extras</h2><p class="small muted">Offer one when it fits. Any extra goes with any plan.</p><ul class="list">${s.addons.map((a) => `<li><strong>${esc(a.name)}</strong> · ${esc(addonPrice(a))}${a.about ? `<br><span class="small">${esc(a.about)}</span>` : ""}${offerHint(a.name) ? `<br><span class="small muted">Offer to: ${esc(offerHint(a.name))}</span>` : ""}</li>`).join("")}</ul></section>` : ""}
       <section class="card"><h2>If they say…</h2>
         <label class="field">Find an answer<input id="objq" type="search" placeholder="price, contract, Facebook…" autocomplete="off"></label>
@@ -1406,12 +1681,14 @@
 
   async function viewWalkin(id) {
     setNav("home");
+    const my = renderSeq;
     const l = id ? await api("/leads/" + id) : null;
+    if (stale(my)) return;
     if (l && l.status !== "ready") return go("#/lead/" + id);
     const r = l ? l.record : null;
     const s = meta.settings;
     const plans = s.plans.length ? s.plans : SUGGESTED_PLANS;
-    const t = payTerms(s);
+    const t = payTerms(s, !!l && l.category === "church");
     const storedName = () => { try { return localStorage.getItem("wb-owner-name") || ""; } catch (e) { return ""; } };
     const me = (!isOwner() || (meta.me && meta.me.id && meta.me.id !== "owner") ? meta.me.name : s.callerName || storedName()) || "[your name]";
     const co = s.companyName || "[company name]";
@@ -1459,13 +1736,14 @@
         <div class="btns btns--full">
           <a class="btn btn--primary" href="#/preview/${id}">📱 Open their preview</a>
           ${r ? `<a class="btn" href="${esc(r.mapsUrl)}" target="_blank" rel="noopener">🗺️ Directions</a>` : ""}
-          <a class="btn" href="/api/leads/${id}/flyer" target="_blank" rel="noopener">🖨️ Flyer to leave</a>
-        </div>`
+          <button class="btn" type="button" data-flyer="${id}">🖨️ Flyer to leave</button>
+        </div>
+        ${contactLine(l) ? `<p>${contactLine(l)}</p>` : ""}`
         : `<p class="muted">What to say and do when you walk into a business, start to finish. Open it from a lead (or a stop on your walk-in route) and it fills in their name, what to show them and the best time to go.</p>
         <p><a class="btn btn--primary" href="#/route">🗺️ Plan a walk-in route</a></p>`}
 
       ${step(1, "Before you walk in", list([
-        `<strong>Best time:</strong> ${esc(l ? WALKIN_TIMING[l.category] || "A slow part of their day, never during a rush." : "A slow part of their day, never during a rush. Restaurants 2 to 4 PM, shops and salons mid-morning, trades early morning.")}`,
+        `<strong>Best time:</strong> ${l && l.bestTime ? `<strong>${esc(l.bestTime)}</strong> (what they told us). ` : ""}${esc(l ? WALKIN_TIMING[l.category] || "A slow part of their day, never during a rush." : "A slow part of their day, never during a rush. Restaurants 2 to 4 PM, shops and salons mid-morning, trades early morning.")}`,
         `Open their preview before you go in so it's loaded. Turn your brightness up and silence your phone.`,
         `Bring the printed flyer. It has a code that opens their website for 60 days, so you can leave it behind.`,
         `Look at their Google listing first: the owner's name is often in replies to reviews. Using it helps.`,
@@ -1473,8 +1751,9 @@
       ]))}
 
       ${step(2, "Walk in", `<p class="small muted">Wait until no customer needs them. Smile, keep it short.</p>
-        ${say(isChurch ? "Hi! Is the pastor or the church secretary in? I'll only need a minute." : "Hi! Is the owner or manager around? I'll only need a minute.")}
-        <p class="small muted">When you have ${isChurch ? "the pastor (or whoever handles their Facebook)" : "the owner"}:</p>
+        ${say(l && l.contact ? `Hi! Is ${l.contact} around? I'll only need a minute.` : isChurch ? "Hi! Is the pastor or the church secretary in? I'll only need a minute." : "Hi! Is the owner or manager around? I'll only need a minute.")}
+        ${l && l.contact ? `<p class="small"><strong>Ask for ${esc(l.contact)}.</strong></p>` : ""}
+        <p class="small muted">When you have ${l && l.contact ? esc(l.contact) : isChurch ? "the pastor (or whoever handles their Facebook)" : "the owner"}:</p>
         ${say(`I'm ${me} with ${co}. We're local, here in Cullman. ${why}, so I went ahead and built you one. Can I show you real quick? It's free to look at.`)}
         ${l && l.category === "finance" && r && r.variant === "financial_advisor" ? `<p class="small"><strong>Advisors: ask this first.</strong> “Does your firm let you use your own website?” Many must use the firm's site or get compliance approval. If they can't, thank them and log it.</p>` : ""}
         ${l && l.category === "finance" && r && r.variant === "tax_prep" ? `<p class="small muted">January to mid-April is their busy season. If you're there then, keep it to one minute and offer to come back in May.</p>` : ""}
@@ -1528,6 +1807,7 @@
 
       ${l && l.salesStatus !== "live" ? signupCardHtml(l) + logCardHtml(l) : ""}`;
     $app.querySelector("#back").addEventListener("click", (e) => { if (!l && history.length > 1) { e.preventDefault(); history.back(); } });
+    bindFlyer();
     if (l && l.salesStatus !== "live") {
       bindShareButtons(l);
       bindLog(l, () => go("#/lead/" + id));
@@ -1581,17 +1861,15 @@
       try {
         const { url } = await api(`/leads/${l.id}/extraslink`, { method: "POST" });
         const name = l.record ? l.record.name : l.name;
-        const digits = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
-        location.href = `sms:+1${digits}?body=${encodeURIComponent(`${greeting()} Here's where you can add extras to the ${name} website, like a photo shoot, a Spanish page or social media posts: ${url}`)}`;
+        location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(`${greeting()} Here's where you can add extras to the ${name} website, like a photo shoot, a Spanish page or social media posts: ${url}`)}`;
       } catch (err) { toast(err.message); } finally { xb.disabled = false; }
     });
     const b = $app.querySelector("[data-askreview]");
     if (!b) return;
     const name = l.record ? l.record.name : l.name;
-    const phoneDigits = l.record ? l.record.phone.e164.slice(2) : String(l.phone || "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
     b.addEventListener("click", () => {
       const msg = `${greeting()} Thanks again for trusting us with the ${name} website! If you have a minute, would you leave us a quick Google review? It really helps a small local business: ${meta.settings.companyReviewUrl}`;
-      location.href = `sms:+1${phoneDigits}?body=${encodeURIComponent(msg)}`;
+      location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(msg)}`;
     });
   }
 
@@ -1603,11 +1881,14 @@
 
   async function viewGbp(id) {
     setNav("home");
+    const my = renderSeq;
     const [l, g] = await Promise.all([api("/leads/" + id), api(`/leads/${id}/gbp`)]);
+    if (stale(my)) return;
     const r = l.record;
-    const phone = r ? r.phone.e164.slice(2) : "";
+    const phone = phoneDigits(l);
     const copyBtn = (text, label = "Copy") => `<button class="btn btn--small" type="button" data-copytext="${esc(text)}">${label}</button>`;
     const render = (st) => {
+      if (stale(my)) return;
       const done = GBP_CHECKS.filter(([k]) => st.checks[k]).length;
       const drafts = st.posts.filter((p) => p.status === "draft");
       const social = st.social || [];
@@ -1726,7 +2007,7 @@
 
   /* ---------- add a business by hand ---------- */
   const PACKS = [["restaurant", "Restaurant, cafe, bakery or food truck"], ["contractor", "Contractor or home service (plumbing, HVAC, painting, concrete, tree, pest…)"], ["salon", "Salon, barber, nails, massage or pet grooming"], ["auto", "Auto repair, body shop, detailing, towing or small engine"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning or pressure washing"], ["finance", "Tax preparer, accountant, insurance agency or financial advisor"], ["church", "Church, VFW/Legion/Lions/lodge, food pantry or community center"], ["print", "Print shop, sign shop, screen printing or embroidery"], ["retail", "Shop: boutique, gifts, florist, antiques, thrift, feed or furniture"]];
-  const PRESENCE = { none: ["No website", "chip--good"], social: ["Only a social page", "chip--good"], free_builder: ["Free-builder site", "chip--warn"], has_site: ["Has a website", "chip--warn"] };
+  const PRESENCE = { none: ["No website", "chip--good"], social: ["Only a social page", "chip--good"], free_builder: ["Free-builder site", "chip--warn"], outdated: ["Outdated website", "chip--warn"], has_site: ["Has a website", "chip--warn"] };
 
   async function viewAdd() {
     setNav("home");
@@ -1745,6 +2026,7 @@
       list.innerHTML = `<li class="card"><span class="spin"></span> Searching…</li>`;
       try {
         const { results } = await api("/places/search?q=" + encodeURIComponent(e.target.q.value.trim()));
+        if (!list.isConnected) return;
         list.innerHTML = results.length
           ? results.map((x, i) => {
               const [plabel, pcls] = PRESENCE[x.presence] || ["", ""];
@@ -1793,7 +2075,9 @@
 
   async function viewRoute() {
     setNav("home");
+    const my = renderSeq;
     const { leads } = await api("/leads");
+    if (stale(my)) return;
     const pool = leads.filter((l) => l.lat && l.status === "ready" && (l.salesStatus === "new" || l.salesStatus === "shown"));
     const picked = new Set();
     let start = { lat: START_TOWNS[0][1], lng: START_TOWNS[0][2], label: "Cullman" };
@@ -1841,12 +2125,13 @@
             <span style="flex:1"><span class="row" style="align-items:baseline"><strong>${esc(l.name)}</strong><span class="dist" style="flex:none">${d.toFixed(1)} mi</span></span>
             <span class="small muted">${esc(CATEGORY_LABEL[l.category] || l.category)} · ${esc(l.reason || "")}</span><br><span class="small">${esc(l.address || "")}</span>
             ${l.followUp ? `<br>${followChip(l.followUp)}` : ""}</span></label>
-            <div class="btns" style="margin:6px 0 0 36px"><a class="btn btn--small btn--primary" href="#/walkin/${l.id}">🚶 Guide</a><a class="btn btn--small" href="#/preview/${l.id}">Preview</a><a class="btn btn--small" href="/api/leads/${l.id}/flyer" target="_blank" rel="noopener">Flyer</a></div></li>`).join("")
+            <div class="btns" style="margin:6px 0 0 36px"><a class="btn btn--small btn--primary" href="#/walkin/${l.id}">🚶 Guide</a><a class="btn btn--small" href="#/preview/${l.id}">Preview</a><button class="btn btn--small" type="button" data-flyer="${l.id}">Flyer</button></div></li>`).join("")
         : `<li class="muted">No open leads with a location${category ? " in this category" : ""}.</li>`;
       list.querySelectorAll("input[data-pick]").forEach((c) => c.addEventListener("change", () => {
         if (c.checked) picked.add(c.dataset.pick); else picked.delete(c.dataset.pick);
         update();
       }));
+      bindFlyer();
       update();
     };
     $app.querySelector("#cat").addEventListener("change", (e) => { category = e.target.value; render(); });
@@ -1868,7 +2153,13 @@
   /* ---------- sales ---------- */
   async function viewSales() {
     setNav("sales");
+    const my = renderSeq;
     const d = await api("/sales");
+    if (stale(my)) return;
+    const plusPlan = (meta.settings.plans || []).find((p) => p.id === "plus") || SUGGESTED_PLANS[1];
+    const pipe = d.pipeline;
+    const lost = d.lostReasons || {};
+    const lostTotal = Object.values(lost).reduce((a, b) => a + (Number(b) || 0), 0);
     const table = (rows) => rows.length
       ? `<table class="stats"><thead><tr><th>Who</th><th>Calls</th><th>Reached</th><th>Interested</th><th>Sold</th></tr></thead><tbody>${rows
           .map((r) => `<tr><th scope="row">${esc(r.person)}</th><td>${r.calls}</td><td>${r.reached}</td><td>${r.interested}</td><td><strong>${r.sold}</strong></td></tr>`).join("")}</tbody></table>`
@@ -1882,10 +2173,15 @@
           : `<p class="muted small">Set a commission per sale in <a href="#/settings">Settings</a>.</p>`}</section>
         <section class="card"><h2>This week</h2>${table(d.week)}</section>
         <section class="card"><h2>This month</h2>${table(d.month)}</section>
+        ${pipe ? `<section class="card"><h2>In the pipeline</h2><p class="bignum">${money(pipe.monthlyIfPlus ?? pipe.shown * plusPlan.monthly)}<span class="small muted"> / month if they all buy ${esc(plusPlan.name)}</span></p>
+          <p class="small muted">${pipe.shown} lead${pipe.shown === 1 ? "" : "s"} shown × ${money(plusPlan.monthly)} (${esc(plusPlan.name)}).</p></section>` : ""}
+        ${lostTotal ? `<section class="card"><h2>Why they said no</h2><div class="chips">${LOST_REASONS.map(([k, t]) => (lost[k] ? `<span class="chip">${esc(t)} <strong>${lost[k]}</strong></span>` : "")).join("")}</div>
+          <p class="small muted" style="margin:8px 0 0">From the reason picked when logging Not interested.</p></section>` : ""}
       </div>
       <section class="card"><h2>Clients</h2>${d.clients.length
         ? `<ul class="list">${d.clients.map((c) => `<li><div class="row"><a href="#/lead/${c.id}"><strong>${esc(c.name)}</strong></a>${c.status === "live" ? '<span class="chip chip--good" style="flex:none">● Live</span>' : '<span class="chip" style="flex:none">Sold</span>'}</div>
-            <p class="small muted" style="margin:4px 0 0">${c.plan ? `${esc(c.plan)} · ${money(c.monthly)}/mo · ${c.paid ? "paid" : "<strong>payment not set up</strong>"}` : "No sign-up on file"}${c.seller ? ` · sold by ${esc(c.seller)}` : ""}</p></li>`).join("")}</ul>`
+            <p class="small muted" style="margin:4px 0 0">${c.plan ? `${esc(c.plan)} · ${money(c.monthly)}/mo · ${c.paid ? "paid" : "<strong>payment not set up</strong>"}` : "No sign-up on file"}${c.seller ? ` · sold by ${esc(c.seller)}` : ""}</p>
+            <div class="btns" style="margin-top:6px"><button class="btn btn--small" type="button" data-portal="${c.id}">💳 Billing portal</button></div></li>`).join("")}</ul>`
         : `<p class="muted small">No clients yet. They show up here once someone signs up or is marked Sold.</p>`}</section>
       <section class="card"><h2>🛒 Website orders</h2>${(d.websiteOrders || []).length
         ? `<ul class="list">${d.websiteOrders.map((o) => `<li><div class="row"><strong>${esc(o.business || "")}</strong>${o.paid ? '<span class="chip chip--good" style="flex:none">Paid</span>' : '<span class="chip chip--warn" style="flex:none">Not paid</span>'}</div>
@@ -1894,12 +2190,18 @@
            <p class="small muted">People who bought from “Get started” on your website. Find their business with <a href="#/add">➕ Add a business</a> to build their site.</p>`
         : `<p class="muted small">None yet. People who buy from “Get started” on your website show up here.</p>`}</section>
       <p class="small muted">Calls are logged outcomes. Reached means someone answered. A sale counts for whoever sent the sign-up link, or whoever marked it Sold.</p>`;
+    $app.querySelectorAll("[data-portal]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await openPortal(b.dataset.portal); } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
   }
 
   /* ---------- inbox ---------- */
   async function viewInbox() {
     setNav("inbox");
+    const my = renderSeq;
     const { items } = await api("/inbox");
+    if (stale(my)) return;
     document.getElementById("inbox-dot").hidden = !items.some((i) => !i.read);
     $app.innerHTML = `<h1>Inbox</h1><p class="muted">Requests customers send through your clients' live websites.</p>
       <ul class="list">${items.length ? items.map((i) => `<li class="card"><div class="lead__top"><strong>${esc(i.data.name)}</strong>${i.read ? "" : '<span class="chip chip--warn">New</span>'}</div>
@@ -1941,6 +2243,8 @@
           ${c.id === meta.me.id ? "" : `<button class="btn btn--small" data-cadmin="${c.id}" data-admin="${c.admin ? 1 : 0}">${c.admin ? "Make caller" : "Give full access"}</button>`}
           <button class="btn btn--small" data-ctoggle="${c.id}" data-off="${c.disabled ? 1 : 0}">${c.disabled ? "Turn on" : "Turn off"}</button>
           <button class="btn btn--small btn--danger" data-cdel="${c.id}">Remove</button></div></li>`).join("") : `<li class="muted small">No callers yet.</li>`}</ul>
+      <div style="margin-top:12px"><h3>Backup</h3><p class="small muted">A copy of your leads, notes, sign-ups and settings as a file. Keep it somewhere safe now and then.</p>
+        <a class="btn btn--small" href="/api/backup" download="website-business-backup.json">⬇️ Download backup</a></div>
       <form id="cf" style="margin-top:12px"><h3>Add someone</h3>
         <label class="field">Their name<input name="name" maxlength="60" required placeholder="Used in texts, call guides and notes"></label>
         <label class="field">Their password <span class="hint">At least 8 characters, different from everyone else's. Tell them in person.</span><input name="password" type="text" minlength="8" autocomplete="off" required></label>
@@ -1969,6 +2273,7 @@
       try { await api(`/callers/${b.dataset.cadmin}`, { method: "PUT", json: { admin: giving } }); viewSettings(); } catch (err) { toast(err.message); }
     }));
     $app.querySelectorAll("[data-ctoggle]").forEach((b) => b.addEventListener("click", async () => {
+      if (b.dataset.off !== "1" && !confirm("Turn this person off? They'll be logged out everywhere and can't log in until you turn them back on. Their notes stay.")) return;
       try { await api(`/callers/${b.dataset.ctoggle}`, { method: "PUT", json: { disabled: b.dataset.off !== "1" } }); viewSettings(); } catch (err) { toast(err.message); }
     }));
     $app.querySelectorAll("[data-cdel]").forEach((b) => b.addEventListener("click", async () => {
@@ -2024,12 +2329,15 @@
 
   async function viewSettings() {
     setNav("settings");
+    const my = renderSeq;
     meta = await api("/meta");
+    if (stale(my)) return;
     if (!isOwner()) {
       $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}</div>`;
       return bindDevice();
     }
     const [{ last30Days: u }, { callers }] = await Promise.all([api("/usage"), api("/callers")]);
+    if (stale(my)) return;
     const s = meta.settings;
     $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">
       <form id="sf" class="card settings-form"><h2>Your business</h2>
@@ -2053,7 +2361,8 @@
         <div class="row" style="flex-wrap:wrap"><label class="field" style="flex:1 1 120px">Short plan (months) <span class="hint">No setup fee · 0 = don't offer</span><input name="shortMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.shortMonths ?? 6}"></label>
         <label class="field" style="flex:1 1 120px">Standard plan (months) <span class="hint">No setup fee</span><input name="minMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.minMonths ?? 12}"></label>
         <label class="field" style="flex:1 1 120px">Month-to-month setup ($) <span class="hint">0 = don't offer</span><input name="flexSetup" type="number" min="0" inputmode="decimal" value="${s.flexSetup ?? 299}"></label>
-        <label class="field" style="flex:1 1 120px">Yearly: months free <span class="hint">0 = don't offer</span><input name="annualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.annualMonthsFree ?? 2}"></label></div>
+        <label class="field" style="flex:1 1 120px">Yearly: months free <span class="hint">0 = don't offer</span><input name="annualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.annualMonthsFree ?? 2}"></label>
+        <label class="field" style="flex:1 1 120px">Churches &amp; nonprofits: yearly months free <span class="hint">4 = 12 months for the price of 8</span><input name="churchAnnualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.churchAnnualMonthsFree ?? 4}"></label></div>
         <h2 style="margin-top:18px">Extras</h2>
         <p class="small muted">Shown on the sign-up page and in call guides. Leave a name blank to remove it.</p>
         ${[...s.addons, { name: "", price: "", unit: "one-time" }].map((a, i) => `<div class="addon"><div class="row"><label class="field" style="flex:2"><span class="sr-only">Extra ${i + 1}</span><input name="addon_${i}_name" value="${esc(a.name)}" placeholder="New extra" maxlength="60"></label>
@@ -2061,7 +2370,8 @@
           <label class="field"><span class="sr-only">Per</span><select name="addon_${i}_unit">${Object.entries(UNIT_LABEL).map(([k, v]) => `<option value="${k}"${a.unit === k ? " selected" : ""}>${k === "quote" ? "quote per job" : v.trim().replace("/", "per ")}</option>`).join("")}</select></label></div>
           <label class="field"><span class="sr-only">What they get</span><input name="addon_${i}_about" value="${esc(a.about || "")}" placeholder="One sentence on what they get" maxlength="200"></label>
           ${a.name ? `<details class="more"><summary>Contract terms for this extra</summary><label class="field"><span class="sr-only">Contract terms</span><textarea name="addon_${i}_terms" rows="4" maxlength="1500">${esc(a.terms || (meta.extraTerms || [])[i] || "")}</textarea></label><p class="small muted">Shown in the agreement customers sign when they pick this extra.</p></details>` : `<input type="hidden" name="addon_${i}_terms" value="">`}</div>`).join("")}
-        <h2 style="margin-top:18px">Caller commission</h2>
+        <h2 style="margin-top:18px">Team goals &amp; commission</h2>
+        <label class="field">Daily call goal per person <span class="hint">Shows as a progress bar on the Today card. 0 = off</span><input name="dailyCalls" type="number" min="0" max="500" inputmode="numeric" value="${s.dailyCalls ?? ""}"></label>
         <label class="field">Commission per sale ($)<input name="commission" type="number" min="0" inputmode="decimal" value="${s.commission ?? ""}"></label>
         <label class="field">Client agreement <span class="hint">Plain-language starting point, not legal advice. Have a lawyer look it over once.</span><textarea name="terms" rows="10">${esc(s.terms || meta.defaultTerms)}</textarea></label>
         <button class="btn btn--small" type="button" id="resetterms">Reset agreement to the standard text</button>
@@ -2123,6 +2433,8 @@
             shortMonths: n(v("shortMonths")),
             flexSetup: n(v("flexSetup")),
             annualMonthsFree: n(v("annualMonthsFree")),
+            churchAnnualMonthsFree: n(v("churchAnnualMonthsFree")),
+            dailyCalls: n(v("dailyCalls")),
             addons,
             commission: n(v("commission")),
             terms: terms && terms !== meta.defaultTerms ? terms : undefined,
@@ -2177,8 +2489,10 @@
 
   async function viewNotifications() {
     setNav("notifications");
+    const my = renderSeq;
     const data = await api("/notifications");
     const ps = await pushState().catch(() => ({ supported: false }));
+    if (stale(my)) return;
     const on = ps.supported && ps.permission === "granted" && ps.sub;
     let last = "";
     const rows = data.items.map((i) => {
@@ -2220,7 +2534,14 @@
 
   async function render() {
     const h = location.hash || "#/";
+    if (ignoreHashOnce) { ignoreHashOnce = false; if (h === lastHash) return; }
     if (h === lastHash) return route(h);
+    if (leaveGuard && lastHash !== null && !leaveGuard()) {
+      // Stay: put the hash back without re-rendering the screen (that would lose the typing we're protecting).
+      ignoreHashOnce = true;
+      location.hash = lastHash;
+      return;
+    }
     if (lastHash !== null) scrollMemo[isHomeHash(lastHash) ? "#/" : lastHash] = window.scrollY;
     lastHash = h;
     window.scrollTo(0, 0);
@@ -2229,7 +2550,10 @@
   }
 
   async function route(h) {
+    renderSeq++;
     stopPolling();
+    leaveGuard = null;
+    while (cleanups.length) { try { cleanups.pop()(); } catch (e) { /* already gone */ } }
     document.body.classList.remove("showing");
     let m;
     try {
@@ -2255,8 +2579,8 @@
       return await viewHome();
     } catch (err) {
       if (err.status !== 401) {
-        $app.innerHTML = `<div class="card"><p>${esc(err.message)}</p><button class="btn" id="reload">Reload</button></div>`;
-        $app.querySelector("#reload").addEventListener("click", () => location.reload());
+        $app.innerHTML = `<div class="card offline"><p>${esc(err.message)}</p><button class="btn btn--primary" id="reload">Try again</button></div>`;
+        $app.querySelector("#reload").addEventListener("click", () => render());
       }
     }
   }

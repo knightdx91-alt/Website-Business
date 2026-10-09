@@ -1,5 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import { packFor } from "../generator/packs/index.ts";
+import { resolveTheme } from "../generator/themes.ts";
+import type { Ctx } from "../generator/components.ts";
 import type { BusinessRecord, Copy, SpanishCopy } from "../generator/types.ts";
 import { ask } from "./gbp.ts";
 import { DEFAULT_COPY_MODEL } from "./write.ts";
@@ -15,7 +18,19 @@ const Schema = z.object({
   ctaTitle: z.string(),
   ctaLine: z.string(),
   metaDescription: z.string().describe("140-155 characters"),
+  nav: z.array(z.object({ en: z.string(), es: z.string() })).describe("One entry per menu label given, short (1-3 words)"),
 });
+
+/** The site's menu labels, so the translator can give each one its Spanish wording. */
+function navLabels(r: BusinessRecord, c: Copy): string[] {
+  const pack = packFor(r.category);
+  const ctx = { r, copy: c, theme: resolveTheme(pack.defaultLook(r)), mode: "preview", site: { slug: "", look: "" }, todos: [], suggestions: [], hasForm: pack.hasForm(r) } as Ctx;
+  try {
+    return pack.nav(ctx).map((n) => n.label);
+  } catch {
+    return [];
+  }
+}
 
 export async function translateToSpanish(
   client: Anthropic,
@@ -26,7 +41,7 @@ export async function translateToSpanish(
 - Translate meaning, not word for word. Keep it short and plain.
 - Keep the business name, street names, town names and brand names exactly as written.
 - Never add facts, prices, promises or claims that aren't in the English.
-- Return one service entry per service given, with the same id.${
+- Return one service entry per service given, with the same id, and one nav entry per menu label given (short, like a website menu: "Servicios", "Reseñas", "Horario y ubicación").${
     r.category === "finance"
       ? `\n- This is a tax, accounting, insurance or financial office. Never use "notario" or "notario público" (say "servicio de notaría" for notary), never mention immigration or legal services, and never add refund, rate, savings or credential claims ("reembolso máximo", "garantizado", "el más barato", "certificado").`
       : ""
@@ -42,6 +57,7 @@ export async function translateToSpanish(
     ctaTitle: c.ctaTitle,
     ctaLine: c.ctaLine,
     metaDescription: c.meta.description,
+    menuLabels: navLabels(r, c),
   };
   const { data, usage } = await ask(client, input.model ?? DEFAULT_COPY_MODEL, system, `<english>\n${JSON.stringify(english, null, 2)}\n</english>\n\nTranslate every field into Spanish.`, Schema, 6000);
   if (r.category === "finance") {
@@ -60,6 +76,7 @@ export async function translateToSpanish(
       ctaTitle: data.ctaTitle,
       ctaLine: data.ctaLine,
       metaDescription: data.metaDescription,
+      nav: Object.fromEntries(data.nav.filter((n) => english.menuLabels.includes(n.en) && n.es.trim()).map((n) => [n.en, n.es.trim()])),
     },
     usage,
   };

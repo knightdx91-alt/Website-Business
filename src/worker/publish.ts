@@ -2,6 +2,8 @@ import { zipSync } from "fflate";
 import { slugify } from "../generator/html.ts";
 import { buildSite } from "../generator/render.ts";
 import type { BusinessRecord, Copy } from "../generator/types.ts";
+import { reviewTexts } from "../places/to-record.ts";
+import type { Place } from "../places/client.ts";
 import { getSettings, updateLead, type LeadRow } from "./db.ts";
 import { COMPANY_ORIGIN } from "./company.ts";
 import { HttpError, now, type Env } from "./env.ts";
@@ -41,6 +43,8 @@ async function buildForPublish(env: Env, lead: LeadRow, appOrigin: string, siteO
       mode: "publish",
       formEndpoint: `${appOrigin}/f/${lead.id}`,
       statsEndpoint: `${appOrigin}/t/${lead.id}`,
+      // Same check as previews: testimonials pasted from Google reviews are caught before they go live.
+      reviewTexts: lead.place_json ? reviewTexts(JSON.parse(lead.place_json) as Place) : [],
       loadFont: await loadFontFrom(env, appOrigin),
       credit: { company: (await getSettings(env)).companyName || "Underground Associates", url: COMPANY_ORIGIN, changeUrl: `${COMPANY_ORIGIN}/change?b=${lead.id}` },
     });
@@ -69,22 +73,31 @@ async function pickProjectName(env: Env, auth: PagesAuth, lead: LeadRow, base: s
   throw new HttpError(500, "Couldn't find a free project name");
 }
 
-export async function publishLead(env: Env, lead: LeadRow, appOrigin: string): Promise<{ url: string }> {
+/** The address the live site is built for: the client's own domain once attached, else the Pages subdomain. */
+export function siteOrigin(lead: Pick<LeadRow, "custom_domain">, pagesOrigin: string): string {
+  return lead.custom_domain ? `https://${lead.custom_domain}` : pagesOrigin;
+}
+
+export async function publishLead(env: Env, lead: LeadRow, appOrigin: string): Promise<{ url: string; pagesUrl: string }> {
   // Dry run first so a blocked site never creates a Pages project.
   await buildForPublish(env, lead, appOrigin, "https://example.pages.dev");
   const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
   const { record } = parse(lead);
   const name = await pickProjectName(env, auth, lead, slugify(record.name));
   const project = await ensureProject(auth, name);
-  const origin = `https://${project.subdomain}`;
+  // Remember the project at once: if the deploy below fails, a retry reuses it instead of orphaning it.
+  if (lead.pages_project !== project.name) await updateLead(env, lead.id, { pages_project: project.name });
+  const pagesOrigin = `https://${project.subdomain}`;
+  const origin = siteOrigin(lead, pagesOrigin);
   const built = await buildForPublish(env, { ...lead, pages_project: project.name }, appOrigin, origin);
   await deploy(auth, project.name, built.files);
-  await updateLead(env, lead.id, { pages_project: project.name, live_url: origin, published_at: now(), sales_status: "live" });
-  return { url: origin };
+  // live_url stays the Pages address (it is what stats and the lead screen key on); the custom domain is kept separately.
+  await updateLead(env, lead.id, { pages_project: project.name, live_url: pagesOrigin, published_at: now(), sales_status: "live" });
+  return { url: origin, pagesUrl: pagesOrigin };
 }
 
 export async function zipLead(env: Env, lead: LeadRow, appOrigin: string): Promise<Uint8Array> {
-  const built = await buildForPublish(env, lead, appOrigin, lead.live_url ?? "https://example.pages.dev");
+  const built = await buildForPublish(env, lead, appOrigin, siteOrigin(lead, lead.live_url ?? "https://example.pages.dev"));
   const entries: Record<string, Uint8Array> = {};
   for (const [path, content] of built.files) entries[path] = typeof content === "string" ? new TextEncoder().encode(content) : content;
   return zipSync(entries, { level: 6 });

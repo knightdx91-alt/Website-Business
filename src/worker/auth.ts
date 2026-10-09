@@ -130,19 +130,46 @@ export async function removeCaller(env: Env, id: string): Promise<void> {
   await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
 }
 
-/** Simple brute-force guard: 10 failures within 15 minutes locks login for the rest of the window. */
-export async function loginAllowed(env: Env): Promise<boolean> {
-  const raw = await getSetting(env, "login_failures");
-  if (!raw) return true;
-  const { count, since } = JSON.parse(raw) as { count: number; since: number };
-  return Date.now() - since > 15 * 60_000 || count < 10;
+const LOCK_WINDOW_MS = 15 * 60_000;
+/** Failures per address before login locks for the rest of the window, and a looser cap across everyone. */
+const LOCK_PER_IP = 10;
+const LOCK_GLOBAL = 50;
+
+interface Failures {
+  count: number;
+  since: number;
 }
 
-export async function recordLoginFailure(env: Env): Promise<void> {
-  const raw = await getSetting(env, "login_failures");
-  const prev = raw ? (JSON.parse(raw) as { count: number; since: number }) : null;
-  const fresh = !prev || Date.now() - prev.since > 15 * 60_000;
-  await setSetting(env, "login_failures", JSON.stringify(fresh ? { count: 1, since: Date.now() } : { count: prev.count + 1, since: prev.since }));
+function failureKeys(ip: string | null | undefined): string[] {
+  return [`login_failures:${(ip ?? "").replace(/[^0-9a-f.:]/gi, "").slice(0, 45) || "unknown"}`, "login_failures"];
+}
+
+async function failures(env: Env, key: string): Promise<Failures | null> {
+  const raw = await getSetting(env, key);
+  if (!raw) return null;
+  const f = JSON.parse(raw) as Failures;
+  return Date.now() - f.since > LOCK_WINDOW_MS ? null : f;
+}
+
+/** Brute-force guard: 10 failures from one address (or 50 from everyone) within 15 minutes locks login for the rest of the window. */
+export async function loginAllowed(env: Env, ip?: string | null): Promise<boolean> {
+  const [perIp, global] = failureKeys(ip);
+  const mine = await failures(env, perIp!);
+  if (mine && mine.count >= LOCK_PER_IP) return false;
+  const all = await failures(env, global!);
+  return !all || all.count < LOCK_GLOBAL;
+}
+
+export async function recordLoginFailure(env: Env, ip?: string | null): Promise<void> {
+  for (const key of failureKeys(ip)) {
+    const prev = await failures(env, key);
+    await setSetting(env, key, JSON.stringify(prev ? { count: prev.count + 1, since: prev.since } : { count: 1, since: Date.now() }));
+  }
+}
+
+/** Drops per-address failure counters once their window has passed (daily cron). */
+export async function pruneLoginFailures(env: Env): Promise<void> {
+  await env.DB.prepare("DELETE FROM settings WHERE key LIKE 'login_failures:%' AND COALESCE(json_extract(value, '$.since'), 0) < ?").bind(Date.now() - LOCK_WINDOW_MS).run();
 }
 
 async function sessionKey(env: Env, userId: string): Promise<string | null> {

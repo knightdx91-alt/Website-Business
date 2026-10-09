@@ -5,19 +5,24 @@ export const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as co
 /** US week display order: Monday first. */
 export const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
-export function formatTime(hhmm: string): string {
-  if (hhmm === "24:00" || hhmm === "00:00") return "midnight";
+export interface HoursFormat {
+  /** Spanish wording: "a. m." / "p. m." (RAE style), mediodía, medianoche, Cerrado. */
+  es?: boolean;
+}
+
+export function formatTime(hhmm: string, opts: HoursFormat = {}): string {
+  if (hhmm === "24:00" || hhmm === "00:00") return opts.es ? "medianoche" : "midnight";
   const [h, m] = hhmm.split(":").map(Number) as [number, number];
-  const suffix = h >= 12 ? "PM" : "AM";
+  const suffix = h >= 12 ? (opts.es ? "p. m." : "PM") : opts.es ? "a. m." : "AM";
   const h12 = h % 12 === 0 ? 12 : h % 12;
-  if (h === 12 && m === 0) return "noon";
+  if (h === 12 && m === 0) return opts.es ? "mediodía" : "noon";
   return m === 0 ? `${h12} ${suffix}` : `${h12}:${String(m).padStart(2, "0")} ${suffix}`;
 }
 
-export function formatIntervals(intervals: Interval[]): string {
-  if (intervals.length === 0) return "Closed";
-  if (intervals.length === 1 && intervals[0]!.open === "00:00" && intervals[0]!.close === "24:00") return "Open 24 hours";
-  return intervals.map((i) => `${formatTime(i.open)} – ${formatTime(i.close)}`).join(", ");
+export function formatIntervals(intervals: Interval[], opts: HoursFormat = {}): string {
+  if (intervals.length === 0) return opts.es ? "Cerrado" : "Closed";
+  if (intervals.length === 1 && intervals[0]!.open === "00:00" && intervals[0]!.close === "24:00") return opts.es ? "Abierto 24 horas" : "Open 24 hours";
+  return intervals.map((i) => `${formatTime(i.open, opts)} – ${formatTime(i.close, opts)}`).join(", ");
 }
 
 export interface HoursRow {
@@ -26,11 +31,11 @@ export interface HoursRow {
   text: string;
 }
 
-export function weeklyRows(hours: Hours): HoursRow[] {
+export function weeklyRows(hours: Hours, opts: HoursFormat = {}): HoursRow[] {
   return DISPLAY_ORDER.map((d) => ({
     day: d,
     label: DAY_NAMES[d],
-    text: hours.open24_7 ? "Open 24 hours" : formatIntervals(hours.weekly[d] ?? []),
+    text: hours.open24_7 ? (opts.es ? "Abierto 24 horas" : "Open 24 hours") : formatIntervals(hours.weekly[d] ?? [], opts),
   }));
 }
 

@@ -47,6 +47,7 @@ function nowIn(tz) {
 var btn = d.querySelector("[data-nav-toggle]"), nav = d.getElementById("site-nav");
 function setNav(open) {
   if (!btn || !nav) return;
+  if (open) measureHdr();
   btn.setAttribute("aria-expanded", String(open));
   nav.classList.toggle("is-open", open);
   d.body.classList.toggle("nav-open", open);
@@ -61,6 +62,17 @@ if (btn && nav) {
   d.addEventListener("keydown", function (e) { if (e.key === "Escape" && nav.classList.contains("is-open")) { setNav(false); btn.focus(); } });
 }
 var hdr = d.querySelector(".hdr"), last = window.scrollY;
+/* --hdr-h: where the header ends, so the open menu and sticky bars start below it even when a long name wraps. */
+function measureHdr() {
+  if (!hdr || hdr.classList.contains("is-hidden")) return;
+  var r = hdr.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+  var acrossTop = r.width >= vw * 0.6 && r.bottom > 0 && r.bottom < vh * 0.6;
+  root.style.setProperty("--hdr-h", (acrossTop ? Math.ceil(r.bottom) : 0) + "px");
+}
+measureHdr();
+window.addEventListener("resize", measureHdr);
+window.addEventListener("load", measureHdr);
+if ("ResizeObserver" in window && hdr) new ResizeObserver(measureHdr).observe(hdr);
 window.addEventListener("scroll", function () {
   var y = window.scrollY;
   if (hdr && !(nav && nav.classList.contains("is-open"))) hdr.classList.toggle("is-hidden", y > last && y > 160);

@@ -35,7 +35,7 @@ export function restaurantVariant(primaryType: string | undefined, types: string
   if (has("breakfast_restaurant") || has("brunch_restaurant") || /\b(pancake|biscuit|waffle)\b/.test(n)) return "breakfast";
   if (has("diner") || /\b(diner|grill)\b/.test(n)) return "diner";
   if (has("cafe") || has("tea_house")) return "cafe";
-  if (has("american_restaurant") || has("seafood_restaurant") || has("steak_house") || /\b(kitchen|catfish|meat|country)\b/.test(n)) return "southern";
+  if (has("american_restaurant") || has("seafood_restaurant") || has("steak_house") || /\b(kitchen|catfish|seafood|fish (house|camp)|meat|country)\b/.test(n)) return "southern";
   return "other";
 }
 
@@ -118,7 +118,7 @@ function menuHighlights(ctx: Ctx): ReturnType<typeof html> {
   const menuBtn = action(ctx.r, "menu")!;
   if (!menu) {
     return html`<section class="section section--surface" id="menu" aria-labelledby="menu-title"><div class="wrap">
-${sectionHead("On the menu", "What we're serving")}
+${sectionHead("On the menu", "What we're serving", undefined, "menu-title")}
 ${ctx.r.variant === "food_truck" ? todo(ctx, "Where can people find you?", "Tell us your regular stops and days (or the page where you post them), and we'll put a schedule section on the site.") : ""}
 ${todo(ctx, "Send us your menu", "Snap a photo of your printed menu and we'll type it in, with prices, so people can read it on their phones and find it on Google.", true)}
 <div class="btns">${button(menuBtn, "secondary")}${button(action(ctx.r, "call")!, "ghost")}</div>
@@ -127,7 +127,7 @@ ${todo(ctx, "Send us your menu", "Snap a photo of your printed menu and we'll ty
   const names = new Set(ext(ctx.r).highlights ?? []);
   const items = menu.sections.flatMap((s) => s.items).filter((i) => names.size === 0 || names.has(i.name)).slice(0, 6);
   return html`<section class="section section--surface" id="menu" aria-labelledby="menu-title"><div class="wrap">
-${sectionHead("On the menu", "Customer favorites")}
+${sectionHead("On the menu", names.size ? "Customer favorites" : "From the menu", undefined, "menu-title")}
 <ul class="cards cards--3">${items.map(
     (i) => html`<li class="card"><h3>${i.name}</h3>${i.price ? html`<p class="price">${i.price}</p>` : ""}${i.description ? html`<p>${i.description}</p>` : ""}</li>`,
   )}</ul>

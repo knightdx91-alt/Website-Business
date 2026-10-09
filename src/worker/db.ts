@@ -24,6 +24,11 @@ export interface LeadRow {
   pitch_json: string | null;
   follow_up: string | null;
   last_contact: number | null;
+  /** Who to ask for and when (review fixes, migration 0012). */
+  contact: string | null;
+  best_time: string | null;
+  /** When the lead was marked Shown; the follow-up cadence counts days from here. */
+  shown_at: number | null;
   lat: number | null;
   lng: number | null;
   custom_domain: string | null;
@@ -100,7 +105,7 @@ export const DEFAULT_ADDONS: AddOn[] = [
   { name: "Photo shoot", price: 199, unit: "one-time", about: "We come by and take 20 to 30 photos of your place, your work and your team for your website and Google profile." },
   { name: "Spanish version of your site", price: 99, unit: "one-time", about: "A Spanish page with your hours, services and how to reach you, linked from every page." },
   { name: "\"We're hiring\" section", price: 49, unit: "one-time", about: "Show the jobs you're filling and how to apply. We update it free whenever your openings change." },
-  { name: "Rush build", price: 49, unit: "one-time", about: "Your site goes live within 24 hours of signing up, once you've checked the details." },
+  { name: "Same-day build", price: 49, unit: "one-time", about: "Live the same business day you approve it." },
   { name: "Social media posts", price: 129, unit: "month", about: "8 to 12 Facebook and Instagram posts a month written for your business. You approve them before they go up." },
   { name: "QR table tents & window sign", price: 49, unit: "each", about: "A printed set with QR codes for your website, menu and Google reviews, for your tables, counter or front window." },
   { name: "Business cards, yard signs & door hangers", price: 0, unit: "quote", about: "Printed pieces that match your website, from a local print shop." },
@@ -130,9 +135,11 @@ function dollars(n: number): string {
  * The ways a client can pay for a plan: a 6-month or 12-month commitment (no setup fee), month to month
  * (the only one with a setup fee), or yearly up front (months free).
  */
-export function billingOptions(plan: Plan, s: Pick<AppSettings, "minMonths" | "shortMonths" | "flexSetup" | "annualMonthsFree">): BillingOption[] {
+export function billingOptions(plan: Plan, s: BillingSettings, opts: { category?: string } = {}): BillingOption[] {
   const min = s.minMonths ?? 12;
   const short = s.shortMonths ?? 6;
+  const church = opts.category === "church";
+  const free = annualMonthsFreeFor(s, opts.category);
   const setup = plan.setup ? `${dollars(plan.setup)} setup` : "no setup fee";
   const out: BillingOption[] = [];
   if (short && min && short < min) {
@@ -163,17 +170,47 @@ export function billingOptions(plan: Plan, s: Pick<AppSettings, "minMonths" | "s
       payLink: plan.payLinkFlex,
     });
   }
-  if (s.annualMonthsFree) {
-    const yearly = plan.monthly * (12 - s.annualMonthsFree);
+  if (free) {
+    const yearly = plan.monthly * (12 - free);
     out.push({
       id: "annual",
-      label: `Pay yearly (${s.annualMonthsFree} months free)`,
-      detail: `${dollars(yearly)} for 12 months (you pay for ${12 - s.annualMonthsFree}, ${s.annualMonthsFree} are free) instead of ${dollars(plan.monthly * 12)} · ${setup} · renews yearly`,
+      label: church ? "Pay yearly (ministry rate)" : `Pay yearly (${free} months free)`,
+      detail: church
+        ? `Ministry rate: 12 months for the price of ${12 - free} — ${dollars(yearly)}/year · ${setup} · renews yearly`
+        : `${dollars(yearly)} for 12 months (you pay for ${12 - free}, ${free} are free) instead of ${dollars(plan.monthly * 12)} · ${setup} · renews yearly`,
       monthlyEquivalent: Math.round((yearly / 12) * 100) / 100,
       payLink: plan.payLinkAnnual,
     });
   }
   return out;
+}
+
+/** The settings billingOptions reads. churchAnnualMonthsFree is optional here so older callers and tests still type-check. */
+export type BillingSettings = Pick<AppSettings, "minMonths" | "shortMonths" | "flexSetup" | "annualMonthsFree"> & { churchAnnualMonthsFree?: number };
+
+/** Months free on the yearly option: the ministry rate for churches and nonprofits, the standard rate for everyone else. */
+export function annualMonthsFreeFor(s: BillingSettings, category?: string): number {
+  return category === "church" ? (s.churchAnnualMonthsFree ?? 4) : (s.annualMonthsFree ?? 0);
+}
+
+/** Shown wherever someone is about to buy, and in the agreement's TIMING section. */
+export const GO_LIVE_TEXT = "Your site goes live within 3 business days of your OK on the details.";
+
+/**
+ * Plain-language lines every agreement carries. They're woven into defaultTerms; when the owner has written their own
+ * service agreement in Settings, contract.ts adds the ones that text doesn't already cover.
+ */
+export const CORE_TERMS: Array<{ key: RegExp; text: string }> = [
+  { key: /remaining months of the minimum/i, text: "If you cancel before the end of your plan's minimum term, the remaining months of the minimum are due." },
+  { key: /isn't fixed within 30 days|not fixed within 30 days/i, text: "If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up." },
+  { key: /total liability/i, text: "Our total liability to you is limited to what you paid us in the 3 months before the problem. Alabama law applies." },
+  { key: /undergroundassociates\.com\/terms/i, text: "Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign." },
+  { key: /30 days before a yearly renewal/i, text: "Yearly plans renew each year. We'll email you at least 30 days before a yearly renewal, and you can cancel before it renews." },
+];
+
+/** The core lines a (custom) service agreement doesn't already say. */
+export function missingCoreTerms(text: string): string[] {
+  return CORE_TERMS.filter((c) => !c.key.test(text)).map((c) => c.text);
 }
 
 export interface AppSettings {
@@ -199,6 +236,10 @@ export interface AppSettings {
   flexSetup?: number;
   /** Months free when paying a year up front. 0 turns the option off. */
   annualMonthsFree?: number;
+  /** Months free on the yearly option for churches and nonprofits (12 months for the price of 8 by default). */
+  churchAnnualMonthsFree: number;
+  /** Daily call goal per person, shown in the app only. 0 = no goal. */
+  dailyCalls?: number;
   addons: AddOn[];
   terms?: string;
   commission?: number;
@@ -218,13 +259,15 @@ export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | 
     `1. What you get: ${us} builds your website, hosts it and keeps it running, plus everything listed in your plan.`,
     "2. Payment: Your plan is charged automatically each month (or each year on a yearly plan), starting today. Month to month has a one-time setup fee, due when you sign up; the other plans have none unless your plan says otherwise.",
     min > 0
-      ? `3. Term: With the ${terms}, those first months are a minimum, then you can cancel any time with 30 days' notice. With month to month, there's no minimum: cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months and renew each year unless you cancel before the renewal date.`
-      : "3. Term: Cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months and renew each year unless you cancel before the renewal date.",
+      ? `3. Term: With the ${terms}, those first months are a minimum, then you can cancel any time with 30 days' notice. If you cancel before the end of your plan's minimum term, the remaining months of the minimum are due. With month to month, there's no minimum: cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months. Yearly plans renew each year. We'll email you at least 30 days before a yearly renewal, and you can cancel before it renews.`
+      : "3. Term: Cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months. Yearly plans renew each year. We'll email you at least 30 days before a yearly renewal, and you can cancel before it renews.",
     "4. Your content stays yours: your business name, logo, photos and text belong to you. You confirm you have the right to use any photos or text you send us.",
     "5. Your domain and email: A domain you already own stays in your name. If we register one for you, we'll transfer it to you on request if you leave. Email forwarding to your own inbox is free with plans that include it. If you choose a Google mailbox instead, Google bills you directly under Google's terms; we set it up but don't charge for it or control Google's prices or service.",
-    "6. If you cancel: the site comes down at the end of your last paid month. We'll send you a copy of the site's files on request.",
-    "7. Changes: Updates listed in your plan are included. We'll quote anything bigger before doing it.",
-    "8. No promises on rankings: the site is built to be found on Google, but no one can guarantee rankings, visitors or sales.",
+    "6. If you cancel: the site comes down at the end of your last paid month. We'll send you a copy of the site's files on request. Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign.",
+    "7. Late payments: If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up.",
+    "8. Changes: Updates listed in your plan are included. We'll quote anything bigger before doing it.",
+    "9. No promises on rankings: the site is built to be found on Google, but no one can guarantee rankings, visitors or sales.",
+    "10. Limits: Our total liability to you is limited to what you paid us in the 3 months before the problem. Alabama law applies.",
   ].join("\n");
 }
 
@@ -249,6 +292,8 @@ export async function getSettings(env: Env): Promise<AppSettings> {
     shortMonths: s.shortMonths ?? 6,
     flexSetup: s.flexSetup ?? 299,
     annualMonthsFree: s.annualMonthsFree ?? 2,
+    churchAnnualMonthsFree: s.churchAnnualMonthsFree ?? 4,
+    dailyCalls: s.dailyCalls ?? 0,
     defaultCap: s.defaultCap ?? 50,
     copyModel: s.copyModel && MODEL_PRICES[s.copyModel] ? s.copyModel : "claude-opus-5-5",
   };

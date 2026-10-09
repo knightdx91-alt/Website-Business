@@ -1,12 +1,13 @@
 import { localDate, type Env } from "./env.ts";
 
-const COLUMN: Record<string, string> = { view: "views", call: "calls", directions: "directions", text: "texts" };
+// No prototype: "?e=constructor" must be an unknown event, not Object's constructor.
+const COLUMN: Record<string, string> = Object.assign(Object.create(null) as Record<string, string>, { view: "views", call: "calls", directions: "directions", text: "texts" });
 const BOT = /bot|crawl|spider|slurp|preview|lighthouse|headless|monitor|curl|wget|python/i;
 
 /** Beacon from a live client site (cookie-free): counts a page view or a tap on call/directions/text. */
 export async function recordHit(env: Env, req: Request, leadId: string, event: string | null): Promise<Response> {
   const done = new Response(null, { status: 204, headers: { "access-control-allow-origin": "*" } });
-  const col = event ? COLUMN[event] : undefined;
+  const col = event && Object.hasOwn(COLUMN, event) ? COLUMN[event] : undefined;
   if (!col || BOT.test(req.headers.get("user-agent") ?? "")) return done;
   const lead = await env.DB.prepare("SELECT live_url, custom_domain FROM leads WHERE id = ?").bind(leadId).first<{ live_url: string | null; custom_domain: string | null }>();
   if (!lead?.live_url) return done;

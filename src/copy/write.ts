@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { hasAnyHours, hoursSummary } from "../generator/hours.ts";
-import { BANNED_PHRASES, quotesReview, SUPERLATIVE } from "../generator/lint.ts";
+import { BANNED_PHRASES, bannedPhraseIn, quotesReview, SUPERLATIVE, unsupportedNumbers } from "../generator/lint.ts";
 import type { CategoryPack } from "../generator/packs/types.ts";
 import type { BusinessRecord, Copy } from "../generator/types.ts";
 
@@ -89,17 +89,11 @@ function brief(pack: CategoryPack, r: BusinessRecord): string {
   return `Voice: ${b.voice}\n\nFields to write:\n${lines.join("\n")}`;
 }
 
-/** Numbers in copy that don't appear in the facts are likely invented. */
-function unsupportedNumbers(text: string, factsText: string): string[] {
-  const nums = text.match(/\b\d[\d,.]*\b/g) ?? [];
-  return [...new Set(nums.filter((n) => !factsText.includes(n)))];
-}
-
 function check(out: CopyOut, factsText: string, reviews: string[], banned: RegExp[] = []): string[] {
   const issues: string[] = [];
   const all = [out.cuisineLabel, out.heroTagline, out.heroSub, ...out.about, ...out.serviceBlurbs.map((s) => s.text), ...out.steps.flatMap((s) => [s.title, s.body]), ...out.faq.flatMap((f) => [f.q, f.a]), out.serviceAreaIntro, out.ctaTitle, out.ctaLine, out.metaDescription].join(" \n ");
-  const lower = all.toLowerCase();
-  for (const p of BANNED_PHRASES) if (lower.includes(p)) issues.push(`uses banned phrase "${p}"`);
+  const hype = bannedPhraseIn(all);
+  if (hype) issues.push(`uses banned phrase "${hype}"`);
   if (SUPERLATIVE.test(all)) issues.push("uses a superlative");
   for (const re of banned) {
     const m = re.exec(all);
@@ -110,7 +104,7 @@ function check(out: CopyOut, factsText: string, reviews: string[], banned: RegEx
   return issues;
 }
 
-function toCopy(out: CopyOut): Copy {
+function toCopy(out: CopyOut, issues: string[] = []): Copy {
   return {
     heroTagline: out.heroTagline,
     heroSub: out.heroSub,
@@ -124,6 +118,7 @@ function toCopy(out: CopyOut): Copy {
     cuisineLabel: out.cuisineLabel || undefined,
     meta: { title: "", description: out.metaDescription },
     approved: false,
+    issues: issues.length ? issues : undefined,
   };
 }
 
@@ -166,5 +161,5 @@ ${brief(input.pack, input.record)}`;
     messages.push({ role: "assistant", content: res.content });
     messages.push({ role: "user", content: `Please fix these problems and return the full copy again:\n- ${issues.join("\n- ")}` });
   }
-  return { copy: toCopy(out!), usage, issues, model };
+  return { copy: toCopy(out!, issues), usage, issues, model };
 }

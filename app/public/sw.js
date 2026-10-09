@@ -1,5 +1,5 @@
 // Caches the app shell so it opens instantly; never caches API data or previews.
-const VERSION = "v33";
+const VERSION = "v34";
 const SHELL = ["/", "/app.css", "/app.js", "/manifest.webmanifest", "/icons/icon-192.png"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -21,7 +21,9 @@ self.addEventListener("fetch", (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match("/"))),
+      // Offline: cached shell files as they are; the app shell itself only for the app's own page ("/"),
+      // never for share, sign-up or other server-rendered pages, which would show the app instead of an error.
+      .catch(() => caches.match(e.request).then((r) => r || (e.request.mode === "navigate" && url.pathname === "/" ? caches.match("/") : Response.error()))),
   );
 });
 

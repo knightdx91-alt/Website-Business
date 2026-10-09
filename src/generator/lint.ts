@@ -1,3 +1,4 @@
+import { hoursSummary } from "./hours.ts";
 import type { BuildMode, BusinessRecord, Copy } from "./types.ts";
 
 export interface LintResult {
@@ -25,6 +26,39 @@ export const BANNED_PHRASES = [
   "best in town",
   "#1",
 ];
+/** Whole-word matcher for a banned phrase, so "Premiere Cleaning" or "elevated deck" don't trip "premier"/"elevate". */
+function phraseRe(p: string): RegExp {
+  const esc = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/-/g, "[- ]?");
+  return new RegExp(`(?<![a-z0-9#])${esc}(?![a-z0-9])`, "i");
+}
+const BANNED_RES = BANNED_PHRASES.map((p) => [p, phraseRe(p)] as const);
+
+/** The first banned phrase found in a piece of text, matched as whole words, or null. */
+export function bannedPhraseIn(text: string): string | null {
+  for (const [p, re] of BANNED_RES) if (re.test(text)) return p;
+  return null;
+}
+
+/** Numbers in AI copy that don't appear in the facts are likely invented. Compared as whole numbers, so "25" isn't excused by "(256)". */
+export function unsupportedNumbers(text: string, factsText: string): string[] {
+  const norm = (n: string) => n.replace(/[,.]/g, "");
+  const known = new Set((factsText.match(/\d[\d,.]*/g) ?? []).map(norm));
+  const nums = text.match(/\b\d[\d,.]*\b/g) ?? [];
+  return [...new Set(nums.filter((n) => !known.has(norm(n))))];
+}
+
+/** Every line the AI wrote (plus the owner-editable text it may have shaped): the only text the phrase checks look at. */
+export function aiTextOf(copy: Copy): string {
+  return [copy.heroTagline, copy.heroSub, ...copy.about, ...Object.values(copy.serviceBlurbs), ...(copy.steps ?? []).flatMap((s) => [s.title, s.body]), ...copy.faq.flatMap((f) => [f.q, f.a]), copy.serviceAreaIntro ?? "", copy.ctaTitle, copy.ctaLine, copy.meta.description, copy.cuisineLabel ?? ""].join(" \n ");
+}
+
+/** The numbers a site may legitimately mention: phone, address, years, prices, licenses, hours. */
+export function factsTextOf(r: BusinessRecord): string {
+  const parts: unknown[] = [r.phone.display, r.phone.e164, r.address, r.foundedYear, r.licenses, r.serviceArea?.radiusMiles, r.ext, r.hours ? hoursSummary(r.hours) : "", r.offers];
+  for (const s of r.services) if (s.price) parts.push(s.price.amount, s.price.min, s.price.max, s.price.note);
+  return JSON.stringify(parts);
+}
+
 /** Business superlatives. "the best time to mow" is advice, not a claim, so common advice phrases are allowed. */
 export const SUPERLATIVE = /\b(?:the best(?! (?:time|way|part|thing|fit|results|choice for you|option for you))|best in (?:town|the|cullman|alabama|county)|finest|number one)\b/i;
 
@@ -96,8 +130,6 @@ export function lintSite(input: LintInput): LintResult {
       if (!/\balt="/.test(m[0])) errors.push(`${path}: image without alt text`);
     }
     for (const re of PLACEHOLDERS) if (re.test(text)) errors.push(`${path}: placeholder text matches ${re}`);
-    const lower = text.toLowerCase();
-    for (const p of BANNED_PHRASES) if (lower.includes(p)) errors.push(`${path}: banned phrase "${p}"`);
     if (SUPERLATIVE.test(text)) warnings.push(`${path}: superlative wording ("${SUPERLATIVE.exec(text)![0]}") needs a sourced award`);
     for (const review of input.reviewTexts ?? []) {
       if (quotesReview(text, review)) errors.push(`${path}: contains text from a Google review`);
@@ -105,13 +137,19 @@ export function lintSite(input: LintInput): LintResult {
     if (html.length > 120_000) warnings.push(`${path}: HTML is ${Math.round(html.length / 1024)} KB (budget ~100 KB)`);
   }
 
-  if (input.banned?.length) {
-    const aiText = [copy.heroTagline, copy.heroSub, ...copy.about, ...Object.values(copy.serviceBlurbs), ...(copy.steps ?? []).flatMap((s) => [s.title, s.body]), ...copy.faq.flatMap((f) => [f.q, f.a]), copy.serviceAreaIntro ?? "", copy.ctaTitle, copy.ctaLine, copy.meta.description].join(" \n ");
-    for (const re of input.banned) {
-      const m = re.exec(aiText);
-      if (m) errors.push(`Site text says "${m[0]}", which isn't allowed for this kind of business. Edit the text or rewrite it.`);
-    }
+  // Hype and category-specific claims are checked in the AI text only. The business name, address and nav are
+  // facts, so "Premier Auto Care" or "Elevate Salon" can still publish.
+  const aiText = aiTextOf(copy);
+  const banned = bannedPhraseIn(aiText);
+  if (banned) errors.push(`Site text uses the banned phrase "${banned}". Edit the text or rewrite it.`);
+  for (const re of input.banned ?? []) {
+    const m = re.exec(aiText);
+    if (m) errors.push(`Site text says "${m[0]}", which isn't allowed for this kind of business. Edit the text or rewrite it.`);
   }
+  if (copy.issues?.length) warnings.push(`AI text may need a look: ${copy.issues.join("; ")}`);
+  const facts = factsTextOf(r);
+  const loose = unsupportedNumbers(aiText, facts).filter((n) => n.replace(/\D/g, "").length >= 2);
+  if (loose.length) warnings.push(`AI text mentions ${loose.map((n) => `"${n}"`).join(", ")}, which isn't in the business facts. Check it with the owner.`);
   if (r.businessStatus !== "OPERATIONAL") errors.push(`Business status is ${r.businessStatus}, not OPERATIONAL`);
   if (input.assetBytes > 100_000) warnings.push(`CSS + JS are ${Math.round(input.assetBytes / 1024)} KB`);
 

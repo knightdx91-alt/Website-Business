@@ -5,7 +5,7 @@ import type { IconName } from "../icons.ts";
 import type { BusinessRecord, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
-export const TRADES = ["plumbing", "hvac", "electrical", "roofing", "painting", "concrete", "remodeling", "handyman", "fencing", "tree", "pest", "appliance", "multi"] as const;
+export const TRADES = ["plumbing", "hvac", "electrical", "roofing", "painting", "concrete", "remodeling", "handyman", "fencing", "tree", "pest", "appliance", "septic", "garage_door", "gutters", "welding", "flooring", "drywall", "multi"] as const;
 
 const TRADE_LABEL: Record<string, string> = {
   plumbing: "Plumbing",
@@ -20,6 +20,12 @@ const TRADE_LABEL: Record<string, string> = {
   tree: "Tree Service",
   pest: "Pest Control",
   appliance: "Appliance Repair",
+  septic: "Septic & Excavation",
+  garage_door: "Garage Doors",
+  gutters: "Gutters",
+  welding: "Welding & Fabrication",
+  flooring: "Flooring",
+  drywall: "Drywall",
   multi: "Home Services",
 };
 
@@ -36,6 +42,12 @@ const TRADE_NOUN: Record<string, string> = {
   tree: "Tree Service",
   pest: "Pest Control Company",
   appliance: "Appliance Repair Tech",
+  septic: "Septic & Excavation Contractor",
+  garage_door: "Garage Door Company",
+  gutters: "Gutter Company",
+  welding: "Welder",
+  flooring: "Flooring Contractor",
+  drywall: "Drywall Contractor",
   multi: "Contractor",
 };
 
@@ -47,6 +59,12 @@ export function contractorTrade(primaryType: string | undefined, types: string[]
   if (all.includes("electrician") || /\belectric/.test(n)) return "electrical";
   if (all.includes("roofing_contractor") || /\broof/.test(n)) return "roofing";
   if (all.includes("painter") || /\bpaint/.test(n)) return "painting";
+  if (/\b(septic|excavat\w*|dirt work|grading|dozer|backhoe|land clearing|site prep\w*|demolition)\b/.test(n)) return "septic";
+  if (/\bgarage doors?\b|\boverhead doors?\b/.test(n)) return "garage_door";
+  if (/\bgutters?\b/.test(n)) return "gutters";
+  if (/\b(weld\w*|fabricat\w*|metal works?|ironworks?)\b/.test(n)) return "welding";
+  if (/\b(floor\w*|carpet|tile|hardwood)\b/.test(n)) return "flooring";
+  if (/\b(drywall|sheetrock|plaster\w*)\b/.test(n)) return "drywall";
   if (/\b(concrete|cement|masonry|paving|driveways?)\b/.test(n)) return "concrete";
   if (/\b(fenc(e|es|ing))\b/.test(n)) return "fencing";
   if (/\b(tree|stump|arborist)\b/.test(n)) return "tree";
@@ -154,6 +172,54 @@ const SEEDS: Record<string, Array<[string, string, IconName]>> = {
     ["microwave", "Microwave repair", "wrench"],
     ["installation", "Appliance installation", "wrench"],
   ],
+  septic: [
+    ["septic-pumping", "Septic tank pumping", "wrench"],
+    ["septic-install", "New septic systems", "wrench"],
+    ["septic-repair", "Septic repairs & field lines", "wrench"],
+    ["excavation", "Excavation & dirt work", "wrench"],
+    ["grading", "Grading & drainage", "wrench"],
+    ["land-clearing", "Land clearing & site prep", "wrench"],
+  ],
+  garage_door: [
+    ["door-repair", "Garage door repair", "wrench"],
+    ["springs-cables", "Springs & cables", "wrench"],
+    ["openers", "Openers & remotes", "wrench"],
+    ["new-doors", "New garage doors", "wrench"],
+    ["commercial-doors", "Commercial & roll-up doors", "wrench"],
+    ["tune-ups", "Tune-ups & safety checks", "calendar"],
+  ],
+  gutters: [
+    ["seamless-gutters", "Seamless gutters", "wrench"],
+    ["gutter-guards", "Gutter guards", "wrench"],
+    ["gutter-repair", "Gutter repair", "wrench"],
+    ["gutter-cleaning", "Gutter cleaning", "wrench"],
+    ["downspouts", "Downspouts & drainage", "wrench"],
+    ["fascia-soffit", "Fascia & soffit", "wrench"],
+  ],
+  welding: [
+    ["welding-repair", "Welding repair", "wrench"],
+    ["custom-fabrication", "Custom fabrication", "wrench"],
+    ["trailer-repair", "Trailer repair & hitches", "wrench"],
+    ["gates-railings", "Gates, railings & handrails", "wrench"],
+    ["mobile-welding", "Mobile welding", "wrench"],
+    ["aluminum-stainless", "Aluminum & stainless", "wrench"],
+  ],
+  flooring: [
+    ["lvp-laminate", "Vinyl plank & laminate", "wrench"],
+    ["hardwood", "Hardwood floors", "wrench"],
+    ["tile", "Tile floors & showers", "wrench"],
+    ["carpet", "Carpet", "wrench"],
+    ["refinishing", "Sanding & refinishing", "wrench"],
+    ["floor-repair", "Floor repair & subfloors", "wrench"],
+  ],
+  drywall: [
+    ["drywall-install", "Drywall hanging & finishing", "wrench"],
+    ["drywall-repair", "Drywall repair & patches", "wrench"],
+    ["texture", "Texture & smooth finishes", "wrench"],
+    ["ceilings", "Ceilings & popcorn removal", "wrench"],
+    ["water-damage", "Water damage repair", "wrench"],
+    ["paint-ready", "Prime & paint-ready walls", "wrench"],
+  ],
   multi: [
     ["repairs", "Repairs", "wrench"],
     ["installations", "Installations", "wrench"],
@@ -199,7 +265,7 @@ export const contractorPack: CategoryPack = {
   },
   variantLabel: (r) => TRADE_LABEL[r.variant] ?? "Home Services",
   schemaType: (r) =>
-    ({ plumbing: "Plumber", hvac: "HVACBusiness", electrical: "Electrician", roofing: "RoofingContractor", painting: "HousePainter", remodeling: "GeneralContractor", pest: "LocalBusiness", appliance: "LocalBusiness", tree: "LocalBusiness" } as Record<string, string>)[r.variant] ?? "HomeAndConstructionBusiness",
+    ({ plumbing: "Plumber", hvac: "HVACBusiness", electrical: "Electrician", roofing: "RoofingContractor", painting: "HousePainter", remodeling: "GeneralContractor", pest: "LocalBusiness", appliance: "LocalBusiness", tree: "LocalBusiness", welding: "LocalBusiness", septic: "LocalBusiness" } as Record<string, string>)[r.variant] ?? "HomeAndConstructionBusiness",
   schemaExtras: () => ({}),
   homeTitle(r) {
     const t = TRADE_LABEL[r.variant] ?? "Home Services";

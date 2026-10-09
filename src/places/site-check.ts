@@ -1,3 +1,5 @@
+const CHALLENGE = /cf-mitigated|Just a moment|challenge-platform|_Incapsula_|cf-chl|Checking your browser|Attention Required! \| Cloudflare/i;
+
 /** Looks at a business's existing website and says what's wrong with it, if anything. Returns null for a decent site. */
 export async function websiteProblem(url: string, now = new Date()): Promise<string | null> {
   let res: Response;
@@ -10,7 +12,14 @@ export async function websiteProblem(url: string, now = new Date()): Promise<str
   } catch {
     return "Website doesn't load";
   }
-  if (res.status >= 500) return "Website is down";
+  if (res.status >= 500) {
+    // Cloudflare, Wix and Imperva answer bots with a 503 "Just a moment…" challenge page. The site is fine; we just can't read it.
+    if (res.status === 503) {
+      const body = await res.text().catch(() => "");
+      if (res.headers.get("cf-mitigated") || CHALLENGE.test(body)) return null;
+    }
+    return "Website is down";
+  }
   if (res.status === 404 || res.status === 410) return "Website page is missing";
   if (res.status >= 400) return null; // 401/403 often means bot blocking, not a broken site.
   const finalUrl = res.url || url;

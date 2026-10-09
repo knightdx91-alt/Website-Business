@@ -37,7 +37,7 @@ export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>)
 
     const builds: Job[] = [];
     let checks = 0;
-    for (const lead of qualify(places, { includeSites: job.badSites, category })) {
+    for (const lead of qualify(places, { includeSites: job.badSites, category, center: job.center ?? MARKET.center })) {
       if (category === "church" && !churchVariant(lead.place.primaryType, lead.place.types ?? [], lead.place.displayName?.text ?? "")) continue;
       if (category === "finance" && !financeVariant(lead.place.primaryType, lead.place.types ?? [], lead.place.displayName?.text ?? "")) continue;
       const exists = await env.DB.prepare("SELECT 1 FROM leads WHERE place_id = ?").bind(lead.place.id).first();

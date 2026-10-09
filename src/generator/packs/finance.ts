@@ -224,7 +224,7 @@ ${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Tick the services you offer", "We started with the usual list for an office like yours. Tell us what to keep, remove or add.", true)}
 </div></section>
 <section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">
-${sectionHead("How it works", r.variant === "tax_prep" ? "Getting your taxes done" : r.variant === "insurance" ? "Getting the right coverage" : "Working with us")}
+${sectionHead("How it works", r.variant === "tax_prep" ? "Getting your taxes done" : r.variant === "insurance" ? "Getting the right coverage" : "Working with us", undefined, "how-title")}
 ${steps(ctx.copy.steps?.length ? ctx.copy.steps : STEPS[r.variant] ?? STEPS.tax_prep!)}
 <div class="btns">${r.variant === "tax_prep" ? html`<a class="btn btn--secondary" href="/what-to-bring/"><span>See what to bring</span></a>` : ""}${tools.map((a) => html`<a class="btn btn--ghost" href="${a.href}" target="_blank" rel="noopener"><span>${a.label}</span><span class="sr"> (opens in new tab)</span></a>`)}</div>
 ${r.variant === "tax_prep" && !f.offSeason ? todo(ctx, "Your hours after tax season", "Tell us your hours from mid-April through December (or “by appointment”) and we'll show both on the site.") : ""}
@@ -298,7 +298,7 @@ ${f.brokercheckUrl || f.crsUrl ? "" : todo(ctx, "Add your BrokerCheck and Form C
 function insuranceBand(ctx: Ctx): Raw {
   const f = ctx.r.ext.finance ?? {};
   return html`<section class="section" id="companies" aria-labelledby="companies-title"><div class="wrap narrow">
-${sectionHead(f.independent ? "Independent agency" : "Our agency", f.independent ? "We shop more than one company for you" : "Help from people you know", f.carriers?.length ? `Companies we work with: ${f.carriers.join(", ")}.` : undefined)}
+${sectionHead(f.independent ? "Independent agency" : "Our agency", f.independent ? "We shop more than one company for you" : "Help from people you know", f.carriers?.length ? `Companies we work with: ${f.carriers.join(", ")}.` : undefined, "companies-title")}
 ${f.carriers?.length ? "" : todo(ctx, "Which companies do you work with?", "Send us the list of insurance companies you're appointed with. We list them by name only (no logos unless the company allows it).")}
 ${f.medicare ? (f.tpmoDisclaimer ? html`<p class="disclosure">${f.tpmoDisclaimer}</p>` : "") : ""}
 </div></section>`;
@@ -350,11 +350,12 @@ export function financeBannedPhrases(r: BusinessRecord): RegExp[] {
     /\brefund (advance|transfer|anticipation)|\baudit[- ]proof\b|\bavoid (an |any )?audits?\b|\bevery deduction\b/i,
     /\b(lowest|cheapest|best|affordable|low|great|competitive) (rates?|prices?|premiums?)\b|\bsave (up to|\$|\d)|\$0 premium/i,
     /\bguarantee/i,
-    /\bfree\b/i,
+    // "free" as in no charge, but not "feel free to call", "free to stop by" or a toll-free number.
+    /(?<!\bfeel |\btoll[- ])\bfree\b(?! to\b)/i,
     /\b(fiduciary|fee-only|unbiased|conflict-free|wealth management)\b/i,
     /\b(notario|abogado|lawyer|legal advice|immigration)\b/i,
     /\b(protect your (savings|principal|nest egg)|guaranteed income|returns? on|outperform)\b/i,
   ];
-  if (!(r.variant === "insurance" && r.ext.finance?.independent)) out.push(/\bindependent\b/i);
+  if (!(r.variant === "insurance" && r.ext.finance?.independent)) out.push(/\bindependent\b(?! contractors?\b)/i);
   return out;
 }

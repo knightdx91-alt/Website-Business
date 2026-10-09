@@ -42,7 +42,8 @@ p{margin:0 0 1em}
 .no-js .navbtn{display:none}
 .no-js .nav{position:static;display:block;width:100%}
 .no-js .nav ul{display:flex;flex-wrap:wrap;gap:0 18px}
-.js .nav{display:none;position:fixed;inset:56px 0 0 0;background:var(--surface);padding:12px 20px 40px;overflow:auto;z-index:39}
+.brand,.hdr__call{position:relative;z-index:1}
+.js .nav{display:none;position:fixed;inset:var(--hdr-h,56px) 0 0 0;background:var(--surface);padding:12px 20px 40px;overflow:auto;z-index:39}
 .js .nav.is-open{display:block}
 .js .nav li{border-bottom:1px solid rgba(27, 29, 42, 0.12)}
 body.nav-open{overflow:hidden}
@@ -104,7 +105,7 @@ body.nav-open{overflow:hidden}
 .card p{margin:0;color:var(--text)}
 .price{font-weight:700;color:var(--heading)}
 /* menu */
-.menu-nav{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.menu-nav{position:sticky;top:var(--hdr-h,56px);z-index:5;background:var(--bg);padding:10px 0;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
 .menu-nav a{flex:none;padding:10px 16px;border-radius:999px;background:var(--band);color:var(--text);text-decoration:none;font-weight:700}
 .menu-sec{margin:36px 0}
 .menu-items{list-style:none;margin:0;padding:0}
@@ -121,7 +122,7 @@ body.nav-open{overflow:hidden}
 .steps p{margin:0}
 /* hours + visit */
 .visit{display:grid;gap:28px}
-@media (min-width:900px){.visit{grid-template-columns:1.1fr 1fr;align-items:start}}
+@media (min-width:900px){.visit{grid-template-columns:1.1fr 1fr;align-items:start}.visit--solo{grid-template-columns:1fr;max-width:640px}}
 .hours{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--radius);overflow:hidden}
 .hours th,.hours td{text-align:left;padding:12px 16px;border-bottom:1px solid rgba(27, 29, 42, 0.1)}
 .hours th{font-weight:700}

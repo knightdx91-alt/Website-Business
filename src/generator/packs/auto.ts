@@ -12,6 +12,8 @@ export function autoVariant(primaryType: string | undefined, types: string[], na
   if (/\b(detail\w*|ceramic|car wash|auto spa)\b/.test(n)) return "detailing";
   if (/\b(small engine|mower|outdoor power|chainsaw)\b/.test(n)) return "small_engine";
   if (all.includes("car_wash")) return "detailing";
+  if (/\b(auto ?glass|windshields?|glass)\b/.test(n)) return "glass";
+  if (/\b(mufflers?|exhaust)\b/.test(n)) return "exhaust";
   if (/\b(body|collision|paint\s?(&|and)\s?body|dent)\b/.test(n)) return "body";
   if (/\b(towing|wrecker|tow)\b/.test(n)) return "towing";
   if (/\btransmission/.test(n)) return "transmission";
@@ -31,6 +33,8 @@ const LABEL: Record<string, string> = {
   body: "Auto Body & Collision Repair",
   detailing: "Auto Detailing",
   small_engine: "Small Engine Repair",
+  glass: "Auto Glass",
+  exhaust: "Muffler & Exhaust",
 };
 
 const SEEDS: Record<string, string[]> = {
@@ -43,9 +47,11 @@ const SEEDS: Record<string, string[]> = {
   body: ["Collision repair", "Dent repair", "Auto painting", "Bumper repair", "Frame straightening", "Insurance claims help"],
   detailing: ["Interior detailing", "Exterior wash & wax", "Full detail", "Paint correction", "Ceramic coating", "Headlight restoration"],
   small_engine: ["Lawn mower repair", "Zero-turn & riding mowers", "Chainsaws & trimmers", "Tune-ups", "Blade sharpening", "Generators & pressure washers"],
+  glass: ["Windshield replacement", "Rock chip repair", "Side & back glass", "Mobile service", "Insurance claims help", "Power window repair"],
+  exhaust: ["Mufflers", "Exhaust repair", "Catalytic converters", "Custom exhaust", "Brakes", "Oil changes"],
 };
 
-const FIX_TITLE: Record<string, string> = { detailing: "What we offer", small_engine: "What we work on" };
+const FIX_TITLE: Record<string, string> = { detailing: "What we offer", small_engine: "What we work on", glass: "What we replace & repair" };
 
 export function seedAutoServices(variant: string): Service[] {
   return (SEEDS[variant] ?? SEEDS.general!).map((name) => ({ id: name.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/-$/, ""), name, featured: true }));
@@ -103,7 +109,7 @@ export const autoPack: CategoryPack = {
     return "auto.shop_floor";
   },
   variantLabel: (r) => LABEL[r.variant] ?? "Auto Repair",
-  schemaType: (r) => (r.variant === "tire" ? ["AutoRepair", "TireShop"] : r.variant === "body" ? "AutoBodyShop" : r.variant === "detailing" ? "AutoWash" : r.variant === "small_engine" ? "LocalBusiness" : "AutoRepair"),
+  schemaType: (r) => (r.variant === "tire" ? ["AutoRepair", "TireShop"] : r.variant === "body" ? "AutoBodyShop" : r.variant === "detailing" ? "AutoWash" : r.variant === "small_engine" ? "LocalBusiness" : r.variant === "glass" ? ["AutoRepair", "AutoPartsStore"] : "AutoRepair"),
   schemaExtras: () => ({}),
   homeTitle(r) {
     const t = LABEL[r.variant] ?? "Auto Repair";

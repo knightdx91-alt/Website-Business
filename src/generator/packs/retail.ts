@@ -12,6 +12,7 @@ export function retailVariant(primaryType: string | undefined, types: string[], 
   if (all.includes("florist") || /\b(flowers?|floral|florist|blooms?|bouquets?|petals?|stems)\b/.test(n)) return "florist";
   if (all.includes("thrift_store") || /\b(thrift|consign\w*|resale|second ?hand|restore|rags)\b/.test(n)) return "thrift";
   if (all.includes("flea_market") || /\b(antiques?|vintage|pickers?|flea|salvage|collectibles)\b/.test(n)) return "antique";
+  if (all.includes("hardware_store") || /\b(hardware|lumber|building supply|home center)\b/.test(n)) return "hardware";
   if (/\b(feed|seed|co-?op|cooperative|farm supply|farm (&|and) home|mill|hay)\b/.test(n) || all.includes("garden_center")) return "farm_feed";
   if (all.includes("furniture_store") || /\b(furniture|mattress\w*|interiors|furnishings)\b/.test(n)) return "furniture";
   if (all.some((t) => /clothing_store|shoe_store/.test(t)) || /\b(boutique|apparel|clothing|threads|closet|outfitters|western wear|boots)\b/.test(n)) return "boutique";
@@ -26,6 +27,7 @@ const LABEL: Record<string, string> = {
   florist: "Florist",
   farm_feed: "Feed & Farm Supply",
   furniture: "Furniture",
+  hardware: "Hardware Store",
 };
 
 const CARRY: Record<string, string[]> = {
@@ -36,6 +38,7 @@ const CARRY: Record<string, string[]> = {
   florist: ["Everyday arrangements", "Sympathy & funeral flowers", "Wedding & event flowers", "Plants", "Seasonal & holiday flowers", "Gifts & balloons"],
   farm_feed: ["Livestock & horse feed", "Pet food", "Poultry feed & supplies", "Seed, fertilizer & garden", "Fencing & farm supplies", "Deer & wildlife feed"],
   furniture: ["Living room", "Bedroom", "Dining", "Mattresses", "Home decor & lighting", "Outdoor furniture"],
+  hardware: ["Tools & hardware", "Paint & stain", "Plumbing & electrical parts", "Lawn & garden", "Keys, screens & small repairs", "Propane, grills & outdoor"],
 };
 
 export function seedRetailCarry(variant: string): Service[] {
@@ -44,7 +47,7 @@ export function seedRetailCarry(variant: string): Service[] {
 
 function first(r: BusinessRecord): ActionId[] {
   if (r.variant === "florist" && r.ext.retail?.shopUrl) return ["shop", "call"];
-  if (r.variant === "farm_feed") return ["call", "directions"];
+  if (r.variant === "farm_feed" || r.variant === "hardware") return ["call", "directions"];
   return ["directions", "call"];
 }
 
@@ -80,7 +83,7 @@ export const retailPack: CategoryPack = {
   defaultLook: (r) =>
     ({ boutique: "retail.shop_window", gift: "retail.mercantile", antique: "retail.salvage_yard", thrift: "retail.salvage_yard", florist: "retail.bloom", farm_feed: "retail.mercantile", furniture: "retail.salvage_yard" } as Record<string, string>)[r.variant] ?? "retail.mercantile",
   variantLabel: (r) => LABEL[r.variant] ?? "Shop",
-  schemaType: (r) => ({ boutique: "ClothingStore", florist: "Florist", furniture: "FurnitureStore", farm_feed: "GardenStore", gift: "Store", antique: "Store", thrift: "Store" } as Record<string, string>)[r.variant] ?? "Store",
+  schemaType: (r) => ({ boutique: "ClothingStore", florist: "Florist", furniture: "FurnitureStore", farm_feed: "GardenStore", hardware: "HardwareStore", gift: "Store", antique: "Store", thrift: "Store" } as Record<string, string>)[r.variant] ?? "Store",
   schemaExtras: () => ({}),
   homeTitle(r) {
     const l = LABEL[r.variant] ?? "Shop";
@@ -111,13 +114,13 @@ export const retailPack: CategoryPack = {
 ${infoStrip(ctx, [])}
 <main id="main">
 <section class="section" id="carry" aria-labelledby="carry-title"><div class="wrap">
-<span class="section__label">What we carry</span><h2 class="section__title" id="carry-title">${r.variant === "florist" ? "Flowers for every occasion" : r.variant === "farm_feed" ? "What you'll find here" : "Come see what's in store"}</h2>
+<span class="section__label">What we carry</span><h2 class="section__title" id="carry-title">${r.variant === "florist" ? "Flowers for every occasion" : r.variant === "farm_feed" || r.variant === "hardware" ? "What you'll find here" : "Come see what's in store"}</h2>
 ${ctx.copy.heroSub ? html`<p class="lead">${ctx.copy.heroSub}</p>` : ""}
 ${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Tick what you carry", "We guessed at what you sell. Tell us which of these to keep, what to add, and any brands you'd like listed.", true)}
 </div></section>
 <section class="section section--band" id="new" aria-labelledby="new-title"><div class="wrap">
-${sectionHead("What's new", r.variant === "florist" ? "See our latest arrangements" : r.variant === "farm_feed" ? "In stock now" : "New things come in all the time", social.length ? "We post new arrivals on social media first. Follow along so you don't miss them." : `Stop by or give us a call at ${r.phone.display} to ask what just came in.`)}
+${sectionHead("What's new", r.variant === "florist" ? "See our latest arrangements" : r.variant === "farm_feed" || r.variant === "hardware" ? "In stock now" : "New things come in all the time", social.length ? "We post new arrivals on social media first. Follow along so you don't miss them." : `Stop by or give us a call at ${r.phone.display} to ask what just came in.`, "new-title")}
 <div class="btns">${social.map(([k, u]) => html`<a class="btn btn--secondary" href="${u}" target="_blank" rel="noopener"><span>Follow us on ${SOCIAL_LABEL[k] ?? k}</span><span class="sr"> (opens in new tab)</span></a>`)}${actions(r, ["shop"]).map((a) => html`<a class="btn btn--ghost" href="${a.href}" target="_blank" rel="noopener"><span>${a.label}</span><span class="sr"> (opens in new tab)</span></a>`)}</div>
 ${social.length ? "" : todo(ctx, "Add your Facebook or Instagram", "Shops like yours sell new arrivals on social media. Send us your page links and we'll add Follow us buttons.")}
 ${r.ext.retail?.shopUrl ? "" : todo(ctx, "Do you sell online?", r.variant === "florist" ? "If you take flower orders online, send us the link and we'll add an Order flowers button." : "If you have a Shopify, Etsy or Facebook shop, send us the link and we'll add a Shop online button.")}

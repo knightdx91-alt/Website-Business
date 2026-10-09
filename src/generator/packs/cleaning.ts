@@ -1,5 +1,5 @@
 import { actions } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, hero, reviews, serviceArea, steps, todo, type Ctx } from "../components.ts";
+import { about, cardGrid, contactForm, ctaBand, faq, hero, reviews, serviceArea, steps, todo, todoBlock, type Ctx } from "../components.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
@@ -92,7 +92,7 @@ ${r.confirmed.includes("services") ? "" : todo(ctx, "Check the services list", "
 <span class="section__label">How it works</span><h2 class="section__title" id="how-title">Three easy steps</h2>
 ${steps(ctx.copy.steps?.length ? ctx.copy.steps : STEPS)}
 </div></section>
-<div class="wrap">${trust(r).length ? "" : todo(ctx, "Tell us your trust details", "Insured? Bonded? Background checks? Bring your own supplies? These help people feel good about letting you in their home.")}</div>
+${trust(r).length ? "" : todoBlock(ctx, "Tell us your trust details", "Insured? Bonded? Background checks? Bring your own supplies? These help people feel good about letting you in their home.")}
 ${reviews(ctx)}
 ${about(ctx, `About ${r.name}`)}
 ${serviceArea(ctx)}
