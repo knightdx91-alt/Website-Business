@@ -1,5 +1,5 @@
 import { action, actions } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, hero, infoStrip, reviews, sectionHead, steps, todo, visit, type Ctx } from "../components.ts";
+import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, steps, todo, visit, type Ctx } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Service } from "../types.ts";
@@ -113,7 +113,7 @@ ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
 ${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: "check" as const })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Check what you make", "We guessed at your services from your Google listing. Tell us what to add or remove (shirts, signs, cards, embroidery…).", true)}
 </div></section>`;
-    const gallery = html`<div class="wrap">${todo(ctx, "Send photos of your work", "Three to nine photos of shirts, signs or prints you've made. Real work is what sells a shop like yours. (We can't use Google's photos on the live site.)")}</div>`;
+    const photos = gallery(ctx, "Send photos of your work", "Three to nine photos of shirts, signs or prints you've made. Real work is what sells a shop like yours. (We can't use Google's photos on the live site.)");
     const who = html`<section class="section section--band" id="who" aria-labelledby="who-title"><div class="wrap">
 ${sectionHead("Who we work with", "Made for local folks", undefined)}
 <ul class="towns">${(WHO[r.variant] ?? WHO.print_shop!).map((w) => html`<li class="chip">${w}</li>`)}</ul>
@@ -133,7 +133,7 @@ ${steps(ctx.copy.steps?.length ? ctx.copy.steps : steps3(r))}
     })}
 ${infoStrip(ctx, [])}
 <main id="main">
-${r.variant === "signs" ? html`${gallery}${services}` : html`${services}${gallery}`}
+${r.variant === "signs" ? html`${photos}${services}` : html`${services}${photos}`}
 ${r.variant === "screen_printing" ? html`${who}${how}` : html`${how}${who}`}
 ${artwork(ctx)}
 ${reviews(ctx)}

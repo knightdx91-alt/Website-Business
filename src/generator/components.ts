@@ -20,6 +20,8 @@ export interface Ctx {
   /** Live sites only: where the cookie-free visit counter sends page views and taps. */
   statsEndpoint?: string;
   hasForm: boolean;
+  /** Set once the photo gallery is on the page, so render.ts doesn't add it twice. */
+  galleryShown?: boolean;
 }
 
 export interface NavItem {
@@ -256,6 +258,32 @@ export function actionBar(acts: Action[]): Raw {
           a.external ? html`<span class="sr"> (opens in new tab)</span>` : ""
         }</a>`,
     )}</nav>`;
+}
+
+/** Owner photos in a grid, or (with none yet) the pack's "send us photos" to-do in its place. */
+export function gallery(ctx: Ctx, todoTitle?: string, todoBody?: string): Raw {
+  const photos = ctx.r.media.gallery.filter((p) => ctx.mode === "preview" || p.source !== "google");
+  if (!photos.length) return todoTitle ? html`<div class="wrap">${todo(ctx, todoTitle, todoBody ?? "")}</div>` : raw("");
+  ctx.galleryShown = true;
+  return html`<section class="section" id="photos" aria-labelledby="photos-title"><div class="wrap">
+${sectionHead("Photos", "Take a look", undefined)}
+<ul class="gallery">${photos.map((p) => html`<li>${imageTag(p)}</li>`)}</ul>
+</div></section>`;
+}
+
+/** "We're hiring": the jobs the owner listed and how to apply (call, text or email). */
+export function hiring(ctx: Ctx): Raw {
+  const h = ctx.r.hiring;
+  if (!h || !h.roles.length) return raw("");
+  const r = ctx.r;
+  const text = action(r, "text");
+  return html`<section class="section section--band" id="jobs" aria-labelledby="jobs-title"><div class="wrap narrow">
+${sectionHead("Jobs", "We're hiring", h.how || "Want to work with us? Get in touch.")}
+<ul class="towns">${h.roles.map((role) => html`<li class="chip">${icon("check", 16)}${role}</li>`)}</ul>
+<div class="btns"><a class="btn btn--secondary" href="${action(r, "call")!.href}">${icon("phone")}<span>Call about a job</span></a>${
+    text ? html`<a class="btn btn--ghost" href="${text.href}"><span>Text us</span></a>` : ""
+  }${r.email ? html`<a class="btn btn--ghost" href="mailto:${r.email}?subject=${encodeURIComponent("Job application")}"><span>Email us</span></a>` : ""}</div>
+</div></section>`;
 }
 
 export function imageTag(img: Image, opts: { lazy?: boolean; cls?: string } = {}): Html {

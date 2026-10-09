@@ -1,5 +1,5 @@
 import { actions, type ActionId } from "../actions.ts";
-import { about, cardGrid, ctaBand, faq, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx } from "../components.ts";
+import { about, cardGrid, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Faq, Service } from "../types.ts";
@@ -126,7 +126,7 @@ ${r.links.booking ? "" : todo(ctx, "Add your booking link", "If you use Square, 
 </div></section>
 ${reviews(ctx, true)}
 ${about(ctx, `About ${r.name}`, "Our story")}
-<div class="wrap">${todo(ctx, "Add photos of your work", `A few photos of ${WORK_PHOTOS[r.variant] ?? WORK_PHOTOS.salon} make the biggest difference for a site like this.`)}</div>
+${gallery(ctx, "Add photos of your work", `A few photos of ${WORK_PHOTOS[r.variant] ?? WORK_PHOTOS.salon} make the biggest difference for a site like this.`)}
 ${visit(ctx)}
 ${faq(dataFaq(r), true)}
 ${ctaBand(ctx, actions(r, [primary(r), primary(r) === "book" ? "call" : "directions"]))}

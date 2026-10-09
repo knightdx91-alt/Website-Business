@@ -195,6 +195,8 @@ export interface BusinessRecord {
     social: Partial<Record<"facebook" | "instagram" | "tiktok" | "youtube" | "nextdoor", string>>;
   };
   media: { logo?: Image; hero?: Image; gallery: Image[] };
+  /** Optional "We're hiring" section: the jobs open and how to apply, in the owner's words. */
+  hiring?: { roles: string[]; how?: string };
   reputation: { rating?: number; count?: number; displayMode: "link_only" | "owner_stated"; ownerStatedText?: string };
   ext: {
     restaurant?: RestaurantExt;

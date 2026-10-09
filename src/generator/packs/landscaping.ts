@@ -1,5 +1,5 @@
 import { actions } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, hero, reviews, serviceArea, steps, todo, type Ctx } from "../components.ts";
+import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, reviews, serviceArea, steps, todo, type Ctx } from "../components.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
@@ -98,7 +98,7 @@ ${r.confirmed.includes("services") ? "" : todo(ctx, "Check the services list", "
 <span class="section__label">How it works</span><h2 class="section__title" id="how-title">${r.variant === "design_build" ? "From idea to finished yard" : "Easy to get started"}</h2>
 ${steps(ctx.copy.steps?.length ? ctx.copy.steps : (STEPS[r.variant] ?? STEPS.lawn_crew!))}
 </div></section>
-<div class="wrap">${todo(ctx, "Add photos of your work", "Before-and-after shots of yards you've done sell a landscaping site better than anything we can write.")}</div>
+${gallery(ctx, "Add photos of your work", "Before-and-after shots of yards you've done sell a landscaping site better than anything we can write.")}
 ${reviews(ctx)}
 ${serviceArea(ctx)}
 ${about(ctx, `About ${r.name}`)}

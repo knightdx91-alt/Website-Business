@@ -1,8 +1,8 @@
 import { CLIENT_SCRIPT } from "./client-script.ts";
-import { actionBar, footer, header, sectionHead, type Ctx } from "./components.ts";
+import { actionBar, footer, gallery, header, hiring, sectionHead, type Ctx } from "./components.ts";
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
-import { html, jsonForScript, type Raw } from "./html.ts";
+import { html, jsonForScript, raw, type Raw } from "./html.ts";
 import { lintSite, type LintResult } from "./lint.ts";
 import { packFor } from "./packs/index.ts";
 import type { CategoryPack } from "./packs/types.ts";
@@ -68,6 +68,18 @@ ${actionBar(pack.actionBar(ctx))}
 </body></html>`}`;
 }
 
+/** Sections every pack gets: the owner's photo gallery (before reviews, unless the pack placed it) and "We're hiring" (before the closing call to action). */
+function withExtras(ctx: Ctx, body: Raw): Raw {
+  let out = body.value;
+  if (!ctx.galleryShown) {
+    const photos = gallery(ctx).value;
+    if (photos) out = out.includes('id="reviews"') ? out.replace(/<section class="section[^"]*" id="reviews"/, (m) => photos + m) : out.replace("</main>", `${photos}</main>`);
+  }
+  const jobs = hiring(ctx).value;
+  if (jobs) out = out.includes('<section class="cta"') ? out.replace('<section class="cta"', `${jobs}<section class="cta"`) : out.replace("</main>", `${jobs}</main>`);
+  return raw(out);
+}
+
 function privacyBody(ctx: Ctx): Raw {
   return html`<main id="main" class="section"><div class="wrap narrow">
 <h1>Privacy</h1>
@@ -108,7 +120,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     path: "/",
     title: pack.homeTitle(ctx.r, ctx.copy.cuisineLabel),
     description: ctx.copy.meta.description,
-    body: pack.home(ctx),
+    body: withExtras(ctx, pack.home(ctx)),
     jsonLd: homeLd,
   });
   pages.push({ path: "/", html: home });

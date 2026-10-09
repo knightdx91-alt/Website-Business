@@ -1,5 +1,5 @@
 import { actions, type ActionId } from "../actions.ts";
-import { about, cardGrid, ctaBand, faq, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx } from "../components.ts";
+import { about, cardGrid, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Faq, Service } from "../types.ts";
@@ -122,7 +122,7 @@ ${sectionHead("What's new", r.variant === "florist" ? "See our latest arrangemen
 ${social.length ? "" : todo(ctx, "Add your Facebook or Instagram", "Shops like yours sell new arrivals on social media. Send us your page links and we'll add Follow us buttons.")}
 ${r.ext.retail?.shopUrl ? "" : todo(ctx, "Do you sell online?", r.variant === "florist" ? "If you take flower orders online, send us the link and we'll add an Order flowers button." : "If you have a Shopify, Etsy or Facebook shop, send us the link and we'll add a Shop online button.")}
 </div></section>
-<div class="wrap">${todo(ctx, "Send photos of your shop", "Three to six photos of your store, displays and front door. People want to see what it's like inside before they drive over.")}</div>
+${gallery(ctx, "Send photos of your shop", "Three to six photos of your store, displays and front door. People want to see what it's like inside before they drive over.")}
 ${reviews(ctx)}
 ${about(ctx, `About ${r.name}`, "Our story")}
 ${visit(ctx, "Come see us")}

@@ -48,6 +48,8 @@ export const EditsSchema = z.object({
       towns: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
       services: z.array(z.string().trim().min(1).max(60)).max(12).optional(),
       menuText: z.string().max(20_000).optional(),
+      hiring: z.object({ roles: z.array(z.string().trim().min(1).max(60)).max(8), how: z.string().trim().max(240) }).nullable().optional(),
+      galleryAlts: z.record(z.string(), z.string().trim().max(150)).optional(),
       confirmed: z.array(z.enum(["name", "phone", "address", "hours", "services", "service_area", "variant", "menu"])).optional(),
     })
     .optional(),
@@ -150,6 +152,8 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
     if (l.instagram !== undefined) r.links.social.instagram = l.instagram || undefined;
   }
   if (e.testimonials) r.testimonials = e.testimonials;
+  if (e.hiring !== undefined) r.hiring = e.hiring && e.hiring.roles.length ? { roles: e.hiring.roles, how: e.hiring.how || undefined } : undefined;
+  if (e.galleryAlts) for (const p of r.media.gallery) if (e.galleryAlts[p.src]) p.alt = e.galleryAlts[p.src]!;
   if (e.towns) r.serviceArea = { towns: e.towns, counties: r.serviceArea?.counties ?? [] };
   if (e.services) {
     const keep = new Map(r.services.map((s) => [s.name.toLowerCase(), s]));

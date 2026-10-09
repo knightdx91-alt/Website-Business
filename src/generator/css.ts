@@ -179,6 +179,9 @@ ${divider}
 .faq details[open] summary::after{content:"\\2212"}
 .faq details p{padding:0 20px 18px;margin:0}
 /* reviews */
+.gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;list-style:none;margin:24px 0 0;padding:0}
+@media (min-width:760px){.gallery{grid-template-columns:repeat(3,1fr);gap:14px}}
+.gallery img{display:block;width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;border-radius:var(--radius)}
 .quotes{display:grid;gap:16px;list-style:none;margin:24px 0;padding:0}
 @media (min-width:900px){.quotes{grid-template-columns:repeat(3,1fr)}}
 .quote{background:var(--surface);border-radius:var(--radius);padding:22px;margin:0;border:${cardBorder};box-shadow:${cardShadow}}
