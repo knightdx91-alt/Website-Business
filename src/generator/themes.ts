@@ -10,6 +10,7 @@ import { LANDSCAPING_LOOKS } from "./looks/landscaping.ts";
 import { CLEANING_LOOKS } from "./looks/cleaning.ts";
 import { PRINT_LOOKS } from "./looks/print.ts";
 import { RETAIL_LOOKS } from "./looks/retail.ts";
+import { FINANCE_LOOKS } from "./looks/finance.ts";
 import type { CategoryId } from "./types.ts";
 
 export interface FontSpec {
@@ -233,6 +234,7 @@ export const LOOKS: Record<string, LookDef> = {
   ...CLEANING_LOOKS,
   ...PRINT_LOOKS,
   ...RETAIL_LOOKS,
+  ...FINANCE_LOOKS,
 };
 
 /**

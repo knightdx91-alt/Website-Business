@@ -1,4 +1,4 @@
-export type CategoryId = "restaurant" | "contractor" | "salon" | "auto" | "landscaping" | "cleaning" | "print" | "retail";
+export type CategoryId = "restaurant" | "contractor" | "salon" | "auto" | "landscaping" | "cleaning" | "print" | "retail" | "finance";
 
 /** Where a value came from. `google` images may appear in previews only. */
 export type Source = "places" | "owner" | "ai" | "system" | "stock" | "google";
