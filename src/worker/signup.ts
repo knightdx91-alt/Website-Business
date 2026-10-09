@@ -128,6 +128,7 @@ ${settings.addons.length ? `<p class="small muted">Optional extras, just ask: ${
 <label>Your title <span class="muted small" style="font-weight:400">(optional)</span><input type="text" name="title" placeholder="Owner" maxlength="60"></label>
 <label>Email for receipts<input type="email" name="email" autocomplete="email" required maxlength="120"></label>
 <label class="check"><input type="checkbox" name="agree" value="yes" required> I'm authorized to sign for ${escHtml(business)}, and I agree to the plan and agreement above. Typing my name counts as my signature.</label>
+<p class="small muted">See also our <a href="https://undergroundassociates.com/terms#refunds" target="_blank" rel="noopener">cancellation &amp; refund policy</a> and <a href="https://undergroundassociates.com/privacy" target="_blank" rel="noopener">privacy policy</a>.</p>
 <button class="btn" type="submit">Accept and continue</button>
 <p class="small muted" style="margin-bottom:0">${escHtml(settings.legalName || settings.companyName || "")}${settings.companyPhone ? ` · ${escHtml(settings.companyPhone)}` : ""}${settings.companyEmail ? ` · ${escHtml(settings.companyEmail)}` : ""}</p>
 </form></div>`;

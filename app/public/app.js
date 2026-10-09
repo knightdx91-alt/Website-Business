@@ -205,7 +205,7 @@
     setNav("home");
     meta = meta || (await api("/meta"));
     if (!document.getElementById("leads")) {
-      $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="due"></div><div id="runs"></div></div><div><section>
+      $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="opened"></div><div id="due"></div><div id="runs"></div></div><div><section>
         <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
@@ -257,7 +257,29 @@
         refreshHome();
       });
     }
+    pushAsk();
     await refreshHome();
+  }
+
+  /** Asks once on the home screen to turn on phone notifications (owner and full access), until done or dismissed. */
+  async function pushAsk() {
+    const el = document.getElementById("pushask");
+    if (!el || !isOwner()) return;
+    let dismissed = false;
+    try { dismissed = localStorage.getItem("wb_push_ask") === "no"; } catch (e) { /* storage blocked */ }
+    const ps = await pushState().catch(() => ({ supported: false }));
+    if (dismissed || !ps.supported || ps.permission === "denied" || (ps.permission === "granted" && ps.sub)) { el.innerHTML = ""; return; }
+    el.innerHTML = `<section class="card due"><h2>🔔 Turn on phone alerts?</h2><p class="small muted">Get a notification when a prospect opens their preview, or a teammate logs a call, makes a sale or gets a sign-up.</p>
+      <div class="btns"><button class="btn btn--primary btn--small" id="pask-on">Turn on</button><button class="btn btn--small" id="pask-no">Not now</button></div></section>`;
+    el.querySelector("#pask-on").addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      try { await turnOnPush(); toast("Phone alerts are on"); el.innerHTML = ""; } catch (err) { toast(err.message); e.target.disabled = false; }
+    });
+    el.querySelector("#pask-no").addEventListener("click", () => {
+      try { localStorage.setItem("wb_push_ask", "no"); } catch (e) { /* storage blocked */ }
+      el.innerHTML = "";
+      toast("You can turn them on any time from 🔔");
+    });
   }
 
   async function refreshHome() {
@@ -268,16 +290,24 @@
     else if (filters.sales) q.set("sales", filters.sales);
     if (filters.category) q.set("category", filters.category);
     try {
-      const [{ runs }, { leads }, { leads: due }] = await Promise.all([
+      const [{ runs }, { leads }, { leads: due }, { leads: opened }] = await Promise.all([
         isOwner() ? api("/runs") : Promise.resolve({ runs: [] }),
         api("/leads?" + q),
         api("/leads?callbacks=due"),
+        api("/leads?opened=recent"),
       ]);
       const runsEl = document.getElementById("runs");
       const leadsEl = document.getElementById("leads");
       const dueEl = document.getElementById("due");
       if (!runsEl || !leadsEl) return;
       runsEl.innerHTML = runsHtml(runs);
+      const openedEl = document.getElementById("opened");
+      if (openedEl) openedEl.innerHTML = opened.length
+        ? `<section class="card due"><h2>👀 Looked at their preview (${opened.length})</h2><p class="small muted">They opened the link you sent in the last 7 days. Call while it's fresh.</p><ul class="list">${opened
+            .map((l) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a><span class="small muted" style="flex:none">${l.previewOpens > 1 ? `${l.previewOpens}× · ` : ""}${ago(l.previewOpenedAt)}</span></div>
+              <div class="btns" style="margin-top:6px"><a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a><a class="btn btn--small" href="#/lead/${l.id}">Notes</a></div></li>`)
+            .join("")}</ul></section>`
+        : "";
       dueEl.innerHTML = due.length
         ? `<section class="card due"><h2>📅 Call back today (${due.length})</h2><ul class="list">${due
             .map((l) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a>${l.followUp < dayFromNow(0) ? `<span class="chip chip--warn" style="flex:none">Overdue</span>` : ""}</div>
@@ -503,7 +533,8 @@
             ${owner ? `<a class="btn" href="#/edit/${l.id}">Edit</a>` : ""}
             ${l.salesStatus !== "live" ? `<a class="btn" href="/api/leads/${l.id}/flyer" target="_blank" rel="noopener">Leave-behind flyer (QR)</a>` : ""}
           </div>
-          ${l.salesStatus !== "live" ? `<div style="margin-top:10px">${shareButtonsHtml()}</div>` : ""}` : ""}
+          ${l.salesStatus !== "live" ? `<div style="margin-top:10px">${shareButtonsHtml()}</div>` : ""}
+          ${l.previewOpens ? `<p class="small" style="margin-top:8px">👀 They opened their preview ${l.previewOpens === 1 ? "once" : `${l.previewOpens} times`}, last ${ago(l.previewOpenedAt)}.</p>` : ""}` : ""}
         ${l.liveUrl ? `<p style="margin-top:12px">Live at <a href="${esc(l.liveUrl)}" target="_blank" rel="noopener">${esc(l.liveUrl.replace("https://", ""))}</a></p>` : ""}
       </section>
       <section class="card"><h2>Calls &amp; notes</h2>
@@ -1635,7 +1666,7 @@
   }
 
   /* ---------- notifications ---------- */
-  const NOTIF_ICON = { note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎" };
+  const NOTIF_ICON = { note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎", preview_open: "👀" };
 
   async function refreshNotifCount() {
     try {
@@ -1694,7 +1725,7 @@
       <section class="card"><h2>Phone notifications</h2>
         ${!ps.supported ? `<p class="small muted">This browser can't show phone notifications. Use the installed app or Chrome on Android.</p>`
           : on ? `<p class="small">✅ On for this phone. You'll get a notification whenever someone else makes a change.</p><div class="btns"><button class="btn btn--small" id="ptest">Send a test</button><button class="btn btn--small" id="poff">Turn off on this phone</button></div>`
-          : `<p class="small muted">Get a notification on this phone when someone adds a note, logs a call, makes a sale, a client signs up, or a website gets a message.</p><button class="btn btn--primary" id="pon">🔔 Turn on phone notifications</button>`}
+          : `<p class="small muted">Get a notification on this phone when a prospect opens their preview, someone adds a note, logs a call, makes a sale, a client signs up, or a website gets a message.</p><button class="btn btn--primary" id="pon">🔔 Turn on phone notifications</button>`}
       </section>
       <ul class="list notifs">${rows || `<li class="muted">Nothing yet. When someone else adds a note, logs a call, makes a sale, or a client signs up, it shows here.</li>`}</ul>`;
     const pon = $app.querySelector("#pon");

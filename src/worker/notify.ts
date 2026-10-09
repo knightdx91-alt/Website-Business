@@ -9,7 +9,7 @@ import { getSetting, setSetting } from "./db.ts";
  * what's new while logged in. That keeps details off the push service and needs no payload encryption.
  */
 
-export type EventKind = "note" | "call" | "status" | "signup_sent" | "signed" | "paid" | "published" | "added" | "message" | "run";
+export type EventKind = "note" | "call" | "status" | "signup_sent" | "signed" | "paid" | "published" | "added" | "message" | "run" | "preview_open";
 
 export interface EventInput {
   kind: EventKind;
@@ -86,6 +86,7 @@ const PUSH_TITLE: Record<EventKind, string> = {
   added: "➕ Lead added",
   message: "💬 New message",
   run: "🔎 Search started",
+  preview_open: "👀 Preview opened",
 };
 
 /** What a phone shows when a push arrives: the newest unread item, or a count when there are several. */

@@ -1,5 +1,5 @@
 import { notify } from "./notify.ts";
-import { billingOptions, getSettings, type AppSettings } from "./db.ts";
+import { billingOptions, defaultTerms, getSettings, type AppSettings } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 import { escHtml as e } from "./page.ts";
 import { SEARCH_GROUPS } from "../places/queries.ts";
@@ -9,6 +9,9 @@ export const COMPANY_HOSTS = ["undergroundassociates.com", "www.undergroundassoc
 const ORIGIN = "https://undergroundassociates.com";
 /** Year Underground Associates LLC started, for the copyright line. */
 const FOUNDED = 2021;
+
+/** Shown on the Terms and Privacy pages; bump when either changes. */
+const POLICIES_UPDATED = "October 9, 2026";
 
 /** Contact form posts land in the app inbox under this pseudo lead id. */
 export const COMPANY_LEAD_ID = "company";
@@ -66,10 +69,12 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   if (path === "/contact" && req.method === "POST") return contactPost(env, req);
   if (path === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`, { headers: { "content-type": "text/plain" } });
   if (path === "/sitemap.xml") {
-    return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
+    return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url><url><loc>${ORIGIN}/terms</loc></url><url><loc>${ORIGIN}/privacy</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
   }
   // Fonts and icons come from the app's static assets.
   if (path.startsWith("/fonts/") || path.startsWith("/icons/")) return null;
+  if (path === "/refunds" || path === "/refund-policy") return Response.redirect(`${ORIGIN}/terms#refunds`, 301);
+  if ((path === "/terms" || path === "/privacy") && req.method === "GET") return policyPage(env, path === "/terms" ? "terms" : "privacy");
   if (path !== "/" || req.method !== "GET") return new Response(null, { status: 302, headers: { location: "/" } });
   return home(env, url);
 }
@@ -204,7 +209,7 @@ ${phone || email ? `<p class="direct">Rather talk? ${phone ? `<a href="${telHref
 ${s.directEmail && s.directEmail !== email ? `<p class="direct">Need ${s.callerName ? e(s.callerName.split(" ")[0]!) : "the owner"} directly? <a href="mailto:${e(s.directEmail)}">${e(s.directEmail)}</a></p>` : ""}
 </div></section>
 </main>
-<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama</div></footer>
+${footer(legal)}
 ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)}">Call</a><a href="#contact">Free preview</a></nav>` : ""}
 </body></html>`;
   return new Response(html, {
@@ -216,6 +221,101 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
       "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
     },
   });
+}
+
+function footer(legal: string): string {
+  return `<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama · <a href="/terms">Terms &amp; refunds</a> · <a href="/privacy">Privacy</a></div></footer>`;
+}
+
+const HEADERS = {
+  "content-type": "text/html; charset=utf-8",
+  "cache-control": "public, max-age=300",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+};
+
+/** Terms of service (with the cancellation and refund policy) and the privacy policy, filled from live Settings. */
+async function policyPage(env: Env, kind: "terms" | "privacy"): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const legal = s.legalName || name;
+  const phone = s.companyPhone;
+  const email = s.companyEmail;
+  const reach = [phone ? `call or text <a href="${telHref(phone)}">${e(phone)}</a>` : "", email ? `email <a href="mailto:${e(email)}">${e(email)}</a>` : ""].filter(Boolean).join(" or ") || "contact us";
+  const sec = (h: string, body: string, id?: string) => `<section${id ? ` id="${id}"` : ""}><h2>${e(h)}</h2>${body}</section>`;
+  const ul = (items: string[]) => `<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
+  let title: string;
+  let body: string;
+  if (kind === "terms") {
+    title = "Terms of service and refund policy";
+    const plan = s.plans[0];
+    const ways = plan ? billingOptions(plan, s) : [];
+    const short = s.shortMonths ?? 6;
+    const min = s.minMonths ?? 12;
+    const terms = s.terms?.trim() || defaultTerms(s);
+    body = [
+      sec("Who we are", `<p>${e(legal)} ("we", "us") builds, hosts and maintains websites for local businesses from Cullman, Alabama. Questions? ${reach}.</p>`),
+      sec("Free previews", `<p>We may build a free preview website for your business from your public Google business listing. Looking at it costs nothing and you're under no obligation. Previews are private, hidden from search engines, and deleted if you don't sign up.</p>`),
+      s.plans.length
+        ? sec("Plans and prices", `${ul(s.plans.map((p) => `<strong>${e(p.name)}</strong>: ${money(p.monthly)} a month${p.setup ? ` plus ${money(p.setup)} setup` : ""}`))}
+<p>Ways to pay:</p>${ul(ways.map((o) => `<strong>${e(o.label)}</strong>: ${e(
+          o.id === "flex"
+            ? `the monthly price plus a one-time ${money(s.flexSetup ?? 0)} setup fee. No minimum.`
+            : o.id === "annual"
+              ? `pay 12 months up front for the price of ${12 - (s.annualMonthsFree ?? 0)}. No setup fee. Renews each year unless you cancel.`
+              : `the monthly price, no setup fee. ${o.id === "short" ? short : min}-month minimum, then cancel any time with 30 days' notice.`,
+        )}`))}
+${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${money(a.price)}${a.unit === "month" ? "/month" : a.unit === "each" ? " each" : a.unit === "one-time" ? " one-time" : ""})`).join(", ")}.</p>` : ""}
+<p>The prices in your signed agreement are the ones you pay. We'll give you at least 30 days' notice before any price change.</p>`)
+        : "",
+      sec("Signing up and paying", `<p>You sign up by reading and accepting your plan and our service agreement on your personal sign-up page. Payments are processed by Stripe and charged automatically to the card you choose; we never see or store your full card number. If a payment fails, we'll reach out. A site may be taken offline if a payment is more than 30 days late.</p>`),
+      sec("Cancellation and refund policy", `${ul([
+        "Previews are always free. You never pay anything unless you sign up.",
+        min ? `Plans with a minimum (${short && short < min ? `${short} or ${min} months` : `${min} months`}): after the minimum, cancel any time with 30 days' notice.` : "",
+        s.flexSetup ? "Month to month: cancel any time with 30 days' notice." : "",
+        "Monthly charges are billed in advance and aren't refunded for part of a month.",
+        s.flexSetup ? `The month-to-month setup fee (${money(s.flexSetup)}) is refunded in full if you cancel before your site goes live. After it goes live, it isn't refundable.` : "",
+        s.annualMonthsFree ? "Yearly plans: cancel within 30 days of paying and we refund what you paid, minus the regular monthly price for each month started. After 30 days, yearly payments aren't refunded; your site stays up through the year you paid for and the plan won't renew." : "",
+        "If we ever charge you by mistake, we refund it in full.",
+        `To cancel or ask for a refund, ${reach}. Refunds go back to your original card, usually within 5 to 10 business days.`,
+      ].filter(Boolean))}`, "refunds"),
+      sec("Service agreement", `<p>This is the agreement you accept when you sign up:</p><div class="terms">${e(terms)}</div>`),
+      sec("Limits", `<p>We work to keep your site online and correct, but we can't promise it will never be down or error-free, and no one can guarantee search rankings, visitors or sales. To the extent the law allows, we aren't liable for lost profits or indirect damages, and our total liability is limited to what you paid us in the 3 months before the claim.</p>`),
+      sec("The law that applies", `<p>These terms are governed by the laws of the State of Alabama.</p>`),
+    ].join("");
+  } else {
+    title = "Privacy policy";
+    body = [
+      sec("Who we are", `<p>${e(legal)} builds and runs websites for local businesses. This policy covers undergroundassociates.com, our sign-up and preview pages, and the websites we host for our clients. Questions? ${reach}.</p>`),
+      sec("What we collect", ul([
+        "<strong>When you contact us:</strong> your name, business name, phone, email and message, plus your IP address to block spam.",
+        "<strong>When you sign up:</strong> your name, title, email, the plan you chose, the agreement you accepted, and your IP address and browser type as a record of your signature.",
+        "<strong>Payments:</strong> Stripe handles them. We see whether a payment went through, not your card number.",
+        "<strong>Business information:</strong> to build previews we use public details from Google business listings (name, address, phone, hours, category and ratings). Google's photos are only shown in private previews and never on a live website.",
+        "<strong>Preview links:</strong> when someone opens a preview link we sent, we note that it was opened and when, so we know when to follow up.",
+        "<strong>Our clients' websites:</strong> we count page views and taps on buttons like Call and Directions, without cookies and without identifying visitors. Messages sent through a client's website form go to that business; we store them only to deliver them.",
+      ])),
+      sec("How we use it", `<p>To answer you, build and run your website, handle billing, and follow up about a preview we made for you. We don't sell or rent personal information, and this website uses no advertising trackers or cookies.</p>`),
+      sec("Calls, texts and email", `<p>We contact you only about your inquiry, your preview or your service. Ask us to stop, or reply STOP to a text, and we will.</p>`),
+      sec("Who we share it with", ul([
+        "Service providers that run our business: Cloudflare (hosting), Google (email and business listings), Stripe (payments), and an AI writing tool that helps draft website text from public business details (never your personal contact information).",
+        "Anyone the law requires us to share with.",
+      ])),
+      sec("How long we keep it", `<p>Messages and sign-up records are kept as long as we need them for your service and our business records. Previews for businesses that don't sign up are deleted within 30 to 90 days; we keep only Google's listing ID so we don't contact the same business twice by mistake.</p>`),
+      sec("Your choices", `<p>To see, correct or delete information we hold about you, ${reach}.</p>`),
+      sec("Children", `<p>Our services are for businesses and aren't meant for children under 13.</p>`),
+    ].join("");
+  }
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${e(title)} | ${e(name)}</title><meta name="description" content="${e(`${title} for ${legal}, Cullman, Alabama.`)}"><link rel="canonical" href="${ORIGIN}/${kind}">
+<meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a>${phone ? `<a class="hdr__call" href="${telHref(phone)}">Call</a>` : `<a class="hdr__call" href="/#contact">Contact</a>`}</div></header>
+<main id="main" class="sec"><div class="wrap narrow legal"><h1>${e(title)}</h1><p class="small muted">Last updated ${POLICIES_UPDATED}</p>${body}</div></main>
+${footer(legal)}
+</body></html>`;
+  return new Response(html, { headers: HEADERS });
 }
 
 const CSS = `@font-face{font-family:"Bricolage";src:url(/fonts/bricolage-grotesque-latin-800-normal.woff2) format("woff2");font-weight:800;font-display:swap}
@@ -260,7 +360,9 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .opt{font-weight:400;color:#c9d1e0}.hp{position:absolute;left:-9999px}
 .note{background:#e8f5ec;color:#0f5132;border-radius:10px;padding:12px 14px;font-weight:700}.note--warn{background:#fff4e0;color:var(--goldtext)}
 .direct{margin-top:18px}
-.ftr{background:#0d1629;color:#aeb7c8;padding:24px 0;font-size:.92rem}
+.ftr{background:#0d1629;color:#aeb7c8;padding:24px 0;font-size:.92rem}.ftr a{color:#dfe5ef}
+.legal h1{font-size:clamp(1.9rem,6vw,2.8rem)}.legal h2{font-size:1.35rem;margin-top:32px}.legal li{margin-bottom:8px}
+.legal .terms{white-space:pre-line;background:var(--alt);border-radius:12px;padding:16px 18px;font-size:.95rem}
 .bar{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--navy);padding:8px 8px calc(8px + env(safe-area-inset-bottom));gap:8px;z-index:6}
 .bar a{flex:1;text-align:center;min-height:48px;display:flex;align-items:center;justify-content:center;border-radius:10px;font-weight:700;text-decoration:none;background:var(--gold);color:var(--navy)}
 .bar a+a{background:#fff}

@@ -85,6 +85,8 @@ function summary(l: LeadRow) {
     lat: l.lat,
     lng: l.lng,
     customDomain: l.custom_domain,
+    previewOpens: l.preview_opens ?? 0,
+    previewOpenedAt: l.preview_opened_at,
     todos: lint?.todos.length ?? 0,
     blockers: lint ? lint.publishBlockers.length + lint.errors.length : null,
     createdAt: l.created_at,
@@ -434,7 +436,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const category = url.searchParams.get("category");
     const callbacks = url.searchParams.get("callbacks");
     let order = "score DESC";
-    if (callbacks) {
+    if (url.searchParams.get("opened") === "recent") {
+      // Prospects who opened their preview in the last 7 days and haven't bought yet: call them now.
+      where.push("preview_opened_at >= ?", "sales_status IN ('new', 'shown')");
+      binds.push(now() - 7 * 86_400_000);
+      order = "preview_opened_at DESC";
+    } else if (callbacks) {
       // "due": today or overdue; "all": every scheduled callback. Closed leads drop off.
       where.push("follow_up IS NOT NULL", "sales_status IN ('new', 'shown')");
       if (callbacks === "due") {
@@ -785,11 +792,30 @@ async function serveShared(env: Env, req: Request, leadId: string, token: string
     const name = esc(lead?.name ?? "your business");
     const from = settings.companyName ? ` by ${esc(settings.companyName)}` : "";
     const banner = `<div role="note" style="position:relative;z-index:60;background:#14213d;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 16px;text-align:center">Free preview made for ${name}${from}. Not live yet; photos and details will be checked with you first.</div>`;
-    text = text.replace(/<body([^>]*)>/, `<body$1>${banner}`);
+    // Link-preview bots (texts, Facebook) fetch the page but don't run scripts, so only a real visit after a moment counts.
+    const beacon = `<script>setTimeout(function(){try{if(sessionStorage.getItem("wbo"))return;sessionStorage.setItem("wbo","1")}catch(e){}if(document.visibilityState!=="hidden"&&navigator.sendBeacon)navigator.sendBeacon("/s/${token}/opened")},3000)</script>`;
+    text = text.replace(/<body([^>]*)>/, `<body$1>${banner}`).replace(/<\/body>/, `${beacon}</body>`);
   }
   const headers = new Headers(res.headers);
   headers.delete("content-length");
   return new Response(text, { status: res.status, headers });
+}
+
+/** A prospect opened their shared preview: count it and tell the team (once per 30 minutes; our own logins don't count). */
+async function previewOpened(env: Env, req: Request, leadId: string): Promise<Response> {
+  if (await getSession(env, req)) return new Response(null, { status: 204 });
+  const t = now();
+  const row = await env.DB.prepare(
+    "UPDATE leads SET preview_opens = preview_opens + 1, preview_opened_at = ? WHERE id = ? AND status != 'expired' AND COALESCE(preview_opened_at, 0) < ? RETURNING preview_opens, name",
+  )
+    .bind(t, leadId, t - 30 * 60_000)
+    .first<{ preview_opens: number; name: string | null }>();
+  if (row) {
+    const n = row.preview_opens;
+    const times = n === 1 ? "" : ` (${n}${n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : n % 10 === 1 && n % 100 !== 11 ? "st" : "th"} time)`;
+    await notify(env, { kind: "preview_open", leadId, text: `${row.name ?? "A prospect"} just opened their preview${times}. Good time to call.` });
+  }
+  return new Response(null, { status: 204 });
 }
 
 async function expireStaleLeads(env: Env): Promise<void> {
@@ -829,6 +855,7 @@ export default {
           return new Response("This preview link has expired. Ask us for a new one.", { status: 410, headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex" } });
         }
         const token = `${leadId}.${exp}.${sig}`;
+        if (rest === "/opened" && req.method === "POST") return await previewOpened(env, req, leadId);
         if (!rest) return Response.redirect(`${url.origin}/s/${token}/`, 301);
         return await serveShared(env, req, leadId, token, rest);
       }

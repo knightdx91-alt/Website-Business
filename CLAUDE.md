@@ -207,6 +207,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   the service worker's `push` handler fetches `/api/notifications/latest` with the login cookie and shows it.
   Subscriptions in `push_subs` (dead ones removed on 404/410). The Android app (1.3+) has POST_NOTIFICATIONS,
   NotificationPermissionRequestActivity and a bell SMALL_ICON so Chrome can delegate notifications to it.
+- Preview opened (migration 0008, `leads.preview_opens` / `preview_opened_at`): share pages (`/s/…`) carry a tiny script that,
+  after 3 s on a visible page and once per browser session, beacons `POST /s/<token>/opened`. Link-preview bots don't run it;
+  logged-in team members don't count; at most one count per 30 min. Each count notifies everyone ("👀 X just opened their
+  preview (2nd time)"). Home shows "Looked at their preview" (`/api/leads?opened=recent`, last 7 days, not yet sold), the lead
+  screen shows the count. Home also asks once to turn on phone alerts (`pushAsk`, dismiss stored in localStorage).
+- Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
+  limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
+  when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.
 - Show plans (`#/plans` or `#/plans/<leadId>`, owner and callers): customer-facing, always light, app bar hidden.
   Plan cards from Settings (tagline per tier in `PLAN_TAGLINE`), every-plan list, ways to pay, add-ons, fine print.
   From a lead, "Choose <plan>" creates that lead's sign-up link and opens it on the same phone.
