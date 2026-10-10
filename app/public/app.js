@@ -695,8 +695,7 @@
       <section class="card"><h2>Website</h2>
         ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p>${owner ? `<button class="btn" data-act="retry">Try again</button>` : `<p class="small muted">The owner can rebuild it.</p>`}` : ""}
         ${l.status === "queued" || l.status === "building" ? `<p><span class="spin"></span> Building… this takes about a minute.</p>` : ""}
-        ${ready ? `<p class="muted small">Design: ${esc(lookName)}${owner && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="restyle">🎨 Try another design</button>` : ""}</p>
-          ${owner && l.salesStatus !== "live" && (l.dnaRecipes || []).length ? `<label class="field small">Or pick a style (keeps the colors)<select data-recipe><option value="">Choose a style…</option>${l.dnaRecipes.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}: ${esc(x.about)}</option>`).join("")}</select></label>` : ""}
+        ${ready ? `${owner && l.salesStatus !== "live" ? "" : `<p class="muted small">Design: ${esc(lookName)}</p>`}
           <div class="btns btns--full">
             <a class="btn btn--primary" href="#/preview/${l.id}">Preview</a>
             <a class="btn" href="#/full/${l.id}">Open full screen</a>
@@ -707,6 +706,13 @@
           ${l.previewOpens ? `<p class="small" style="margin-top:8px">👀 They opened their preview ${l.previewOpens === 1 ? "once" : `${l.previewOpens} times`}, last ${ago(l.previewOpenedAt)}.</p>` : ""}` : ""}
         ${l.liveUrl ? `<p style="margin-top:12px">Live at <a href="${esc(l.liveUrl)}" target="_blank" rel="noopener">${esc(l.liveUrl.replace("https://", ""))}</a></p>` : ""}
       </section>
+      ${ready && owner && l.salesStatus !== "live" ? `<section class="card"><h2>🎨 Design</h2>
+        <p class="small muted">Now: ${esc(lookName)}</p>
+        <div class="btns btns--full"><button class="btn btn--primary" type="button" data-act="restyle">Try another design</button><button class="btn" type="button" data-act="restructure">Same colors, new structure</button></div>
+        ${(l.dnaRecipes || []).length ? `<p class="small" style="margin:12px 0 6px"><strong>Or pick a style</strong> (keeps the colors)</p><div class="row" style="flex-wrap:wrap;gap:6px">${l.dnaRecipes.map((x) => `<button class="btn btn--small" type="button" data-recipe="${esc(x.id)}" title="${esc(x.about)}">${esc(x.name)}</button>`).join("")}</div>` : ""}
+        <label class="field small" style="margin-top:12px">Colors &amp; fonts<select data-look>${l.looks.map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>
+        <p class="small muted" style="margin:8px 0 0">Every part (layout, opening, buttons, services…) can be set by hand in <a href="#/edit/${l.id}">Edit → Design</a>.</p>
+      </section>` : ""}
       <section class="card"><h2>Calls &amp; notes</h2>
         ${l.followUp && open ? `<div class="row" style="margin-bottom:8px">${followChip(l.followUp)}<button class="linkbtn" data-act="clearfollow" style="flex:none">Clear</button></div>` : ""}
         ${notesHtml(l, 0, true)}
@@ -784,12 +790,19 @@
     });
     act("portal", () => openPortal(id));
     act("restyle", async () => { await api(`/leads/${id}/restyle`, { method: "POST" }); toast("New design ready"); viewLead(id); });
-    const recipeSel = $app.querySelector("[data-recipe]");
-    if (recipeSel) recipeSel.addEventListener("change", async () => {
-      if (!recipeSel.value) return;
-      recipeSel.disabled = true;
-      try { await api(`/leads/${id}/restyle`, { method: "POST", json: { recipe: recipeSel.value } }); toast("New structure ready"); viewLead(id); }
-      catch (e) { recipeSel.disabled = false; throw e; }
+    act("restructure", async () => { await api(`/leads/${id}/restyle`, { method: "POST", json: { structureOnly: true } }); toast("New structure ready"); viewLead(id); });
+    $app.querySelectorAll("[data-recipe]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await api(`/leads/${id}/restyle`, { method: "POST", json: { recipe: b.dataset.recipe } }); toast(`${b.textContent} ready`); viewLead(id); }
+      catch (e) { b.disabled = false; throw e; }
+    }));
+    const lookSel = $app.querySelector("[data-look]");
+    if (lookSel) lookSel.addEventListener("change", async () => {
+      // Keep the layout and structure; only the colors and fonts change.
+      const code = (l.dnaOrder || []).map((k) => k.letter + Math.max(0, k.values.findIndex((v) => v.id === ((l.dna || {})[k.id] || k.values[0].id)))).join("");
+      lookSel.disabled = true;
+      try { await api(`/leads/${id}/edits`, { method: "PUT", json: { look: `${lookSel.value}~${l.layout || "classic"}~${code}` } }); toast("Colors changed"); viewLead(id); }
+      catch (e) { lookSel.disabled = false; throw e; }
     });
     if (owner) act("retry", async () => { await api(`/leads/${id}/retry`, { method: "POST" }); toast("Rebuilding…"); setTimeout(() => viewLead(id), 1500); });
     act("rewrite", async () => {
