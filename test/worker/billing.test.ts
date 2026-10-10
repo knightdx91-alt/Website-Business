@@ -40,10 +40,13 @@ test("churches and nonprofits get the ministry rate on the yearly option: 12 mon
 test("the default agreement carries the five core lines; a custom one that lacks them gets them added", () => {
   const terms = defaultTerms({ minMonths: 12, shortMonths: 6 });
   assert.deepEqual(missingCoreTerms(terms), []);
-  assert.match(terms, /remaining months of the minimum are due/);
+  assert.match(terms, /remaining months of the minimum term/);
   assert.match(terms, /isn't fixed within 30 days/);
-  assert.match(terms, /total liability to you is limited to what you paid us in the 3 months/);
+  assert.match(terms, /total liability to you is limited to what you paid us in the 12 months/);
+  assert.match(terms, /early cancellation fee equal to your monthly price times the remaining months of the minimum term/);
+  assert.match(terms, /\$15 late fee/);
+  assert.match(terms, /Cullman County/);
   assert.match(terms, /undergroundassociates\.com\/terms is part of this agreement/);
   assert.match(terms, /at least 30 days before a yearly renewal/);
-  assert.equal(missingCoreTerms("Our own short agreement. Our total liability is capped.").length, 4);
+  assert.equal(missingCoreTerms("Our own short agreement. Our total liability is capped.").length, 10);
 });

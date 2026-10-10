@@ -534,6 +534,25 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (both hosts, public by token) and `/api/agreements/<s|p>/<id>.pdf` (app); the unsigned preview at `/api/contract.pdf?…` with a
   "Preview, not signed" notice and footer. "Download PDF" buttons on both pages, "⬇ PDF" next to every agreement link in the app
   and "⬇ Agreement PDF" on the sign-up card. `test/worker/pdf.test.ts` checks the PNG flattening and the PDF structure.
+- Agreement rewrite (Oct 2026, research/contract-review-2026.md: 43-clause gap analysis, Alabama law on late fees / interest
+  (§ 8-8-1 8%/yr cap), liquidated damages vs penalties, chargebacks, attorney's fees, E-SIGN/UETA, auto-renewal, 5 lawyer
+  questions). `defaultTerms` is now 22 numbered sections: deemed approval after 7 days, card-on-file authorization + tax,
+  an explicit EARLY CANCELLATION FEE (monthly price × remaining months of the minimum, "a fair estimate of our loss, not a
+  penalty"; pay monthly with the site live, or now less 15%; chargeable to the card on file), renewal + how to cancel,
+  late payments ($15 fee after 10 days, 8%/yr after 30 days overdue, offline at 30, may end at 60 with the whole balance
+  due, $49 reinstatement, collection costs and attorney's fees), payment disputes (a chargeback = missed payment + the
+  bank's $15 fee), content/ownership (their name/logo/photos/text/domain; our templates/code; portfolio + credit line),
+  AI-drafted text is theirs once approved, domain transfer within 10 business days (60-day registrar lock), exit copy of
+  the pages within 30 days, client duties, third-party services, "if we let you down" (free month for >24 h our-fault
+  downtime; 3 strikes or 14 days unfixed → cancel without the term + pro-rata refund), WCAG 2.1 AA effort + no results
+  promises + warranty disclaimer, 12-month liability cap + indemnity, force majeure, business sale/assignment, texts +
+  emails + notices + privacy policy, confidentiality, talk-first then Cullman County courts, entire agreement/severability/
+  survival. `CORE_TERMS` has 11 regex-keyed lines appended to any custom agreement that lacks them. `esignClause` adds
+  electronic delivery + "you can keep a copy". `INVOICE_TEXT` (churches) has Net 15/30, late +15/+45/+75 and the authority
+  line. `STANDARD_EXTRA_TERMS` gained the research's fixes (photo no-show = the visit, new visit $99; GBP refund half if
+  Google won't verify; ad accounts in the client's name; logo has no trademark search; NFC dead-card swap 90 days; quotes
+  good 30 days). `/terms` refunds list, Limits (12 months) and a "How we settle disagreements" section match. The numbers
+  are business decisions (ranges in the research §7 table); the owner should have a lawyer review once.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.
