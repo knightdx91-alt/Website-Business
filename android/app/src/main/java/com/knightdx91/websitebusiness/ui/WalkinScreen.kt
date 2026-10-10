@@ -44,7 +44,6 @@ import com.knightdx91.websitebusiness.net.fill
 import com.knightdx91.websitebusiness.net.flyerLeft
 import com.knightdx91.websitebusiness.net.planOptions
 import com.knightdx91.websitebusiness.net.walkinLead
-import com.knightdx91.websitebusiness.webRoute
 import kotlinx.coroutines.launch
 
 /**
@@ -113,20 +112,13 @@ fun WalkinScreen(state: AppState, nav: NavHostController, leadId: String?) {
         scope.launch {
             // Marks a New lead Shown first (fire and forget), then opens the printable with the 60-day code.
             runCatching { state.api.flyerLeft(l.lead.id) }
-            nav.navigate(webRoute("/api/leads/${l.lead.id}/flyer"))
+            nav.navigate(pdfNav("/api/leads/${l.lead.id}/flyer.pdf", "Flyer"))
         }
     }
 
+    /** The native sign-up screen makes the lead's sign-up link and lets them sign and pay on this phone. */
     fun openSignup(l: WalkinLead, planId: String) {
-        if (busy) return
-        busy = true
-        scope.launch {
-            try {
-                val r = state.api.signupLink(l.lead.id, planId)
-                val url = r.getString("url") + (if (meta?.tapReady == true) "?tap=1" else "")
-                nav.navigate(webRoute(url.removePrefix(state.api.origin)))
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't open the sign-up page") } finally { busy = false }
-        }
+        nav.navigate("signup/${l.lead.id}?plan=$planId")
     }
 
     Scaffold(topBar = {
@@ -257,7 +249,7 @@ fun WalkinScreen(state: AppState, nav: NavHostController, leadId: String?) {
                     Text("Lead with the middle plan. Go down if price is the worry, up if they want everything done for them.", style = MaterialTheme.typography.bodySmall, color = muted)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                         OutlinedButton(onClick = { nav.navigate(if (l != null) "plans/${l.lead.id}" else "plans") }) { Text("📋 Show them the plans") }
-                        OutlinedButton(onClick = { nav.navigate(webRoute("/api/contract" + (if (l != null) "?lead=${l.lead.id}" else ""))) }) { Text("📄 Show them the agreement") }
+                        OutlinedButton(onClick = { nav.navigate(pdfNav("/api/contract.pdf" + (if (l != null) "?lead=${l.lead.id}" else ""), "Agreement")) }) { Text("📄 Show them the agreement") }
                         OutlinedButton(onClick = { nav.navigate("playbook") }) { Text("💬 Plans & answers") }
                     }
                 }
@@ -318,9 +310,8 @@ fun WalkinScreen(state: AppState, nav: NavHostController, leadId: String?) {
                             Text("Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs.", style = MaterialTheme.typography.bodySmall, color = muted)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                                 OutlinedButton(onClick = { nav.navigate("plans/${l.lead.id}") }) { Text("📋 Show them the plans") }
-                                OutlinedButton(onClick = { nav.navigate(webRoute("/api/contract?lead=${l.lead.id}")) }) { Text("📄 Show them the agreement") }
-                                OutlinedButton(onClick = { nav.navigate(webRoute("/api/contract.pdf?lead=${l.lead.id}")) }) { Text("⬇ Agreement PDF") }
-                                OutlinedButton(onClick = { nav.navigate(webRoute("/api/ach.pdf?lead=${l.lead.id}")) }) { Text("🏦 Payment authorization form") }
+                                OutlinedButton(onClick = { nav.navigate(pdfNav("/api/contract.pdf?lead=${l.lead.id}", "Agreement")) }) { Text("📄 Show them the agreement") }
+                                OutlinedButton(onClick = { nav.navigate(pdfNav("/api/ach.pdf?lead=${l.lead.id}", "Payment authorization form")) }) { Text("🏦 Payment authorization form") }
                             }
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                                 plans.forEach { p ->

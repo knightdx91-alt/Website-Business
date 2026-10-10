@@ -45,7 +45,6 @@ import com.knightdx91.websitebusiness.net.Content
 import com.knightdx91.websitebusiness.net.PlanOffer
 import com.knightdx91.websitebusiness.net.PlanOptions
 import com.knightdx91.websitebusiness.net.planOptions
-import com.knightdx91.websitebusiness.webRoute
 
 /**
  * Plans & answers (owner and callers): what each plan gets them, why it's worth it, ways to pay, extras and what to
@@ -85,7 +84,7 @@ fun PlaybookScreen(state: AppState, nav: NavHostController) {
                 Text("What each plan gets them, why it's worth it, and what to say when they push back.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                     Button(onClick = { nav.navigate("plans") }) { Text("📋 Show the customer the plans") }
-                    OutlinedButton(onClick = { nav.navigate(webRoute("/api/contract")) }) { Text("📄 Read the agreement") }
+                    OutlinedButton(onClick = { nav.navigate(pdfNav("/api/contract.pdf", "Agreement")) }) { Text("📄 Read the agreement") }
                 }
             }
             item {

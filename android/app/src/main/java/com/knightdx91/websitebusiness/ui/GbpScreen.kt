@@ -60,7 +60,6 @@ import com.knightdx91.websitebusiness.net.gbpWriteKit
 import com.knightdx91.websitebusiness.net.gbpWritePosts
 import com.knightdx91.websitebusiness.net.gbpWriteReply
 import com.knightdx91.websitebusiness.net.gbpWriteSocial
-import com.knightdx91.websitebusiness.webRoute
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -257,7 +256,7 @@ fun GbpScreen(state: AppState, nav: NavHostController, leadId: String) {
                                 }
                                 "reviewcards" -> {
                                     if (l.noReviews) Text("Not for financial advisors: no review cards or review requests.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    else OutlinedButton(onClick = { nav.navigate(webRoute("/api/leads/$leadId/reviewcard")) }) { Text("Review cards (QR)") }
+                                    else OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/$leadId/reviewcard.pdf", "Review cards")) }) { Text("Review cards (QR)") }
                                 }
                                 else -> {}
                             }

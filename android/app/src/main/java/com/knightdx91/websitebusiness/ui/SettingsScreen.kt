@@ -73,7 +73,6 @@ import com.knightdx91.websitebusiness.net.str
 import com.knightdx91.websitebusiness.net.updateCaller
 import com.knightdx91.websitebusiness.net.usage
 import com.knightdx91.websitebusiness.update.Updater
-import com.knightdx91.websitebusiness.webRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -763,11 +762,10 @@ private fun PreviewCard(m: SettingsMeta, plan: String, onPlan: (String) -> Unit,
                 billingOptions.forEach { id -> FilterChip(selected = billingPicked == id, onClick = { onBilling(id) }, label = { Text(label(id)) }) }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
-                Button(onClick = { nav.navigate(webRoute("/api/contract?$qs")) }) { Text("Show the example agreement") }
-                OutlinedButton(onClick = { nav.navigate(webRoute("/api/contract.pdf?$qs")) }) { Text("⬇ Download as PDF") }
+                Button(onClick = { nav.navigate(pdfNav("/api/contract.pdf?$qs", "Agreement")) }) { Text("Show the example agreement (PDF)") }
             }
         }
-        TextButton(onClick = { nav.navigate(webRoute("/api/ach.pdf")) }, contentPadding = PaddingValues(0.dp), modifier = Modifier.padding(top = 4.dp)) { Text("⬇ Blank payment authorization form (ACH debit or card, PDF)") }
+        TextButton(onClick = { nav.navigate(pdfNav("/api/ach.pdf", "Payment authorization form")) }, contentPadding = PaddingValues(0.dp), modifier = Modifier.padding(top = 4.dp)) { Text("⬇ Blank payment authorization form (ACH debit or card, PDF)") }
         Hint("For clients who pay by invoice or want a paper authorization on file. Bank and card numbers go on the paper and into Stripe, never into this app.")
     }
 }

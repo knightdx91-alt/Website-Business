@@ -54,7 +54,6 @@ import com.knightdx91.websitebusiness.net.Api
 import com.knightdx91.websitebusiness.net.RouteLead
 import com.knightdx91.websitebusiness.net.flyerShown
 import com.knightdx91.websitebusiness.net.routeLeads
-import com.knightdx91.websitebusiness.webRoute
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
 import kotlin.math.asin
@@ -173,7 +172,7 @@ fun RouteScreen(state: AppState, nav: NavHostController) {
         scope.launch {
             // Marks a New lead Shown; the printable itself is a GET with no side effects.
             runCatching { state.api.flyerShown(id) }
-            nav.navigate(webRoute("/api/leads/$id/flyer"))
+            nav.navigate(pdfNav("/api/leads/$id/flyer.pdf", "Flyer"))
         }
     }
 
