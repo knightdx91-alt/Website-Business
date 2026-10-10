@@ -1055,6 +1055,7 @@
         ${isRt ? `${cb("giftCards", "They sell gift cards", !!ext.giftCards)}${cb("delivery", "They deliver", !!ext.delivery)}` : ""}
       </section>
       ${isParts ? partsEditCard(r, ext, cb, serviceLines) : ""}
+      ${isA && !isParts ? autoEditCard(r, ext, cb) : ""}
       ${isRt ? donationsEditCard(r, ext, cb) : ""}
       ${isF ? financeEditCard(r, ext, cb) : ""}
       ${isCh ? churchEditCard(r, ext, cb) : ""}
@@ -1064,6 +1065,7 @@
         ${isRt ? `<label class="field">${r.variant === "florist" ? "Online flower order page" : "Online shop (Shopify, Etsy, Facebook shop)"}<input name="shop" type="url" value="${esc(ext.shopUrl || "")}" placeholder="https://"></label>` : ""}
         ${isP ? `<label class="field">Email for artwork<input name="email" type="email" value="${esc(r.email || "")}" placeholder="orders@…"></label>` : ""}
         <label class="field">Online booking link<input name="booking" type="url" value="${esc(r.links.booking || "")}" placeholder="https://"></label>
+        ${isA && !isParts ? `<p class="small muted">Ask which shop software they use. Tekmetric: Settings → Online Booking gives a public “direct link” (or an embed; use the link). Shopmonkey: the Work Request form has a shareable public URL. ShopGenie: the online scheduling page has its own link. AutoLeap: the online booking page URL. Paste that link here and the site's main button becomes Book online.</p>` : ""}
         <label class="field">Facebook page<input name="facebook" type="url" value="${esc(r.links.social.facebook || "")}" placeholder="https://facebook.com/…"></label>
         <label class="field">Instagram<input name="instagram" type="url" value="${esc(r.links.social.instagram || "")}" placeholder="https://instagram.com/…"></label>
       </section>
@@ -1197,6 +1199,7 @@
           ...(isP ? { email: val("email"), designHelp: on("designHelp"), proofBeforePrint: on("proofBeforePrint"), ...(r.variant === "signs" ? { install: on("install") } : {}) } : {}),
           ...(isRt ? { giftCards: on("giftCards"), delivery: on("delivery"), donations: donationsEditValues(f) } : {}),
           ...(isParts ? { parts: partsEditValues(f) } : {}),
+          ...(isA && !isParts ? { auto: autoEditValues(f, r) } : {}),
           ...(isF ? { finance: financeEditValues(f, r) } : {}),
           ...(isCh ? { church: churchEditValues(f) } : {}),
           testimonials,
@@ -1605,6 +1608,58 @@
     return { counter, counterConfirmed: on("partsCounterOk"), turnaround: v("partsTurnaround"), commercial: on("partsCommercial"), commercialText: v("partsCommercialText"), program: v("partsProgram"), orderUrl: v("partsOrderUrl") };
   }
 
+  /* ---------- auto repair shops: amenities, programs, financing, and the towing / tire / body modules (research/trends-2026 §1) ---------- */
+  const AUTO_AMENITIES = [["loaner", "Loaner cars"], ["shuttle", "Shuttle service"], ["key_drop", "After-hours key drop"], ["wifi", "Waiting room with Wi-Fi"], ["digital_inspection", "Digital inspections texted to you"], ["second_opinion", "Free second opinions"], ["walk_ins", "Walk-ins welcome"], ["same_day", "Same-day service on most jobs"], ["towing", "Towing available"], ["spanish", "Spanish spoken"]];
+  const AUTO_PROGRAMS = ["NAPA AutoCare", "TechNet", "Jasper", "AAA Approved Auto Repair", "Bosch Service", "ASE Blue Seal", "RepairPal Certified", "BBB Accredited"];
+  function autoEditCard(r, x, cb) {
+    const v = r.variant;
+    const on = new Set(x.amenities || []);
+    const programs = x.programs || [];
+    const other = programs.filter((p) => !AUTO_PROGRAMS.includes(p));
+    const fin = x.financing || {};
+    const tow = x.tow || {};
+    const body = x.body || {};
+    const inp = (name, label, value, ph, type) => `<label class="field">${label}<input name="${name}" type="${type || "text"}" value="${esc(value || "")}" placeholder="${esc(ph || "")}"></label>`;
+    return `<section class="card"><h2>Auto shop details</h2>
+      <p class="small muted">Only what the owner confirms. Amenities go in a “Good to know” row under the opening; programs show as plain text (no logos).</p>
+      <h3>Good to know</h3>
+      ${AUTO_AMENITIES.map(([id, label]) => cb("am_" + id, label, on.has(id))).join("")}
+      <h3>Programs they belong to</h3>
+      ${AUTO_PROGRAMS.map((p, i) => cb("pg_" + i, p, programs.includes(p))).join("")}
+      ${inp("autoProgramsOther", "Other programs (comma separated)", other.join(", "), "Mitchell 1, Interstate Batteries dealer")}
+      <div class="row">${inp("autoFinLender", "Financing through <span class=\"hint\">lender name only; the site never states approval odds or “no credit check”</span>", fin.lender, "Synchrony Car Care")}${inp("autoFinUrl", "Apply link (optional)", fin.url, "https://", "url")}</div>
+      ${v === "towing" ? `<h3>Towing</h3>
+        ${inp("towPhone", "Tow line (if different from the shop number)", tow.phone, "(256) 555-0100", "tel")}
+        ${cb("towAlways", "Tow line is staffed 24/7 (owner confirmed; required before the site may say 24/7)", !!tow.always)}
+        ${inp("towYard", "Yard / pickup note (optional)", tow.yardNote, "Yard pickup weekdays 8 to 5; bring your ID and proof of ownership.")}` : ""}
+      ${v === "tire" ? `<h3>Tires</h3>
+        <label class="field">Brands they carry (one per line)<textarea name="tireBrands" rows="4" placeholder="Michelin&#10;Goodyear&#10;Cooper">${esc((x.tireBrands || []).join("\n"))}</textarea></label>
+        ${inp("tireStoreUrl", "Online tire store (adds “Shop tires online”)", x.storeUrl, "https://", "url")}` : ""}
+      ${v === "body" ? `<h3>Body shop</h3>
+        <label class="field">Insurance companies they work with (one per line)<textarea name="bodyInsurers" rows="4" placeholder="State Farm&#10;Alfa&#10;Progressive">${esc((body.insurers || []).join("\n"))}</textarea></label>
+        <label class="field">Certifications (one per line, their words)<textarea name="bodyCerts" rows="3" placeholder="I-CAR Gold Class&#10;Ford Certified Collision Network">${esc((body.certifications || []).join("\n"))}</textarea></label>
+        ${cb("bodyRight", "Show the “You choose the shop” right-to-choose line (owner confirmed)", !!body.rightToChooseConfirmed)}
+        ${inp("bodyEstimate", "Estimate note (optional)", body.estimateNote, "Text us photos of the damage and we'll give you a rough estimate the same day.")}
+        <p class="small muted">Before/after photos go in the Photo gallery card above (send 3 pairs).</p>` : ""}
+    </section>`;
+  }
+  function autoEditValues(f, r) {
+    const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
+    const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
+    const lines = (n) => (f.elements[n] ? f.elements[n].value.split("\n").map((x) => x.trim()).filter(Boolean) : undefined);
+    const programs = AUTO_PROGRAMS.filter((p, i) => on("pg_" + i)).concat((v("autoProgramsOther") || "").split(",").map((x) => x.trim()).filter(Boolean));
+    const out = {
+      amenities: AUTO_AMENITIES.map(([id]) => id).filter((id) => on("am_" + id)),
+      programs,
+      financing: v("autoFinLender") ? { lender: v("autoFinLender"), url: v("autoFinUrl") || "" } : null,
+      tow: r.variant === "towing" ? { phone: v("towPhone") || "", always: !!on("towAlways"), yardNote: v("towYard") || "" } : undefined,
+      tireBrands: r.variant === "tire" ? lines("tireBrands") : undefined,
+      storeUrl: r.variant === "tire" ? v("tireStoreUrl") : undefined,
+      body: r.variant === "body" ? { insurers: lines("bodyInsurers") || [], certifications: lines("bodyCerts") || [], rightToChooseConfirmed: !!on("bodyRight"), estimateNote: v("bodyEstimate") || "" } : undefined,
+    };
+    return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
+  }
+
   /* ---------- shops: donations (on by default for thrift stores) ---------- */
   function donationsEditCard(r, x, cb) {
     const d = x.donations || {};
@@ -1636,13 +1691,15 @@
     const p = x.pastor || {};
     const ta = (name, label, value, rows, ph) => `<label class="field">${label}<textarea name="${name}" rows="${rows}" placeholder="${esc(ph || "")}">${esc(value || "")}</textarea></label>`;
     const inp = (name, label, value, ph, type) => `<label class="field">${label}<input name="${name}" type="${type || "text"}" value="${esc(value || "")}" placeholder="${esc(ph || "")}"></label>`;
-    const lines = (x.schedule || []).map((s) => `${s.day} | ${s.time} | ${s.label}`).join("\n");
+    const k = x.kids || {};
+    const hd = x.hallDetails || {};
+    const lines = (x.schedule || []).map((s) => `${s.day} | ${s.time} | ${s.label}${s.lang === "es" ? " | es" : ""}`).join("\n");
     return `<section class="card"><h2>Church &amp; nonprofit details</h2>
       <p class="small muted">Only their own words. We never write beliefs, history or claims for them.</p>
       <label class="field">Kind of group<select name="chVariant">${CH_VARIANTS.map(([k, t]) => `<option value="${k}"${k === v ? " selected" : ""}>${t}</option>`).join("")}</select></label>
       ${v === "church" ? `${inp("chLabel", "How they describe their church <span class=\"hint\">e.g. “Missionary Baptist church”, or just “Church”</span>", x.traditionLabel)}
         ${cb("chLabelOk", "They confirmed this wording (required)", !!x.traditionConfirmed)}
-        ${ta("chSchedule", "Service times, one per line: <code>Day | Time | What</code>", lines, 5, "Sunday | 9:45 AM | Sunday School\nSunday | 11:00 AM | Worship\nWednesday | 6:30 PM | Prayer & Bible Study")}
+        ${ta("chSchedule", "Service times, one per line: <code>Day | Time | What</code> <span class=\"hint\">add <code>| es</code> for a Spanish service</span>", lines, 5, "Sunday | 9:45 AM | Sunday School\nSunday | 11:00 AM | Worship\nSunday | 2:00 PM | Servicio en español | es\nWednesday | 6:30 PM | Prayer & Bible Study")}
         ${cb("chScheduleOk", "They confirmed the service times (required)", !!x.scheduleConfirmed)}
         <h3>Plan a visit (their answers)</h3>
         ${inp("chParking", "Parking and which door", fv.parking)}${inp("chDress", "What people wear", fv.dress)}${inp("chKids", "Kids and nursery", fv.kids)}
@@ -1657,11 +1714,26 @@
         ${inp("chLive", "Watch live link (YouTube or Facebook)", x.liveUrl, "https://", "url")}
         ${inp("chSermons", "Past services / sermons link", x.sermonsUrl, "https://", "url")}
         ${cb("chSpanish", "They have services in Spanish", !!x.spanish)}
-        ${inp("chFacility", "Weddings & facility use (their policy)", x.facility)}` : ""}
+        ${inp("chFacility", "Weddings & facility use (their policy)", x.facility)}
+        <h3>Kids &amp; students (their words)</h3>
+        ${inp("chKidsNursery", "Nursery", k.nursery, "Birth through age 3, during Sunday School and worship")}${inp("chKidsKids", "Kids", k.kids, "Children's church for K to 5th grade during the 11:00 service")}
+        ${inp("chKidsStudents", "Students", k.students, "Youth meet Wednesdays at 6:30 in the fellowship hall")}${inp("chKidsCheckIn", "Check-in (only if they really do it)", k.checkIn)}
+        <h3>Links</h3>
+        ${inp("chPlanVisit", "Their own Plan-a-visit form (Church Center, Tithely…)", x.planVisitUrl, "https://", "url")}
+        ${inp("chConnectCard", "Connect card link", x.connectCardUrl, "https://", "url")}
+        ${inp("chPrayer", "Prayer requests go to <span class=\"hint\">a link, mailto:pastor@… or sms:+1256…; we never store requests</span>", x.prayerUrl, "mailto:")}
+        ${inp("chBulletin", "Bulletin / newsletter link", x.bulletinUrl, "https://", "url")}
+        ${inp("chApp", "Church app link", x.appUrl, "https://", "url")}
+        ${inp("chPodcast", "Podcast link", x.podcastUrl, "https://", "url")}
+        ${inp("chLiveNote", "Watch line (their words)", x.liveNote, "Live Sundays at 10:30 on Facebook")}` : ""}
       ${v === "charity" ? `${ta("chHelp", "Getting help: days, hours, who can come, what to bring (required)", x.help, 4)}` : ""}
       ${v === "civic_post" ? `${inp("chMeetings", "When and where they meet (required)", x.meetings, "2nd Tuesday, 6:30 PM, at the post home")}
         ${ta("chJoinText", "Who can join and how (their words)", x.joinText, 3)}${inp("chJoinUrl", "Join link (optional)", x.joinUrl, "https://", "url")}` : ""}
-      ${v === "civic_post" || v === "community_center" ? inp("chHall", "Hall rental (capacity, kitchen, how to book)", x.hall) : ""}
+      ${v === "civic_post" || v === "community_center" ? `${inp("chHall", "Hall rental (a sentence or two)", x.hall)}
+        <div class="row">${inp("chHallCap", "Seats (number)", hd.capacity, "150")}${inp("chHallTables", "Tables & chairs", hd.tables, "20 round tables, 160 chairs")}</div>
+        ${cb("chHallKitchen", "Kitchen available", !!hd.kitchen)}
+        ${inp("chHallHow", "How to book", hd.how, "Call the post home Tuesday to Friday, 10 to 2.")}` : ""}
+      ${v === "charity" ? inp("chVolunteerUrl", "Volunteer sign-up link", x.volunteerUrl, "https://", "url") : ""}
       ${v !== "church" ? `${inp("chDonate", "Donate link", x.donateUrl, "https://", "url")}${inp("chNeeded", "Items they need", x.needed)}${inp("chVolunteer", "How to volunteer", x.volunteer)}
         ${inp("chStatus", "Nonprofit status line (their words)", x.statusText, "We're a 501(c)(3); gifts are tax-deductible.")}
         ${cb("chStatusOk", "They confirmed this status line", !!x.deductibleConfirmed)}` : ""}
@@ -1670,7 +1742,12 @@
   function churchEditValues(f) {
     const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
     const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
-    const sched = f.elements.chSchedule ? f.elements.chSchedule.value.split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((p) => p.length >= 2 && p[0]).map((p) => (p.length === 2 ? { day: p[0], time: "", label: p[1] } : { day: p[0], time: p[1], label: p.slice(2).join(" ") || p[1] })) : undefined;
+    const sched = f.elements.chSchedule ? f.elements.chSchedule.value.split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((p) => p.length >= 2 && p[0]).map((p) => {
+      const es = p.length >= 4 && /^es$/i.test(p[p.length - 1]);
+      const parts = es ? p.slice(0, -1) : p;
+      const row = parts.length === 2 ? { day: parts[0], time: "", label: parts[1] } : { day: parts[0], time: parts[1], label: parts.slice(2).join(" ") || parts[1] };
+      return es ? Object.assign(row, { lang: "es" }) : row;
+    }) : undefined;
     const out = {
       variant: v("chVariant"), traditionLabel: v("chLabel"), traditionConfirmed: on("chLabelOk"), schedule: sched, scheduleConfirmed: on("chScheduleOk"),
       firstVisit: f.elements.chParking ? { parking: v("chParking"), dress: v("chDress"), kids: v("chKids"), length: v("chLength"), music: v("chMusic"), accessibility: v("chAccess") } : undefined,
@@ -1679,6 +1756,10 @@
       givingUrl: v("chGive"), liveUrl: v("chLive"), sermonsUrl: v("chSermons"), spanish: on("chSpanish"), facility: v("chFacility"),
       help: f.elements.chHelp ? f.elements.chHelp.value.trim() : undefined, meetings: v("chMeetings"), joinText: f.elements.chJoinText ? f.elements.chJoinText.value.trim() : undefined, joinUrl: v("chJoinUrl"), hall: v("chHall"),
       donateUrl: v("chDonate"), needed: v("chNeeded"), volunteer: v("chVolunteer"), statusText: v("chStatus"), deductibleConfirmed: on("chStatusOk"),
+      kids: f.elements.chKidsNursery ? { nursery: v("chKidsNursery"), kids: v("chKidsKids"), students: v("chKidsStudents"), checkIn: v("chKidsCheckIn") } : undefined,
+      planVisitUrl: v("chPlanVisit"), connectCardUrl: v("chConnectCard"), prayerUrl: v("chPrayer"), bulletinUrl: v("chBulletin"), appUrl: v("chApp"), podcastUrl: v("chPodcast"), liveNote: v("chLiveNote"),
+      hallDetails: f.elements.chHallCap ? { capacity: v("chHallCap"), kitchen: !!on("chHallKitchen"), tables: v("chHallTables"), how: v("chHallHow") } : undefined,
+      volunteerUrl: v("chVolunteerUrl"),
     };
     return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
   }
@@ -1687,9 +1768,21 @@
   /** Financial advisors may not use testimonials or reviews (Alabama 830-X-3-.22, SEC/FINRA rules). */
   const noReviews = (l) => l.category === "finance" && (l.record ? l.record.variant : "") === "financial_advisor";
   const FIN_VARIANTS = [["tax_prep", "Tax preparation"], ["accounting", "Accounting & bookkeeping"], ["insurance", "Insurance agency"], ["financial_advisor", "Financial advisor"]];
+  const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  /** "Name | pay URL | claims phone | claims URL" per line; names-only lines stay plain names. */
+  function carrierLines(list) {
+    return (list || []).map((c) => (typeof c === "string" ? c : [c.name, c.payUrl || "", c.claimsPhone || "", c.claimsUrl || ""].join(" | ").replace(/( \|\s*)+$/, ""))).join("\n");
+  }
+  function parseCarrierLines(text) {
+    return text.split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((p) => p[0]).map((p) => (p.length === 1 ? p[0] : { name: p[0], payUrl: p[1] || undefined, claimsPhone: p[2] || undefined, claimsUrl: p[3] || undefined }));
+  }
   function financeEditCard(r, x, cb) {
     const v = r.variant;
     const modes = x.modes || [];
+    const sh = x.seasonHours || {};
+    const ara = x.advisorReviewsApproved || {};
+    const peopleLines = (x.people || []).map((p) => [p.name, p.title || "", p.credentials || "", p.line || ""].join(" | ").replace(/( \|\s*)+$/, "")).join("\n");
+    const feeLines = (x.fees || []).map((p) => `${p.service} | ${p.price}`).join("\n");
     const ta = (name, label, value, rows, ph) => `<label class="field">${label}<textarea name="${name}" rows="${rows}" placeholder="${esc(ph || "")}">${esc(value || "")}</textarea></label>`;
     const inp = (name, label, value, ph, type) => `<label class="field">${label}<input name="${name}" type="${type || "text"}" value="${esc(value || "")}" placeholder="${esc(ph || "")}"></label>`;
     return `<section class="card"><h2>Tax &amp; finance details</h2>
@@ -1697,23 +1790,34 @@
       <label class="field">Type of office<select name="finVariant">${FIN_VARIANTS.map(([k, t]) => `<option value="${k}"${k === v ? " selected" : ""}>${t}</option>`).join("")}</select></label>
       ${inp("finCredentials", "Credentials line <span class=\"hint\">Their exact words, e.g. “Enrolled Agent” or “Jane Smith, CPA”</span>", x.credentials)}
       ${cb("finCredentialsConfirmed", "Owner confirmed the credentials line is right", !!x.credentialsConfirmed)}
+      ${ta("finPeople", "Who you'll work with, one person per line: <code>Name | Title | Credentials | One line</code>", peopleLines, 4, "Jane Smith | Owner | Enrolled Agent | Jane has prepared returns in Cullman since 2009.\nTom Lee | Bookkeeper | | Tom keeps the books for a dozen local businesses.")}
+      ${cb("finPeopleOk", "Owner confirmed every name and credential above (required while anyone is listed)", !!x.peopleConfirmed)}
+      ${inp("finWhoWeServe", "Who they serve (their words, optional)", x.whoWeServe, "farms, trucking companies and small contractors")}
+      ${ta("finFees", "Published fees (optional), one per line: <code>Service | Price</code> <span class=\"hint\">Published fees must be honored for 30 days after a change.</span>", feeLines, 3, "Form 1040 with W-2s | from $150\nSchedule C | from $250")}
+      ${inp("finFeesAsOf", "Fees as of (month and year)", x.feesAsOf, MONTHS_LONG[new Date().getMonth()] + " " + new Date().getFullYear())}
       ${v === "tax_prep" ? `${cb("finPtin", "Owner confirmed every paid preparer has a current PTIN (required)", !!x.ptinConfirmed)}
         ${cb("finEfile", "Owner confirmed they're an Authorized IRS e-file Provider (has an EFIN)", !!x.efileProvider)}
         ${inp("finOffSeason", "Hours after tax season", x.offSeason, "After April 15, Monday to Thursday 9 to 4, or by appointment")}
+        <h3>Tax season hours</h3>
+        <p class="small muted">Google's hours stay the regular set. Inside this window the site shows these first with a “Tax season hours” chip; outside it they move under the regular hours. The open/closed pill still follows Google's hours.</p>
+        <div class="row">${inp("finSeasonFrom", "From (MM-DD)", sh.from, "01-15")}${inp("finSeasonTo", "To (MM-DD)", sh.to, "04-15")}</div>
+        ${inp("finSeasonSummary", "Season hours (their words)", sh.summary, "Monday to Friday 8 to 7, Saturday 9 to 3")}
         ${ta("finBring", "What to bring (one per line; leave blank for the standard list)", (x.whatToBring || []).join("\n"), 5)}` : ""}
       ${v === "tax_prep" || v === "accounting" ? `${cb("finCpa", "Owner confirmed an Alabama CPA firm permit (required if “CPA” appears anywhere)", !!x.cpaPermitConfirmed)}${inp("finCpaNo", "Firm permit # (optional, shown in the footer)", x.cpaPermitNo)}` : ""}
       ${v === "insurance" ? `${cb("finIndependent", "Independent agency (works with several companies)", !!x.independent)}
-        ${ta("finCarriers", "Companies they're appointed with (one per line, names only)", (x.carriers || []).join("\n"), 4)}
+        ${ta("finCarriers", "Companies they're appointed with, one per line: <code>Name | pay-a-bill link | claims phone | claims link</code> <span class=\"hint\">A name alone is fine; links add a “Pay a bill / Report a claim” list.</span>", carrierLines(x.carriers), 5, "Progressive | https://account.progressive.com | 800-776-4737 | https://www.progressive.com/claims/\nAuto-Owners")}
+        <label class="field">Memberships (comma separated; text chips only, no logos)<input name="finMemberships" value="${esc((x.memberships || []).join(", "))}" placeholder="Trusted Choice, Big “I”"></label>
         ${cb("finLicenses", "Owner confirmed the agents shown are licensed in Alabama for these lines (required)", !!x.licensesConfirmed)}
         ${inp("finLicenseNo", "License # or NPN (optional, shown in the footer)", x.licenseNo)}
         ${cb("finMedicare", "They sell Medicare Advantage or Part D plans", !!x.medicare)}
-        ${ta("finTpmo", "Medicare disclaimer (required if they sell Medicare plans; paste the current wording from their carrier or FMO)", x.tpmoDisclaimer, 4)}` : ""}
+        ${ta("finTpmo", "Medicare disclaimer (required if they sell Medicare plans) <span class=\"hint\">Paste the current (October 2026) CMS wording from their carrier or FMO; the SHIP reference was removed, so an older paste is out of date.</span>", x.tpmoDisclaimer, 4)}` : ""}
       ${v === "financial_advisor" ? `<p class="small"><strong>Ask first:</strong> does their firm let them use their own website? Most need compliance approval.</p>
         ${ta("finDisclosure", "Firm disclosure text (required, word for word)", x.disclosure, 5, "Securities offered through …, Member FINRA/SIPC. Advisory services offered through …")}
         <div class="row">${inp("finApprovedBy", "Compliance approved by (required)", x.complianceApprovedBy)}${inp("finApprovedOn", "Approval date", x.complianceApprovedOn, "", "date")}</div>
         ${inp("finBrokercheck", "BrokerCheck link", x.brokercheckUrl, "https://brokercheck.finra.org/…", "url")}
         ${inp("finCrs", "Form CRS link", x.crsUrl, "https://", "url")}
-        <p class="small muted">Advisor sites never show reviews, ratings or testimonials.</p>` : ""}
+        <p class="small muted">Advisor sites show no reviews, ratings or testimonials by default. Alabama dropped its testimonial ban in Dec 2025, so if the firm's compliance department approves it in writing, fill in who and when and the site adds a reviews section with the SEC disclosure line under it.</p>
+        <div class="row">${inp("finRevBy", "Reviews approved by (compliance)", ara.by)}${inp("finRevOn", "Approval date", ara.on, "", "date")}</div>` : ""}
       ${cb("finSpanish", "Se habla español", !!x.spanish)}
       <div class="row">${cb("finDrop", "Drop-off", modes.includes("drop_off"))}${cb("finInPerson", "In person", modes.includes("in_person"))}${cb("finVirtual", "Virtual", modes.includes("virtual"))}</div>
       ${inp("finPortal", "Client portal link (document upload)", x.portalUrl, "https://", "url")}
@@ -1727,10 +1831,17 @@
       variant: v("finVariant"), credentials: v("finCredentials"), credentialsConfirmed: on("finCredentialsConfirmed"),
       ptinConfirmed: on("finPtin"), efileProvider: on("finEfile"), offSeason: v("finOffSeason"), whatToBring: lines("finBring"),
       cpaPermitConfirmed: on("finCpa"), cpaPermitNo: v("finCpaNo"),
-      independent: on("finIndependent"), carriers: lines("finCarriers"), licensesConfirmed: on("finLicenses"), licenseNo: v("finLicenseNo"), medicare: on("finMedicare"), tpmoDisclaimer: v("finTpmo"),
+      independent: on("finIndependent"), carriers: f.elements.finCarriers ? parseCarrierLines(f.elements.finCarriers.value) : undefined, licensesConfirmed: on("finLicenses"), licenseNo: v("finLicenseNo"), medicare: on("finMedicare"), tpmoDisclaimer: v("finTpmo"),
       disclosure: f.elements.finDisclosure ? f.elements.finDisclosure.value.trim() : undefined, complianceApprovedBy: v("finApprovedBy"), complianceApprovedOn: v("finApprovedOn"), brokercheckUrl: v("finBrokercheck"), crsUrl: v("finCrs"),
       spanish: on("finSpanish"), modes: [["finDrop", "drop_off"], ["finInPerson", "in_person"], ["finVirtual", "virtual"]].filter(([n]) => on(n)).map(([, m]) => m),
       portalUrl: v("finPortal"),
+      people: f.elements.finPeople ? f.elements.finPeople.value.split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((p) => p[0]).map((p) => ({ name: p[0], title: p[1] || "", credentials: p[2] || undefined, line: p.slice(3).join(" | ") || undefined })) : undefined,
+      peopleConfirmed: on("finPeopleOk"), whoWeServe: v("finWhoWeServe"),
+      fees: f.elements.finFees ? f.elements.finFees.value.split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((p) => p[0] && p[1]).map((p) => ({ service: p[0], price: p[1] })) : undefined,
+      feesAsOf: v("finFeesAsOf"),
+      seasonHours: f.elements.finSeasonSummary ? (v("finSeasonFrom") && v("finSeasonTo") && v("finSeasonSummary") ? { from: v("finSeasonFrom"), to: v("finSeasonTo"), summary: v("finSeasonSummary") } : null) : undefined,
+      memberships: f.elements.finMemberships ? v("finMemberships").split(",").map((x) => x.trim()).filter(Boolean) : undefined,
+      advisorReviewsApproved: f.elements.finRevBy ? (v("finRevBy") && v("finRevOn") ? { by: v("finRevBy"), on: v("finRevOn") } : null) : undefined,
     };
     return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
   }

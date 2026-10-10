@@ -3,7 +3,7 @@ import { z } from "zod";
 import { parseMenuText } from "../generator/menu.ts";
 import { parsePrice } from "../generator/price.ts";
 import { packFor } from "../generator/packs/index.ts";
-import { PARTS_COUNTER } from "../generator/packs/auto.ts";
+import { AUTO_AMENITY_IDS, PARTS_COUNTER } from "../generator/packs/auto.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import type { BusinessRecord, ConfirmableField, Copy, Service } from "../generator/types.ts";
 import { HttpError } from "./env.ts";
@@ -16,6 +16,14 @@ const url = z
   .max(500)
   .refine((u) => u.startsWith("https://") || u.startsWith("http://"), "Links must start with https://")
   .or(z.literal(""));
+// A link that may also be an email or text line (prayer requests): https, http, mailto: or sms:, never anything else.
+const contactUrl = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((u) => /^(https?:\/\/\S+|mailto:[^\s@]+@[^\s@]+|sms:\+?[\d-]+)$/i.test(u), "Use a web link, mailto: or sms:")
+  .or(z.literal(""));
+const shortList = (max: number, len = 60) => z.array(z.string().trim().min(1).max(len)).max(max);
 
 /** Everything the owner can change from the edit screen. Validated at the API boundary. */
 export const EditsSchema = z.object({
@@ -58,6 +66,19 @@ export const EditsSchema = z.object({
         })
         .partial()
         .optional(),
+      /** Auto repair shops (not parts stores): amenities, programs, financing and the towing / tire / body modules. */
+      auto: z
+        .object({
+          amenities: z.array(z.enum(AUTO_AMENITY_IDS as [string, ...string[]])).max(12),
+          programs: shortList(12, 40),
+          financing: z.object({ lender: z.string().trim().max(60), url }).partial().nullable(),
+          tow: z.object({ phone: z.string().trim().max(30), always: z.boolean(), yardNote: z.string().trim().max(300) }).partial().nullable(),
+          tireBrands: shortList(20, 40),
+          storeUrl: url,
+          body: z.object({ insurers: shortList(30), certifications: shortList(12), rightToChooseConfirmed: z.boolean(), estimateNote: z.string().trim().max(300) }).partial().nullable(),
+        })
+        .partial()
+        .optional(),
       /** Shops: the Donations section (on by default for thrift stores). */
       donations: z
         .object({
@@ -77,7 +98,7 @@ export const EditsSchema = z.object({
           variant: z.enum(["church", "civic_post", "charity", "community_center"]),
           traditionLabel: z.string().trim().max(80),
           traditionConfirmed: z.boolean(),
-          schedule: z.array(z.object({ day: z.string().trim().min(1).max(30), time: z.string().trim().max(30), label: z.string().trim().min(1).max(80) })).max(20),
+          schedule: z.array(z.object({ day: z.string().trim().min(1).max(30), time: z.string().trim().max(30), label: z.string().trim().min(1).max(80), lang: z.enum(["es"]).optional() })).max(20),
           scheduleConfirmed: z.boolean(),
           firstVisit: z.object({ parking: z.string().trim().max(300), dress: z.string().trim().max(300), kids: z.string().trim().max(300), length: z.string().trim().max(200), music: z.string().trim().max(200), accessibility: z.string().trim().max(300) }).partial(),
           pastor: z.object({ name: z.string().trim().max(80), title: z.string().trim().max(60), bio: z.string().trim().max(1500) }).partial(),
@@ -99,6 +120,16 @@ export const EditsSchema = z.object({
           hall: z.string().trim().max(600),
           statusText: z.string().trim().max(200),
           deductibleConfirmed: z.boolean(),
+          planVisitUrl: url,
+          connectCardUrl: url,
+          prayerUrl: contactUrl,
+          bulletinUrl: url,
+          appUrl: url,
+          podcastUrl: url,
+          liveNote: z.string().trim().max(160),
+          kids: z.object({ nursery: z.string().trim().max(300), kids: z.string().trim().max(300), students: z.string().trim().max(300), checkIn: z.string().trim().max(300) }).partial(),
+          volunteerUrl: url,
+          hallDetails: z.object({ capacity: z.string().trim().max(40), kitchen: z.boolean(), tables: z.string().trim().max(120), how: z.string().trim().max(300) }).partial(),
         })
         .partial()
         .optional(),
@@ -117,7 +148,9 @@ export const EditsSchema = z.object({
           offSeason: z.string().trim().max(240),
           whatToBring: z.array(z.string().trim().min(1).max(160)).max(25),
           independent: z.boolean(),
-          carriers: z.array(z.string().trim().min(1).max(60)).max(30),
+          carriers: z
+            .array(z.union([z.string().trim().min(1).max(60), z.object({ name: z.string().trim().min(1).max(60), payUrl: url.optional(), claimsPhone: z.string().trim().max(30).optional(), claimsUrl: url.optional() })]))
+            .max(30),
           licensesConfirmed: z.boolean(),
           licenseNo: z.string().trim().max(40),
           medicare: z.boolean(),
@@ -127,6 +160,14 @@ export const EditsSchema = z.object({
           complianceApprovedOn: z.string().trim().max(40),
           brokercheckUrl: url,
           crsUrl: url,
+          people: z.array(z.object({ name: z.string().trim().min(1).max(80), title: z.string().trim().max(80), credentials: z.string().trim().max(80).optional(), line: z.string().trim().max(200).optional() })).max(12),
+          peopleConfirmed: z.boolean(),
+          seasonHours: z.object({ from: z.string().regex(/^\d{2}-\d{2}$/), to: z.string().regex(/^\d{2}-\d{2}$/), summary: z.string().trim().max(200) }).nullable(),
+          memberships: shortList(8, 40),
+          whoWeServe: z.string().trim().max(160),
+          fees: z.array(z.object({ service: z.string().trim().min(1).max(80), price: z.string().trim().min(1).max(40) })).max(20),
+          feesAsOf: z.string().trim().max(30),
+          advisorReviewsApproved: z.object({ by: z.string().trim().max(120), on: z.string().trim().max(40) }).nullable(),
         })
         .partial()
         .optional(),
@@ -175,6 +216,13 @@ export const EditsSchema = z.object({
     .optional(),
 });
 export type Edits = z.infer<typeof EditsSchema>;
+
+/** Drops empty strings and empty arrays from an object; undefined when nothing is left. Owner fields are either filled or absent. */
+function tidy<T extends Record<string, unknown>>(o: T | null | undefined): T | undefined {
+  if (!o) return undefined;
+  const out = Object.fromEntries(Object.entries(o).filter(([, v]) => !(v === "" || v === undefined || (Array.isArray(v) && !v.length)))) as T;
+  return Object.keys(out).length ? out : undefined;
+}
 
 function serviceId(name: string): string {
   return name
@@ -228,6 +276,34 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
       for (const [k, v] of Object.entries(e.parts)) x[k] = v === "" ? undefined : v;
       r.ext.auto.parts = x as typeof r.ext.auto.parts;
     }
+    if (e.auto && r.variant !== "parts") {
+      const a = r.ext.auto;
+      const x = e.auto;
+      if (x.amenities !== undefined) a.amenities = x.amenities.length ? (x.amenities as typeof a.amenities) : undefined;
+      if (x.programs !== undefined) a.programs = x.programs.length ? x.programs : undefined;
+      if (x.financing !== undefined) a.financing = x.financing?.lender ? { lender: x.financing.lender, url: x.financing.url || undefined } : undefined;
+      if (x.tireBrands !== undefined) a.tireBrands = x.tireBrands.length ? x.tireBrands : undefined;
+      if (x.storeUrl !== undefined) a.storeUrl = x.storeUrl || undefined;
+      if (x.tow !== undefined) {
+        if (!x.tow) a.tow = undefined;
+        else {
+          let phone: string | undefined;
+          if (x.tow.phone) {
+            const p = normalizeUsPhone(x.tow.phone);
+            if (!p) throw new HttpError(400, "That tow number doesn't look like a US number");
+            phone = p.display;
+          }
+          a.tow = tidy({ phone, always: x.tow.always ?? a.tow?.always ?? false, yardNote: x.tow.yardNote }) as typeof a.tow;
+          if (a.tow && !a.tow.phone && !a.tow.always && !a.tow.yardNote) a.tow = undefined;
+        }
+      }
+      if (x.body !== undefined) {
+        a.body = x.body
+          ? { insurers: x.body.insurers ?? a.body?.insurers ?? [], certifications: x.body.certifications ?? a.body?.certifications ?? [], rightToChooseConfirmed: x.body.rightToChooseConfirmed ?? a.body?.rightToChooseConfirmed ?? false, estimateNote: x.body.estimateNote || undefined }
+          : undefined;
+        if (a.body && !a.body.insurers.length && !a.body.certifications.length && !a.body.rightToChooseConfirmed && !a.body.estimateNote) a.body = undefined;
+      }
+    }
   }
   if (r.category === "landscaping") {
     r.ext.landscaping = r.ext.landscaping ?? {};
@@ -252,7 +328,7 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
     }
   }
   if (r.category === "church" && e.church) {
-    const { variant, pastor, firstVisit, ...rest } = e.church;
+    const { variant, pastor, firstVisit, kids, hallDetails, ...rest } = e.church;
     if (variant) r.variant = variant;
     const x: Record<string, unknown> = { ...(r.ext.church ?? {}) };
     for (const [k, v] of Object.entries(rest)) x[k] = v === "" || (Array.isArray(v) && !v.length) ? undefined : v;
@@ -261,14 +337,27 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
       const fv = Object.fromEntries(Object.entries(firstVisit).filter(([, v]) => v));
       x.firstVisit = Object.keys(fv).length ? fv : undefined;
     }
+    if (kids) x.kids = tidy(kids);
+    if (hallDetails) {
+      const h = tidy({ ...hallDetails, kitchen: hallDetails.kitchen || undefined });
+      x.hallDetails = h;
+    }
     r.ext.church = x as typeof r.ext.church;
   }
   if (r.category === "finance" && e.finance) {
-    const { variant, ...rest } = e.finance;
+    const { variant, people, seasonHours, carriers, advisorReviewsApproved, ...rest } = e.finance;
     if (variant) r.variant = variant;
     const x: Record<string, unknown> = { ...(r.ext.finance ?? {}) };
     // Empty text clears a field; everything here is the owner's own wording or confirmation.
     for (const [k, v] of Object.entries(rest)) x[k] = v === "" || (Array.isArray(v) && !v.length) ? undefined : v;
+    if (people !== undefined) x.people = people.length ? people.map((p) => ({ ...(tidy({ credentials: p.credentials, line: p.line }) ?? {}), name: p.name, title: p.title })) : undefined;
+    if (seasonHours !== undefined) x.seasonHours = seasonHours?.summary ? seasonHours : undefined;
+    if (carriers !== undefined) {
+      // Names-only entries stay strings (compatible with older records); entries with any link become objects.
+      const list = carriers.map((c) => (typeof c === "string" ? c : (tidy(c) as typeof c))).filter(Boolean).map((c) => (typeof c === "string" ? c : Object.keys(c).length === 1 ? c.name : c));
+      x.carriers = list.length ? list : undefined;
+    }
+    if (advisorReviewsApproved !== undefined) x.advisorReviewsApproved = advisorReviewsApproved?.by && advisorReviewsApproved.on ? advisorReviewsApproved : undefined;
     r.ext.finance = x as typeof r.ext.finance;
   }
   if (r.category === "cleaning") {

@@ -1,8 +1,10 @@
 import { actions, type ActionId } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, steps, todo, visit, type Ctx, serviceList } from "../components.ts";
+import { about, chips, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, steps, todayIso, todo, visit, type Ctx, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html, raw, type Raw } from "../html.ts";
-import type { BusinessRecord, Faq, Service } from "../types.ts";
+import { icon } from "../icons.ts";
+import { normalizeUsPhone, telHref } from "../phone.ts";
+import type { BusinessRecord, Faq, FinanceCarrier, FinanceExt, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 /**
@@ -129,6 +131,29 @@ export const isAdvisor = (r: BusinessRecord) => r.category === "finance" && r.va
 /** "CPA" anywhere (name or credentials) needs the Alabama firm permit confirmed (§5.3). */
 export const mentionsCpa = (r: BusinessRecord) => /\bc\.?p\.?a\.?s?\b|certified public/i.test(`${r.name} ${r.ext.finance?.credentials ?? ""}`);
 
+/** Carriers as objects, whether the record holds the older names-only list or the service-centre form. */
+export function carrierItems(f: FinanceExt | undefined): FinanceCarrier[] {
+  return (f?.carriers ?? []).map((c) => (typeof c === "string" ? { name: c } : c)).filter((c) => c.name);
+}
+
+/** True when today (MM-DD) falls inside the owner's season window; a window may wrap the year (11-01 to 02-15). */
+export function inSeason(season: { from: string; to: string } | undefined, today = todayIso().slice(5)): boolean {
+  if (!season || !/^\d{2}-\d{2}$/.test(season.from) || !/^\d{2}-\d{2}$/.test(season.to)) return false;
+  return season.from <= season.to ? today >= season.from && today <= season.to : today >= season.from || today <= season.to;
+}
+
+/** "Jan 2 to Apr 15" from MM-DD bounds. */
+function seasonLabel(season: { from: string; to: string }): string {
+  const M = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const f = (s: string) => `${M[Number(s.slice(0, 2)) - 1] ?? ""} ${Number(s.slice(3))}`;
+  return `${f(season.from)} to ${f(season.to)}`;
+}
+
+/** Advisors may show reviews only once the firm's compliance department has approved it (research/trends-2026 §2E). */
+export const advisorReviewsOk = (r: BusinessRecord) => isAdvisor(r) && !!(r.ext.finance?.advisorReviewsApproved?.by && r.ext.finance.advisorReviewsApproved.on);
+
+const COVERAGE = ["Auto", "Home", "Life", "Business", "Other"];
+
 function first(r: BusinessRecord): ActionId[] {
   const book = !!r.links.booking;
   if (r.variant === "insurance") return ["call", "quote"];
@@ -159,7 +184,7 @@ function dataFaq(ctx: Ctx): Faq[] {
     if (f.offSeason) out.push({ q: "Are you open after tax season?", a: f.offSeason });
   }
   if (r.variant === "insurance") {
-    if (f.carriers?.length) out.push({ q: "Which companies do you work with?", a: `We work with ${f.carriers.join(", ")}. Call us and we'll help you compare.` });
+    if (carrierItems(f).length) out.push({ q: "Which companies do you work with?", a: `We work with ${carrierItems(f).map((c) => c.name).join(", ")}. Call us and we'll help you compare.` });
     out.push({ q: "What do I need for a quote?", a: "Your name, address and the coverage you want. For auto, the drivers and vehicles. Call or send a request and we'll take it from there." });
   }
   if (r.variant === "financial_advisor" && f.brokercheckUrl) out.push({ q: "Where can I check your background?", a: "Anyone can look up a financial professional's background on FINRA BrokerCheck. The link is on our disclosures page." });
@@ -204,8 +229,14 @@ export const financePack: CategoryPack = {
     const r = ctx.r;
     const f = r.ext.finance ?? {};
     const label = r.variant === "insurance" ? (f.independent ? "Independent insurance agency" : "Insurance agency") : LABEL[r.variant] ?? "Tax & finance";
-    const chips = [...(f.modes ?? []).map((m) => MODE_LABEL[m]).filter((x): x is string => !!x), ...(f.spanish ? ["Se habla español"] : [])];
+    const season = r.variant === "tax_prep" && f.seasonHours?.summary ? f.seasonHours : undefined;
+    const inWindow = inSeason(season);
+    const stripChips = [...(f.modes ?? []).map((m) => MODE_LABEL[m]).filter((x): x is string => !!x), ...(f.spanish ? ["Se habla español"] : []), ...(season && inWindow ? ["Tax season hours"] : [])];
     const tools = actions(r, ["portal", "book"]);
+    const rep = r.reputation;
+    const quoteNote = ctx.reviewsAllowed !== false && rep.rating && rep.count && rep.count >= 10 && r.mapsUrl
+      ? html`<p class="lead"><a href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("star", 18)} ${rep.rating.toFixed(1)} on Google · ${rep.count} reviews<span class="sr"> (opens in new tab)</span></a></p>`
+      : undefined;
     return html`${hero(ctx, {
       eyebrow: r.name,
       h1: `${r.variant === "insurance" ? "Insurance" : label} in ${r.address.city}, ${r.address.state}`,
@@ -215,14 +246,17 @@ export const financePack: CategoryPack = {
       actions: actions(r, first(r)),
       badge: r.foundedYear && ctx.theme.knobs.badge === "seal" ? `Since ${r.foundedYear}` : undefined,
     })}
-${infoStrip(ctx, chips)}
+${infoStrip(ctx, stripChips)}
 <main id="main">
 <section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
 <span class="section__label">${label}</span><h2 class="section__title" id="services-title">${r.variant === "insurance" ? "Coverage we can help with" : "How we can help"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
 ${serviceList(ctx, r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
+${f.whoWeServe ? html`<p class="lead" id="who"><strong>Who we serve:</strong> ${f.whoWeServe}.</p>` : ""}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Tick the services you offer", "We started with the usual list for an office like yours. Tell us what to keep, remove or add.", true)}
 </div></section>
+${people(ctx)}
+${fees(ctx)}
 <section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">
 ${sectionHead("How it works", r.variant === "tax_prep" ? "Getting your taxes done" : r.variant === "insurance" ? "Getting the right coverage" : "Working with us", undefined, "how-title")}
 ${steps(ctx.copy.steps?.length ? ctx.copy.steps : STEPS[r.variant] ?? STEPS.tax_prep!)}
@@ -232,11 +266,13 @@ ${r.variant !== "insurance" && !f.portalUrl ? todo(ctx, "Do you use a client por
 </div></section>
 ${r.variant === "insurance" ? insuranceBand(ctx) : ""}
 ${gallery(ctx, "Send photos of your office", "A photo of your front door and one of you or your team. People like to see who they'll be talking to about their money.")}
-${isAdvisor(r) ? "" : reviews(ctx)}
+${isAdvisor(r) ? (advisorReviewsOk(r) ? html`${reviews(ctx)}<div class="wrap"><p class="disclosure" id="reviews-disclosure">These reviews were given by clients; no compensation was paid. Conflicts of interest: none.</p></div>` : "") : reviews(ctx)}
 ${about(ctx, `About ${r.name}`)}
-${visit(ctx, "Visit our office")}
+${visit(ctx, "Visit our office", season ? seasonHours(season, inWindow) : {})}
 ${faq([...dataFaq(ctx), ...ctx.copy.faq].slice(0, 6), true)}
-${contactForm(ctx, r.services.map((s) => s.name), [], [], "Leave your name and number and we'll call you back. Please don't send tax documents, Social Security numbers or account numbers through this form.")}
+${r.variant === "insurance"
+  ? contactForm(ctx, [...COVERAGE.slice(0, 4), ...(f.medicare ? ["Medicare"] : []), "Other"], [], [], "Pick the coverage, leave your name and number, and we'll call you back to go over options. Please don't send policy numbers, Social Security numbers or documents through this form.", { title: "Start a quote", label: "Quote", topic: "Quote", button: "Start my quote", serviceLabel: "What would you like a quote for?", serviceFirst: true, note: quoteNote })
+  : contactForm(ctx, r.services.map((s) => s.name), [], [], "Leave your name and number and we'll call you back. Please don't send tax documents, Social Security numbers or account numbers through this form.")}
 ${ctaBand(ctx, actions(r, first(r)))}
 ${requiredChecks(ctx)}
 </main>`;
@@ -283,7 +319,7 @@ ${f.brokercheckUrl || f.crsUrl ? "" : todo(ctx, "Add your BrokerCheck and Form C
     }. 6th-8th grade reading level, short sentences, name the town. Never claim or invent: credentials or titles (CPA, enrolled agent, CFP, licensed, certified, registered, bonded), "IRS-approved" or e-file wording, years in business, numbers of clients or carriers, refund size or speed ("maximum", "fast", "guaranteed" refunds), avoiding audits, rates or savings ("lowest", "cheapest", "affordable", "save"), carrier names, "free", "fiduciary", "fee-only", "independent", "wealth management", any tax, insurance or investment advice or tax-law facts (deductions, limits, deadlines), predictions or performance, "notario" or immigration services. Describe services, not outcomes.`,
     fields: {
       heroTagline: `One sentence (12-22 words) introducing the services list: what kind of help the office gives people and businesses around ${r.address.city}. No outcomes or claims.`,
-      heroSub: "One line (12-22 words) under the headline: who they help, built only from the facts given. No superlatives, no promises.",
+      heroSub: `One line (12-22 words) under the headline: who they help, built only from the facts given${r.ext.finance?.whoWeServe ? ` (the owner says they serve ${r.ext.finance.whoWeServe}; you may say so)` : ""}. No superlatives, no promises.`,
       serviceBlurbs: "For each service id, one line (8-16 words) describing the service in plain words. Never outcomes (bigger refund, savings, lower rates), never prices.",
       faq: "4-5 questions people ask about working with this office (appointments, how it works, what happens next) with short answers (30-60 words) about the office only. Never answer tax, insurance or investment questions, never state deadlines, rules, limits or prices. End with an invitation to call when specifics are needed.",
       about:
@@ -294,14 +330,58 @@ ${f.brokercheckUrl || f.crsUrl ? "" : todo(ctx, "Add your BrokerCheck and Form C
   }),
 };
 
-/** Coverage band for insurance: who they work with (owner's list only) and the Medicare disclaimer when it applies. */
+/** Coverage band for insurance: who they work with (owner's list only), memberships, the per-carrier service centre and the Medicare disclaimer. */
 function insuranceBand(ctx: Ctx): Raw {
   const f = ctx.r.ext.finance ?? {};
+  const carriers = carrierItems(f);
+  const centre = carriers.filter((c) => c.payUrl || c.claimsPhone || c.claimsUrl);
   return html`<section class="section" id="companies" aria-labelledby="companies-title"><div class="wrap narrow">
-${sectionHead(f.independent ? "Independent agency" : "Our agency", f.independent ? "We shop more than one company for you" : "Help from people you know", f.carriers?.length ? `Companies we work with: ${f.carriers.join(", ")}.` : undefined, "companies-title")}
-${f.carriers?.length ? "" : todo(ctx, "Which companies do you work with?", "Send us the list of insurance companies you're appointed with. We list them by name only (no logos unless the company allows it).")}
+${sectionHead(f.independent ? "Independent agency" : "Our agency", f.independent ? "We shop more than one company for you" : "Help from people you know", carriers.length ? `Companies we work with: ${carriers.map((c) => c.name).join(", ")}.` : undefined, "companies-title")}
+${f.memberships?.length ? html`<p><strong>Member of</strong></p>${chips(f.memberships, "Memberships")}` : ""}
+${carriers.length ? "" : todo(ctx, "Which companies do you work with?", "Send us the list of insurance companies you're appointed with. We list them by name only (no logos unless the company allows it).")}
+${centre.length ? html`<h3 id="service-center">Pay a bill or report a claim</h3><p>Go straight to your company, or call us and we'll help.</p>
+<ul class="svcctr">${centre.map((c) => {
+    const tel = c.claimsPhone ? normalizeUsPhone(c.claimsPhone) : null;
+    return html`<li><strong>${c.name}</strong>${c.payUrl ? html`<a href="${c.payUrl}" target="_blank" rel="noopener">Pay a bill<span class="sr"> (opens in new tab)</span></a>` : ""}${
+      c.claimsUrl ? html`<a href="${c.claimsUrl}" target="_blank" rel="noopener">Report a claim<span class="sr"> (opens in new tab)</span></a>` : ""
+    }${c.claimsPhone ? html`<span>Claims: ${tel ? html`<a href="${telHref(tel.e164)}">${tel.display}</a>` : c.claimsPhone}</span>` : ""}</li>`;
+  })}</ul>` : ""}
 ${f.medicare ? (f.tpmoDisclaimer ? html`<p class="disclosure">${f.tpmoDisclaimer}</p>` : "") : ""}
 </div></section>`;
+}
+
+/** "Who you'll work with": names, titles and credentials exactly as given. Required confirmation while anyone is listed. */
+function people(ctx: Ctx): Raw {
+  const f = ctx.r.ext.finance ?? {};
+  const list = (f.people ?? []).filter((p) => p.name);
+  if (!list.length) return raw("");
+  return html`<section class="section section--band" id="people" aria-labelledby="people-title"><div class="wrap">
+${sectionHead("Our team", "Who you'll work with", undefined, "people-title")}
+<ul class="cards${list.length > 2 ? " cards--3" : ""}">${list.map(
+    (p) => html`<li class="card"><h3>${p.name}</h3><p class="role">${[p.title, p.credentials].filter(Boolean).join(" · ")}</p>${p.line ? html`<p>${p.line}</p>` : ""}</li>`,
+  )}</ul>
+${f.peopleConfirmed ? "" : todo(ctx, "Confirm names and credentials", "Check every name, title and credential in the team section is exactly right (EA, CPA, CFP®, licensed agent). We never add titles you didn't give us.", true)}
+</div></section>`;
+}
+
+/** Published fees (owner's list) with the month they were last set; Circular 230 says published fees must be honored 30 days. */
+function fees(ctx: Ctx): Raw {
+  const f = ctx.r.ext.finance ?? {};
+  const list = (f.fees ?? []).filter((x) => x.service && x.price);
+  if (!list.length) return raw("");
+  return html`<section class="section" id="fees" aria-labelledby="fees-title"><div class="wrap narrow">
+${sectionHead("Fees", "What it costs", undefined, "fees-title")}
+<ul class="svc svc--table">${list.map((x) => html`<li><div class="svc__row"><h3>${x.service}</h3><span class="svc__dots" aria-hidden="true"></span><span class="price">${x.price}</span></div></li>`)}</ul>
+<p class="muted">${f.feesAsOf ? `Fees shown as of ${f.feesAsOf}; call to confirm.` : "Call to confirm current fees."}</p>
+${f.feesAsOf ? "" : todo(ctx, "When were these fees last set?", "Give us the month and year (for example “October 2026”). Published fees must be honored for 30 days after they're changed, so the site says when they were set.")}
+</div></section>`;
+}
+
+/** Tax season hours around the Google (regular) hours: whichever applies today comes first, with a chip. */
+function seasonHours(season: NonNullable<FinanceExt["seasonHours"]>, inWindow: boolean): { before?: Raw; after?: Raw } {
+  const seasonBlock = (now: boolean) => html`<div class="season${now ? "" : " season--after"}"><h3>Tax season hours${now ? html` <span class="chip">${icon("clock", 14)}Now</span>` : ""}</h3><p>${seasonLabel(season)}: ${season.summary}</p></div>`;
+  const regular = html`<h3>${inWindow ? "Rest of the year" : "Hours"}</h3>`;
+  return inWindow ? { before: html`${seasonBlock(true)}${regular}` } : { before: regular, after: seasonBlock(false) };
 }
 
 /**
@@ -316,7 +396,7 @@ function requiredChecks(ctx: Ctx): Raw {
   if (r.variant === "tax_prep" && !f.ptinConfirmed) out.push(todo(ctx, "Confirm every paid preparer has a current PTIN", "The IRS requires one for anyone paid to prepare returns. It doesn't go on the site; we just need your OK.", true));
   if (mentionsCpa(r) && !f.cpaPermitConfirmed) out.push(todo(ctx, "Confirm your Alabama CPA firm permit", "Using “CPA” in your name or titles needs a firm permit from the Alabama State Board of Public Accountancy. Confirm you have one (the permit number can go in the footer).", true));
   if (r.variant === "insurance" && !f.licensesConfirmed) out.push(todo(ctx, "Confirm your agents are licensed", "Confirm each agent named on the site holds an Alabama producer license for the coverage shown.", true));
-  if (r.variant === "insurance" && f.medicare && !f.tpmoDisclaimer) out.push(todo(ctx, "Paste the Medicare disclaimer", "Agencies selling Medicare Advantage or Part D plans must show the CMS disclaimer. Paste the current wording from your carrier or FMO, with your numbers.", true));
+  if (r.variant === "insurance" && f.medicare && !f.tpmoDisclaimer) out.push(todo(ctx, "Paste the Medicare disclaimer", "Agencies selling Medicare Advantage or Part D plans must show the CMS third-party marketing disclaimer. Paste the current (October 2026) CMS wording from your carrier or FMO, with your numbers; the SHIP reference was removed in that update, so an older paste is out of date.", true));
   if (isAdvisor(r)) {
     if (!f.disclosure) out.push(todo(ctx, "Paste your firm's disclosure text", "Word for word from your firm. It shows in the footer of every page.", true));
     if (!f.complianceApprovedBy || !f.complianceApprovedOn) out.push(todo(ctx, "Get your compliance department's approval", "Most firms must approve a website before it goes live. Send them the preview link, then tell us who approved it and when.", true));

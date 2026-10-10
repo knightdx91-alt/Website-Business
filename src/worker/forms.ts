@@ -3,12 +3,15 @@ import { getLead } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 
 // Every FormField name the generator can render (src/generator/components.ts), plus the hidden topic a special form sets.
-const FIELDS = ["topic", "name", "phone", "email", "service", "vehicle", "frequency", "home_size", "property", "quantity", "year", "make", "model", "part", "items", "address", "best_day", "town", "message"] as const;
+const FIELDS = ["topic", "name", "phone", "email", "service", "vehicle", "frequency", "home_size", "property", "quantity", "year", "make", "model", "part", "items", "address", "best_day", "tire_size", "brand", "town", "message"] as const;
 
-/** One line for the notification: what they asked for (service, the part and vehicle, or the pickup items). */
+/** One line for the notification: what they asked for (service, the part and vehicle, the tire size ×4, or the pickup items). */
 export function requestSummary(data: Record<string, string>): string {
   const vehicle = [data.year, data.make, data.model].filter(Boolean).join(" ") || data.vehicle;
-  const bits = [data.service, data.part, vehicle, data.items, data.address, data.best_day ? `best day ${data.best_day}` : "", data.town].filter(Boolean);
+  // "265/70R17 ×4" or "2014 Ford F-150 ×4": the quantity rides on the thing being quoted.
+  const qty = data.quantity && /^\d+$/.test(data.quantity) ? ` ×${data.quantity}` : data.quantity ? ` (${data.quantity})` : "";
+  const sized = data.tire_size ? `${data.tire_size}${qty}` : "";
+  const bits = [data.service, data.part, sized, sized ? (data.tire_size && vehicle ? vehicle : "") : vehicle ? `${vehicle}${qty}` : "", data.brand, data.items, data.address, data.best_day ? `best day ${data.best_day}` : "", data.town].filter(Boolean);
   const what = bits.join(" · ");
   return data.topic ? `${data.topic}${what ? `: ${what}` : ""}` : what;
 }

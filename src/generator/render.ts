@@ -81,7 +81,7 @@ ${ogImage ? html`<meta property="og:image" content="${ogImage}">${heroImg!.width
 <script type="application/ld+json">${jsonForScript(o.jsonLd)}</script>
 ${hasAnyHours(ctx.r.hours) ? html`<script type="application/json" id="hours-data">${jsonForScript({ tz: ctx.r.timezone, hours: ctx.r.hours })}</script>` : ""}
 </head><body>
-${header(ctx, nav)}
+${header(ctx, nav, { utilityLine: pack.utilityLine?.(ctx) })}
 ${o.body}
 ${footer(ctx, nav, { note: pack.footerNote?.(ctx), reviews: pack.reviewsAllowed?.(ctx.r) ?? true })}
 ${actionBar(pack.actionBar(ctx), ctx.theme.dna)}

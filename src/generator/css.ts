@@ -256,6 +256,26 @@ ${divider}
 .about{display:grid;gap:28px}
 @media (min-width:900px){.about--photo{grid-template-columns:1fr 1fr;align-items:center}}
 .about img{border-radius:var(--radius)}
+/* category modules (auto / finance / church, Oct 2026) */
+.util__rev .i{color:var(--accent)}
+.hero__note{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-weight:700;font-size:1.05rem;margin:0 0 1.2rem}
+.hero__note .chip{background:var(--surface);color:var(--text)}
+.amen{background:var(--surface);border-bottom:1px solid ${withAlpha(c.text, 0.1)};padding:14px 0 12px}
+.amen .section__label{margin-bottom:.2rem}
+.tow{background:var(--primary);color:var(--on-primary)}
+.tow__in{display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px;padding:14px 20px;max-width:1120px;margin:0 auto}
+.tow__lead{font:${t.headingWeight} 1.25rem/1.2 var(--hf);margin:0}
+.tow__in a{color:inherit;font-weight:700}
+.tow__num{font-size:1.35rem;white-space:nowrap}
+.tow__note{margin:0;font-size:.95rem;flex:1 1 100%}
+.chips+h3,.chips+p,.chips+.btns{margin-top:1rem}
+.card .role{margin:0 0 .5em;color:var(--muted);font-weight:600}
+.svcctr{list-style:none;margin:20px 0 0;padding:0}
+.svcctr li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 18px;padding:12px 0;border-bottom:1px solid ${withAlpha(c.text, 0.15)}}
+.svcctr strong{flex:1 1 12em}
+.season{margin:0 0 20px}.season h3{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 .3em;font-size:1.1rem}.season p{margin:0}.season+.hours{margin-top:4px}
+.season--after{margin:20px 0 0}
+.schedule__lang{font-size:.78rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--band);color:var(--text);margin-left:auto;align-self:center}
 ${dnaCss(t)}
 ${scopeLayoutCss(layoutCss(t), t.dna)}`;
 }

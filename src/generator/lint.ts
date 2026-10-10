@@ -1,4 +1,5 @@
 import { hoursSummary } from "./hours.ts";
+import { extraPhones } from "./phone.ts";
 import type { BuildMode, BusinessRecord, Copy } from "./types.ts";
 
 export interface LintResult {
@@ -109,6 +110,7 @@ export function lintSite(input: LintInput): LintResult {
   const errors: string[] = [];
   const blockers: string[] = [];
   const warnings: string[] = [];
+  const okTel = new Set([`tel:${r.phone.e164}`, ...extraPhones(r).map((p) => `tel:${p}`)]);
 
   for (const { path, html } of pages) {
     const text = visibleText(html);
@@ -124,7 +126,7 @@ export function lintSite(input: LintInput): LintResult {
     for (const m of html.matchAll(/href="([^"]*)"/g)) {
       const href = m[1]!;
       if (href === "#" || href === "") errors.push(`${path}: empty or "#" link`);
-      if (href.startsWith("tel:") && href !== `tel:${r.phone.e164}`) errors.push(`${path}: phone link ${href} doesn't match ${r.phone.e164}`);
+      if (href.startsWith("tel:") && !okTel.has(href)) errors.push(`${path}: phone link ${href} doesn't match ${r.phone.e164}`);
     }
     for (const m of html.matchAll(/<img\b[^>]*>/g)) {
       if (!/\balt="/.test(m[0])) errors.push(`${path}: image without alt text`);

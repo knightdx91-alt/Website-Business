@@ -79,6 +79,7 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
         return { id, label: ins ? "Get a quote" : "Request a call back", short: ins ? "Quote" : "Call back", href: "#contact", external: false, icon: "clipboard" };
       }
       if (r.category === "auto" && r.variant === "parts") return { id, label: "Reserve a part", short: "Reserve", href: "#reserve", external: false, icon: "clipboard" };
+      if (r.category === "auto" && r.variant === "tire") return { id, label: "Get a tire quote", short: "Tire quote", href: "#contact", external: false, icon: "clipboard" };
       const free = freeEstimates(r);
       const label = free ? (r.category === "contractor" || r.category === "auto" ? "Get a free estimate" : "Get a free quote") : r.category === "auto" ? "Request an appointment" : r.category === "contractor" ? "Request service" : r.category === "print" ? "Get a quote" : "Request a quote";
       return { id, label, short: free ? (r.category === "contractor" || r.category === "auto" ? "Estimate" : "Free quote") : r.category === "auto" ? "Request" : "Quote", href: "#contact", external: false, icon: "clipboard" };
@@ -96,8 +97,12 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
       if (!url) return null;
       return { id, label: r.variant === "tax_prep" ? "Upload your documents" : "Client portal", short: r.variant === "tax_prep" ? "Upload" : "Portal", href: url, external: true, icon: "clipboard" };
     }
-    case "visit":
+    case "visit": {
+      // The church's own Plan-a-visit form (Church Center, Tithely…) wins over our anchor when they have one.
+      const own = r.ext.church?.planVisitUrl;
+      if (own) return { id, label: "Plan a visit", short: "Visit", href: own, external: true, icon: "calendar" };
       return { id, label: r.ext.church?.tradition === "catholic" ? "Mass times" : "Plan a visit", short: r.ext.church?.tradition === "catholic" ? "Mass" : "Visit", href: r.ext.church?.tradition === "catholic" ? "#times" : "#plan", external: false, icon: "calendar" };
+    }
     case "watch":
       return r.ext.church?.liveUrl ? { id, label: "Watch live", short: "Watch", href: r.ext.church.liveUrl, external: true, icon: "arrow" } : null;
     case "give":

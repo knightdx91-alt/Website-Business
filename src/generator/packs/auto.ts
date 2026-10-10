@@ -1,9 +1,11 @@
 import { action, actions } from "../actions.ts";
-import { about, button, cardGrid, contactForm, ctaBand, faq, hero, infoStrip, reviews, sectionHead, serviceArea, serviceList, steps, todo, visit, type Ctx } from "../components.ts";
+import { about, button, cardGrid, chips, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, serviceArea, serviceList, steps, todo, visit, type Ctx, type FormField } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
-import { html, type Raw } from "../html.ts";
-import type { IconName } from "../icons.ts";
-import type { AutoPartsExt, BusinessRecord, PartsCounterService, Service } from "../types.ts";
+import { html, raw, type Raw } from "../html.ts";
+import { icon, type IconName } from "../icons.ts";
+import { aiTextOf } from "../lint.ts";
+import { normalizeUsPhone, smsHref, telHref } from "../phone.ts";
+import type { AutoAmenity, AutoPartsExt, BusinessRecord, PartsCounterService, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 export function autoVariant(primaryType: string | undefined, types: string[], name: string): string {
@@ -75,6 +77,38 @@ export function partsCounter(r: BusinessRecord): typeof PARTS_COUNTER {
 }
 
 const PARTS_ICONS: Record<PartsCounterService, IconName> = { battery: "check", install: "wrench", loaner: "wrench", hose: "wrench", machine: "wrench", keys: "check", paint: "check" };
+
+/** Amenities a shop can tick in Edit (research/trends-2026 §1D: the best sites lead with these; only 11/80 local shops mention any). */
+export const AUTO_AMENITIES: Array<{ id: AutoAmenity; label: string }> = [
+  { id: "loaner", label: "Loaner cars" },
+  { id: "shuttle", label: "Shuttle service" },
+  { id: "key_drop", label: "After-hours key drop" },
+  { id: "wifi", label: "Waiting room with Wi-Fi" },
+  { id: "digital_inspection", label: "Digital inspections texted to you" },
+  { id: "second_opinion", label: "Free second opinions" },
+  { id: "walk_ins", label: "Walk-ins welcome" },
+  { id: "same_day", label: "Same-day service on most jobs" },
+  { id: "towing", label: "Towing available" },
+  { id: "spanish", label: "Spanish spoken" },
+];
+export const AUTO_AMENITY_IDS = AUTO_AMENITIES.map((a) => a.id);
+
+/** Program names offered as ticks in Edit; the owner can type others. Text chips only (the logos are licensed). */
+export const AUTO_PROGRAMS = ["NAPA AutoCare", "TechNet", "Jasper", "AAA Approved Auto Repair", "Bosch Service", "ASE Blue Seal", "RepairPal Certified", "BBB Accredited"];
+
+export function autoAmenityLabels(r: BusinessRecord): string[] {
+  const on = new Set(r.ext.auto?.amenities ?? []);
+  return AUTO_AMENITIES.filter((a) => on.has(a.id)).map((a) => a.label);
+}
+
+/** "24/7", "24 hours", "around the clock": only a towing shop with a confirmed staffed line may say it. */
+const ALWAYS_RE = /\b(24\s?\/\s?7|24 hours?|twenty-four hours?|around the clock|any time of night|day or night)\b/i;
+
+/** The tow line as the site shows it: the owner's separate number when it normalizes, else the shop's main line. */
+export function towLine(r: BusinessRecord): { e164: string; display: string; separate: boolean } {
+  const t = r.ext.auto?.tow?.phone ? normalizeUsPhone(r.ext.auto.tow.phone) : null;
+  return t ? { ...t, separate: true } : { e164: r.phone.e164, display: r.phone.display, separate: false };
+}
 
 export function seedAutoServices(variant: string): Service[] {
   return (SEEDS[variant] ?? SEEDS.general!).map((name) => ({ id: name.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/-$/, ""), name, featured: true }));
@@ -149,11 +183,12 @@ export const autoPack: CategoryPack = {
         ]
       : [
           { label: "Services", href: "/#services" },
+          ...(ctx.r.variant === "body" ? [{ label: "After an accident", href: "/#claims" }] : []),
           { label: "Reviews", href: "/#reviews" },
           { label: "About", href: "/#about" },
           { label: "Hours & location", href: "/#visit" },
           { label: "FAQ", href: "/#faq" },
-          { label: "Appointments", href: "/#contact" },
+          { label: ctx.r.variant === "tire" ? "Tire quote" : "Appointments", href: "/#contact" },
         ],
   actionBar: (ctx) => actions(ctx.r, ["call", ...(ctx.r.smsEnabled ? (["text"] as const) : []), ctx.r.links.booking && ctx.r.variant !== "parts" ? "book" : "quote", "directions"]),
   homeFaq: (ctx) => ctx.copy.faq.slice(0, 6),
@@ -162,6 +197,8 @@ export const autoPack: CategoryPack = {
     if (r.variant === "parts") return partsHome(ctx);
     const label = LABEL[r.variant] ?? "Auto Repair";
     const second = r.links.booking ? "book" : "quote";
+    const a = r.ext.auto ?? {};
+    const amenities = autoAmenityLabels(r);
     return html`${hero(ctx, {
       eyebrow: r.name,
       h1: `${label} in ${r.address.city}, ${r.address.state}`,
@@ -171,31 +208,42 @@ export const autoPack: CategoryPack = {
       actions: actions(r, ["call", second]),
       badge: r.foundedYear && ctx.theme.knobs.badge === "seal" ? `Serving ${r.address.city} since ${r.foundedYear}` : undefined,
     })}
+${r.variant === "towing" ? towStrip(ctx) : ""}
+${amenities.length ? html`<div class="amen" aria-label="Good to know"><div class="wrap"><span class="section__label">Good to know</span>${chips(amenities, "Good to know")}</div></div>` : ""}
 ${infoStrip(ctx, [])}
 <main id="main">
 <section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
 <span class="section__label">Services</span><h2 class="section__title" id="services-title">${FIX_TITLE[r.variant] ?? "What we fix"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
 ${serviceList(ctx, r.services.map((s, i) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: ICONS[i % ICONS.length] })))}
+${r.variant === "tire" ? tireExtras(ctx) : ""}
 </div></section>
+${warrantyBand(ctx)}
 <section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">
 <span class="section__label">How it works</span><h2 class="section__title" id="how-title">No surprises</h2>
 ${steps(ctx.copy.steps?.length ? ctx.copy.steps : (VARIANT_STEPS[r.variant] ?? STEPS))}
 </div></section>
+${r.variant === "body" ? claimsBlock(ctx) : ""}
+${r.variant === "body" ? gallery(ctx, "Send 3 before/after pairs", "Body shops sell with photos: send three before-and-after pairs of recent jobs (no plates or faces) and we'll show them here.") : ""}
 ${reviews(ctx)}
 ${about(ctx, `About ${r.name}`)}
 ${visit(ctx)}
 ${serviceArea(ctx)}
 ${faq(ctx.copy.faq.slice(0, 6), true)}
-${contactForm(ctx, r.services.map((s) => s.name), [], [{ name: "vehicle", label: r.variant === "small_engine" ? "Equipment (type, make, model)" : "Vehicle (year, make, model)", autocomplete: "off" }], r.variant === "small_engine" ? "Tell us what your equipment is doing and we'll call you back." : r.variant === "detailing" ? "Tell us about your vehicle and what you'd like done. We'll call you back." : "Tell us what your car is doing and when you'd like to bring it in. We'll call you back.")}
+${r.variant === "tire" ? tireQuoteForm(ctx) : contactForm(ctx, r.services.map((s) => s.name), [], [{ name: "vehicle", label: r.variant === "small_engine" ? "Equipment (type, make, model)" : "Vehicle (year, make, model)", autocomplete: "off" }], r.variant === "small_engine" ? "Tell us what your equipment is doing and we'll call you back." : r.variant === "detailing" ? "Tell us about your vehicle and what you'd like done. We'll call you back." : r.variant === "body" ? (a.body?.estimateNote || "Tell us what happened and what the damage looks like. We'll call you back to set up an estimate.") : "Tell us what your car is doing and when you'd like to bring it in. We'll call you back.")}
 ${ctaBand(ctx, actions(r, ["call", "directions"]))}
+${r.variant === "towing" ? towTodos(ctx) : ""}
 </main>`;
   },
   pages: () => [],
-  bannedPhrases: (r) => (r.variant === "parts" ? partsBannedPhrases(r) : []),
+  bannedPhrases: (r) => (r.variant === "parts" ? partsBannedPhrases(r) : autoBannedPhrases(r)),
   copyBrief: (r) => r.variant === "parts" ? partsBrief(r) : ({
     voice:
-      "Plain, confident and neighborly, like a trusted mechanic explaining things. Short sentences. Never mention ASE, warranties, years, family-owned, towing hours, shuttles, loaners, prices or 'estimate before any work' unless given in the facts.",
+      `Plain, confident and neighborly, like a trusted mechanic explaining things. Short sentences. Never mention ASE, warranties, programs, financing, years, family-owned, towing hours, shuttles, loaners, prices or 'estimate before any work' unless given in the facts. Never write "EV certified" or claim any hybrid or electric-vehicle credential; ${
+        r.services.some((s) => /\b(hybrid|ev|electric)\b/i.test(s.name)) ? "the services list includes hybrids or EVs, so you may say at most that the shop works on hybrids and EVs." : "do not mention hybrids or EVs at all."
+      }${r.variant === "towing" ? ` Towing: ${r.ext.auto?.tow?.always ? "the tow line is staffed 24/7 (that fact is given, you may say it once)." : "never say 24/7, 24 hours or around the clock; the tow hours are not confirmed."}` : ""}${
+        r.ext.auto?.financing ? " Financing exists (say only that it's available through the lender named; never approval odds, credit checks or terms)." : ""
+      }`,
     fields: {
       heroTagline: "One sentence (12-22 words) introducing the services list: what kinds of vehicles (or equipment, for a small engine shop) and work they handle around town.",
       heroSub: "One line (15-25 words) on what they fix, for drivers in the town. No superlatives, no claims beyond the facts.",
@@ -216,6 +264,116 @@ ${ctaBand(ctx, actions(r, ["call", "directions"]))}
   }),
 };
 
+
+/** Auto repair (non-parts) phrases the AI may never use. */
+export function autoBannedPhrases(r: BusinessRecord): RegExp[] {
+  const out: RegExp[] = [
+    /\bev[- ]certified\b|\bcertified (ev|hybrid|electric)\b/i,
+    /\b(no|without a) credit check\b|\b(instant|guaranteed|easy|quick) approval\b|\beveryone('s| is) approved\b/i,
+  ];
+  if (!(r.variant === "towing" && r.ext.auto?.tow?.always)) out.push(ALWAYS_RE);
+  return out;
+}
+
+/** Warranty term, program names and financing in one band after the services; nothing renders when none is set. */
+function warrantyBand(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const a = r.ext.auto ?? {};
+  const w = a.warranty;
+  const term = w && (w.months || w.miles) ? [w.months ? `${w.months}-month` : "", w.miles ? `${w.miles.toLocaleString("en-US")}-mile` : ""].filter(Boolean).join(" / ") : "";
+  const programs = a.programs ?? [];
+  const fin = a.financing?.lender ? a.financing : undefined;
+  if (!term && !programs.length && !fin) return raw("");
+  const title = term ? `${term} warranty${w?.nationwide ? ", honored nationwide" : ""}` : programs.length ? "Programs we belong to" : "Financing available";
+  const intro = term ? `Our work is backed by a ${term} warranty${w?.nationwide ? " that's honored at participating shops across the country" : ""}. Ask us for the details when you drop off.` : undefined;
+  return html`<section class="section" id="warranty" aria-labelledby="warranty-title"><div class="wrap narrow">
+${sectionHead("Warranty & programs", title, intro, "warranty-title")}
+${programs.length ? html`${term ? html`<h3>Programs we belong to</h3>` : ""}${chips(programs, "Programs")}` : ""}
+${fin ? html`<p class="lead"><strong>Financing available</strong> through ${fin.lender}. Ask at the counter, or ${fin.url ? html`<a href="${fin.url}" target="_blank" rel="noopener">apply with ${fin.lender}<span class="sr"> (opens in new tab)</span></a>` : "call us"} for the details.</p>` : ""}
+</div></section>`;
+}
+
+/** Towing: "Need a tow?" under the opening with the tow line, 24/7 only when confirmed, and a text-us-your-location link. */
+function towStrip(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const t = r.ext.auto?.tow;
+  const line = towLine(r);
+  const always = !!t?.always;
+  const text = r.smsEnabled ? smsHref(r.phone.e164) : "";
+  return html`<section class="tow" aria-label="Towing"><div class="tow__in">
+<p class="tow__lead">Need a tow?</p>
+<a class="tow__num" href="${telHref(line.e164)}">${icon("phone", 18)}${line.display}</a>
+${always ? html`<span>${icon("clock", 18)}24/7</span>` : ""}
+${text ? html`<a href="${text}">${icon("message", 18)}Text us your location</a>` : ""}
+${t?.yardNote ? html`<p class="tow__note">${t.yardNote}</p>` : ""}
+</div></section>`;
+}
+
+/** Towing to-dos: the tow line and hours; 24/7 is a REQUIRED confirmation whenever the page claims it. */
+function towTodos(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const t = r.ext.auto?.tow;
+  const claims = ALWAYS_RE.test(`${aiTextOf(ctx.copy)} ${r.services.map((s) => s.name).join(" ")} ${autoAmenityLabels(r).join(" ")}`);
+  const out: Raw[] = [];
+  if (!t?.always && claims) out.push(todo(ctx, "Confirm 24/7 towing", "The site text mentions 24/7 or around-the-clock towing. Confirm that a real person answers the tow line at any hour (tick \"Tow line is staffed 24/7\" in Edit), or we take the claim out.", true));
+  if (!t?.phone) out.push(todo(ctx, "Is there a separate tow number?", `Right now the Need-a-tow strip calls ${r.phone.display}. If a different line is answered after hours, give us that number${t?.always ? "" : ", and tell us whether it's really staffed 24/7"}.`));
+  if (!out.length) return raw("");
+  return html`<section class="section" aria-label="Towing details to confirm"><div class="wrap narrow">${out}</div></section>`;
+}
+
+/** Tire shops: brands as chips and a storefront link under the services list. */
+function tireExtras(ctx: Ctx): Raw {
+  const a = ctx.r.ext.auto ?? {};
+  const brands = a.tireBrands ?? [];
+  const store = a.storeUrl ? { id: "shop" as const, label: "Shop tires online", short: "Shop", href: a.storeUrl, external: true, icon: "bag" as const } : null;
+  const quote = action(ctx.r, "quote")!;
+  return html`${brands.length ? html`<h3>Brands we carry</h3>${chips(brands, "Tire brands")}` : ""}
+<div class="btns">${button(quote, "secondary")}${store ? button(store, "ghost") : ""}</div>
+${brands.length ? "" : todo(ctx, "Which tire brands do you carry?", "List the brands you stock or order most (and any you'd rather not name). We show them as plain text, no logos.")}`;
+}
+
+/** Tire quote: by size or by vehicle, how many, and a brand preference. The Inbox line reads "Tire quote: 265/70R17 ×4". */
+function tireQuoteForm(ctx: Ctx): Raw {
+  const fields: FormField[] = [
+    { name: "tire_size", label: "Tire size (on the sidewall)", placeholder: "265/70R17", autocomplete: "off" },
+    { name: "year", label: "Or your vehicle: year", inputmode: "numeric", autocomplete: "off" },
+    { name: "make", label: "Make", autocomplete: "off" },
+    { name: "model", label: "Model", autocomplete: "off" },
+    { name: "quantity", label: "How many tires?", options: ["1", "2", "4", "Not sure"] },
+    { name: "brand", label: "Brand preference (optional)", autocomplete: "off" },
+  ];
+  return contactForm(ctx, [], [], fields, "Give us your tire size (it's printed on the sidewall) or your year, make and model, and we'll call you back with a quote.", {
+    id: "contact",
+    label: "Tires",
+    title: "Get a tire quote",
+    topic: "Tire quote",
+    button: "Request a quote",
+    details: "Anything else (alignment, a slow leak, when you need them)",
+  });
+}
+
+/** Body shops: what to do after a wreck, insurers and certifications in the owner's words, the right-to-choose line only once confirmed. */
+function claimsBlock(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const b = r.ext.auto?.body;
+  const call = action(r, "call")!;
+  const text = action(r, "text");
+  const stepsList = [
+    { title: "Call us", body: `Once everyone's safe, call ${r.phone.display}${r.smsEnabled ? " or text us photos of the damage" : ""}. We'll tell you what to do next.` },
+    { title: "We work with your insurance", body: "Bring us the claim number and we'll handle the estimate and the paperwork with your insurance company." },
+    { title: "We handle the rest", body: "We keep you posted while the work is done and call you when it's ready." },
+  ];
+  return html`<section class="section" id="claims" aria-labelledby="claims-title"><div class="wrap">
+${sectionHead("After an accident", "What to do after a wreck", b?.estimateNote || undefined, "claims-title")}
+${steps(stepsList)}
+${b?.rightToChooseConfirmed ? html`<p class="lead"><strong>You choose the shop.</strong> Your insurance company may suggest a repair shop, but where your vehicle is repaired is your decision.</p>` : ""}
+${b?.insurers?.length ? html`<h3>Insurance companies we work with</h3>${chips(b.insurers, "Insurers")}` : ""}
+${b?.certifications?.length ? html`<h3>Certifications</h3>${chips(b.certifications, "Certifications")}` : ""}
+<div class="btns">${button(call, "primary")}${text ? button(text, "ghost") : ""}</div>
+${b?.insurers?.length ? "" : todo(ctx, "Which insurance companies do you work with?", "List the insurers you regularly handle claims for. We name them as plain text and never call them partners.")}
+${b?.rightToChooseConfirmed ? "" : todo(ctx, "Right-to-choose line (optional)", "Many body shops tell customers they may pick their own shop. If you want that line, confirm it in Edit and we show it in your words-safe form: \"You choose the shop.\"")}
+</div></section>`;
+}
 
 /** The parts-store home page: the counter sells it ("call and we'll tell you if it's on the shelf"), not a bay. */
 function partsHome(ctx: Ctx): Raw {
