@@ -34,6 +34,7 @@ export function plansOptions(s: AppSettings, category?: string) {
     payWays: payWays(s, plans, church).map(([title, detail]) => ({ title, detail })),
     priceShort: priceShort(s, all, church),
     invoice: s.invoiceForAll !== false || church,
-    addons: (s.addons ?? []).map((a) => ({ name: a.name, about: a.about ?? "", price: addonPriceText(a), unit: a.unit })),
+    // `amount` is the raw price so the Android sign-up screen can total an order as extras are ticked.
+    addons: (s.addons ?? []).map((a) => ({ name: a.name, about: a.about ?? "", price: addonPriceText(a), unit: a.unit, amount: a.price })),
   };
 }

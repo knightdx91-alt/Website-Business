@@ -81,4 +81,6 @@ dependencies {
     // Stripe Terminal, Tap to Pay on Android (in-person card payments on the phone itself).
     implementation("com.stripe:stripeterminal-taptopay:6.0.0")
     implementation("com.stripe:stripeterminal-core:6.0.0")
+    // Stripe PaymentSheet: typing a card into the phone on the in-person sign-up (ui/SignupScreen.kt).
+    implementation("com.stripe:stripe-android:22.8.1")
 }
