@@ -103,6 +103,7 @@ h3 { font-size: 1rem; margin: 0 0 6px; }
 
 .progress { height: 10px; border-radius: 999px; background: var(--chip); overflow: hidden; margin: 8px 0; }
 .progress > i { display: block; height: 100%; background: var(--primary); transition: width .4s ease; }
+.progress--warn > i { background: var(--warn, #b45309); }
 
 .list { list-style: none; margin: 0; padding: 0; }
 .list li { padding: 8px 0; border-bottom: 1px solid var(--line); }

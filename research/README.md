@@ -17,6 +17,7 @@ designs, code or text. Refresh about once a year.
 | `tax-finance.md` | Tax preparers, accountants/bookkeepers/CPAs, independent insurance agencies, financial advisors: 96 home pages. Compliance per variant (Circular 230, Alabama CPA permits, insurance advertising rules, SEC/FINRA and Alabama advisor rules), what-to-bring checklist, no reviews for advisors. |
 | `churches-nonprofits.md` | Churches, civic posts (VFW, Legion, Lions…), charities and community centers: 197 church and 20 nonprofit home pages. Service times and beliefs come from the church, give/watch links, selling to churches. |
 | `retail-shops.md` | Boutiques, gift, antique, thrift, florist, feed and furniture shops: 78 home pages. Directions/hours first, what-we-carry categories, social for new arrivals, no cart. |
+| `android-tap-to-pay-2026.md` | Not a category blueprint: research for taking in-person card payments on the owner's Fold 8 with Stripe Tap to Pay on Android (SDK 6.0.0 requirements, sideload vs Play, the card_present → generated_card → subscription flow with Worker REST examples, TWA + native activity vs WebView, headless build, PCI/receipts, build plan). |
 
 Each category file has: summary, sample table, pages, home-page section order,
 features and CTAs, integrations, mobile behavior, content the AI writes, data

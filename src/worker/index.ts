@@ -59,6 +59,8 @@ const PHOTO_COST = 0.007;
 const BACKUP_KEEP = 8;
 /** A build still "queued"/"building" after this long is stuck (the queue gave up) and may be retried. */
 const STUCK_BUILD_MS = 20 * 60_000;
+/** A run still searching or building this long after it started is treated as stalled. */
+const STALLED_RUN_MS = 90 * 60_000;
 /** Which scheduled trigger fired (wrangler.jsonc): the daily housekeeping run and the weekly backup. */
 const CRON_WEEKLY_BACKUP = "0 9 * * SUN";
 
@@ -442,19 +444,42 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     await env.DB.prepare("INSERT INTO runs (id, created_at, categories, cap, searches_total, options_json) VALUES (?, ?, ?, ?, ?, ?)")
       .bind(id, now(), groups.map((g) => g.id).join(","), input.cap, jobs.length, JSON.stringify({ wider: input.wider, badSites: input.badSites }))
       .run();
-    await env.JOBS.sendBatch(jobs.map((j) => ({ body: { ...j, runId: id } as Job })));
+    // Queues take at most 100 messages per batch; a big run (every category + nearby towns) is more than that.
+    try {
+      for (let i = 0; i < jobs.length; i += 100) await env.JOBS.sendBatch(jobs.slice(i, i + 100).map((j) => ({ body: { ...j, runId: id } as Job })));
+    } catch (err) {
+      await env.DB.prepare("DELETE FROM runs WHERE id = ?").bind(id).run();
+      throw new HttpError(502, `Couldn't start the run: ${err instanceof Error ? err.message : String(err)}`);
+    }
     await notify(env, { kind: "run", actor: session, text: `${session.name} started a search run: ${groups.map((g) => g.label).join(", ")} (up to ${input.cap} sites)` });
     return json({ id });
   }
 
+  const runDismiss = /^\/runs\/([a-z0-9]+)\/dismiss$/.exec(path);
+  if (runDismiss && m === "POST") {
+    ownerOnly();
+    await env.DB.prepare("UPDATE runs SET status = 'dismissed' WHERE id = ?").bind(runDismiss[1]).run();
+    return json({ ok: true });
+  }
+
   if (path === "/runs" && m === "GET") {
-    const runs = await env.DB.prepare("SELECT * FROM runs ORDER BY created_at DESC LIMIT 10").all<RunRow>();
+    const runs = await env.DB.prepare("SELECT * FROM runs WHERE status != 'dismissed' ORDER BY created_at DESC LIMIT 10").all<RunRow>();
     const out = [];
     for (const r of runs.results) {
       const counts = await env.DB.prepare("SELECT status, COUNT(*) AS n FROM leads WHERE run_id = ? GROUP BY status").bind(r.id).all<{ status: string; n: number }>();
       const by = Object.fromEntries(counts.results.map((c) => [c.status, c.n]));
       const searching = r.searches_done < r.searches_total;
       const pending = (by.queued ?? 0) + (by.building ?? 0);
+      const total = Object.values(by).reduce((a, b) => a + b, 0);
+      let status = r.status;
+      // A run that is still "searching" or "building" long after it started has lost its queue messages
+      // (an enqueue that failed, a consumer crash). Mark it so the app stops showing a spinner forever;
+      // one that found nothing is dropped outright.
+      if (status === "running" && (searching || pending > 0) && now() - r.created_at > STALLED_RUN_MS) {
+        status = total === 0 ? "dismissed" : "stalled";
+        await env.DB.prepare("UPDATE runs SET status = ? WHERE id = ? AND status = 'running'").bind(status, r.id).run();
+        if (status === "dismissed") continue;
+      }
       out.push({
         id: r.id,
         createdAt: r.created_at,
@@ -464,7 +489,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         searchesDone: r.searches_done,
         searchesTotal: r.searches_total,
         counts: by,
-        done: !searching && pending === 0,
+        status,
+        stalled: status === "stalled",
+        done: status !== "running" || (!searching && pending === 0),
       });
     }
     return json({ runs: out });

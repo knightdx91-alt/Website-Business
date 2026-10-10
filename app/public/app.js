@@ -174,27 +174,103 @@
       </form></section>`;
   }
 
-  function runsHtml(runs) {
-    if (!runs.length) return "";
-    return `<section class="card"><h2>Recent runs</h2>${runs
-      .slice(0, 3)
+  /** Home shows only runs that are still going (or stopped early); the Find leads screen shows the recent ones too. */
+  function runsHtml(runs, all) {
+    const rows = all ? runs.slice(0, 5) : runs.filter((r) => !r.done || r.stalled).slice(0, 3);
+    if (!rows.length) return all ? `<section class="card"><h2>Recent runs</h2><p class="muted small">No runs yet. Pick categories above and tap Run.</p></section>` : "";
+    return `<section class="card"><h2>${all ? "Recent runs" : "Running now"}</h2>${rows
       .map((r) => {
         const c = r.counts;
         const total = Object.values(c).reduce((a, b) => a + b, 0);
         const finished = (c.ready || 0) + (c.failed || 0);
         const searching = r.searchesDone < r.searchesTotal;
-        const pct = searching ? Math.round((r.searchesDone / Math.max(r.searchesTotal, 1)) * 20) : total ? 20 + Math.round((finished / total) * 80) : 100;
-        const label = searching
-          ? `Searching Google… (${r.searchesDone}/${r.searchesTotal})`
-          : r.done
-            ? `Done · ${c.ready || 0} sites ready${c.failed ? ` · ${c.failed} failed` : ""}`
-            : `Building sites… ${finished} of ${total}`;
+        const pct = r.stalled ? 100 : searching ? Math.round((r.searchesDone / Math.max(r.searchesTotal, 1)) * 20) : total ? 20 + Math.round((finished / total) * 80) : 100;
+        const label = r.stalled
+          ? `Stopped early · ${c.ready || 0} site${c.ready === 1 ? "" : "s"} ready. Run it again to pick up the rest.`
+          : searching
+            ? `Searching Google… (${r.searchesDone}/${r.searchesTotal})`
+            : r.done
+              ? `Done · ${c.ready || 0} sites ready${c.failed ? ` · ${c.failed} failed` : ""}`
+              : `Building sites… ${finished} of ${total}`;
         const opts = [r.options && r.options.wider ? "nearby towns" : "", r.options && r.options.badSites ? "outdated sites" : ""].filter(Boolean);
         return `<div><div class="row"><strong>${esc(r.categories.map(groupLabel).join(", "))}${opts.length ? ` <span class="muted small">+ ${esc(opts.join(", "))}</span>` : ""}</strong><span class="muted small" style="text-align:right">${ago(r.createdAt)}</span></div>
-          <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
-          <p class="small muted" style="margin:0 0 10px">${r.done ? "" : '<span class="spin"></span> '}${esc(label)}</p></div>`;
+          <div class="progress${r.stalled ? " progress--warn" : ""}" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+          <p class="small muted" style="margin:0 0 10px">${r.done ? "" : '<span class="spin"></span> '}${esc(label)}${r.stalled ? ` <button type="button" class="btn btn--small" data-dismiss-run="${esc(r.id)}">Dismiss</button>` : ""}</p></div>`;
       })
       .join("")}</section>`;
+  }
+
+  function bindRunDismiss(el, after) {
+    el.querySelectorAll("[data-dismiss-run]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        b.disabled = true;
+        try { await api(`/runs/${b.dataset.dismissRun}/dismiss`, { method: "POST", json: {} }); after(); } catch (err) { toast(err.message); b.disabled = false; }
+      }),
+    );
+  }
+
+  /** The category picker + Run button, with the cost estimate and Pick all. `onStarted` runs after a successful Run. */
+  function bindRunForm(form, onStarted) {
+    const updateEst = () => {
+      const cats = [...form.querySelectorAll("input[name=cat]:checked")].map((i) => i.value);
+      const cap = Number(form.cap.value) || 0;
+      form.querySelector("#est").textContent = cats.length ? `Up to ${cap} sites. Writing costs about $${estimate(cats, cap)} at most, plus up to $${googleEstimate(cats, form.wider.checked)} for Google searches.` : "Pick at least one category.";
+    };
+    form.addEventListener("input", updateEst);
+    updateEst();
+    form.querySelector("#allcats").addEventListener("click", (e) => {
+      const boxes = [...form.querySelectorAll("input[name=cat]")];
+      const all = boxes.every((i) => i.checked);
+      boxes.forEach((i) => (i.checked = !all));
+      e.target.textContent = all ? "Pick all" : "Clear all";
+      updateEst();
+    });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const cats = [...form.querySelectorAll("input[name=cat]:checked")].map((i) => i.value);
+      if (!cats.length) return toast("Pick at least one category");
+      const btn = form.querySelector("button[type=submit]");
+      btn.disabled = true;
+      try {
+        await api("/runs", { method: "POST", json: { categories: cats, cap: Number(form.cap.value), wider: form.wider.checked, badSites: form.badSites.checked } });
+        toast("Run started. It keeps going in the cloud; new sites show up on the Leads screen.");
+        onStarted();
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
+  /** #/run: the owner's Find new leads screen (the category picker used to sit on the home screen). */
+  async function viewRun() {
+    setNav("home");
+    const my = renderSeq;
+    meta = meta || (await api("/meta"));
+    if (stale(my)) return;
+    if (!isOwner()) return go("#/");
+    $app.innerHTML = `<p><a href="#/">← Leads</a></p><h1>Find new leads</h1>${runCard()}<div id="runs"><p class="muted small">Loading…</p></div>`;
+    bindRunForm($app.querySelector("#run"), () => refreshRuns());
+    await refreshRuns();
+  }
+
+  async function refreshRuns() {
+    stopPolling();
+    if (location.hash !== "#/run") return;
+    const my = renderSeq;
+    try {
+      const { runs } = await api("/runs");
+      if (stale(my)) return;
+      const el = document.getElementById("runs");
+      if (!el) return;
+      el.innerHTML = runsHtml(runs, true);
+      bindRunDismiss(el, () => refreshRuns());
+      if (runs.some((r) => !r.done)) pollTimer = setTimeout(refreshRuns, 5000);
+    } catch (err) {
+      if (stale(my) || err.status === 401) return;
+      toast(err.message);
+    }
   }
 
   function statusChip(l) {
@@ -227,46 +303,13 @@
     meta = meta || (await api("/meta"));
     if (stale(my)) return;
     if (!document.getElementById("leads")) {
-      $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="today"></div><div id="tasks"></div><div id="unpaid"></div><div id="runs"></div></div><div><section>
-        <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a></div>
+      $app.innerHTML = `<div class="split"><div>${isOwner() ? "" : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="today"></div><div id="tasks"></div><div id="unpaid"></div><div id="runs"></div></div><div><section>
+        <div class="btns btns--full" style="margin-bottom:12px">${isOwner() ? `<a class="btn btn--primary" href="#/run">🔎 Find new leads</a>` : ""}<a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
           .join("")}</select></label>
         <ul class="list" id="leads"><li class="muted">Loading…</li></ul></section></div></div>`;
-      const form = $app.querySelector("#run");
-      if (form) {
-      const updateEst = () => {
-        const cats = [...form.querySelectorAll("input[name=cat]:checked")].map((i) => i.value);
-        const cap = Number(form.cap.value) || 0;
-        $app.querySelector("#est").textContent = cats.length ? `Up to ${cap} sites. Writing costs about $${estimate(cats, cap)} at most, plus up to $${googleEstimate(cats, form.wider.checked)} for Google searches.` : "Pick at least one category.";
-      };
-      form.addEventListener("input", updateEst);
-      updateEst();
-      form.querySelector("#allcats").addEventListener("click", (e) => {
-        const boxes = [...form.querySelectorAll("input[name=cat]")];
-        const all = boxes.every((i) => i.checked);
-        boxes.forEach((i) => (i.checked = !all));
-        e.target.textContent = all ? "Pick all" : "Clear all";
-        updateEst();
-      });
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const cats = [...form.querySelectorAll("input[name=cat]:checked")].map((i) => i.value);
-        if (!cats.length) return toast("Pick at least one category");
-        const btn = form.querySelector("button");
-        btn.disabled = true;
-        try {
-          await api("/runs", { method: "POST", json: { categories: cats, cap: Number(form.cap.value), wider: form.wider.checked, badSites: form.badSites.checked } });
-          toast("Run started. Sites will appear below as they're built.");
-          refreshHome();
-        } catch (err) {
-          toast(err.message);
-        } finally {
-          btn.disabled = false;
-        }
-      });
-      }
       $app.querySelectorAll("[data-sales]").forEach((b) =>
         b.addEventListener("click", () => {
           filters.sales = b.dataset.sales;
@@ -381,7 +424,8 @@
       const runsEl = document.getElementById("runs");
       const leadsEl = document.getElementById("leads");
       if (!runsEl || !leadsEl) return;
-      runsEl.innerHTML = runsHtml(runs);
+      runsEl.innerHTML = runsHtml(runs, false);
+      bindRunDismiss(runsEl, () => refreshHome());
       const todayEl = document.getElementById("today");
       if (todayEl) todayEl.innerHTML = todayHtml(due, opened, fresh || leads);
       const tasksEl = document.getElementById("tasks");
@@ -392,7 +436,7 @@
         unpaidEl.querySelectorAll("[data-resend]").forEach((b) => b.addEventListener("click", () => resendSignup(b.dataset.resend, b)));
       }
       const empty = {
-        new: isOwner() ? "No new leads yet. Pick a category and tap Run." : "No new leads right now. Check back after the next run.",
+        new: isOwner() ? "No new leads yet. Tap Find new leads to run a search." : "No new leads right now. Check back after the next run.",
         callbacks: "No callbacks scheduled. Use “Call back…” after a call to schedule one.",
       };
       leadsEl.innerHTML = leads.length ? leads.map(leadCard).join("") : `<li class="card muted">${empty[filters.sales] || "Nothing here yet."}</li>`;
@@ -3353,6 +3397,7 @@
       if ((m = /^#\/plans(?:\/([a-z0-9]+))?$/.exec(h))) return await viewShowPlans(m[1]);
       if (h === "#/route") return await viewRoute();
       if (h === "#/add") return await viewAdd();
+      if (h === "#/run") return await viewRun();
       if ((m = /^#\/gbp\/([a-z0-9]+)$/.exec(h))) return await viewGbp(m[1]);
       if (h === "#/sales") return await viewSales();
       if (h === "#/inbox") return await viewInbox();
