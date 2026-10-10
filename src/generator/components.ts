@@ -26,6 +26,8 @@ export interface Ctx {
   credit?: { company: string; url: string; changeUrl: string };
   /** False for categories that may not show reviews anywhere (financial advisors, churches). */
   reviewsAllowed?: boolean;
+  /** Set by hero() when it shows the open/closed pill, so the info strip shows today's hours instead of repeating it. */
+  statusShown?: boolean;
 }
 
 export interface NavItem {
@@ -97,13 +99,16 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   const h1 = html`<h1 id="hero-title">${o.h1}</h1>`;
   const sub = html`<p class="hero__sub">${o.sub}</p>`;
   const status = o.showStatus ? html`<p class="status" data-open-status hidden></p>` : "";
+  if (o.showStatus && hasAnyHours(r.hours)) ctx.statusShown = true;
   // Proof up top: the Google rating, when it's good and based on enough reviews (never for categories that can't show reviews).
   const rep = r.reputation;
   const proof = ctx.reviewsAllowed !== false && rep.rating && rep.count && rep.rating >= 4.3 && rep.count >= 10 && r.mapsUrl
     ? html`<li class="hero__proof"><a href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("star", 18)}${rep.rating.toFixed(1)} on Google · ${rep.count} reviews<span class="sr"> (opens in new tab)</span></a></li>`
     : "";
   const trust = o.trust.length || proof ? html`<ul class="hero__trust">${proof}${o.trust.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : "";
-  const btns = html`<div class="btns" data-hero-actions>${o.actions.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>`;
+  // Texting is how many people would rather reach a plumber or a barber: when the number takes texts and the
+  // buttons don't already offer it, a quiet line under them does, without a third stacked button.
+  const btns = html`<div class="btns" data-hero-actions>${o.actions.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>${textLine(ctx, o.actions)}`;
   switch (kind) {
     case "split": {
       // Headline on the left; an "at a glance" panel (photo, open/closed, hours, address, phone, buttons) on the right.
@@ -146,7 +151,7 @@ export function infoStrip(ctx: Ctx, chips: string[]): Raw {
   return html`<div class="strip strip--${kind}"><div class="strip__in">
 <a class="strip__item" href="${dir.href}" target="_blank" rel="noopener">${icon("pin")}<span>${addr}<span class="sr"> (opens directions in new tab)</span></span></a>
 <a class="strip__item" href="${call.href}">${icon("phone")}<span>${r.phone.display}</span></a>
-${hasAnyHours(r.hours) ? html`<a class="strip__item" href="#visit">${icon("clock")}<span><span data-open-status hidden></span><span class="strip__more"> See all hours</span></span></a>` : ""}
+${hasAnyHours(r.hours) ? html`<a class="strip__item" href="#visit">${icon("clock")}<span>${ctx.statusShown ? html`<span data-today-hours>Hours</span>` : html`<span data-open-status hidden></span>`}<span class="strip__more"> See all hours</span></span></a>` : ""}
 ${chips.length ? html`<ul class="chips" aria-label="Services">${chips.map((c) => html`<li class="chip">${icon("check", 16)}${c}</li>`)}</ul>` : ""}
 </div></div>`;
 }
@@ -332,8 +337,17 @@ ${towns.length ? html`<label>Town<select name="town"><option value="">Choose one
 export function ctaBand(ctx: Ctx, acts: Action[]): Raw {
   return html`<section class="cta cta--${ctx.theme.dna.cta}" aria-labelledby="cta-title"><div class="wrap${ctx.theme.dna.cta === "band" ? " narrow" : ""}">
 <h2 id="cta-title">${ctx.copy.ctaTitle}</h2><p>${ctx.copy.ctaLine}</p>
-<div class="btns">${acts.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>
-</div></section>`;
+<div class="btns">${acts.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>${textLine(ctx, acts)}
+</div></section>${TEXT_ASK.has(ctx.r.category) && !ctx.r.smsEnabled ? todoBlock(ctx, "Can customers text this number?", "Lots of people would rather text a photo of the problem than call. If this number takes texts, tick \"This number takes texts\" in Edit and the site gets a Text us button.") : ""}`;
+}
+
+/** Categories where a Text us button is worth asking the owner about (print asks in its own artwork section). */
+const TEXT_ASK = new Set(["contractor", "salon", "auto", "cleaning", "landscaping"]);
+
+/** "Or text us" under a button row, when the number takes texts and no button already says so. */
+function textLine(ctx: Ctx, acts: Action[]): Raw {
+  const text = action(ctx.r, "text");
+  return text && !acts.some((a) => a.id === "text") ? html`<p class="hero__alt">Or text us: <a href="${text.href}">${ctx.r.phone.display}</a></p>` : raw("");
 }
 
 export function footer(ctx: Ctx, nav: NavItem[], extra: { note?: Raw; reviews?: boolean } = {}): Raw {
@@ -368,8 +382,8 @@ export function actionBar(acts: Action[], dna?: Dna): Raw {
     if (!call) return raw("");
     return html`<nav class="bar bar--fab" aria-label="Quick actions"><a href="${call.href}">${icon(call.icon)}<span>${call.short}</span></a></nav>`;
   }
-  return html`<nav class="bar" aria-label="Quick actions">${acts
-    .slice(0, 3)
+  const shown = acts.slice(0, 4);
+  return html`<nav class="bar${shown.length > 3 ? " bar--4" : ""}" aria-label="Quick actions">${shown
     .map(
       (a) =>
         html`<a href="${a.href}"${a.external ? raw(' target="_blank" rel="noopener"') : ""}>${icon(a.icon)}<span>${a.short}</span>${

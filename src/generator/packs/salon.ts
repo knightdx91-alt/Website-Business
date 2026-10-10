@@ -93,7 +93,7 @@ export const salonPack: CategoryPack = {
     { label: "About", href: "/#about" },
     { label: "Hours & location", href: "/#visit" },
   ],
-  actionBar: (ctx) => actions(ctx.r, ctx.r.links.booking ? ["book", "call", "directions"] : ["call", "directions"]),
+  actionBar: (ctx) => actions(ctx.r, [...(ctx.r.links.booking ? (["book"] as const) : []), "call", ...(ctx.r.smsEnabled ? (["text"] as const) : []), "directions"]),
   homeFaq: (ctx) => dataFaq(ctx.r),
   home(ctx: Ctx) {
     const r = ctx.r;

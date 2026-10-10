@@ -80,7 +80,7 @@ export function spanishPage(ctx: Ctx): { title: string; description: string; bod
 <p class="hero__eyebrow">${where}</p>
 <h1 id="es-title">${r.name}</h1>
 <p class="hero__sub">${s.heroTagline}</p>
-<div class="btns">${acts.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>
+<div class="btns">${acts.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>${r.smsEnabled && !acts.some((a) => a.id === "text") ? html`<p class="hero__alt">O envíenos un mensaje de texto: <a href="${action(r, "text")!.href}">${r.phone.display}</a></p>` : ""}
 <p><a href="/" lang="en">English</a></p>
 </div></section>
 ${services.length ? html`<section class="section" aria-labelledby="es-services"><div class="wrap"><span class="section__label">Servicios</span><h2 class="section__title" id="es-services">Lo que ofrecemos</h2><p class="lead">${s.heroSub}</p>${cardGrid(services.map((title) => ({ title, icon: "check" as const })))}</div></section>` : ""}

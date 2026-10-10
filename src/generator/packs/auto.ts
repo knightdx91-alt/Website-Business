@@ -155,7 +155,7 @@ export const autoPack: CategoryPack = {
           { label: "FAQ", href: "/#faq" },
           { label: "Appointments", href: "/#contact" },
         ],
-  actionBar: (ctx) => actions(ctx.r, ["call", ctx.r.links.booking && ctx.r.variant !== "parts" ? "book" : "quote", "directions"]),
+  actionBar: (ctx) => actions(ctx.r, ["call", ...(ctx.r.smsEnabled ? (["text"] as const) : []), ctx.r.links.booking && ctx.r.variant !== "parts" ? "book" : "quote", "directions"]),
   homeFaq: (ctx) => ctx.copy.faq.slice(0, 6),
   home(ctx: Ctx) {
     const r = ctx.r;

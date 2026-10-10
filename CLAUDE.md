@@ -223,6 +223,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   proof when ≥4.3 with ≥10 reviews and the pack allows reviews (`ctx.reviewsAllowed`). App: Edit → Design → "Page
   structure" pickers + 🎲 Surprise me (`dnaCode()` encodes; `/api/leads/:id` carries `dna` + `dnaOrder`); "Try another
   design" rerolls everything. Design sheets accept the full id. Research behind it: `research/design-upgrade-2026.md`.
+- Text us + open status (Oct 2026): when `smsEnabled` is ticked (Edit → "This number takes texts"), a Text us button is in
+  the phone call bar for contractors, salons and auto shops (cleaning/landscaping/print already had it; the bar takes up to
+  4 buttons, `bar--4`), and an "Or text us: (256)…" line (`textLine()`, `.hero__alt`) sits under the hero buttons and in the
+  closing section wherever no button already says Text (Spanish page too). Trades/salons/auto/cleaning/landscaping without
+  it get the suggested to-do "Can customers text this number?" (under the closing section). The open/closed pill shows once:
+  when the hero shows it (`ctx.statusShown`), the info strip's clock line shows today's hours instead (`data-today-hours`,
+  filled by `todayText()` in the client script: "Today 11 AM – 8 PM" / "Closed today"). `test/text-open.test.ts`.
 - Auto parts stores (auto pack, variant `parts`, Oct 2026): `autoVariant` picks it from the name ("auto parts", "parts & supply"…, not
   "parts & repair"/salvage) or Google's `auto_parts_store`; search group "Auto parts stores"; chains (O'Reilly, AutoZone, NAPA,
   Carquest…) are in the auto chain list. Label "Auto Parts Store", schema `AutoPartsStore`, no service area. The site sells the

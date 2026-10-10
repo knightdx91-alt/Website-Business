@@ -39,6 +39,16 @@ function openStatus(hours, now) {
   }
   return { open: false, text: "Closed" };
 }
+/** Today's hours for the info strip, e.g. "Today 11 AM – 8 PM" or "Closed today". */
+function todayText(hours, now) {
+  if (hours.open24_7) return "Open 24 hours";
+  var today = (hours.weekly && hours.weekly[now.day]) || [], parts = [];
+  for (var i = 0; i < today.length; i++) {
+    if (today[i].open === "00:00" && today[i].close === "24:00") return "Open all day today";
+    parts.push(fmtTime(today[i].open) + " \u2013 " + fmtTime(today[i].close));
+  }
+  return parts.length ? "Today " + parts.join(", ") : "Closed today";
+}
 function nowIn(tz) {
   var parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
   var get = function (t) { for (var i = 0; i < parts.length; i++) if (parts[i].type === t) return parts[i].value; return ""; };
@@ -101,6 +111,8 @@ if (hd) {
       els[i].classList.add(st.open ? "is-open" : "is-closed");
       els[i].hidden = false;
     }
+    var th = d.querySelectorAll("[data-today-hours]");
+    for (var t = 0; t < th.length; t++) th[t].textContent = todayText(data.hours, now);
     var rows = d.querySelectorAll("[data-day='" + now.day + "']");
     for (var j = 0; j < rows.length; j++) rows[j].classList.add("is-today");
   } catch (err) {}

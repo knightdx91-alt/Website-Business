@@ -279,7 +279,7 @@ export const contractorPack: CategoryPack = {
     { label: "FAQ", href: "/#faq" },
     { label: "Contact", href: "/#contact" },
   ],
-  actionBar: (ctx) => actions(ctx.r, ["call", "quote"]),
+  actionBar: (ctx) => actions(ctx.r, ctx.r.smsEnabled ? ["call", "text", "quote"] : ["call", "quote"]),
   homeFaq: (ctx) => ctx.copy.faq.slice(0, 6),
   home(ctx: Ctx) {
     const r = ctx.r;

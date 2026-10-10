@@ -71,6 +71,7 @@ p{margin:0 0 1em}
 .btn--secondary{background:var(--secondary);color:var(--on-secondary)}
 .btn--ghost{background:transparent;color:inherit;border-color:currentColor}
 .btns{display:flex;flex-wrap:wrap;gap:12px}
+.hero__alt{margin:.75rem 0 0;font-size:.98rem}.hero__alt a{color:inherit;font-weight:700}.cta .hero__alt{text-align:center}
 @media (max-width:599px){.btns .btn{flex:1 1 100%}}
 /* header */
 .hdr{position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid ${withAlpha(c.text, 0.12)};transition:transform .25s ease}
@@ -236,6 +237,7 @@ ${divider}
 .bar a{flex:1;display:flex;align-items:center;justify-content:center;gap:.45em;min-height:48px;border-radius:var(--btn-radius);font-weight:700;text-decoration:none;color:var(--on-bar);border:2px solid ${withAlpha(c.onBar, 0.5)}}
 .bar a:first-child{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
 .bar.is-hidden,.bar.is-typing{transform:translateY(110%)}
+.bar--4{gap:6px;padding-left:6px;padding-right:6px}.bar--4 a{gap:.3em;font-size:.92rem;padding:0 4px}
 @media (min-width:768px){.bar{display:none}}
 /* owner to-do (preview only) */
 .todo{border:2px dashed ${withAlpha(c.text, 0.45)};border-radius:var(--radius);padding:18px 20px;background:${withAlpha(c.surface, 0.7)};color:var(--text);margin:20px 0}
