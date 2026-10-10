@@ -6,7 +6,7 @@ import type { Hours } from "../src/generator/types.ts";
 import { categoryRecord, sampleCopy } from "./fixtures.ts";
 
 const build = async (record: ReturnType<typeof categoryRecord>, look?: string) => {
-  const out = await buildSite({ record, copy: sampleCopy(), site: { slug: "t", look }, mode: "preview" });
+  const out = await buildSite({ record, copy: sampleCopy(), site: { slug: "t", look: look ?? "contractor.toolbox" }, mode: "preview" });
   return { home: String(out.files.get("index.html")), out };
 };
 

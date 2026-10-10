@@ -223,6 +223,20 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   proof when ≥4.3 with ≥10 reviews and the pack allows reviews (`ctx.reviewsAllowed`). App: Edit → Design → "Page
   structure" pickers + 🎲 Surprise me (`dnaCode()` encodes; `/api/leads/:id` carries `dna` + `dnaOrder`); "Try another
   design" rerolls everything. Design sheets accept the full id. Research behind it: `research/design-upgrade-2026.md`.
+  Second round (Oct 2026): 16 knobs. New values: openings `card` (photo, then a floating card; falls back to banner
+  without a photo) and `billboard` (the name huge, facts row under it); top bar `utility` (thin info line: address,
+  today's hours, Español, phone) and `overlay` (see-through fixed header, solid once scrolled, `is-scrolled` from the client
+  script); buttons `pill`, `shadow`; address bar `ticker` (primary-colored one-liner) and `factcard` (card pulled up over the
+  opening); services `table` (dot-leader price list) and `scroller` (snap row on phones, grid on desktop); closing `inline`;
+  footer `bigname`; photo `tilt`. New knobs (letters t r k d o m q; ids without them parse as legacy): `headline`
+  (what+where / business name / the promise line = `copy.heroTagline` ≤72 chars, sub becomes `heroSub`), `rhythm` (bands /
+  continuous / numbered chapters / boxed sections), `scale` (standard / dramatic / poster / tight; billboard keeps its own
+  size), `density`, `tone` (light opening when no backdrop photo), `motif` (CSS textures on the opening, never over photos),
+  `proof` (inline trust row or a `.proof` band under the opening with the Google rating + trust items). `settleDna()` holds the
+  consistency rules (also used by the app's restyle); `RECIPES[category]` are named structures (Photo first, Menu board,
+  Dispatch, Lookbook, Quiet office…) that set the big knobs; `pickDna` starts from one ~55% of the time. App: the lead screen
+  has "Or pick a style (keeps the colors)" (`POST /restyle {recipe}` keeps look+layout) and Edit → Design has "Start from a
+  style" (fills the pickers from `data-dna` on the option). `test/dna.test.ts` builds every recipe of every category.
 - Text us + open status (Oct 2026): when `smsEnabled` is ticked (Edit → "This number takes texts"), a Text us button is in
   the phone call bar for contractors, salons and auto shops (cleaning/landscaping/print already had it; the bar takes up to
   4 buttons, `bar--4`), and an "Or text us: (256)…" line (`textLine()`, `.hero__alt`) sits under the hero buttons and in the

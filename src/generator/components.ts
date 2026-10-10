@@ -61,8 +61,17 @@ export function todoBlock(ctx: Ctx, title: string, body: string, required = fals
 }
 
 export function header(ctx: Ctx, nav: NavItem[]): Raw {
-  const call = action(ctx.r, "call")!;
-  return html`<a class="skip" href="#main">Skip to content</a>
+  const r = ctx.r;
+  const call = action(r, "call")!;
+  // "utility" top bar: a thin line of facts above the header (address, today's hours, Español, phone).
+  const addr = r.showStreetAddress && r.address.street ? `${r.address.street}, ${r.address.city}` : `${r.address.city}, ${r.address.state}`;
+  const util =
+    ctx.theme.dna.nav === "utility"
+      ? html`<div class="util"><div class="wrap util__in"><span>${icon("pin", 16)}${addr}</span>${hasAnyHours(r.hours) ? html`<span>${icon("clock", 16)}<span data-today-hours>Hours</span></span>` : ""}${
+          ctx.copy.es ? html`<a href="/es/" lang="es">Español</a>` : ""
+        }<a href="${call.href}">${icon("phone", 16)}${r.phone.display}</a></div></div>`
+      : "";
+  return html`<a class="skip" href="#main">Skip to content</a>${util}
 <header class="hdr"><div class="wrap hdr__in">
 <a class="brand" href="/">${ctx.r.name}</a>
 <a class="hdr__call" href="${call.href}" aria-label="Call ${ctx.r.phone.display}">${icon("phone")}<span>${ctx.r.phone.display}</span></a>
@@ -83,11 +92,26 @@ export interface HeroOpts {
 
 export function hero(ctx: Ctx, o: HeroOpts): Raw {
   const r = ctx.r;
+  const dna = ctx.theme.dna;
   const img = r.media.hero;
   const showImg = !!img && (ctx.mode === "preview" || img.source !== "google");
-  // The DNA's opening; a full-screen photo needs a photo, so it falls back to the classic stack without one.
-  let kind = ctx.theme.dna.hero;
+  // The DNA's opening; the photo-led kinds need a photo, so they fall back to a plain kind without one.
+  let kind = dna.hero;
   if (kind === "cover" && !showImg) kind = "stack";
+  if (kind === "card" && !showImg) kind = "banner";
+  // Headline strategy: what + where (default), the business name, or the promise line from the copy.
+  let h1Text = o.h1;
+  let eyebrowText = o.eyebrow;
+  let subText = o.sub;
+  const promise = ctx.copy.heroTagline;
+  if (kind === "billboard" || dna.headline === "name") {
+    h1Text = r.name;
+    eyebrowText = o.h1;
+  } else if (dna.headline === "promise" && promise && promise.length <= 72) {
+    h1Text = promise;
+    eyebrowText = o.h1;
+    subText = o.sub === promise ? ctx.copy.heroSub : o.sub;
+  }
   const backdrop = showImg && (kind === "stack" || kind === "cover");
   const cls = `hero hero--${ctx.theme.knobs.hero}${backdrop ? " hero--photo" : ""} hero--${kind}`;
   const imgAttrs = raw(`src="${img?.src ?? ""}" alt="" width="${img?.width ?? 1200}" height="${img?.height ?? 800}" decoding="async"`);
@@ -95,9 +119,9 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   const photo = showImg && !backdrop ? html`<div class="ph"><img ${imgAttrs} fetchpriority="high"></div>` : "";
   const credit = showImg && img!.attribution ? html`<p class="hero__credit">Photo: ${img!.attribution.uri ? html`<a href="${img!.attribution.uri}" target="_blank" rel="noopener">${img!.attribution.name}</a>` : img!.attribution.name}</p>` : "";
   const badge = o.badge ? html`<p class="badge">${o.badge}</p>` : "";
-  const eyebrow = o.eyebrow ? html`<p class="hero__eyebrow">${o.eyebrow}</p>` : "";
-  const h1 = html`<h1 id="hero-title">${o.h1}</h1>`;
-  const sub = html`<p class="hero__sub">${o.sub}</p>`;
+  const eyebrow = eyebrowText ? html`<p class="hero__eyebrow">${eyebrowText}</p>` : "";
+  const h1 = html`<h1 id="hero-title">${h1Text}</h1>`;
+  const sub = subText ? html`<p class="hero__sub">${subText}</p>` : "";
   const status = o.showStatus ? html`<p class="status" data-open-status hidden></p>` : "";
   if (o.showStatus && hasAnyHours(r.hours)) ctx.statusShown = true;
   // Proof up top: the Google rating, when it's good and based on enough reviews (never for categories that can't show reviews).
@@ -105,11 +129,35 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   const proof = ctx.reviewsAllowed !== false && rep.rating && rep.count && rep.rating >= 4.3 && rep.count >= 10 && r.mapsUrl
     ? html`<li class="hero__proof"><a href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("star", 18)}${rep.rating.toFixed(1)} on Google · ${rep.count} reviews<span class="sr"> (opens in new tab)</span></a></li>`
     : "";
-  const trust = o.trust.length || proof ? html`<ul class="hero__trust">${proof}${o.trust.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : "";
+  // Proof either rides in the opening (trust row) or gets its own band right under it.
+  const bandProof = dna.proof === "band" && !!(proof || o.trust.length);
+  const trust = !bandProof && (o.trust.length || proof) ? html`<ul class="hero__trust">${proof}${o.trust.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : "";
+  const band = bandProof
+    ? html`<div class="proof"><div class="proof__in">${
+        proof && rep.rating && rep.count
+          ? html`<div class="proof__rating"><a href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("star", 28)}<strong>${rep.rating.toFixed(1)}</strong><span>${rep.count} Google reviews<span class="sr"> (opens in new tab)</span></span></a></div>`
+          : ""
+      }${o.trust.length ? html`<ul class="proof__list">${o.trust.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : ""}</div></div>`
+    : "";
   // Texting is how many people would rather reach a plumber or a barber: when the number takes texts and the
   // buttons don't already offer it, a quiet line under them does, without a third stacked button.
   const btns = html`<div class="btns" data-hero-actions>${o.actions.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>${textLine(ctx, o.actions)}`;
+  const body = heroBody(kind);
+  return html`${body}${band}`;
+
+  function heroBody(kind: Dna["hero"]): Raw {
   switch (kind) {
+    case "card":
+      // The photo first, full width; then a card with everything else floating up over its bottom edge.
+      return html`<section class="${cls}" aria-labelledby="hero-title">
+<div class="hero__photo">${photo}</div>
+<div class="hero__in"><div class="hero__card">${badge}${eyebrow}${h1}${sub}${status}${trust}${btns}</div></div>
+${credit}
+</section>`;
+    case "billboard":
+      // The name as the sign: huge, then what they do and the facts in a row under it; the photo as a band below.
+      return html`<section class="${cls}" aria-labelledby="hero-title"><div class="hero__in">${badge}${eyebrow}${h1}<div class="hero__bb">${sub}${status}${trust}${btns}</div></div></section>
+${photo ? html`<div class="hero__band">${photo}${credit}</div>` : ""}`;
     case "split": {
       // Headline on the left; an "at a glance" panel (photo, open/closed, hours, address, phone, buttons) on the right.
       const dir = action(r, "directions")!;
@@ -138,6 +186,7 @@ ${badge}${eyebrow}${h1}${sub}${status}${trust}${btns}
 </div>
 ${credit}
 </section>`;
+  }
   }
 }
 
@@ -189,6 +238,15 @@ export function serviceList(ctx: Ctx, items: CardItem[], cols: 2 | 3 = 3): Raw {
       )}</div>`;
     case "columns":
       return html`<div class="svc svc--cols">${items.map((it) => html`<div><h3>${it.title}${price(it.price)}</h3>${body(it.body)}</div>`)}</div>`;
+    case "table":
+      // A price list with dot leaders; without prices it reads as a tidy ruled index.
+      return html`<ul class="svc svc--table">${items.map(
+        (it) => html`<li><div class="svc__row"><h3>${it.title}</h3><span class="svc__dots" aria-hidden="true"></span>${it.price ? html`<span class="price">${it.price}</span>` : ""}</div>${body(it.body)}</li>`,
+      )}</ul>`;
+    case "scroller":
+      return html`<div class="svc svc--scroll" tabindex="0" role="region" aria-label="Services, swipe to see more"><ul>${items.map(
+        (it) => html`<li>${it.icon ? html`<span class="svc__i">${icon(it.icon, 30)}</span>` : ""}<h3>${it.title}${price(it.price)}</h3>${body(it.body)}</li>`,
+      )}</ul></div>`;
     default:
       return cardGrid(items, cols);
   }
@@ -359,7 +417,9 @@ export function footer(ctx: Ctx, nav: NavItem[], extra: { note?: Raw; reviews?: 
       ? html`${r.address.street}<br>${r.address.city}, ${r.address.state} ${r.address.zip ?? ""}`
       : html`${r.address.county ? `Serving ${r.address.county} County, ${r.address.state}` : `${r.address.city}, ${r.address.state}`}`;
   return html`<footer class="ftr ftr--${ctx.theme.dna.footer}"><div class="wrap">
-${ctx.theme.dna.footer === "bigcta" ? html`<div class="ftr__cta"><p>${ctx.copy.ctaTitle}</p>${button(action(r, "call")!, "primary")}</div>` : ""}
+${ctx.theme.dna.footer === "bigcta" ? html`<div class="ftr__cta"><p>${ctx.copy.ctaTitle}</p>${button(action(r, "call")!, "primary")}</div>` : ""}${
+    ctx.theme.dna.footer === "bigname" ? html`<p class="ftr__name" aria-hidden="true">${r.name}</p>` : ""
+  }
 <div class="ftr__grid">
 <div><h2>${r.name}</h2><address style="font-style:normal">${where}</address><p><a href="${action(r, "call")!.href}">${r.phone.display}</a></p></div>
 <div>${hasAnyHours(r.hours) ? html`<h2>Hours</h2><p>${hoursSummary(r.hours)}</p>` : ""}${

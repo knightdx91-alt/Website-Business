@@ -696,6 +696,7 @@
         ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p>${owner ? `<button class="btn" data-act="retry">Try again</button>` : `<p class="small muted">The owner can rebuild it.</p>`}` : ""}
         ${l.status === "queued" || l.status === "building" ? `<p><span class="spin"></span> Building… this takes about a minute.</p>` : ""}
         ${ready ? `<p class="muted small">Design: ${esc(lookName)}${owner && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="restyle">🎨 Try another design</button>` : ""}</p>
+          ${owner && l.salesStatus !== "live" && (l.dnaRecipes || []).length ? `<label class="field small">Or pick a style (keeps the colors)<select data-recipe><option value="">Choose a style…</option>${l.dnaRecipes.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}: ${esc(x.about)}</option>`).join("")}</select></label>` : ""}
           <div class="btns btns--full">
             <a class="btn btn--primary" href="#/preview/${l.id}">Preview</a>
             <a class="btn" href="#/full/${l.id}">Open full screen</a>
@@ -783,6 +784,13 @@
     });
     act("portal", () => openPortal(id));
     act("restyle", async () => { await api(`/leads/${id}/restyle`, { method: "POST" }); toast("New design ready"); viewLead(id); });
+    const recipeSel = $app.querySelector("[data-recipe]");
+    if (recipeSel) recipeSel.addEventListener("change", async () => {
+      if (!recipeSel.value) return;
+      recipeSel.disabled = true;
+      try { await api(`/leads/${id}/restyle`, { method: "POST", json: { recipe: recipeSel.value } }); toast("New structure ready"); viewLead(id); }
+      catch (e) { recipeSel.disabled = false; throw e; }
+    });
     if (owner) act("retry", async () => { await api(`/leads/${id}/retry`, { method: "POST" }); toast("Rebuilding…"); setTimeout(() => viewLead(id), 1500); });
     act("rewrite", async () => {
       if (!confirm("Write new text with AI? Your text edits will be replaced. Facts, photos and menu stay.")) return;
@@ -1008,6 +1016,7 @@
         .join("")}</select></label>
         <h3 style="margin:6px 0 4px">Page structure</h3>
         <p class="small muted">How the page is put together: the opening, the top bar, buttons, how services are shown. Mix these with any colors and layout.</p>
+        ${(l.dnaRecipes || []).length ? `<label class="field">Start from a style<select name="dna_recipe" data-recipe-fill><option value="">Keep my picks</option>${l.dnaRecipes.map((x) => `<option value="${esc(x.id)}" data-dna="${esc(JSON.stringify(x.dna))}">${esc(x.name)}: ${esc(x.about)}</option>`).join("")}</select></label>` : ""}
         <div class="row" style="flex-wrap:wrap">${(l.dnaOrder || []).map((k) => `<label class="field" style="flex:1 1 150px">${esc(k.label)}<select name="dna_${esc(k.id)}">${k.values.map((v) => `<option value="${esc(v.id)}"${((l.dna || {})[k.id] || k.values[0].id) === v.id ? " selected" : ""}>${esc(v.name)}</option>`).join("")}</select></label>`).join("")}</div>
         <button class="btn btn--small" type="button" data-act="shuffle">🎲 Surprise me</button></section>
       <section class="card"><h2>Facts (only if the owner says so)</h2>
@@ -2849,6 +2858,19 @@
     }
     return any ? "~" + code : "";
   }
+  // Edit → Design: picking a style sets the structure pickers it cares about; the others stay as they were.
+  document.addEventListener("change", (e) => {
+    const sel = e.target.closest && e.target.closest("[data-recipe-fill]");
+    if (!sel || !sel.value) return;
+    const f = sel.closest("form"), opt = sel.selectedOptions[0];
+    let dna = {};
+    try { dna = JSON.parse((opt && opt.dataset.dna) || "{}"); } catch (err) { dna = {}; }
+    if (!f) return;
+    for (const [k, v] of Object.entries(dna)) { const el = f.elements["dna_" + k]; if (el) el.value = v; }
+    const hero = f.elements.dna_hero, strip = f.elements.dna_strip;
+    if (hero && strip) { if (hero.value === "split") strip.value = "none"; else if (strip.value === "none") strip.value = "bar"; }
+    toast(`${opt.textContent.split(":")[0]} set. Save to see it.`);
+  });
   document.addEventListener("click", (e) => {
     const b = e.target.closest && e.target.closest("[data-act=shuffle]");
     if (!b) return;

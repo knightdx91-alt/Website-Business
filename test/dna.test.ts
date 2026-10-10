@@ -16,11 +16,15 @@ test("dna encodes and parses round-trip; bad codes are rejected", () => {
   assert.equal(parseDna("h9n0b0s0v0c0f0a0p0"), undefined, "index out of range");
   assert.equal(parseDna("h0n0"), undefined, "too short");
   assert.equal(parseDna("h0n0b0s0v0c0f0a0p0x"), undefined, "trailing junk");
-  assert.equal(encodeDna(LEGACY_DNA), "h0n0b0s0v0c0f0a0p0");
+  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q0") }, "an id from before the newer knobs still parses, with legacy values for them");
+  assert.equal(parseDna("h0n0b0s0v0c0f0a0p0t5"), undefined, "a newer knob out of range is still rejected");
+  assert.equal(encodeDna(LEGACY_DNA), "h0n0b0s0v0c0f0a0p0t0r0k0d0o0m0q0");
   const d = parseDesign("auto.motor_oil~classic~h1n2b3s2v1c1f1a1p1");
   assert.equal(d.layout, "classic");
   assert.equal(d.dna?.hero, "cover");
   assert.equal(designId("auto.motor_oil", "classic", LEGACY_DNA), "auto.motor_oil~classic", "legacy dna is left off the id");
+  const legacyish = parseDesign("auto.motor_oil~classic~h0n0b0s0v0c0f0a0p0");
+  assert.equal(encodeDna(legacyish.dna!), encodeDna(LEGACY_DNA));
 });
 
 test("picked dna is deterministic, category-aware and self-consistent", () => {
@@ -75,6 +79,20 @@ test("every structure builds lint-clean on every layout, with and without a phot
       const noPhoto = await buildSite({ record: categoryRecord("salon", { media: { hero: undefined, gallery: [] } }), copy: sampleCopy(), site: site(design), mode: "preview" });
       assert.deepEqual(noPhoto.lint.errors, [], `${design} (no photo)`);
       n++;
+    }
+  }
+  // Every recipe of every category builds clean too, on a layout chosen by its position.
+  const { RECIPES, settleDna } = await import("../src/generator/dna.ts");
+  const { looksFor } = await import("../src/generator/themes.ts");
+  let j = 0;
+  for (const [category, recipes] of Object.entries(RECIPES)) {
+    const look = looksFor(category as "auto")[0]!;
+    for (const recipe of recipes) {
+      const d = settleDna({ ...LEGACY_DNA, ...recipe.dna });
+      const design = `${look}~${LAYOUT_IDS[j++ % LAYOUT_IDS.length]}~${encodeDna(d)}`;
+      const rec = category === "restaurant" ? restaurantRecord() : categoryRecord(category as "auto", { smsEnabled: true });
+      const out = await buildSite({ record: rec, copy: sampleCopy(), site: site(design), mode: "preview" });
+      assert.deepEqual(out.lint.errors, [], `${category} recipe ${recipe.id}: ${design}`);
     }
   }
   const r = await buildSite({ record: restaurantRecord(), copy: sampleCopy(), site: site(`restaurant.pit_plank~classic~${encodeDna({ ...LEGACY_DNA, hero: "split", strip: "none", services: "tiles" })}`), mode: "preview" });

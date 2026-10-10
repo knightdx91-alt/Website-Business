@@ -93,6 +93,7 @@ if ("ResizeObserver" in window && hdr) new ResizeObserver(measureHdr).observe(hd
 window.addEventListener("scroll", function () {
   var y = window.scrollY;
   if (hdr && !(nav && nav.classList.contains("is-open"))) hdr.classList.toggle("is-hidden", y > last && y > 160);
+  if (hdr) hdr.classList.toggle("is-scrolled", y > 24);
   last = y;
 }, { passive: true });
 var bar = d.querySelector(".bar"), heroActions = d.querySelector("[data-hero-actions]");

@@ -1,8 +1,8 @@
 import { layoutOf } from "../generator/design.ts";
 import { LAYOUT_IDS, LAYOUTS } from "../generator/layouts.ts";
 import { z } from "zod";
-import { DNA_ORDER, LEGACY_DNA } from "../generator/dna.ts";
-import { LOOKS, parseDesign } from "../generator/themes.ts";
+import { DNA_ORDER, LEGACY_DNA, RECIPES, encodeDna, pickDna, settleDna } from "../generator/dna.ts";
+import { designId, LOOKS, parseDesign } from "../generator/themes.ts";
 import { menuToText } from "../generator/menu.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import { packFor } from "../generator/packs/index.ts";
@@ -178,6 +178,7 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
     looks: pack.looks.map((id) => ({ id, name: LOOKS[id]?.name ?? id })),
     layouts: LAYOUT_IDS.map((id) => ({ id, name: LAYOUTS[id].name, about: LAYOUTS[id].about })),
     dnaOrder: DNA_ORDER,
+    dnaRecipes: RECIPES[l.category as CategoryId] ?? [],
     dna: l.look ? (parseDesign(l.look).dna ?? LEGACY_DNA) : null,
     layout: l.look ? layoutOf(l.look) : null,
     lookBase: l.look ? parseDesign(l.look).look : null,
@@ -889,7 +890,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");
       if (lead.sales_status === "live") throw new HttpError(409, "This site is already live. Change its design from Edit.");
       const record = JSON.parse(lead.record_json) as BusinessRecord;
-      const look = await chooseLook(env, record, `${id}:${Date.now()}`, lead.look ?? undefined);
+      // With a style recipe: keep the colors and layout, rebuild the structure from that recipe (the rest re-rolled).
+      const want = req.headers.get("content-type")?.includes("json") ? ((await req.json().catch(() => ({}))) as { recipe?: string }) : {};
+      const recipe = want.recipe ? (RECIPES[record.category] ?? []).find((r) => r.id === want.recipe) : undefined;
+      let look: string;
+      if (recipe && lead.look) {
+        const cur = parseDesign(lead.look);
+        const base = pickDna(`${id}:${Date.now()}`, record.category, { avoid: cur.dna ? [cur.dna] : [] });
+        look = designId(cur.look, layoutOf(lead.look), settleDna({ ...base, ...recipe.dna }));
+      } else look = await chooseLook(env, record, `${id}:${Date.now()}`, lead.look ?? undefined);
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), look);
       return json({ ok: true, look });
     }
