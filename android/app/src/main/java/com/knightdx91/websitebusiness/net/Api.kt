@@ -21,7 +21,8 @@ class Api(context: Context) {
 
     // ---- plumbing ----
 
-    private suspend fun call(method: String, path: String, body: JSONObject? = null, auth: Boolean = true): Response = withContext(Dispatchers.IO) {
+    /** One JSON request to `/api<path>`. Screens use the typed helpers below or the getJson/postJson/putJson/deleteJson shortcuts. */
+    suspend fun call(method: String, path: String, body: JSONObject? = null, auth: Boolean = true): Response = withContext(Dispatchers.IO) {
         val conn = URL(origin + "/api" + path).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = method
@@ -63,6 +64,48 @@ class Api(context: Context) {
     private suspend fun post(path: String, body: JSONObject? = null) = call("POST", path, body).json()
     private suspend fun put(path: String, body: JSONObject) = call("PUT", path, body).json()
     private suspend fun delete(path: String) = call("DELETE", path).json()
+
+    suspend fun getJson(path: String): JSONObject = get(path)
+    suspend fun postJson(path: String, body: JSONObject? = null): JSONObject = post(path, body)
+    suspend fun putJson(path: String, body: JSONObject): JSONObject = put(path, body)
+    suspend fun deleteJson(path: String): JSONObject = delete(path)
+
+    /** Raw bytes with the session (preview images, PDFs). */
+    suspend fun bytes(path: String): ByteArray = withContext(Dispatchers.IO) {
+        val conn = URL(if (path.startsWith("http")) path else origin + path).openConnection() as HttpURLConnection
+        try {
+            prefs.token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 60_000
+            if (conn.responseCode == 401) throw Unauthorized()
+            if (conn.responseCode >= 400) throw ApiException("Server error ${conn.responseCode}", conn.responseCode)
+            conn.inputStream.use { it.readBytes() }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Uploads a photo (JPEG bytes) to a lead: `kind` is "photo" (main photo) or "gallery". */
+    suspend fun uploadPhoto(leadId: String, kind: String, jpeg: ByteArray, w: Int, h: Int, alt: String): JSONObject = withContext(Dispatchers.IO) {
+        val conn = URL("$origin/api/leads/$leadId/$kind?w=$w&h=$h&alt=${URLEncoder.encode(alt, "UTF-8")}").openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 120_000
+            conn.setRequestProperty("x-wb", "1")
+            conn.setRequestProperty("Content-Type", "image/jpeg")
+            prefs.token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
+            conn.outputStream.use { it.write(jpeg) }
+            val status = conn.responseCode
+            val text = (if (status < 400) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+            if (status == 401) throw Unauthorized()
+            if (status >= 400) throw ApiException(runCatching { JSONObject(text).optString("error") }.getOrNull()?.ifBlank { null } ?: "Upload failed ($status)", status)
+            if (text.isBlank()) JSONObject() else JSONObject(text)
+        } finally {
+            conn.disconnect()
+        }
+    }
 
     private fun q(vararg pairs: Pair<String, String?>): String {
         val parts = pairs.filter { !it.second.isNullOrBlank() }.map { "${it.first}=${URLEncoder.encode(it.second, "UTF-8")}" }
