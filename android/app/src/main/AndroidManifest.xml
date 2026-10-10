@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Trusted Web Activity: opens the live app full-screen in the phone's Chrome engine,
-     so logins, tap-to-call, texting, photo upload and downloads work exactly like the website.
-     Plus one native screen, TapToPayActivity, that takes a card by tap with Stripe Terminal;
-     the web app opens it with an intent://tap?… link (scheme wbpay). -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- Website Business, the native Android app: leads, call log, tasks, alerts, Tap to Pay. It talks to the same Worker
+     API as the web app; long-tail screens (site editor, inbox, sales dashboard, settings) open the web app inside the
+     app's own WebView with the same login. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Lets the app show the web app's notifications (new notes, calls, sales, sign-ups). -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Tap to Pay: Stripe requires the phone's location while taking a payment, and talks to Stripe itself. -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Team alerts (new notes, calls, sales, sign-ups, preview opens). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Tap to Pay: Stripe requires the phone's location while taking a payment. -->
+    <!-- tools:node="replace": a library declares this with maxSdkVersion=30, which would leave Tap to Pay without location on Android 13+. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="replace" />
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- In-app updates: the app downloads the new build and asks Android to install it. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
@@ -22,36 +25,22 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/appName"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Translucent.NoTitleBar">
-
-        <meta-data
-            android:name="asset_statements"
-            android:resource="@string/assetStatements" />
+        android:usesCleartextTraffic="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
-            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/launcherName">
-            <meta-data
-                android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="@string/launchUrl" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
-                android:resource="@color/brand" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
-                android:resource="@color/brand" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.FALLBACK_STRATEGY"
-                android:value="customtabs" />
-
+            android:label="@string/appName"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Opened by the web app (intent://tap?t=…#Intent;scheme=wbpay;package=…;end) on top of the Chrome tab. -->
+        <!-- Also reachable from the web app (intent://tap?t=…#Intent;scheme=wbpay;package=…;end) when a sign-up page is open in Chrome. -->
         <activity
             android:name=".tap.TapToPayActivity"
             android:exported="true"
@@ -67,34 +56,14 @@
             </intent-filter>
         </activity>
 
-        <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
-
-        <activity
-            android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity"
-            android:exported="false" />
-
-        <activity
-            android:name="com.google.androidbrowserhelper.trusted.WebViewFallbackActivity"
-            android:configChanges="orientation|screenSize"
-            android:exported="false" />
-
-        <service
-            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
-            android:enabled="true"
-            android:exported="true">
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
             <meta-data
-                android:name="android.support.customtabs.trusted.SMALL_ICON"
-                android:resource="@drawable/ic_notification" />
-            <intent-filter>
-                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </service>
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
-
-    <queries>
-        <intent>
-            <action android:name="android.support.customtabs.action.CustomTabsService" />
-        </intent>
-    </queries>
 </manifest>

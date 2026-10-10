@@ -2,6 +2,7 @@ package com.knightdx91.websitebusiness.tap
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -57,6 +58,15 @@ import kotlin.concurrent.thread
  */
 class TapToPayActivity : Activity() {
 
+    companion object {
+        const val EXTRA_TOKEN = "t"
+        const val EXTRA_ORIGIN = "o"
+
+        /** Opened straight from the app's lead screen (no deep link needed). */
+        fun intent(context: Context, token: String, origin: String): Intent =
+            Intent(context, TapToPayActivity::class.java).putExtra(EXTRA_TOKEN, token).putExtra(EXTRA_ORIGIN, origin)
+    }
+
     private lateinit var business: TextView
     private lateinit var plan: TextView
     private lateinit var amount: TextView
@@ -93,9 +103,9 @@ class TapToPayActivity : Activity() {
         fix.setOnClickListener { fixAction?.invoke() }
 
         val data = intent?.data
-        val token = data?.getQueryParameter("t")
-        val origin = data?.getQueryParameter("o")?.takeIf { it.startsWith("https://") } ?: BuildConfig.BASE_URL
-        if (data == null || token.isNullOrBlank()) {
+        val token = intent?.getStringExtra(EXTRA_TOKEN) ?: data?.getQueryParameter("t")
+        val origin = (intent?.getStringExtra(EXTRA_ORIGIN) ?: data?.getQueryParameter("o"))?.takeIf { it.startsWith("https://") } ?: BuildConfig.BASE_URL
+        if (token.isNullOrBlank()) {
             fail(getString(R.string.tapOpenFromApp), null)
             return
         }
@@ -337,9 +347,10 @@ class TapToPayActivity : Activity() {
         busy(getString(R.string.tapSaving))
         detail.text = ""
         val a = api ?: return
+        val piId = pi.id ?: return fail(getString(R.string.tapServerError), null, retryable = true)
         thread {
             try {
-                val r = a.complete(pi.id)
+                val r = a.complete(piId)
                 runOnUiThread {
                     val card = r.optString("card").takeIf { it.isNotBlank() }
                     val renews = r.optString("renewsOn").takeIf { it.isNotBlank() }
@@ -423,7 +434,7 @@ class TapToPayActivity : Activity() {
             TerminalErrorCode.CARD_READ_TIMED_OUT -> getString(R.string.tapTimedOut)
             TerminalErrorCode.SESSION_EXPIRED -> getString(R.string.tapSessionExpired)
             TerminalErrorCode.STRIPE_API_CONNECTION_ERROR -> getString(R.string.tapOffline)
-            else -> e.errorMessage.ifBlank { e.errorCode.toString() }
+            else -> (e.errorMessage?.takeIf { it.isNotBlank() } ?: e.errorCode.toString())
         }
     }
 }

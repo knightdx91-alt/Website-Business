@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="appName">Website Business</string>
-    <string name="launcherName">Sites</string>
-    <string name="launchUrl">https://website-business.knightdx91.workers.dev/</string>
-    <string name="assetStatements" translatable="false">[{ \"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": { \"namespace\": \"web\", \"site\": \"https://website-business.knightdx91.workers.dev\" } }]</string>
+    <string name="alertsChannel">Team alerts</string>
+    <string name="alertsChannelAbout">Calls logged, sales, sign-ups, payments and prospects opening their preview.</string>
     <!-- Tap to Pay screen -->
     <string name="tapTitle">Tap to Pay</string>
     <string name="tapOpenFromApp">Open this from a client\'s sign-up in the app: Lead → Signed up → Take payment by tap.</string>

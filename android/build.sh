@@ -21,4 +21,10 @@ echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 (cd android && gradle --no-daemon -q assembleRelease -PwbKeystore="$KEYDIR/website-business.jks" -PwbKeystorePassword="$(cat "$KEYDIR/password.txt")")
 npx wrangler r2 object put website-business-sites/_build/website-business.apk --remote \
   --file android/app/build/outputs/apk/release/app-release.apk --content-type application/vnd.android.package-archive
-echo "Uploaded. Bump versionCode in android/app/build.gradle.kts before the next release."
+# Version file the app's updater checks (GET /api/android/version).
+VC=$(grep -oE 'versionCode = [0-9]+' android/app/build.gradle.kts | grep -oE '[0-9]+')
+VN=$(grep -oE 'versionName = "[^"]+"' android/app/build.gradle.kts | cut -d'"' -f2)
+printf '{"versionCode":%s,"versionName":"%s","uploadedAt":"%s"}' "$VC" "$VN" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > android/app/build/outputs/apk/release/version.json
+npx wrangler r2 object put website-business-sites/_build/website-business.json --remote \
+  --file android/app/build/outputs/apk/release/version.json --content-type application/json
+echo "Uploaded $VN ($VC). Phones with an older build get an update prompt. Bump versionCode in android/app/build.gradle.kts before the next release."

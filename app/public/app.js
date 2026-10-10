@@ -116,18 +116,41 @@
   async function viewLogin() {
     meta = null;
     setNav("login");
-    const state = await api("/auth/state");
+    const [state, cfg] = await Promise.all([api("/auth/state"), api("/auth/config").catch(() => ({}))]);
     if (state.loggedIn) return go("#/");
     const setup = !state.hasOwner;
+    const google = !setup && !!cfg.googleClientId;
+    const passwords = setup || !cfg.requireGoogle;
     $app.innerHTML = `<div class="login card">
-      <h1>${setup ? "Create your password" : "Log in"}</h1>
-      <p class="muted">${setup ? "First time here. Pick a password only you know. You'll use it to open the app on any device." : "Enter your password. Callers use the password the owner gave them."}</p>
+      <h1>${setup ? "Create your password" : google ? "Sign in" : "Log in"}</h1>
+      ${google ? `<p class="muted">Use your <strong>@${esc(cfg.domain || "")}</strong> Google account.</p><div id="gbtn" style="margin:12px 0 16px;min-height:44px"></div><p class="small muted" id="gmsg"></p>` : ""}
+      ${passwords ? `<p class="muted">${setup ? "First time here. Pick a password only you know. You'll use it to open the app on any device." : google ? "Or use a password:" : "Enter your password. Callers use the password the owner gave them."}</p>
       <form id="f">
         <label class="field">Password<input type="password" name="password" autocomplete="${setup ? "new-password" : "current-password"}" minlength="${setup ? 8 : 1}" required></label>
         ${setup ? `<label class="field">Type it again<input type="password" name="again" autocomplete="new-password" required></label>` : ""}
-        <button class="btn btn--primary" type="submit">${setup ? "Create password" : "Log in"}</button>
-      </form></div>`;
-    $app.querySelector("#f").addEventListener("submit", async (e) => {
+        <button class="btn ${google ? "" : "btn--primary"}" type="submit">${setup ? "Create password" : "Log in"}</button>
+      </form>` : `<p class="small muted">Passwords are turned off for this team.</p>`}</div>`;
+    if (google) {
+      const finish = async (idToken) => {
+        try {
+          await api("/auth/google", { method: "POST", json: { idToken } });
+          meta = null;
+          const next = new URLSearchParams(location.search).get("next");
+          if (next && next.startsWith("/p/")) location.href = next;
+          else go("#/");
+        } catch (err) { const m = document.getElementById("gmsg"); if (m) m.textContent = err.message; }
+      };
+      const render = () => {
+        const el = document.getElementById("gbtn");
+        if (!el) return;
+        if (!window.google || !window.google.accounts) { setTimeout(render, 300); return; }
+        window.google.accounts.id.initialize({ client_id: cfg.googleClientId, hosted_domain: cfg.domain || undefined, callback: (r) => finish(r.credential), ux_mode: "popup", auto_select: false });
+        window.google.accounts.id.renderButton(el, { theme: "outline", size: "large", text: "signin_with", shape: "pill", width: 280 });
+      };
+      render();
+    }
+    const form = $app.querySelector("#f");
+    if (form) form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
       if (setup && fd.get("password") !== fd.get("again")) return toast("The passwords don't match");
@@ -2932,7 +2955,9 @@
     return `<section class="card"><h2>Team</h2>
       <p class="small muted"><strong>Callers</strong> can see leads, previews and call guides, text preview links, log calls and set callbacks. They can't run searches, edit or publish sites, delete leads, or see settings, spending or the inbox.<br><strong>Full access</strong> can do everything you can, under their own name.</p>
       <ul class="list">${callers.length ? callers.map((c) => `<li><div class="row"><strong>${esc(c.name)}</strong><span class="chip${c.admin ? " chip--good" : ""}" style="flex:none">${c.admin ? "Full access" : "Caller"}</span>${c.disabled ? `<span class="chip" style="flex:none">Turned off</span>` : ""}</div>
+        <p class="small muted" style="margin:2px 0 0">${c.email ? `✉️ ${esc(c.email)}${c.googleOnly ? " · Google sign-in only" : ""}` : "No Google address yet"}</p>
         <div class="btns" style="margin-top:6px">
+          <button class="btn btn--small" data-cemail="${c.id}" data-email="${esc(c.email || "")}">${c.email ? "Change email" : "Add Google email"}</button>
           <button class="btn btn--small" data-cpass="${c.id}">New password</button>
           ${c.id === meta.me.id ? "" : `<button class="btn btn--small" data-cadmin="${c.id}" data-admin="${c.admin ? 1 : 0}">${c.admin ? "Make caller" : "Give full access"}</button>`}
           <button class="btn btn--small" data-ctoggle="${c.id}" data-off="${c.disabled ? 1 : 0}">${c.disabled ? "Turn on" : "Turn off"}</button>
@@ -2941,7 +2966,8 @@
         <a class="btn btn--small" href="/api/backup" download="website-business-backup.json">⬇️ Download backup</a></div>
       <form id="cf" style="margin-top:12px"><h3>Add someone</h3>
         <label class="field">Their name<input name="name" maxlength="60" required placeholder="Used in texts, call guides and notes"></label>
-        <label class="field">Their password <span class="hint">At least 8 characters, different from everyone else's. Tell them in person.</span><input name="password" type="text" minlength="8" autocomplete="off" required></label>
+        <label class="field">Their company Google address <span class="hint">They sign in with Google using this address (anyone on the company domain can also just sign in and shows up here as a caller).</span><input name="email" type="email" autocomplete="off" placeholder="name@${esc((meta.settings && meta.settings.googleDomain) || "undergroundassociates.com")}"></label>
+        <label class="field">Their password <span class="hint">Optional when they have a Google address. At least 8 characters, different from everyone else's.</span><input name="password" type="text" minlength="8" autocomplete="off"></label>
         <label class="check"><input type="checkbox" name="admin"> Full access (can do everything you can)</label>
         <button class="btn btn--primary" type="submit">Add</button></form></section>`;
   }
@@ -2961,11 +2987,16 @@
       e.preventDefault();
       const f = e.target;
       try {
-        await api("/callers", { method: "POST", json: { name: f.name.value.trim(), password: f.password.value, admin: f.admin.checked } });
-        toast("Added. They log in with that password.");
+        await api("/callers", { method: "POST", json: { name: f.name.value.trim(), password: f.password.value || undefined, email: f.email.value.trim() || undefined, admin: f.admin.checked } });
+        toast(f.email.value.trim() ? "Added. They sign in with Google." : "Added. They log in with that password.");
         viewSettings();
       } catch (err) { toast(err.message); }
     });
+    $app.querySelectorAll("[data-cemail]").forEach((b) => b.addEventListener("click", async () => {
+      const email = prompt("Their company Google address (blank to remove):", b.dataset.email || "");
+      if (email === null) return;
+      try { await api(`/callers/${b.dataset.cemail}`, { method: "PUT", json: { email: email.trim() || null } }); viewSettings(); } catch (err) { toast(err.message); }
+    }));
     $app.querySelectorAll("[data-cpass]").forEach((b) => b.addEventListener("click", async () => {
       const password = prompt("New password for this caller (at least 8 characters). They'll be logged out everywhere.");
       if (!password) return;
@@ -3060,6 +3091,12 @@
         <label class="field">Owner's direct email <span class="hint">Shown on your website as "Need the owner directly?"</span><input name="directEmail" type="email" value="${esc(s.directEmail || "")}" placeholder="post@undergroundassociates.com"></label>
         <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
         ${!meta.me.id || meta.me.id === "owner" ? `<label class="field">Your name <span class="hint">Your texts say "Hi, this is ___ with ${esc(s.companyName || "your company")}". Everyone else's texts use their own login names.</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="e.g. Post"></label>` : ""}
+        <h2 style="margin-top:18px">Team sign-in (Google)</h2>
+        <p class="small muted">Everyone signs in with their company Google account. One-time setup in Google Cloud (see the Android app card below for the steps), then paste the web client ID here.</p>
+        <label class="field">Google client ID <span class="hint">The OAuth “Web application” client, ends in .apps.googleusercontent.com</span><input name="googleClientId" value="${esc(s.googleClientId || "")}" placeholder="1234567890-abc.apps.googleusercontent.com" autocomplete="off"></label>
+        <div class="row"><label class="field">Company domain<input name="googleDomain" value="${esc(s.googleDomain || "undergroundassociates.com")}"></label>
+        <label class="field">Owner's Google address <span class="hint">This address signs in as the owner</span><input name="ownerEmail" type="email" value="${esc(s.ownerEmail || "")}" placeholder="post@undergroundassociates.com"></label></div>
+        <label class="check"><input type="checkbox" name="requireGoogle"${s.requireGoogle ? " checked" : ""}> Turn passwords off (Google only). Turn this on once your own Google sign-in works.</label>
         <h2 style="margin-top:18px">Plans &amp; prices</h2>
         <div class="card small" style="margin:8px 0">${meta.checkout && meta.checkout.online
           ? `✅ <strong>Online checkout is on.</strong> Sign-up links, “Buy now” on your website and “Buy extras” links all go to a Stripe checkout with exactly what the client picked. The payment links below aren't needed.`
@@ -3151,6 +3188,10 @@
             legalName: v("legalName") || undefined,
             companyPhone: v("companyPhone") || undefined,
             companyEmail: v("companyEmail") || undefined,
+            googleClientId: v("googleClientId") || undefined,
+            googleDomain: v("googleDomain").toLowerCase() || undefined,
+            ownerEmail: v("ownerEmail").toLowerCase() || undefined,
+            requireGoogle: f.requireGoogle.checked,
             companyStreet: v("companyStreet") || undefined,
             companyCity: v("companyCity") || undefined,
             companyState: v("companyState").toUpperCase() || undefined,

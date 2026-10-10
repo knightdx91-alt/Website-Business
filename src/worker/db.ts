@@ -250,6 +250,11 @@ export interface AppSettings {
   companyCity?: string;
   companyState?: string;
   companyZip?: string;
+  /** Google sign-in (Settings → Team): the OAuth web client id, the Workspace domain allowed, the owner's address, and whether passwords are off. */
+  googleClientId?: string;
+  googleDomain?: string;
+  ownerEmail?: string;
+  requireGoogle?: boolean;
   /** The owner's own address, shown next to the business email for people who want them directly. */
   directEmail?: string;
   /** Our own Google "write a review" link, texted to happy clients. */

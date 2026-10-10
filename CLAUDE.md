@@ -108,7 +108,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       (Worker API + queue pipeline, D1/R2 storage, phone PWA, Pages publish, form inbox)
 - [x] Packs for salons, auto, landscaping, cleaning (now 25 looks per category, all AA-checked).
       Real Cullman leads found: 14 salon, 20 auto, 11 landscaping, 6 cleaning.
-- [x] Caller logins (limited access), call log with callbacks, Android app (TWA APK)
+- [x] Caller logins (limited access), call log with callbacks, Android app (TWA APK; native Compose app since 2.0, Oct 2026)
 - [x] Growth batch: plans + client sign-up page + Stripe/Square payment links, visit counter +
       monthly report, review QR cards, preview flyers, custom domains, outdated-website leads,
       food trucks / nail salons / pet groomers, nearby towns, walk-in route, sales dashboard
@@ -179,16 +179,46 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Call log: `lead_notes` (outcome + note + author) and `leads.follow_up` (YYYY-MM-DD, Cullman time) via
   `POST /api/leads/:id/log`. "No answer" defaults the callback to tomorrow; Sold/Not interested clear it.
   Home shows "Call back today" (due + overdue). A future callback keeps a lead from expiring, capped at 90 days.
-- Android app (`android/`): a Trusted Web Activity (androidbrowserhelper) that opens the live app
-  full-screen; `/.well-known/assetlinks.json` (in `index.ts`) carries the signing cert fingerprint.
-  `npm run android` builds it (needs ANDROID_HOME with platform 36) and uploads it to R2
-  `_build/website-business.apk`, served behind login at `/api/android.apk` (Settings → Download).
-  The app only needs rebuilding for shell changes (name, icon, package); features ship with `npm run deploy`.
-  The signing key is deliberately NOT kept anywhere (owner's choice). If it's gone, `android/build.sh`
-  makes a new one: add its fingerprint to `ASSET_LINKS` (keep the old ones so existing installs stay full-screen),
-  redeploy, and phones uninstall + reinstall once to move to the new build. 1.2 (Oct 2026) was signed with a new key. 2.0 (Oct 2026)
-  adds the Kotlin Tap to Pay screen (see "Tap to Pay" below); the Android SDK lives outside the repo (`ANDROID_HOME`).
-  Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first.
+- Android app (`android/`, 2.0, Oct 2026): a real native app (Kotlin + Jetpack Compose, Material 3), not a web wrapper any more.
+  Package `com.knightdx91.websitebusiness`, `MainActivity` = one Compose activity with bottom tabs Leads / Tasks / Alerts / Settings
+  (`ui/*Screen.kt`): home (Today card, status tabs, search, type filter, lead cards), lead detail (call/text/directions, call guide,
+  preview, log a call with outcome chips + callback day, status, sign-ups + 💳 Take payment by tap, plan buttons → sign-up page,
+  call log), native call guide (`PitchScreen`), alerts, tasks, Find new leads (owner). The long tail (site editor `#/edit/<id>`,
+  preview `#/preview/<id>`, Show plans, in-person guide, inbox, sales, full settings, the sign-up / agreement pages) opens the web app
+  inside the app's own `WebScreen` (WebView with the session as the `wb_session` cookie; tel/sms/geo/intent:// hand off, file
+  chooser for photos, downloads). API client `net/Api.kt` (HttpURLConnection + org.json, `Authorization: Bearer <session>`; the
+  Worker's `getSession` accepts the cookie value as a bearer token), models in `net/Models.kt`, session in `net/Prefs.kt`
+  (app-private SharedPreferences). Alerts: no Chrome, so no Web Push; `alerts/AlertWorker` (WorkManager, every 15 min) fetches
+  `/api/notifications` and posts the new ones (channel `team`); opening Alerts marks them seen. Updates: `update/Updater.kt` reads
+  `GET /api/android/version` (R2 `_build/website-business.json`, written by `android/build.sh` beside the APK), Settings shows
+  "Download and install" (downloads with the bearer token into cache, FileProvider `<pkg>.files`, package installer prompts;
+  needs "install unknown apps" once). True silent auto-update needs a Google Play listing (internal testing track is enough;
+  US$25 developer account; Play App Signing changes the cert, so add Google's SHA-256 to `ASSET_LINKS` and the Android OAuth client).
+  Build: `npm run android` (needs ANDROID_HOME with platform 36 + build-tools 36; the SDK lives outside the repo, e.g. in the
+  session scratchpad) → signed arm64 APK ≈44 MB, uploaded to R2 `_build/website-business.apk`, served behind login at
+  `/api/android.apk` (also the web Settings card). Signing key: `$KEYDIR/website-business.jks` (default ~/.website-business-keys),
+  deliberately NOT backed up (owner's choice); if lost, build.sh makes a new one → Google's Android OAuth client needs the new SHA-1
+  and phones reinstall. Current cert SHA-1 `51:63:58:A2:3D:6B:62:36:AF:26:FD:66:B9:25:69:2D:8F:58:43:B3`, SHA-256
+  `AB:07:5A:34:…:CE:A3:16` (second entry in `ASSET_LINKS`). Deps: Compose BOM 2025.10.00, navigation-compose 2.9.3, Credential
+  Manager 1.5.0 + googleid 1.1.1, work 2.10.3, Stripe Terminal 6.0.0; Kotlin 2.3.21 (matches the Stripe SDK). The manifest forces
+  `ACCESS_FINE_LOCATION` with `tools:node="replace"` (a library caps it at SDK 30, which would break Tap to Pay on Android 13+).
+  Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first. `ASSET_LINKS` stays in index.ts.
+- Google sign-in (Oct 2026, `src/worker/google.ts`, migration 0015 `users.email`): the team signs in with their company Google
+  Workspace account. Web: the login page shows Google Identity Services' button when Settings → "Team sign-in (Google)" has a
+  client ID (`googleClientId`; `index.html` loads accounts.google.com/gsi/client); Android: Credential Manager →
+  `GetGoogleIdOption(serverClientId = the same web client ID)`. Both POST the ID token to `POST /api/auth/google`; the Worker
+  verifies RS256 against Google's JWKS (`verifyGoogleIdToken`: iss, aud = client ID, exp, email_verified) and
+  `onCompanyDomain` (address AND `hd` claim on `googleDomain`, default undergroundassociates.com), then `googleSession`:
+  `ownerEmail` → owner; a `users` row with that email → their role (disabled rows refused); any other address on the domain →
+  a new caller row (password `google.<uuid>`, unusable; the owner is notified) which Settings → Team shows with "Google sign-in
+  only". The response sets the cookie and returns `token` (same value) for the app. `GET /api/auth/config` (public) carries the
+  client ID, domain, `requireGoogle`. `requireGoogle` (Settings checkbox "Turn passwords off") makes `/auth/login` refuse
+  passwords; the owner's password login keeps working until then (and `/auth/setup` always). Team rows take an email
+  (`POST/PUT /api/callers` `email`; add form: email and/or password). Owner's one-time Google Cloud setup: OAuth consent
+  screen (Internal, Workspace) → credentials: a **Web application** client (authorized JavaScript origin
+  https://website-business.knightdx91.workers.dev; paste its ID into Settings) and an **Android** client (package
+  `com.knightdx91.websitebusiness`, the signing SHA-1 above; no ID to paste). The owner's Google address goes in Settings →
+  "Owner's Google address" (the owner session still needs `owner_password` set, which it is). `test/worker/google.test.ts`.
 - Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS). Several groups share one
   template, and the variant comes from the Google type + business name: food trucks/bakeries/coffee →
   restaurant pack; nails, pet groomers, massage (`massage`, needs the AL license # before publish) → salon

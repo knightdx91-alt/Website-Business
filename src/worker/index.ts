@@ -14,7 +14,7 @@ import { profileTextProblems, socialTextProblems, writeMonthlyPosts, writeProfil
 import { reviewTexts } from "../places/to-record.ts";
 import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
-import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup } from "./auth.ts";
+import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
@@ -30,6 +30,7 @@ import { handleFormPost } from "./forms.ts";
 import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
 import { stripeWebhook } from "./stripe.ts";
 import { completeTap, connectionToken, reconcileTaps, setupTap, startTap, tapAuth, tapSession, tapStatus } from "./tap.ts";
+import { DEFAULT_DOMAIN, googleSession, verifyGoogleIdToken } from "./google.ts";
 import { extraTerms } from "./contract.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
 import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
@@ -236,10 +237,33 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     await setupOwner(env, password);
     return json({ ok: true }, 200, { "set-cookie": await sessionCookie(env, { role: "owner", userId: "owner", name: "Owner" }) });
   }
+  // How to sign in (public): the Google client id for the buttons, the domain allowed, and whether passwords are off.
+  if (path === "/auth/config" && m === "GET") {
+    const s = await getSettings(env);
+    return json({ googleClientId: s.googleClientId ?? null, domain: s.googleDomain || DEFAULT_DOMAIN, requireGoogle: !!(s.requireGoogle && s.googleClientId), hasOwner: await hasOwner(env) });
+  }
+  // Google sign-in (web button or the Android app): a verified company Workspace account becomes the same signed session.
+  if (path === "/auth/google" && m === "POST") {
+    const ip = req.headers.get("cf-connecting-ip");
+    if (!(await loginAllowed(env, ip))) throw new HttpError(429, "Too many tries. Wait 15 minutes and try again.");
+    const { idToken } = await body(req, z.object({ idToken: z.string().min(20).max(8192) }));
+    const s = await getSettings(env);
+    if (!s.googleClientId) throw new HttpError(409, "Google sign-in isn't set up yet (Settings → Team → Google sign-in)");
+    let who: Session;
+    try {
+      who = await googleSession(env, await verifyGoogleIdToken(idToken, s.googleClientId));
+    } catch (err) {
+      await recordLoginFailure(env, ip);
+      throw err;
+    }
+    return json({ ok: true, role: who.role, name: who.name, userId: who.userId, token: await sessionToken(env, who) }, 200, { "set-cookie": await sessionCookie(env, who) });
+  }
   if (path === "/auth/login" && m === "POST") {
     const ip = req.headers.get("cf-connecting-ip");
     if (!(await loginAllowed(env, ip))) throw new HttpError(429, "Too many tries. Wait 15 minutes and try again.");
     const { password } = await body(req, z.object({ password: z.string().max(200) }));
+    const cfg = await getSettings(env);
+    if (cfg.requireGoogle && cfg.googleClientId) throw new HttpError(403, "Passwords are turned off. Sign in with your company Google account.");
     const who = await checkPassword(env, password);
     if (!who) {
       await recordLoginFailure(env, ip);
@@ -250,7 +274,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/auth/logout" && m === "POST") return json({ ok: true }, 200, { "set-cookie": clearCookie() });
 
   // The Android Tap to Pay screen: no cookie (it isn't Chrome), a short-lived token from /leads/:id/tap instead.
-  if (path.startsWith("/tap/") && req.headers.has("authorization")) {
+  if ((path === "/tap/session" || path === "/tap/connection_token" || path === "/tap/complete") && req.headers.has("authorization")) {
     const row = await tapAuth(env, req.headers.get("authorization"));
     if (path === "/tap/session" && m === "GET") return json(await tapSession(env, row));
     if (path === "/tap/connection_token" && m === "POST") return json(await connectionToken(env));
@@ -362,6 +386,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         legalName: z.string().trim().max(120).optional(),
         companyPhone: z.string().trim().max(30).optional(),
         companyEmail: z.string().trim().email().max(120).optional(),
+        googleClientId: z.string().trim().regex(/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/, "A Google client ID ends in .apps.googleusercontent.com").optional(),
+        googleDomain: z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "A domain like undergroundassociates.com").optional(),
+        ownerEmail: z.string().trim().toLowerCase().email().max(120).optional(),
+        requireGoogle: z.boolean().optional(),
         companyStreet: z.string().trim().max(120).optional(),
         companyCity: z.string().trim().max(60).optional(),
         companyState: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Two-letter state").optional(),
@@ -419,6 +447,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   }
 
   // The Android app (android/), for any logged-in user to install. Uploaded to R2 by `npm run android:upload`.
+  // The Android app checks this on start and in Settings; build.sh writes it next to the APK.
+  if (path === "/android/version" && m === "GET") {
+    const v = await env.BUCKET.get("_build/website-business.json");
+    if (!v) throw new HttpError(404, "No Android build uploaded yet");
+    const info = (await v.json()) as { versionCode: number; versionName: string; uploadedAt?: string };
+    return json({ ...info, url: `${url.origin}/api/android.apk` });
+  }
   if (path === "/android.apk" && m === "GET") {
     const apk = await env.BUCKET.get("_build/website-business.apk");
     if (!apk) throw new HttpError(404, "The Android app hasn't been uploaded yet");
@@ -526,12 +561,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/callers" || path.startsWith("/callers/")) ownerOnly();
   if (path === "/callers" && m === "GET") return json({ callers: await listCallers(env) });
   if (path === "/callers" && m === "POST") {
-    const input = await body(req, z.object({ name: CALLER_NAME, password: z.string().max(200), admin: z.boolean().optional() }));
-    return json({ id: await addCaller(env, input.name, input.password, input.admin) });
+    const input = await body(req, z.object({ name: CALLER_NAME, password: z.string().max(200).optional(), admin: z.boolean().optional(), email: z.string().trim().toLowerCase().email().max(120).optional() }));
+    return json({ id: await addCaller(env, input.name, input.password || null, input.admin, input.email) });
   }
   const callerMatch = /^\/callers\/([a-z0-9]+)$/.exec(path);
   if (callerMatch && m === "PUT") {
-    const change = await body(req, z.object({ name: CALLER_NAME.optional(), password: z.string().max(200).optional(), disabled: z.boolean().optional(), admin: z.boolean().optional() }));
+    const change = await body(req, z.object({ name: CALLER_NAME.optional(), password: z.string().max(200).optional(), disabled: z.boolean().optional(), admin: z.boolean().optional(), email: z.string().trim().toLowerCase().email().max(120).nullable().optional() }));
     if (change.admin === false && callerMatch[1] === session.userId) throw new HttpError(400, "You can't take away your own full access");
     await updateCaller(env, callerMatch[1]!, change);
     return json({ ok: true });

@@ -73,6 +73,7 @@ interface UserRow {
   disabled: number;
   admin: number;
   created_at: number;
+  email: string | null;
 }
 
 /** Login is password-only, so every password must be unique across the owner and callers. */
@@ -93,26 +94,42 @@ export async function checkPassword(env: Env, password: string): Promise<Session
   return null;
 }
 
-export async function listCallers(env: Env): Promise<{ id: string; name: string; disabled: boolean; admin: boolean; createdAt: number }[]> {
+export async function listCallers(env: Env): Promise<{ id: string; name: string; disabled: boolean; admin: boolean; createdAt: number; email: string | null; googleOnly: boolean }[]> {
   const rows = await env.DB.prepare("SELECT * FROM users ORDER BY created_at").all<UserRow>();
-  return rows.results.map((u) => ({ id: u.id, name: u.name, disabled: !!u.disabled, admin: !!u.admin, createdAt: u.created_at }));
+  return rows.results.map((u) => ({ id: u.id, name: u.name, disabled: !!u.disabled, admin: !!u.admin, createdAt: u.created_at, email: u.email ?? null, googleOnly: u.password.startsWith("google.") }));
 }
 
 function checkNewPassword(password: string): void {
   if (password.length < 8) throw new HttpError(400, "Use at least 8 characters");
 }
 
-/** A team member: a caller (limited) or, with admin, full access like the owner under their own name. */
-export async function addCaller(env: Env, name: string, password: string, admin = false): Promise<string> {
-  checkNewPassword(password);
-  if (await passwordTaken(env, password)) throw new HttpError(409, "Pick a different password; that one is already in use");
+/**
+ * A team member: a caller (limited) or, with admin, full access like the owner under their own name. With no password
+ * they can only sign in with Google (their company address must be given).
+ */
+export async function addCaller(env: Env, name: string, password: string | null, admin = false, email?: string | null): Promise<string> {
+  let stored: string;
+  if (password) {
+    checkNewPassword(password);
+    if (await passwordTaken(env, password)) throw new HttpError(409, "Pick a different password; that one is already in use");
+    stored = await hashPassword(password);
+  } else {
+    if (!email) throw new HttpError(400, "Give them a password, or their company Google address");
+    stored = `google.${crypto.randomUUID()}`;
+  }
+  if (email && (await emailTaken(env, email))) throw new HttpError(409, "Someone on the team already has that email");
   const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-  await env.DB.prepare("INSERT INTO users (id, name, password, disabled, admin, created_at) VALUES (?, ?, ?, 0, ?, ?)").bind(id, name, await hashPassword(password), admin ? 1 : 0, Date.now()).run();
+  await env.DB.prepare("INSERT INTO users (id, name, password, disabled, admin, created_at, email) VALUES (?, ?, ?, 0, ?, ?, ?)").bind(id, name, stored, admin ? 1 : 0, Date.now(), email ? email.toLowerCase() : null).run();
   return id;
 }
 
+async function emailTaken(env: Env, email: string, exceptUserId?: string): Promise<boolean> {
+  const row = await env.DB.prepare("SELECT id FROM users WHERE lower(email) = ?").bind(email.toLowerCase()).first<{ id: string }>();
+  return !!row && row.id !== exceptUserId;
+}
+
 /** Changing a caller's password or turning them off signs them out everywhere (the session is bound to the stored hash). */
-export async function updateCaller(env: Env, id: string, change: { name?: string; password?: string; disabled?: boolean; admin?: boolean }): Promise<void> {
+export async function updateCaller(env: Env, id: string, change: { name?: string; password?: string; disabled?: boolean; admin?: boolean; email?: string | null }): Promise<void> {
   const user = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>();
   if (!user) throw new HttpError(404, "Caller not found");
   let password = user.password;
@@ -121,8 +138,10 @@ export async function updateCaller(env: Env, id: string, change: { name?: string
     if (await passwordTaken(env, change.password, id)) throw new HttpError(409, "Pick a different password; that one is already in use");
     password = await hashPassword(change.password);
   }
-  await env.DB.prepare("UPDATE users SET name = ?, password = ?, disabled = ?, admin = ? WHERE id = ?")
-    .bind(change.name ?? user.name, password, change.disabled === undefined ? user.disabled : change.disabled ? 1 : 0, change.admin === undefined ? user.admin : change.admin ? 1 : 0, id)
+  if (change.email && (await emailTaken(env, change.email, id))) throw new HttpError(409, "Someone on the team already has that email");
+  const email = change.email === undefined ? user.email : change.email ? change.email.toLowerCase() : null;
+  await env.DB.prepare("UPDATE users SET name = ?, password = ?, disabled = ?, admin = ?, email = ? WHERE id = ?")
+    .bind(change.name ?? user.name, password, change.disabled === undefined ? user.disabled : change.disabled ? 1 : 0, change.admin === undefined ? user.admin : change.admin ? 1 : 0, email, id)
     .run();
 }
 
@@ -178,12 +197,18 @@ async function sessionKey(env: Env, userId: string): Promise<string | null> {
   return u && !u.disabled ? u.password : null;
 }
 
-export async function sessionCookie(env: Env, s: Session): Promise<string> {
+/** The signed session value: the web app carries it in the wb_session cookie, the Android app as a Bearer token. */
+export async function sessionToken(env: Env, s: Session): Promise<string> {
   const exp = Date.now() + SESSION_DAYS * 86_400_000;
   const key = await sessionKey(env, s.userId);
-  const value = `${s.userId}.${exp}.${await hmac(env.APP_SECRET, `session.${s.userId}.${exp}.${key}`)}`;
-  return `${COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * 86_400}`;
+  return `${s.userId}.${exp}.${await hmac(env.APP_SECRET, `session.${s.userId}.${exp}.${key}`)}`;
 }
+
+export async function sessionCookie(env: Env, s: Session): Promise<string> {
+  return `${COOKIE}=${await sessionToken(env, s)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * 86_400}`;
+}
+
+export const SESSION_COOKIE = COOKIE;
 
 export function clearCookie(): string {
   return `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
@@ -192,8 +217,14 @@ export function clearCookie(): string {
 export async function getSession(env: Env, req: Request): Promise<Session | null> {
   const cookie = req.headers.get("cookie") ?? "";
   const m = new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`).exec(cookie);
-  if (!m) return null;
-  const [userId, exp, sig] = m[1]!.split(".");
+  let raw = m?.[1];
+  if (!raw) {
+    // The Android app: the same value as a Bearer token (three parts; Tap to Pay tokens have four and are handled elsewhere).
+    const bearer = /^Bearer\s+(.+)$/i.exec(req.headers.get("authorization") ?? "")?.[1]?.trim();
+    if (bearer && bearer.split(".").length === 3) raw = bearer;
+  }
+  if (!raw) return null;
+  const [userId, exp, sig] = raw.split(".");
   if (!userId || !exp || !sig || !/^[a-z0-9]+$/.test(userId) || Number(exp) < Date.now()) return null;
   const key = await sessionKey(env, userId);
   if (!key || !safeEqual(sig, await hmac(env.APP_SECRET, `session.${userId}.${exp}.${key}`))) return null;
