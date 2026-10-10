@@ -260,7 +260,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   chain list per category with whole-name matching (`isChain(name, category)`), booking/ordering pages count as no
   website, 40 km cut + phone dedupe in `qualify` (pipeline passes `center`), 6 new search groups (septic/dirt work, doors/
   gutters/welding, floors/drywall, glass/muffler, seafood/hibachi/wings, hardware) with new contractor/auto/retail
-  variants, hours required for storefront packs, no empty visit/reviews sections, SVG favicon + og:image, assets
+  variants, hours only ever suggested (owner asked to make them required, then reversed: a site goes live without them), no empty visit/reviews sections, SVG favicon + og:image, assets
   `must-revalidate`, finance/church banned lists fixed for everyday phrases (`SCRIPTURE_REF` needs a book name),
   `copy.issues` + loose-number warnings in lint, `sectionHead(..., id)` for aria-labelledby, Spanish nav labels + a. m./
   p. m. hours, bot-challenge 503s aren't "down". `test/fixes.test.ts`, `test/worker/review-fixes.test.ts`.

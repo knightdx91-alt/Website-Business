@@ -136,15 +136,15 @@ export function hoursTable(ctx: Ctx): Raw {
 }
 
 /**
- * Hours and address for storefront businesses. Hours are required before publishing (every caller is a shop people
- * drive to); until they're in, the section is a single column so no empty box ships.
+ * Hours and address for storefront businesses. Google's hours are used when it has them; otherwise the owner is asked
+ * for theirs (a suggestion, never a publish blocker) and the section is a single column so no empty box ships.
  */
 export function visit(ctx: Ctx, title = "Visit us"): Raw {
   const r = ctx.r;
   const dir = action(r, "directions")!;
   const call = action(r, "call")!;
   const hasHours = hasAnyHours(r.hours);
-  const hoursTodo = hasHours ? raw("") : todo(ctx, "Add your hours", "Google doesn't list hours for you yet. Tell us your hours and we'll add them here.", true);
+  const hoursTodo = hasHours ? raw("") : todo(ctx, "Add your hours", "Google doesn't list hours for you yet. Tell us your hours and we'll add them here.");
   const left = hasHours ? hoursTable(ctx) : hoursTodo;
   return html`<section class="section" id="visit" aria-labelledby="visit-title"><div class="wrap">
 <span class="section__label">Hours &amp; location</span><h2 class="section__title" id="visit-title">${title}</h2>

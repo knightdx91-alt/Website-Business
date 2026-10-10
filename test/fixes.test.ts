@@ -45,13 +45,16 @@ test("copy-writer issues and loose numbers show as warnings, never blockers", as
   assert.ok(!grounded.lint.warnings.some((w) => /business facts/.test(w)));
 });
 
-test("no hours or testimonials: no empty columns or quote grids on live sites, hours required for storefronts", async () => {
+test("no hours or testimonials: no empty columns or quote grids on live sites, hours only suggested", async () => {
   const ex = EXAMPLES.find((e) => e.record.category === "retail")!;
   const record = structuredClone(ex.record);
   record.hours = undefined;
   record.testimonials = [];
   const preview = await buildSite({ record, copy: ex.copy, site: site(), mode: "preview" });
-  assert.ok(preview.todos.includes("Add your hours"), "storefront hours are a required to-do");
+  assert.ok(!preview.todos.includes("Add your hours") && preview.suggestions.includes("Add your hours"), "storefront hours are suggested, never required");
+  const noHoursLive = await buildSite({ record, copy: ex.copy, site: site(), mode: "publish" });
+  assert.ok(!noHoursLive.lint.publishBlockers.some((b) => /hours/i.test(b)) && noHoursLive.lint.errors.length === 0, "a shop without Google hours still publishes");
+  assert.match(String(noHoursLive.files.get("index.html")), /class="visit visit--solo"/);
   const pub = await buildSite({ record: { ...record, hours: ex.record.hours }, copy: ex.copy, site: site(), mode: "publish" });
   const home = String(pub.files.get("index.html"));
   assert.match(home, /Read our reviews on Google/);
