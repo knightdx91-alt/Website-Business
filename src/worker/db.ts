@@ -288,6 +288,8 @@ export interface AppSettings {
   reinstatementFee?: number;
   /** Fee for a bank debit that comes back unpaid or a card charge the bank disputes (0 = none). */
   returnedPaymentFee?: number;
+  /** Stripe publishable key (pk_live_…; not a secret) for the Android app's native card entry. */
+  stripePublishableKey?: string;
   /** Offer "Pay by check or bank transfer (we'll send an invoice)" on every sign-up page, not only churches. */
   invoiceForAll?: boolean;
   /** Daily call goal per person, shown in the app only. 0 = no goal. */

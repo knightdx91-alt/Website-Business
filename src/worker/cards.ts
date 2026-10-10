@@ -82,3 +82,101 @@ ${from || o.phone ? `<p class="lead" style="margin-top:20px">${from ? `Questions
 <p class="small muted">This preview link works for ${o.days} days.</p></div>`;
   return page(`Preview flyer: ${o.business}`, body, { brand: "", css: CARD_CSS });
 }
+
+// ---- PDF versions for the Android app (drawn with src/worker/pdf.ts; the HTML ones above stay for the web) ----
+
+import { drawPdf, LETTER, type Draw } from "./pdf.ts";
+
+/** QR modules as rows of "1"/"0" (error correction M). */
+export function qrGrid(text: string): string[] {
+  const qr = qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+  const n = qr.getModuleCount();
+  const rows: string[] = [];
+  for (let r = 0; r < n; r++) {
+    let row = "";
+    for (let c = 0; c < n; c++) row += qr.isDark(r, c) ? "1" : "0";
+    rows.push(row);
+  }
+  return rows;
+}
+
+const IN = 72;
+const reviewUrl = (placeId: string) => `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
+
+/** Four tear-apart review cards on one page: "Love it? Leave us a Google review" + QR. */
+export function reviewCardsPdf(business: string, placeId: string): Uint8Array {
+  const grid = qrGrid(reviewUrl(placeId));
+  const ops: Draw[] = [];
+  const cw = LETTER.w / 2, ch = LETTER.h / 2;
+  for (let i = 0; i < 4; i++) {
+    const x0 = (i % 2) * cw, y0 = Math.floor(i / 2) * ch;
+    ops.push({ t: "rect", x: x0 + 0.25 * IN, y: y0 + 0.25 * IN, w: cw - 0.5 * IN, h: ch - 0.5 * IN, gray: 0.75, stroke: true });
+    ops.push({ t: "text", x: x0 + cw / 2, y: y0 + 0.9 * IN, size: 20, bold: true, text: business, align: "center", maxW: cw - 1 * IN });
+    ops.push({ t: "text", x: x0 + cw / 2, y: y0 + 1.45 * IN, size: 13, text: "Love it here? Leave us a Google review.", align: "center" });
+    ops.push({ t: "qr", x: x0 + cw / 2 - 0.9 * IN, y: y0 + 1.75 * IN, size: 1.8 * IN, grid });
+    ops.push({ t: "text", x: x0 + cw / 2, y: y0 + 3.85 * IN, size: 11, text: "Point your camera at the code", align: "center", gray: 0.35 });
+    ops.push({ t: "text", x: x0 + cw / 2, y: y0 + 4.1 * IN, size: 10, text: "Thank you!", align: "center", gray: 0.35 });
+  }
+  return drawPdf([ops], `Review cards: ${business}`);
+}
+
+/** Folded table tent: two panels (top one upside down) with the website/menu QR and the review QR. */
+export function tableTentsPdf(o: { business: string; siteUrl: string; menu: boolean; placeId: string }): Uint8Array {
+  const site = qrGrid(o.siteUrl), rev = qrGrid(reviewUrl(o.placeId));
+  const panel = (): Draw[] => {
+    const top = LETTER.h / 2;
+    return [
+      { t: "text", x: LETTER.w / 2, y: top + 0.8 * IN, size: 24, bold: true, text: o.business, align: "center", maxW: LETTER.w - 1.5 * IN },
+      { t: "qr", x: LETTER.w / 2 - 2.3 * IN, y: top + 1.3 * IN, size: 1.8 * IN, grid: site },
+      { t: "text", x: LETTER.w / 2 - 1.4 * IN, y: top + 3.35 * IN, size: 13, bold: true, text: o.menu ? "Our menu" : "Our website", align: "center" },
+      { t: "qr", x: LETTER.w / 2 + 0.5 * IN, y: top + 1.3 * IN, size: 1.8 * IN, grid: rev },
+      { t: "text", x: LETTER.w / 2 + 1.4 * IN, y: top + 3.35 * IN, size: 13, bold: true, text: "Leave a review", align: "center" },
+      { t: "text", x: LETTER.w / 2, y: top + 3.7 * IN, size: 10, text: "Point your camera at a code", align: "center", gray: 0.35 },
+    ];
+  };
+  const ops: Draw[] = [
+    { t: "rect", x: 0.4 * IN, y: LETTER.h / 2, w: LETTER.w - 0.8 * IN, h: 0.6, gray: 0.6 },
+    { t: "text", x: LETTER.w / 2, y: LETTER.h / 2 - 4, size: 7, text: "fold here", align: "center", gray: 0.5 },
+    ...panel(),
+    { t: "flip", ops: panel() },
+  ];
+  return drawPdf([ops], `Table tent: ${o.business}`);
+}
+
+/** A front-window or counter sign: big QR to the website, phone number, small review QR. */
+export function windowSignPdf(o: { business: string; siteUrl: string; phone?: string; placeId: string; menu: boolean }): Uint8Array {
+  const site = qrGrid(o.siteUrl), rev = qrGrid(reviewUrl(o.placeId));
+  const ops: Draw[] = [
+    { t: "rect", x: 0, y: 0, w: LETTER.w, h: 1.6 * IN, gray: 0.08 },
+    { t: "text", x: LETTER.w / 2, y: 0.95 * IN, size: 30, bold: true, text: o.business, align: "center", gray: 1, maxW: LETTER.w - 1 * IN },
+    { t: "text", x: LETTER.w / 2, y: 2.4 * IN, size: 18, bold: true, text: o.menu ? "Scan for our menu & hours" : "Scan for our website & hours", align: "center" },
+    { t: "qr", x: LETTER.w / 2 - 2 * IN, y: 2.7 * IN, size: 4 * IN, grid: site },
+    { t: "text", x: LETTER.w / 2, y: 7.05 * IN, size: 12, text: o.siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, ""), align: "center", gray: 0.35 },
+    ...(o.phone ? [{ t: "text", x: LETTER.w / 2, y: 7.55 * IN, size: 20, bold: true, text: o.phone, align: "center" } as Draw] : []),
+    { t: "qr", x: LETTER.w / 2 - 2.2 * IN, y: 8.4 * IN, size: 1.3 * IN, grid: rev },
+    { t: "text", x: LETTER.w / 2 - 0.7 * IN, y: 8.85 * IN, size: 14, bold: true, text: "Love it here?" },
+    { t: "text", x: LETTER.w / 2 - 0.7 * IN, y: 9.15 * IN, size: 12, text: "Leave us a Google review" },
+  ];
+  return drawPdf([ops], `Window sign: ${o.business}`);
+}
+
+/** One-page leave-behind with a QR code to the business's free preview. */
+export function previewFlyerPdf(o: { business: string; previewUrl: string; company?: string; phone?: string; caller?: string; days: number }): Uint8Array {
+  const grid = qrGrid(o.previewUrl);
+  const ops: Draw[] = [
+    { t: "rect", x: 0, y: 0, w: LETTER.w, h: 1.5 * IN, gray: 0.08 },
+    { t: "text", x: LETTER.w / 2, y: 0.7 * IN, size: 16, text: `A free website preview for`, align: "center", gray: 1 },
+    { t: "text", x: LETTER.w / 2, y: 1.15 * IN, size: 26, bold: true, text: o.business, align: "center", gray: 1, maxW: LETTER.w - 1 * IN },
+    { t: "text", x: LETTER.w / 2, y: 2.3 * IN, size: 15, text: "We built a website for your business. Take a look:", align: "center" },
+    { t: "qr", x: LETTER.w / 2 - 1.75 * IN, y: 2.7 * IN, size: 3.5 * IN, grid },
+    { t: "text", x: LETTER.w / 2, y: 6.5 * IN, size: 11, text: "Point your phone's camera at the code, or type:", align: "center", gray: 0.35 },
+    { t: "text", x: LETTER.w / 2, y: 6.8 * IN, size: 11, text: o.previewUrl, align: "center", gray: 0.2 },
+    { t: "text", x: 0.9 * IN, y: 7.6 * IN, size: 13, text: "Nothing is published and nothing is owed. If you like it, we'll make it yours: your photos, your words, your domain.", maxW: LETTER.w - 1.8 * IN },
+    { t: "text", x: 0.9 * IN, y: 8.3 * IN, size: 13, text: `This preview stays up for ${o.days} days.`, maxW: LETTER.w - 1.8 * IN },
+    { t: "text", x: 0.9 * IN, y: 9.3 * IN, size: 15, bold: true, text: [o.caller, o.company].filter(Boolean).join(" · ") || "Website Business" },
+    ...(o.phone ? [{ t: "text", x: 0.9 * IN, y: 9.6 * IN, size: 15, text: `Call or text ${o.phone}` } as Draw] : []),
+  ];
+  return drawPdf([ops], `Preview flyer: ${o.business}`);
+}

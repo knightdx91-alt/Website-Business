@@ -15,12 +15,12 @@ import { reviewTexts } from "../places/to-record.ts";
 import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
-import { previewFlyer, reviewCards, tableTents, windowSign } from "./cards.ts";
+import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
 import { cadenceFor, nextCadenceStep, salesDashboard } from "./sales.ts";
 import { portalSession } from "./checkout.ts";
-import { achFormPdf, agreementPage, agreementPdf, contractPreviewPage, contractPreviewPdf, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
+import { achFormPdf, agreementPage, agreementPdf, appSignup, contractJson, contractPreviewPage, contractPreviewPdf, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { EXPIRE_SQL } from "./expire.ts";
 import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
@@ -29,7 +29,8 @@ import { HttpError, json, localDate, newId, now, type Env, type Job } from "./en
 import { handleFormPost } from "./forms.ts";
 import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
 import { stripeWebhook } from "./stripe.ts";
-import { completeTap, connectionToken, reconcileTaps, setupTap, startTap, tapAuth, tapSession, tapStatus } from "./tap.ts";
+import { pdfResponse } from "./pdf.ts";
+import { cardReady, completeCardSetup, completeTap, connectionToken, reconcileTaps, setupTap, startCardSetup, startTap, tapAuth, tapSession, tapStatus } from "./tap.ts";
 import { DEFAULT_DOMAIN, googleSession, verifyGoogleIdToken } from "./google.ts";
 import { editForm, editsFromForm } from "./editform.ts";
 import { extraTerms } from "./contract.ts";
@@ -298,6 +299,19 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
 
   // The agreement a business would sign, before signing: owner and callers show it on the phone.
   if (path === "/ach.pdf" && m === "GET") return achFormPdf(env, { leadId: url.searchParams.get("lead") ?? undefined });
+  if (path === "/contract.json" && m === "GET") {
+    return contractJson(env, { leadId: url.searchParams.get("lead") ?? undefined, plan: url.searchParams.get("plan") ?? undefined, billing: url.searchParams.get("billing") ?? undefined, picks: url.searchParams.get("picks") ?? undefined });
+  }
+  // The Android app's native card entry (Stripe payment sheet) for a signed sign-up: owner and callers.
+  const payMatch = /^\/signups\/([a-z0-9]+)\/pay\/(start|complete)$/.exec(path);
+  if (payMatch && m === "POST") {
+    const sid = payMatch[1]!;
+    const owner = await env.DB.prepare("SELECT lead_id FROM signups WHERE id = ?").bind(sid).first<{ lead_id: string }>();
+    if (!owner) throw new HttpError(404, "No such sign-up");
+    if (payMatch[2] === "start") return json(await startCardSetup(env, { signupId: sid, leadId: owner.lead_id }));
+    const { setupIntentId } = await body(req, z.object({ setupIntentId: z.string().regex(/^seti_[A-Za-z0-9]+$/) }));
+    return json(await completeCardSetup(env, { signupId: sid, setupIntentId, actorName: session.name }));
+  }
   if ((path === "/contract" || path === "/contract.pdf") && m === "GET") {
     const q = { leadId: url.searchParams.get("lead") ?? undefined, plan: url.searchParams.get("plan") ?? undefined, billing: url.searchParams.get("billing") ?? undefined };
     return path.endsWith(".pdf") ? contractPreviewPdf(env, q) : contractPreviewPage(env, q);
@@ -331,7 +345,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json({
       me: { role: session.role, name: session.name, id: session.userId },
       team,
-      checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: mailReady(env) },
+      checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: mailReady(env), publishableKey: settings.stripePublishableKey ?? null, cardReady: await cardReady(env, settings) },
       tap: isOwner ? await tapStatus(env, settings) : { ready: false },
       extraTerms: isOwner ? settings.addons.map((a) => extraTerms(a)) : [],
       categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
@@ -403,6 +417,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         googleDomain: z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "A domain like undergroundassociates.com").optional(),
         ownerEmail: z.string().trim().toLowerCase().email().max(120).optional(),
         requireGoogle: z.boolean().optional(),
+        stripePublishableKey: z.string().trim().regex(/^pk_(live|test)_[A-Za-z0-9]+$/, "A Stripe publishable key starts with pk_live_ or pk_test_").optional(),
         companyStreet: z.string().trim().max(120).optional(),
         companyCity: z.string().trim().max(60).optional(),
         companyState: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Two-letter state").optional(),
@@ -712,7 +727,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const action = leadMatch[2] ?? "";
     const sub = leadMatch[3];
     const lead: LeadRow = await requireLead(env, id);
-    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/flyer", "/extraslink", "/contact"].includes(action);
+    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/signups", "/flyer", "/extraslink", "/contact"].includes(action) || (action === "/flyer.pdf" && m === "GET");
     if (!callerSafe) ownerOnly();
 
     if (action === "" && m === "GET") {
@@ -749,6 +764,26 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       if (m === "GET") return Response.redirect(`${url.origin}/x/${token}`, 302);
       return json({ url: `${url.origin}/x/${token}`, expiresInDays: 30 });
     }
+    // In-app sign-up: the client signs on the owner's (or a caller's) phone with the native signature pad.
+    if (action === "/signups" && m === "POST") {
+      const input = await body(
+        req,
+        z.object({
+          plan: z.enum(["basic", "plus", "pro"]),
+          billing: z.string().trim().max(20),
+          picks: z.array(z.object({ index: z.number().int().min(0).max(50), qty: z.number().int().min(1).max(20).default(1) })).max(30).default([]),
+          business: z.string().trim().max(120).optional(),
+          name: z.string().trim().max(100),
+          title: z.string().trim().max(60).optional(),
+          email: z.string().trim().max(120),
+          signature: z.string().max(300_000),
+          consent: z.boolean(),
+        }),
+      );
+      const settings = await getSettings(env);
+      const ready = await tapStatus(env, settings);
+      return json(await appSignup(env, req, { lead, origin: url.origin, input, sentBy: session.name, tapReady: ready.ready, cardReady: await cardReady(env, settings) }));
+    }
     if (action === "/signup" && m === "POST") {
       const { plan } = await body(req, z.object({ plan: z.enum(["basic", "plus", "pro"]) }));
       const settings = await getSettings(env);
@@ -782,6 +817,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         await notify(env, { kind: "status", actor: session, leadId: id, text: `${session.name} left ${lead.name} a preview flyer (marked Shown)` });
       }
       return json(summary((await getLead(env, id))!));
+    }
+    if (action === "/flyer.pdf" && m === "GET") {
+      if (lead.status !== "ready") throw new HttpError(409, "The preview isn't ready yet");
+      const days = 60;
+      const token = await shareToken(env, id, days);
+      const settings = await getSettings(env);
+      return pdfResponse(previewFlyerPdf({ business: lead.name ?? "your business", previewUrl: `${url.origin}/s/${token}/`, company: settings.companyName, phone: settings.companyPhone, caller: isOwner ? settings.callerName : session.name, days }), `flyer-${id}.pdf`);
     }
     if (action === "/flyer" && m === "GET") {
       if (lead.status !== "ready") throw new HttpError(409, "The preview isn't ready yet");
@@ -882,6 +924,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         await chargeAi(env, settings.copyModel, usage);
         return json({ reply, problems: profileTextProblems(reply, 4000) });
       }
+    }
+    if (action === "/reviewcard.pdf" && m === "GET") {
+      if (lead.category === "finance" && lead.record_json && (JSON.parse(lead.record_json) as BusinessRecord).variant === "financial_advisor") throw new HttpError(409, "Financial advisors can't use review cards");
+      return pdfResponse(reviewCardsPdf(lead.name ?? "us", lead.place_id), `review-cards-${id}.pdf`);
+    }
+    if ((action === "/tents.pdf" || action === "/window.pdf") && m === "GET") {
+      const siteUrl = lead.custom_domain ? `https://${lead.custom_domain}/` : lead.live_url;
+      if (!siteUrl) throw new HttpError(409, "Publish the site first: the QR codes point to the live website");
+      const record = lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null;
+      const menu = !!record?.ext.restaurant?.menu;
+      const o = { business: lead.name ?? "Us", siteUrl: menu ? `${siteUrl.replace(/\/$/, "")}/menu/` : siteUrl, menu, placeId: lead.place_id, phone: record?.phone.display };
+      return pdfResponse(action === "/tents.pdf" ? tableTentsPdf(o) : windowSignPdf(o), `${action === "/tents.pdf" ? "table-tents" : "window-sign"}-${id}.pdf`);
     }
     if (action === "/reviewcard" && m === "GET") {
       if (lead.category === "finance" && lead.record_json && (JSON.parse(lead.record_json) as BusinessRecord).variant === "financial_advisor") throw new HttpError(409, "Financial advisors can't use review cards");

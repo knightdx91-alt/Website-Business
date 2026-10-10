@@ -1,7 +1,7 @@
 import { notify } from "./notify.ts";
-import { shareToken } from "./auth.ts";
+import { shareToken, signupToken } from "./auth.ts";
 import { checkoutParams, createCheckout, dollars, INVOICE_BILLING, pickerHtml, picksFromForm, priceExtras, priceSignup, type Pick, type PricedOrder } from "./checkout.ts";
-import { addonPrice, billingOptions, defaultTerms, getLead, getSettings, GO_LIVE_TEXT, updateLead, type BillingOption, type Plan } from "./db.ts";
+import { addonPrice, billingOptions, defaultTerms, getLead, getSettings, GO_LIVE_TEXT, updateLead, type BillingOption, type LeadRow, type Plan } from "./db.ts";
 import { HttpError, localDate, newId, now, type Env } from "./env.ts";
 import { escHtml, page } from "./page.ts";
 import { agreementToken, verifyAgreement } from "./auth.ts";
@@ -559,4 +559,122 @@ export async function achFormPdf(env: Env, q: { leadId?: string }): Promise<Resp
   ].join("\n");
   const doc = { title: "Recurring Payment Authorization", notice: "ACH bank debit or debit/credit card. Not legal advice: have a lawyer review once.", text, footer: settings.companyName || legal };
   return pdfResponse(pdfBytes(doc), `payment-authorization${business ? `-${business.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : ""}.pdf`);
+}
+
+
+// ---- the Android app: agreement as JSON, and signing without the web page ----
+
+const HEADING_LINE = /^[A-Z0-9][A-Z0-9 &'’,.:()/-]{2,}$/;
+
+/** The agreement text split into sections at its ALL-CAPS heading lines (the same rule the PDF uses). */
+export function contractSections(text: string): Array<{ heading: string; text: string }> {
+  const out: Array<{ heading: string; text: string }> = [];
+  let cur: { heading: string; lines: string[] } = { heading: "", lines: [] };
+  for (const raw of text.split("\n")) {
+    const line = raw.trimEnd();
+    if (HEADING_LINE.test(line.trim()) && /[A-Z]/.test(line)) {
+      if (cur.heading || cur.lines.some((l) => l.trim())) out.push({ heading: cur.heading, text: cur.lines.join("\n").trim() });
+      cur = { heading: line.trim(), lines: [] };
+    } else cur.lines.push(line);
+  }
+  if (cur.heading || cur.lines.some((l) => l.trim())) out.push({ heading: cur.heading, text: cur.lines.join("\n").trim() });
+  return out;
+}
+
+/** "0:1,3:2" → picks (index:qty); bad parts are dropped. */
+export function parsePicks(raw: string | null | undefined, addonCount: number): Pick[] {
+  if (!raw) return [];
+  const out: Pick[] = [];
+  for (const part of raw.split(",")) {
+    const m = /^(\d+)(?::(\d+))?$/.exec(part.trim());
+    if (!m) continue;
+    const index = Number(m[1]);
+    if (index < 0 || index >= addonCount || out.some((p) => p.index === index)) continue;
+    out.push({ index, qty: Math.min(20, Math.max(1, Number(m[2] ?? 1))) });
+  }
+  return out;
+}
+
+/**
+ * GET /api/contract.json?lead=&plan=&billing=&picks=: the exact agreement a business would sign for that order, as
+ * sections, for the app's native sign-up screen (owner and callers). Nothing is stored.
+ */
+export async function contractJson(env: Env, q: { leadId?: string; plan?: string; billing?: string; picks?: string }): Promise<Response> {
+  const settings = await getSettings(env);
+  const lead = q.leadId ? await getLead(env, q.leadId) : null;
+  const record = lead?.record_json ? (JSON.parse(lead.record_json) as { name?: string }) : null;
+  const business = record?.name || lead?.name || "your business";
+  const plan = settings.plans.find((p) => p.id === q.plan && p.monthly) ?? settings.plans.find((p) => p.monthly);
+  if (!plan) throw new HttpError(404, "No plans set up yet");
+  const category = lead?.category ?? undefined;
+  const invoice = q.billing === INVOICE_BILLING;
+  const picks = parsePicks(q.picks, settings.addons.length);
+  const order = priceSignup(settings, plan.id, q.billing ?? "standard", picks, { category, invoice });
+  const terms = contractText(settings, order, { business, kind: "signup" });
+  const sections = contractSections(terms);
+  return new Response(JSON.stringify({ title: terms.split("\n")[0] || "Agreement", business, plan: plan.id, billing: order.option?.id ?? q.billing, dueCents: order.dueToday, renews: order.renews, sections }), {
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
+export interface AppSignupInput {
+  plan: string;
+  billing: string;
+  picks: Pick[];
+  business?: string;
+  name: string;
+  title?: string;
+  email: string;
+  signature: string;
+  consent: boolean;
+}
+
+/**
+ * POST /api/leads/:id/signups: the in-app sign-up (client signs on the owner's phone with a native signature pad). Same
+ * checks and bookkeeping as the sign-up page's POST: the order is priced from Settings, the agreement text is rebuilt
+ * here, the signature must be a real PNG, and the lead becomes Sold with a callback for tomorrow until paid.
+ */
+export async function appSignup(env: Env, req: Request, o: { lead: LeadRow; origin: string; input: AppSignupInput; sentBy: string | null; tapReady: boolean; cardReady: boolean }): Promise<Record<string, unknown>> {
+  const { lead, input } = o;
+  const settings = await getSettings(env);
+  if (lead.status !== "ready") throw new HttpError(409, "The preview isn't ready yet");
+  const form = new FormData();
+  form.set("signer_name", input.name);
+  form.set("signature", input.signature);
+  form.set("agree", input.consent ? "yes" : "no");
+  const signed = readSignature(form);
+  if (!signed) throw new HttpError(400, "Type the full name, draw the signature and tick the agreement first");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) throw new HttpError(400, "That email address doesn't look right");
+  const business = (input.business || "").trim().slice(0, 120) || lead.name || "your business";
+  const allowInvoice = settings.invoiceForAll !== false || lead.category === "church";
+  const invoice = input.billing === INVOICE_BILLING;
+  if (invoice && !allowInvoice) throw new HttpError(400, "Paying by invoice isn't offered for this client");
+  const picks = input.picks.filter((p, i, all) => p.index >= 0 && p.index < settings.addons.length && all.findIndex((x) => x.index === p.index) === i).map((p) => ({ index: p.index, qty: Math.min(20, Math.max(1, p.qty || 1)) }));
+  const order = priceSignup(settings, input.plan, input.billing, picks, { category: lead.category, invoice: allowInvoice });
+  const terms = contractText(settings, order, { business, kind: "signup" });
+  const here = `${o.origin}/a/${await signupToken(env, lead.id, input.plan)}`;
+  const saved = await saveOrder(env, req, { leadId: lead.id, order, picks, terms, name: signed.name, signature: signed.signature, title: (input.title || "").trim().slice(0, 60), email: input.email.trim().slice(0, 120), sentBy: o.sentBy, source: "link", successUrl: `${here}?paid=1`, cancelUrl: `${here}?canceled=1` });
+  const title = (input.title || "").trim();
+  await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, 'signed', ?, ?)")
+    .bind(newId(), lead.id, signed.name, `Signed up in the app: ${orderSummary(order)}. ${order.invoice ? "On first invoice" : "Due today"} ${dollars(order.dueToday)}${title ? `. Signed as ${title}` : ""}. Email: ${input.email}`, now())
+    .run();
+  await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, 'App', NULL, ?, ?)")
+    .bind(newId(), lead.id, order.invoice ? "Signed; wants an invoice (check or bank transfer)" : "Signed the agreement; payment not finished yet. If they don't pay today, call.", now())
+    .run();
+  await notify(env, { kind: "signed", actorName: signed.name, leadId: lead.id, text: `✍️ ${signed.name} signed ${lead.name} up in the app: ${orderSummary(order)}${order.invoice ? " (wants an invoice)" : ""}${o.sentBy ? `, with ${o.sentBy}` : ""}` });
+  await updateLead(env, lead.id, { sales_status: lead.sales_status === "live" ? "live" : "sold", follow_up: localDate(1), last_contact: now() });
+  return {
+    signupId: saved.signupId,
+    dueCents: order.dueToday,
+    renews: order.renews ? { amountCents: order.renews.amount, interval: order.renews.interval } : null,
+    invoice: !!order.invoice,
+    checkoutUrl: saved.checkoutUrl,
+    agreementPdf: `/api/agreements/s/${saved.signupId}.pdf`,
+    agreementUrl: saved.agreementUrl,
+    tapReady: o.tapReady && !order.invoice && order.dueToday >= 50,
+    cardReady: o.cardReady && !order.invoice && !!saved.checkoutUrl,
+    email: input.email.trim(),
+    business,
+    firstName: signed.name.split(" ")[0],
+  };
 }

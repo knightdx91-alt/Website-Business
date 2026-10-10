@@ -283,6 +283,23 @@ function layout(doc: PdfDoc): Op[][] {
 /** Builds the PDF bytes. */
 export function pdfBytes(doc: PdfDoc, image?: PdfImage): Uint8Array {
   const pages = layout(doc);
+  const footerBytes = toWinAnsi(doc.footer ?? "");
+  const streams = pages.map((ops, i) => {
+    let s = "";
+    for (const op of ops) {
+      if (op.kind === "text") s += `BT /${op.bold ? "F2" : "F1"} ${op.size} Tf ${op.x.toFixed(2)} ${op.y.toFixed(2)} Td ${pdfString(op.bytes!)} Tj ET\n`;
+      else if (image) s += `q ${op.w!.toFixed(2)} 0 0 ${op.h!.toFixed(2)} ${op.x.toFixed(2)} ${op.y.toFixed(2)} cm /Im1 Do Q\n`;
+    }
+    const pn = toWinAnsi(`Page ${i + 1} of ${pages.length}`);
+    s += `BT /F1 8.5 Tf 0.4 g ${MARGIN} ${MARGIN - 18} Td ${pdfString(footerBytes)} Tj ET\n`;
+    s += `BT /F1 8.5 Tf 0.4 g ${(PAGE_W - MARGIN - widthOf(pn, 8.5, false)).toFixed(2)} ${MARGIN - 18} Td ${pdfString(pn)} Tj ET\n`;
+    return s;
+  });
+  return assemblePdf(streams, doc.title, image);
+}
+
+/** Letter pages from ready content streams (Helvetica = F1, Helvetica-Bold = F2, optional image Im1). */
+function assemblePdf(streams: string[], title: string, image?: PdfImage): Uint8Array {
   const objects: Array<string | Uint8Array> = [];
   const add = (o: string | Uint8Array) => objects.push(o) && objects.length;
   const catalog = add(""); // 1, filled last
@@ -290,24 +307,15 @@ export function pdfBytes(doc: PdfDoc, image?: PdfImage): Uint8Array {
   const f1 = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
   const f2 = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
   const imgObj = image ? add(concat(`<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${image.data.length} >>\nstream\n`, image.data, "\nendstream")) : 0;
-  const footerBytes = toWinAnsi(doc.footer ?? "");
   const pageIds: number[] = [];
-  pages.forEach((ops, i) => {
-    let s = "";
-    for (const op of ops) {
-      if (op.kind === "text") s += `BT /${op.bold ? "F2" : "F1"} ${op.size} Tf ${op.x.toFixed(2)} ${op.y.toFixed(2)} Td ${pdfString(op.bytes!)} Tj ET\n`;
-      else if (imgObj) s += `q ${op.w!.toFixed(2)} 0 0 ${op.h!.toFixed(2)} ${op.x.toFixed(2)} ${op.y.toFixed(2)} cm /Im1 Do Q\n`;
-    }
-    const pn = toWinAnsi(`Page ${i + 1} of ${pages.length}`);
-    s += `BT /F1 8.5 Tf 0.4 g ${MARGIN} ${MARGIN - 18} Td ${pdfString(footerBytes)} Tj ET\n`;
-    s += `BT /F1 8.5 Tf 0.4 g ${(PAGE_W - MARGIN - widthOf(pn, 8.5, false)).toFixed(2)} ${MARGIN - 18} Td ${pdfString(pn)} Tj ET\n`;
+  for (const s of streams) {
     const content = add(concat(`<< /Length ${utf8len(s)} >>\nstream\n`, s, "\nendstream"));
     const res = `<< /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >>${imgObj ? ` /XObject << /Im1 ${imgObj} 0 R >>` : ""} >>`;
     pageIds.push(add(`<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources ${res} /Contents ${content} 0 R >>`));
-  });
+  }
   objects[catalog - 1] = `<< /Type /Catalog /Pages ${pagesObj} 0 R >>`;
   objects[pagesObj - 1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
-  const info = add(`<< /Title ${pdfString(toWinAnsi(doc.title))} /Producer (Website Business) >>`);
+  const info = add(`<< /Title ${pdfString(toWinAnsi(title))} /Producer (Website Business) >>`);
 
   const parts: Uint8Array[] = [];
   const enc = new TextEncoder();
@@ -335,6 +343,67 @@ export function pdfBytes(doc: PdfDoc, image?: PdfImage): Uint8Array {
     p += part.length;
   }
   return out;
+}
+
+// ---- free-form drawing (printables: QR cards, tents, signs, flyers) ----
+
+/** Drawing instructions in points from the top-left of a Letter page (612 × 792). */
+export type Draw =
+  | { t: "text"; x: number; y: number; size: number; text: string; bold?: boolean; align?: "left" | "center" | "right"; gray?: number; maxW?: number }
+  | { t: "rect"; x: number; y: number; w: number; h: number; gray?: number; stroke?: boolean }
+  | { t: "qr"; x: number; y: number; size: number; grid: string[] }
+  | { t: "flip"; ops: Draw[] };
+
+export const LETTER = { w: PAGE_W, h: PAGE_H };
+
+export function textWidth(text: string, size: number, bold = false): number {
+  return widthOf(toWinAnsi(text), size, bold);
+}
+
+function drawOps(ops: Draw[], flipped: boolean): string {
+  let s = "";
+  for (const op of ops) {
+    if (op.t === "flip") {
+      // Rotate 180° about the page centre: a table tent's top panel reads right once folded.
+      s += `q -1 0 0 -1 ${PAGE_W} ${PAGE_H} cm\n${drawOps(op.ops, !flipped)}Q\n`;
+      continue;
+    }
+    if (op.t === "rect") {
+      s += `q ${(op.gray ?? 0).toFixed(2)} ${op.stroke ? "G 1 w" : "g"} ${op.x.toFixed(2)} ${(PAGE_H - op.y - op.h).toFixed(2)} ${op.w.toFixed(2)} ${op.h.toFixed(2)} re ${op.stroke ? "S" : "f"} Q\n`;
+      continue;
+    }
+    if (op.t === "qr") {
+      const n = op.grid.length;
+      const cell = op.size / n;
+      s += "q 0 g\n";
+      for (let r = 0; r < n; r++) {
+        const row = op.grid[r]!;
+        let c = 0;
+        while (c < n) {
+          if (row[c] !== "1") { c++; continue; }
+          let run = 1;
+          while (c + run < n && row[c + run] === "1") run++;
+          s += `${(op.x + c * cell).toFixed(2)} ${(PAGE_H - op.y - (r + 1) * cell).toFixed(2)} ${(run * cell + 0.2).toFixed(2)} ${(cell + 0.2).toFixed(2)} re f\n`;
+          c += run;
+        }
+      }
+      s += "Q\n";
+      continue;
+    }
+    const lines = op.maxW ? wrap(op.text, op.size, !!op.bold, op.maxW).map((b) => b) : [toWinAnsi(op.text)];
+    lines.forEach((bytes, i) => {
+      const w = widthOf(bytes, op.size, !!op.bold);
+      const x = op.align === "center" ? op.x - w / 2 : op.align === "right" ? op.x - w : op.x;
+      const y = PAGE_H - op.y - i * op.size * 1.25;
+      s += `BT /${op.bold ? "F2" : "F1"} ${op.size} Tf ${(op.gray ?? 0).toFixed(2)} g ${x.toFixed(2)} ${y.toFixed(2)} Td ${pdfString(bytes)} Tj ET\n`;
+    });
+  }
+  return s;
+}
+
+/** A PDF made of drawn pages (no flowing text, no page numbers). */
+export function drawPdf(pages: Draw[][], title: string): Uint8Array {
+  return assemblePdf(pages.map((ops) => drawOps(ops, false)), title);
 }
 
 function utf8len(s: string): number {

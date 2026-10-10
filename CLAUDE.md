@@ -211,6 +211,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Manager 1.5.0 + googleid 1.1.1, work 2.10.3, Stripe Terminal 6.0.0; Kotlin 2.3.21 (matches the Stripe SDK). The manifest forces
   `ACCESS_FINE_LOCATION` with `tools:node="replace"` (a library caps it at SDK 30, which would break Tap to Pay on Android 13+).
   Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first. `ASSET_LINKS` stays in index.ts.
+- App-only endpoints for the fully native Android app (Oct 2026): printables as PDFs drawn with `drawPdf()` in pdf.ts
+  (`GET /api/leads/:id/{reviewcard,tents,window,flyer}.pdf`, builders in cards.ts; `qrGrid()`); `GET /api/contract.json?lead&plan&
+  billing&picks=i:q,…` (agreement sections for the native sign-up, `contractSections`/`parsePicks` in signup.ts); `POST
+  /api/leads/:id/signups` (owner + callers; `appSignup`: the same checks and notes as the sign-up page's POST, signature as a PNG
+  data URL from the native pad) → `{signupId, dueCents, renews, invoice, checkoutUrl, agreementPdf, tapReady, cardReady}`; native
+  card entry with Stripe's payment sheet: `POST /api/signups/:id/pay/start` (SetupIntent, needs Settings → "Stripe publishable key"
+  `stripePublishableKey`; `/meta.checkout.cardReady`) and `POST /api/signups/:id/pay/complete {setupIntentId}` (charges today's
+  amount off-session, then `activatePlan()` in tap.ts, shared with Tap to Pay, starts the subscription one period ahead).
+  The Android app shows PDFs with `PdfScreen` (PdfRenderer + print + share) and signs clients up in `SignupScreen`.
 - Editor as data (Oct 2026, `src/worker/editform.ts`): `GET /api/leads/:id/editform` returns the Edit screen as cards and fields
   (types text/textarea/check/select/number/url/tel/email/date/heading/note/hidden; special card kinds photo / gallery / spanish /
   design carry the hero source, gallery thumbnails and whether a Spanish page exists) for the lead's category and variant, with the

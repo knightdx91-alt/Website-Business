@@ -160,21 +160,7 @@ export async function startTap(
   if (amountCents < MIN_CENTS) throw new HttpError(409, "Nothing is due today on this sign-up");
   const plan = JSON.parse(row.plan_json) as { id?: string; name: string; billing?: string };
 
-  let customer = row.stripe_customer;
-  if (!customer) {
-    const prev = await env.DB.prepare("SELECT stripe_customer FROM signups WHERE lead_id = ? AND stripe_customer IS NOT NULL ORDER BY created_at DESC LIMIT 1").bind(row.lead_id).first<{ stripe_customer: string }>();
-    customer = prev?.stripe_customer ?? null;
-  }
-  if (!customer) {
-    const c = await stripe<{ id: string }>(env, "customers", {
-      name: business,
-      ...(row.signer_email ? { email: row.signer_email } : {}),
-      ...(lead.phone ? { phone: lead.phone } : {}),
-      description: `${row.signer_name} · signed up in person`,
-      metadata: { leadId: row.lead_id, signupId: row.id },
-    }, `cus:${row.id}`);
-    customer = c.id;
-  }
+  const customer = await ensureCustomer(env, row, lead);
 
   // Reuse an open PaymentIntent (same amount) rather than authorizing a second one.
   let pi: PaymentIntentObj | null = null;
@@ -308,51 +294,142 @@ export async function completeTap(env: Env, o: { signupId: string; paymentIntent
   const generated = details?.generated_card ?? null;
   const card = details?.brand ? `${details.brand.replace(/^\w/, (c) => c.toUpperCase())} ••${details.last4 ?? ""}` : null;
   const customer = pi.customer ?? row.stripe_customer;
+  return activatePlan(env, row, { customer, paymentMethod: generated, paidCents: pi.amount, paidRef: pi.id, card, how: "in person by tap", actorName: o.actorName });
+}
 
-  // What renews: the plan line and any monthly extras, priced the same way the sign-up page priced them.
-  const settings = await getSettings(env);
+/** The lines that renew for a sign-up, priced the way the sign-up page priced them. */
+function recurringLines(settings: AppSettings, row: TapSignupRow, category: string | undefined): Array<{ name: string; amount: number; qty: number; interval: "month" | "year" }> {
   const plan = JSON.parse(row.plan_json) as { id?: string; name: string; billing?: string };
   const extras = row.extras_json ? (JSON.parse(row.extras_json) as { picks?: Pick[]; invoice?: boolean; renews?: { amount: number; interval: "month" | "year" } | null }) : null;
-  let recurring: Array<{ name: string; amount: number; qty: number; interval: "month" | "year" }> = [];
   try {
-    const priced = priceSignup(settings, plan.id ?? "plus", plan.billing ?? "standard", extras?.picks ?? [], { category: lead?.category, invoice: !!extras?.invoice });
-    recurring = priced.lines.filter((l): l is typeof l & { interval: "month" | "year" } => !!l.interval).map((l) => ({ name: l.name, amount: l.amount, qty: l.qty, interval: l.interval }));
+    const priced = priceSignup(settings, plan.id ?? "plus", plan.billing ?? "standard", extras?.picks ?? [], { category, invoice: !!extras?.invoice });
+    return priced.lines.filter((l): l is typeof l & { interval: "month" | "year" } => !!l.interval).map((l) => ({ name: l.name, amount: l.amount, qty: l.qty, interval: l.interval }));
   } catch {
-    if (extras?.renews) recurring = [{ name: `${plan.name} website plan`, amount: extras.renews.amount, qty: 1, interval: extras.renews.interval }];
+    return extras?.renews ? [{ name: `${plan.name} website plan`, amount: extras.renews.amount, qty: 1, interval: extras.renews.interval }] : [];
   }
+}
 
+/**
+ * The bookkeeping after the first payment was taken (by tap or by a card entered on the phone): the plan subscription
+ * from the saved payment method, anchored one period ahead with no proration, the sign-up marked paid, a note and an
+ * alert. Idempotent per sign-up and payment reference.
+ */
+async function activatePlan(
+  env: Env,
+  row: TapSignupRow,
+  o: { customer: string | null; paymentMethod: string | null; paidCents: number; paidRef: string; card: string | null; how: string; actorName: string; via?: string },
+): Promise<TapResult> {
+  const lead = await getLead(env, row.lead_id);
+  const business = lead?.name ?? "the client";
+  const settings = await getSettings(env);
+  const recurring = recurringLines(settings, row, lead?.category);
   let subscription: string | null = row.stripe_subscription;
   let renewsOn: string | null = null;
-  if (generated && customer && recurring.length && !subscription) {
+  if (o.paymentMethod && o.customer && recurring.length && !subscription) {
     const interval = recurring[0]!.interval;
     const anchor = nextPeriodStart(new Date(), interval);
     const sub = await stripe<{ id: string }>(env, "subscriptions", {
-      customer,
-      default_payment_method: generated,
+      customer: o.customer,
+      default_payment_method: o.paymentMethod,
       items: recurring.map((l) => ({ quantity: l.qty, price_data: { currency: "usd", unit_amount: l.amount, product_data: { name: l.name }, recurring: { interval: l.interval } } })),
       billing_cycle_anchor: anchor,
       proration_behavior: "none",
       off_session: true,
       collection_method: "charge_automatically",
-      metadata: { kind: "signup", signupId: row.id, leadId: row.lead_id, paidInPerson: pi.id },
-    }, `sub:${row.id}:${pi.id}`);
+      metadata: { kind: "signup", signupId: row.id, leadId: row.lead_id, paidInPerson: o.paidRef },
+    }, `sub:${row.id}:${o.paidRef}`);
     subscription = sub.id;
     renewsOn = longDate(anchor);
-    await stripe(env, `customers/${customer}`, { invoice_settings: { default_payment_method: generated } }).catch(() => undefined);
+    await stripe(env, `customers/${o.customer}`, { invoice_settings: { default_payment_method: o.paymentMethod } }).catch(() => undefined);
   }
-
-  await env.DB.prepare("UPDATE signups SET paid = 1, stripe_customer = COALESCE(?, stripe_customer), stripe_subscription = COALESCE(?, stripe_subscription), paid_via = 'tap', tap_nonce = NULL WHERE id = ?")
-    .bind(customer, subscription, row.id)
+  await env.DB.prepare("UPDATE signups SET paid = 1, stripe_customer = COALESCE(?, stripe_customer), stripe_subscription = COALESCE(?, stripe_subscription), paid_via = ?, tap_nonce = NULL WHERE id = ?")
+    .bind(o.customer, subscription, o.via ?? "tap", row.id)
     .run();
   const renewText = subscription && recurring.length ? ` Renews ${recurring[0]!.interval === "year" ? "yearly" : "monthly"}${renewsOn ? ` from ${renewsOn}` : ""} on the same card.` : "";
-  const cardText = generated ? "" : recurring.length ? " The card couldn't be saved for renewals (some phone wallets can't be): open their Stripe billing portal to add a card before the next payment." : "";
-  const note = `Paid ${money(pi.amount)} in person by tap${card ? ` (${card})` : ""}.${renewText}${cardText}`;
+  const cardText = o.paymentMethod ? "" : recurring.length ? " The card couldn't be saved for renewals (some phone wallets can't be): open their Stripe billing portal to add a card before the next payment." : "";
+  const note = `Paid ${money(o.paidCents)} ${o.how}${o.card ? ` (${o.card})` : ""}.${renewText}${cardText}`;
   if (lead) {
     await updateLead(env, row.lead_id, { follow_up: null });
     await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)").bind(newId(), row.lead_id, o.actorName, note, now()).run();
   }
-  await notify(env, { kind: "paid", actorName: o.actorName, leadId: lead ? row.lead_id : null, text: `💳 ${business} paid ${money(pi.amount)} by tap.${renewText}${generated ? "" : " ⚠️ Card not saved for renewals."}` });
-  return { ok: true, amountCents: pi.amount, card, cardSaved: !!generated, subscription, renewsOn, message: note };
+  await notify(env, { kind: "paid", actorName: o.actorName, leadId: lead ? row.lead_id : null, text: `💳 ${business} paid ${money(o.paidCents)} ${o.how}.${renewText}${o.paymentMethod ? "" : " ⚠️ Card not saved for renewals."}` });
+  return { ok: true, amountCents: o.paidCents, card: o.card, cardSaved: !!o.paymentMethod, subscription, renewsOn, message: note };
+}
+
+async function ensureCustomer(env: Env, row: TapSignupRow, lead: { name: string | null; phone: string | null }): Promise<string> {
+  if (row.stripe_customer) return row.stripe_customer;
+  const prev = await env.DB.prepare("SELECT stripe_customer FROM signups WHERE lead_id = ? AND stripe_customer IS NOT NULL ORDER BY created_at DESC LIMIT 1").bind(row.lead_id).first<{ stripe_customer: string }>();
+  if (prev?.stripe_customer) return prev.stripe_customer;
+  const c = await stripe<{ id: string }>(env, "customers", {
+    name: lead.name ?? "Client",
+    ...(row.signer_email ? { email: row.signer_email } : {}),
+    ...(lead.phone ? { phone: lead.phone } : {}),
+    description: `${row.signer_name} · signed up in person`,
+    metadata: { leadId: row.lead_id, signupId: row.id },
+  }, `cus:${row.id}`);
+  return c.id;
+}
+
+/** Whether a card can be typed into the app (Stripe's native payment sheet needs the publishable key from Settings). */
+export async function cardReady(env: Env, s?: AppSettings): Promise<boolean> {
+  const settings = s ?? (await getSettings(env));
+  return !!env.STRIPE_SECRET_KEY && !!settings.stripePublishableKey;
+}
+
+/**
+ * "Enter card on this phone": a SetupIntent the app's Stripe payment sheet confirms, so the card is saved for
+ * off-session use; `completeCardSetup` then charges today's amount and starts the plan from it.
+ */
+export async function startCardSetup(env: Env, o: { signupId: string; leadId: string }): Promise<{ clientSecret: string; publishableKey: string; amountCents: number }> {
+  const settings = await getSettings(env);
+  if (!env.STRIPE_SECRET_KEY) throw new HttpError(409, "Stripe isn't connected");
+  if (!settings.stripePublishableKey) throw new HttpError(409, "Add the Stripe publishable key in Settings → Plans & prices first");
+  const row = await signupRow(env, o.signupId);
+  if (row.lead_id !== o.leadId) throw new HttpError(404, "No such sign-up");
+  if (row.paid) throw new HttpError(409, "This sign-up is already paid");
+  const lead = await getLead(env, row.lead_id);
+  if (!lead) throw new HttpError(404, "No such lead");
+  const customer = await ensureCustomer(env, row, lead);
+  const si = await stripe<{ id: string; client_secret: string }>(env, "setup_intents", {
+    customer,
+    payment_method_types: ["card"],
+    usage: "off_session",
+    metadata: { kind: "signup_card", signupId: row.id, leadId: row.lead_id },
+  });
+  await env.DB.prepare("UPDATE signups SET stripe_customer = ? WHERE id = ?").bind(customer, row.id).run();
+  return { clientSecret: si.client_secret, publishableKey: settings.stripePublishableKey, amountCents: row.due_cents ?? 0 };
+}
+
+export async function completeCardSetup(env: Env, o: { signupId: string; setupIntentId: string; actorName: string }): Promise<TapResult> {
+  const row = await signupRow(env, o.signupId);
+  if (row.paid && row.stripe_subscription) return { ok: true, already: true, amountCents: row.due_cents ?? 0, card: null, cardSaved: true, subscription: row.stripe_subscription, renewsOn: null, message: "Already paid." };
+  const si = await stripeGet<{ id: string; status: string; customer: string | null; payment_method: string | null; metadata?: Record<string, string> }>(env, `setup_intents/${o.setupIntentId}`);
+  if (si.metadata?.signupId !== row.id) throw new HttpError(409, "That card setup doesn't belong to this sign-up");
+  if (si.status !== "succeeded" || !si.payment_method) throw new HttpError(409, `The card wasn't saved (${si.status}). Try again.`);
+  const customer = si.customer ?? row.stripe_customer;
+  if (!customer) throw new HttpError(409, "No Stripe customer for this sign-up");
+  const pm = await stripeGet<{ card?: { brand?: string; last4?: string } }>(env, `payment_methods/${si.payment_method}`).catch(() => ({} as { card?: { brand?: string; last4?: string } }));
+  const card = pm.card?.brand ? `${pm.card.brand.replace(/^\w/, (c) => c.toUpperCase())} ••${pm.card.last4 ?? ""}` : null;
+  const lead = await getLead(env, row.lead_id);
+  const plan = JSON.parse(row.plan_json) as { name: string };
+  const due = row.due_cents ?? 0;
+  let paidRef = si.id;
+  if (due >= MIN_CENTS) {
+    const pi = await stripe<PaymentIntentObj & { status: string }>(env, "payment_intents", {
+      amount: due,
+      currency: "usd",
+      customer,
+      payment_method: si.payment_method,
+      off_session: true,
+      confirm: true,
+      ...(row.signer_email ? { receipt_email: row.signer_email } : {}),
+      description: `${plan.name} website plan for ${lead?.name ?? "client"}: first payment, card entered in person`,
+      metadata: { kind: "signup_card", signupId: row.id, leadId: row.lead_id },
+    }, `pi:card:${row.id}:${si.id}`);
+    if (pi.status !== "succeeded") throw new HttpError(402, pi.status === "requires_action" ? "The bank wants to verify this card. Text them the payment link to finish on their own phone." : `The charge didn't go through (${pi.status}).`);
+    paidRef = pi.id;
+  }
+  return activatePlan(env, row, { customer, paymentMethod: si.payment_method, paidCents: due, paidRef, card, how: "by card entered on the phone", actorName: o.actorName, via: "card" });
 }
 
 /**

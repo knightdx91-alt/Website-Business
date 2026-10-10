@@ -3080,6 +3080,7 @@
         <label class="field">Legal name <span class="hint">Who signs client agreements</span><input name="legalName" value="${esc(s.legalName || "")}" placeholder="e.g. Underground Associates LLC"></label>
         <div class="row"><label class="field">Business phone<input name="companyPhone" type="tel" value="${esc(s.companyPhone || "")}"></label>
         <label class="field">Business email <span class="hint">Shown everywhere</span><input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
+        <label class="field">Stripe publishable key <span class="hint">From Stripe → Developers → API keys (starts with pk_live_). Lets the Android app take a card typed on the phone. Not a secret.</span><input name="stripePublishableKey" value="${esc(s.stripePublishableKey || "")}" placeholder="pk_live_…" autocomplete="off"></label>
         <label class="field">Business street address <span class="hint">Needed once for Tap to Pay (Stripe registers where in-person payments happen). Not shown to clients.</span><input name="companyStreet" value="${esc(s.companyStreet || "")}" placeholder="123 2nd Ave SW" autocomplete="street-address"></label>
         <div class="row"><label class="field">City<input name="companyCity" value="${esc(s.companyCity || "")}" placeholder="Cullman"></label>
         <label class="field">State<input name="companyState" value="${esc(s.companyState || "AL")}" maxlength="2" style="text-transform:uppercase"></label>
@@ -3192,6 +3193,7 @@
             googleDomain: v("googleDomain").toLowerCase() || undefined,
             ownerEmail: v("ownerEmail").toLowerCase() || undefined,
             requireGoogle: f.requireGoogle.checked,
+            stripePublishableKey: v("stripePublishableKey") || undefined,
             companyStreet: v("companyStreet") || undefined,
             companyCity: v("companyCity") || undefined,
             companyState: v("companyState").toUpperCase() || undefined,
