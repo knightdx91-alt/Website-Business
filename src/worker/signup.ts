@@ -191,8 +191,8 @@ export async function serveSignup(env: Env, req: Request, leadId: string, planId
   const business = lead.name ?? "your business";
   const url = new URL(req.url);
   const here = `${origin}${url.pathname}`;
-  // Churches and nonprofits can pay against an invoice; anyone else can when the link carries ?invoice=1.
-  const allowInvoice = lead.category === "church" || url.searchParams.get("invoice") === "1";
+  // Pay by invoice: every client when Settings allows it (the default), always churches, or a link carrying ?invoice=1.
+  const allowInvoice = settings.invoiceForAll !== false || lead.category === "church" || url.searchParams.get("invoice") === "1";
   const pricing = { category: lead.category, invoice: allowInvoice };
 
   if (req.method === "POST") {

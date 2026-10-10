@@ -368,6 +368,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         interestRate: z.number().min(0).max(8).optional(),
         reinstatementFee: z.number().min(0).max(500).optional(),
         returnedPaymentFee: z.number().min(0).max(100).optional(),
+        invoiceForAll: z.boolean().optional(),
         annualMonthsFree: z.number().int().min(0).max(6).optional(),
         addons: z
           .array(z.object({ name: z.string().trim().min(1).max(60), price: z.number().min(0).max(10_000), unit: z.enum(["month", "each", "one-time", "quote"]), about: z.string().trim().max(200).optional(), terms: z.string().trim().max(1500).optional() }))

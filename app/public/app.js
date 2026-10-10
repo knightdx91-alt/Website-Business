@@ -1401,6 +1401,7 @@
     const out = t.commits.map((m) => [`${m}-month plan`, `The monthly price, no setup fee. After ${m} months, cancel any time with 30 days' notice.`]);
     if (!t.commits.length) out.push(["Monthly", "The monthly price. Cancel any time."]);
     if (t.flex) out.push(["Month to month", `Same monthly price plus a one-time ${money(t.flex)} setup fee. No contract, cancel any time.`]);
+    if (s.invoiceForAll !== false || church) out.push(["Pay by invoice", "We send an invoice; pay by check or bank transfer. Monthly invoices are due in 15 days, yearly in 30. Nothing is charged online."]);
     if (t.free) out.push([`Pay yearly, ${t.free} months free`, `12 months for the price of ${12 - t.free}${t.church ? " for churches and nonprofits" : ""}, no setup fee. ${plans.map((p) => `${esc(p.name)} ${money(p.monthly * (12 - t.free))}/year`).join(" · ")}`]);
     return out;
   }
@@ -2960,6 +2961,7 @@
         <label class="field" style="flex:1 1 120px">Early payoff discount (%) <span class="hint">Off the remaining months when they pay the early cancellation fee up front · 0 = none</span><input name="payoffDiscount" type="number" min="0" max="100" inputmode="numeric" value="${s.payoffDiscount ?? 15}"></label>
         <label class="field" style="flex:1 1 120px">Interest on overdue balances (% a year) <span class="hint">After 30 days overdue · Alabama allows up to 8 in a written contract · 0 = none</span><input name="interestRate" type="number" min="0" max="8" step="0.5" inputmode="decimal" value="${s.interestRate ?? 8}"></label>
         <label class="field" style="flex:1 1 120px">Reinstatement fee ($) <span class="hint">To put a site back online after non-payment · 0 = none</span><input name="reinstatementFee" type="number" min="0" max="500" step="0.01" inputmode="decimal" value="${s.reinstatementFee ?? 49}"></label>
+        <label class="check" style="flex:1 1 100%"><input type="checkbox" name="invoiceForAll"${s.invoiceForAll !== false ? " checked" : ""}> Offer “Pay by check or bank transfer (we'll send an invoice)” to every client, not only churches</label>
         <label class="field" style="flex:1 1 120px">Returned payment / dispute fee ($) <span class="hint">A bank debit that bounces or a charge they dispute · 0 = none</span><input name="returnedPaymentFee" type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${s.returnedPaymentFee ?? 15}"></label>
       </div>
       <section class="card" style="margin-top:14px"><h2>📄 Preview the agreement</h2>
@@ -3050,6 +3052,7 @@
             interestRate: n(v("interestRate")),
             reinstatementFee: n(v("reinstatementFee")),
             returnedPaymentFee: n(v("returnedPaymentFee")),
+            invoiceForAll: !!(f.elements.invoiceForAll && f.elements.invoiceForAll.checked),
             annualMonthsFree: n(v("annualMonthsFree")),
             churchAnnualMonthsFree: n(v("churchAnnualMonthsFree")),
             dailyCalls: n(v("dailyCalls")),

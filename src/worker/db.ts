@@ -278,6 +278,8 @@ export interface AppSettings {
   reinstatementFee?: number;
   /** Fee for a bank debit that comes back unpaid or a card charge the bank disputes (0 = none). */
   returnedPaymentFee?: number;
+  /** Offer "Pay by check or bank transfer (we'll send an invoice)" on every sign-up page, not only churches. */
+  invoiceForAll?: boolean;
   /** Daily call goal per person, shown in the app only. 0 = no goal. */
   dailyCalls?: number;
   addons: AddOn[];
@@ -362,6 +364,7 @@ export async function getSettings(env: Env): Promise<AppSettings> {
     interestRate: s.interestRate ?? 8,
     reinstatementFee: s.reinstatementFee ?? 49,
     returnedPaymentFee: s.returnedPaymentFee ?? 15,
+    invoiceForAll: s.invoiceForAll ?? true,
     annualMonthsFree: s.annualMonthsFree ?? 2,
     churchAnnualMonthsFree: s.churchAnnualMonthsFree ?? 4,
     dailyCalls: s.dailyCalls ?? 0,
