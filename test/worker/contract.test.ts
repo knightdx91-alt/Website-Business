@@ -37,7 +37,7 @@ test("the agreement holds the order, plan, way to pay, main terms and only the e
 test("the agreement says when the site goes live and carries the five core lines", () => {
   const order = priceSignup(s, "plus", "standard", []);
   const text = contractText(s, order, { business: "Joe's Pizza", kind: "signup" });
-  assert.match(text, /HOW YOU PAY\n12-month plan[^\n]*\n\nPAYMENT AUTHORIZATION\n[\s\S]*?\n\nTIMING\nWe put your site live within 3 business days after you approve the details\. A same-day build, if bought, goes live the same business day/);
+  assert.match(text, /HOW YOU PAY\n12-month plan[^\n]*\n\nPAYMENT AUTHORIZATION\n[\s\S]*?\n\nTIMING\nStandard timing: your site goes live within 3 business days after you approve the final details\.[^\n]*Same-day timing is a separate paid extra/);
   assert.match(text, /you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term/);
   assert.match(text, /If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up\./);
   assert.match(text, /Our total liability to you is limited to what you paid us in the 12 months before the problem\./);
@@ -49,7 +49,7 @@ test("the agreement says when the site goes live and carries the five core lines
   assert.match(custom, /SERVICE AGREEMENT\n1\. We build and host your site\.\n2\. Our total liability[^\n]*\n\nALSO PART OF THIS AGREEMENT\nIf you cancel before the end/);
   assert.equal((custom.match(/total liability/g) ?? []).length, 1);
   const html = contractSectionsHtml(s, { business: "Joe's", kind: "signup", esc: (t) => t });
-  assert.match(html, /<h3>Timing<\/h3><p>We put your site live within 3 business days/);
+  assert.match(html, /<h3>Timing<\/h3><p>Standard timing: your site goes live within 3 business days/);
   assert.match(html, /<p data-invoice-text hidden>Paying by invoice: we email an invoice/);
   // Extras-only agreements don't repeat the timing or terms.
   assert.doesNotMatch(contractText(s, priceExtras(s, [{ index: 2, qty: 1 }]), { business: "Joe's", kind: "extras" }), /TIMING/);
