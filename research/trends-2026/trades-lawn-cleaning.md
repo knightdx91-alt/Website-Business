@@ -120,7 +120,8 @@ No autoplay carousels in any standout; looping *silent* video appears on tree/la
 3. **Promise**: "Fast, Honest HVAC Service That Puts Your Budget First" (Doggone), "Cold air is cold air. Why pay more?"
    (Cheap Cold Air), "Advanced Comfort. Made Simple." (per CI Web Group).
 4. **Question**: "Is Your AC Blowing Warm Air in the Louisiana Heat?" (Air It Up); the Mr. Handyman home page asks a
-   question in large capitals (per [Zarla](https://www.zarla.com/guides/handyman-website-examples)).
+   question in large capitals (per the 2025–2026 handyman roundups at [Zarla](https://www.zarla.com/guides/handyman-website-examples)
+   and [Website Planet](https://websiteplanet.com/blog/best-handyman-website)).
 5. **Customer-focused**: "Protect Your Family and Home" (Northface Construction, per [Hook Agency](https://hookagency.com/blog/best-roofing-websites/)).
 Hook Agency's 2026 advice is the shortest version: say what you do and that you solve it *now*
 ("HVAC problems? Solved today.") ([Hook Agency 2026 trends](https://hookagency.com/blog/contractor-website-design-trends-2026/)).
@@ -212,9 +213,9 @@ typing anything.
 | Brands serviced (Trane, Carrier, Rheem…) | HVAC and appliance buyers search by brand; Doggone and Bama Air list them | Brand list and permission | Text list (no logos) | Should (HVAC, appliance, garage door); Nice (others) |
 | Coupons / first-time offers with expiry | 22/60 in blueprint; Reliant seasonal specials, Brothers $50 off, Bama Air 3 coupons | Offer, amount, expiry | `Offer` type exists with `expiresOn`, nothing renders it | Should |
 | Utility rebates (TVA EnergyRight via Cullman EC) | Local HVAC lever: rebates require a Quality Contractor Network member ([EnergyRight](https://energyright.com/?p=28230)); Bama Air advertises up to $1,500 | Whether they are QCN members | A link-out line, owner-confirmed | Nice (HVAC only) |
-| Same-day / no-overtime / upfront-pricing chips | Len the Plumber, Doggone, Bama Air's top tier; 77% hate hidden costs | Which are true | Pre-written chip options to tick | Should |
+| Same-day / no-overtime / upfront-pricing chips | [Len the Plumber](https://lentheplumber.com/faq/) pairs "no overtime charges" with a 24/7 line and same-day seven days a week; Doggone; Bama Air's top tier; 77% hate hidden costs | Which are true | Pre-written chip options to tick | Should |
 | Free second opinion banner | Doggone, Air It Up, Logan Services | A yes | Toggle | Nice (HVAC, roofing, plumbing) |
-| Senior / military / first-responder discount | Doggone 20%, Penguin Air; 11/60 in blueprint | Which groups, how much | Toggle + text | Nice |
+| Senior / military / first-responder discount | Doggone 20% (seniors, veterans, non-profits); Penguin Air's veteran and public-servant discounts (per [ServiceTitan](https://www.servicetitan.com/blog/hvac-websites)); 11/60 in blueprint | Which groups, how much | Toggle + text | Nice |
 | Payment methods row | Anderson Landscape lists cards, PayPal, cash, check; checks fell to 36% of payments (Visa) | What they take | Checkbox list | Nice |
 | Technician name + photo before the visit | 58% like it | A photo | "Meet the crew" block (owner photos only) | Nice |
 | Lead-safe (EPA RRP) badge for pre-1978 homes | Hedlund promotes it | Certification | Toggle | Nice (painting, remodel, drywall) |
@@ -227,9 +228,9 @@ typing anything.
   offer needs an expiry; our `Offer.expiresOn` already forces one.
 - **Urgency without lying**: "same-day or next-day" (Air It Up), "same-day estimates" (Cheap Cold Air), "we show up
   when we say" (several). Only with the owner's word; the copy brief already bans invented response times.
-- **Seasonal**: HVAC tune-up pushes run March–April and August–September, 4–6 weeks before the heat or cold, and
-  marketing vendors agree the October demand is decided in August
-  ([search summary](https://ciwebgroup.com/blog/why-august-critical-furnace-tune-up-email-list)); roofing "storm season" pages;
+- **Seasonal**: HVAC tune-up pushes run March–April and August–September, 4–6 weeks before the heat or cold
+  ([InvoiceASAP seasonal HVAC campaigns](https://blog.invoiceasap.com/seasonal-hvac-marketing-campaigns-that-drive-results/)),
+  and the October furnace demand is decided in August ([CI Web Group](https://ciwebgroup.com/blog/why-august-critical-furnace-tune-up-email-list)); roofing "storm season" pages;
   "winter weather preparation" plumbing specials (Reliant).
 - **Local pride**: "serving neighbors, not quotas" (Doggone), neighborhood cards describing typical local houses
   (Air It Up), "Best of Cullman Times 2025 and 2026" (Bama Air), chamber logos (Sweepers).
@@ -244,9 +245,9 @@ typing anything.
   (Kensington Mechanical's centered serif logo, Aeric's serif italics, per createtoday). Stay readable; kinetic text is
   for brands, not for a plumber ([TheeDigital](https://www.theedigital.com/blog/web-design-trends), [tinyfrog](https://tinyfrog.com/web-design-trends-2026/)).
 - **Color**: for HVAC/plumbing, navy (7/16 palettes) and orange (6/16) dominate, white backgrounds on 7/16
-  ([createtoday HVAC](https://createtoday.io/examples/best-hvac-websites)); the general 2026 advice is grounded palettes
-  with one bold accent on a dark or neutral section, 4.5:1 minimum contrast, and orange rising as a primary accent
-  ([search summary](https://www.theedigital.com/blog/web-design-trends)). Dark-mode heroes work for install brands
+  ([createtoday HVAC](https://createtoday.io/examples/best-hvac-websites)); the general 2026 advice is calmer, grounded
+  palettes with one saturated accent on a dark or neutral section and 4.5:1 minimum contrast
+  ([TheeDigital](https://www.theedigital.com/blog/web-design-trends), [tinyfrog](https://tinyfrog.com/web-design-trends-2026/)). Dark-mode heroes work for install brands
   (Cheap Cold Air) but not for emergency pages where the number must pop.
 - **Imagery**: own trucks, crews and owners; illustrated houses and mascots as the alternative when there is no
   photographer (Doggone, Gray Duck, Maize, AirWorks); vertical 9:16 crops for phone heroes; WebP/AVIF.
@@ -337,7 +338,7 @@ process, named projects, consultation).
 | Alabama ADAI permit line for fertilization / weed control | Applying fertilizer, herbicide or pesticide for pay needs an ADAI Horticulture Professional Services license with a certified operator; mowing/trimming/planting do not ([ACES](https://www.aces.edu/blog/topics/commercial-applicator/ornamental-and-turf-pest-control-commercial-applicator-permit-information-otps-otpc/), [startbusinessbystate](https://startbusinessbystate.com/alabama/landscaping/)) | Permit number, or drop those services | Required to-do when services include fertilization/weed/pest; show "ADAI permit #" chip when given | Must (compliance) |
 | Two estimate paths (drive-by vs walkthrough) | Anderson explains it; crews quote from the curb for mowing but walk the yard for installs | Which they do | Template text toggle | Nice |
 | "We text you a photo after each visit" | Greenbeard's reviewers mention it; 68% expect photo proof | A yes | Chip + FAQ answer | Should |
-| Autopay / card-on-file note | Cory's process step; Jobber reports 50% of its payments are online | How they bill | Process step text option | Nice |
+| Autopay / card-on-file note | Cory's process step; Jobber reports 50% of the payments it processes are now online ([Q3 2025 report coverage](https://www.landscapemanagement.net/jobber-releases-its-latest-home-service-economic-report-for-q3/)) | How they bill | Process step text option | Nice |
 | Client hub / pay-online link | Jobber/Yardbook client portals on 12/59 blueprint sites | Portal URL | `portal` action exists | Nice |
 | Instant quote tool link | Satellite-measured quotes (Service Autopilot + Deep Lawn, LawnVex, RealGreen) exist, but all are paid software | Their tool URL | Link-out button only | Nice |
 | Snow / holiday lights / pressure washing add-ons | Regional add-ons; holiday lights on 7/59 blueprint sites, a season tier on Cory's | Which add-ons | Services list | Nice |
