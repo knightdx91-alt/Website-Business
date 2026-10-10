@@ -20,7 +20,7 @@ import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
 import { cadenceFor, nextCadenceStep, salesDashboard } from "./sales.ts";
 import { portalSession } from "./checkout.ts";
-import { agreementPage, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
+import { agreementPage, contractPreviewPage, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { EXPIRE_SQL } from "./expire.ts";
 import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
@@ -254,6 +254,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (!isOwner) throw new HttpError(403, "Only the owner can do that");
   };
 
+  // The agreement a business would sign, before signing: owner and callers show it on the phone.
+  if (path === "/contract" && m === "GET") {
+    return contractPreviewPage(env, { leadId: url.searchParams.get("lead") ?? undefined, plan: url.searchParams.get("plan") ?? undefined, billing: url.searchParams.get("billing") ?? undefined });
+  }
   if (path === "/meta" && m === "GET") {
     const settings = await getSettings(env);
     // Callers see prices and plan names (Show plans, Plans & answers) but not commission, private addresses,

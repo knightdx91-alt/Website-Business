@@ -525,6 +525,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   rebuilds the text with `contractText`; stored in signups.terms/signature (+ ip, user agent, time) or purchases.
   Signed copies: `/agreement/<s|p><id>.<hmac>` (permanent link, both hosts; shown on thank-you/paid pages and passed in
   Stripe's success URL as ?a=) and `/api/agreements/<s|p>/<id>` from the app (sign-up card, extras list, website orders).
+  Before signing: `GET /api/contract?lead=&plan=&billing=` (`contractPreviewPage` in signup.ts; owner and callers) renders the
+  exact agreement a business would sign for that plan and way to pay, with plan / way-to-pay switch pills, a "Preview, nothing
+  is signed" notice and Print; nothing is stored. Buttons: lead page sign-up card "📄 Show them the agreement", Show plans
+  ("Read the agreement" under each plan), the walk-in guide and Plans & answers.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.

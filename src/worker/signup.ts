@@ -1,7 +1,7 @@
 import { notify } from "./notify.ts";
 import { shareToken } from "./auth.ts";
 import { checkoutParams, createCheckout, dollars, INVOICE_BILLING, pickerHtml, picksFromForm, priceExtras, priceSignup, type Pick, type PricedOrder } from "./checkout.ts";
-import { addonPrice, defaultTerms, getLead, getSettings, GO_LIVE_TEXT, updateLead, type BillingOption, type Plan } from "./db.ts";
+import { addonPrice, billingOptions, defaultTerms, getLead, getSettings, GO_LIVE_TEXT, updateLead, type BillingOption, type Plan } from "./db.ts";
 import { HttpError, localDate, newId, now, type Env } from "./env.ts";
 import { escHtml, page } from "./page.ts";
 import { agreementToken, verifyAgreement } from "./auth.ts";
@@ -373,4 +373,33 @@ ${signature}
 <p class="small muted">Accepted for ${escHtml(settings.legalName || settings.companyName || "")}${row.paid ? " · Payment received" : ""}</p>
 ${ref.kind === "s" ? manageBillingHtml(settings) : ""}</div></div>`;
   return page(`Signed agreement${row.business ? `: ${row.business}` : ""}`, body, { brand, css: "@media print{.top{display:none}.card{border:0}}" });
+}
+
+/**
+ * The agreement as it would read for a plan and way to pay, before anyone signs: for showing the business owner on
+ * the phone ("here's what you'd be agreeing to"). Nothing is stored. Owner and callers (login cookie), any plan.
+ */
+export async function contractPreviewPage(env: Env, q: { leadId?: string; plan?: string; billing?: string }): Promise<Response> {
+  const settings = await getSettings(env);
+  const lead = q.leadId ? await getLead(env, q.leadId) : null;
+  const record = lead?.record_json ? (JSON.parse(lead.record_json) as { name?: string }) : null;
+  const business = record?.name || lead?.name || "your business";
+  const plans = settings.plans.filter((p) => p.monthly);
+  const plan = plans.find((p) => p.id === q.plan) ?? plans.find((p) => p.id === "plus") ?? plans[0];
+  const brand = settings.companyName || "Agreement";
+  if (!plan) return page("Agreement", `<div class="wrap"><div class="card"><h1>No plans set up yet</h1><p>Add plans in Settings first.</p></div></div>`, { brand, status: 404 });
+  const options = billingOptions(plan, settings, { category: lead?.category ?? undefined });
+  const option = options.find((o) => o.id === q.billing) ?? options.find((o) => o.id === "standard") ?? options[0]!;
+  const order = priceSignup(settings, plan.id, option.id, [], { category: lead?.category ?? undefined });
+  const terms = contractText(settings, order, { business, kind: "signup" });
+  const link = (planId: string, billing: string) => `/api/contract?${q.leadId ? `lead=${encodeURIComponent(q.leadId)}&` : ""}plan=${encodeURIComponent(planId)}&billing=${encodeURIComponent(billing)}`;
+  const pill = (href: string, label: string, on: boolean) => `<a class="btn btn--small${on ? " btn--primary" : ""}" href="${href}" style="margin:0 6px 6px 0">${escHtml(label)}</a>`;
+  const body = `<div class="wrap"><div class="card">
+<p class="small" style="margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#fff7e0;border:1px solid #f1d58a"><strong>Preview.</strong> This is the agreement ${escHtml(business)} would sign for the <strong>${escHtml(plan.name)}</strong> plan, paying <strong>${escHtml(option.label.toLowerCase())}</strong>. Nothing is signed or stored; extras are added at sign-up.</p>
+<p class="small muted" style="margin:0 0 4px">Plan</p><p class="noprint">${plans.map((p) => pill(link(p.id, option.id), p.name, p.id === plan.id)).join("")}</p>
+<p class="small muted" style="margin:0 0 4px">Way to pay</p><p class="noprint">${options.map((o) => pill(link(plan.id, o.id), o.label, o.id === option.id)).join("")}</p>
+<div class="terms" style="max-height:none;white-space:pre-line">${escHtml(terms)}</div>
+<p class="noprint" style="margin-top:16px"><button class="btn" type="button" onclick="window.print()">Print or save as PDF</button></p>
+</div></div>`;
+  return page(`Agreement preview: ${plan.name}`, body, { brand, css: "@media print{.top{display:none}.card{border:0}}" });
 }

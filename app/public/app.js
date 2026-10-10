@@ -514,7 +514,7 @@
       ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)} · <a href="/api/agreements/p/${p.id}" target="_blank" rel="noopener">📄 agreement</a></li>`).join("")}</ul>` : ""}
       ${plans.length
         ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
-          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a></p>
+          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> <a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a></p>
           <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div>
           <div id="signuplink"></div>`
         : isOwner() ? `<p class="small muted">Add your plans and prices in <a href="#/settings">Settings</a> first.</p>` : `<p class="small muted">The owner hasn't set up plans yet.</p>`}
@@ -1445,6 +1445,7 @@
           <p class="show__day">${p.setup ? `${money(p.setup)} setup · ` : t.commits.length ? `No setup fee on ${commitWords(t)} plans · ` : ""}about ${perDay(p.monthly)} a day</p>
           <ul>${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
           ${leadId ? `<button class="show__choose" data-choose="${esc(p.id)}">Choose ${esc(p.name)}</button>` : ""}
+          <p class="show__agree"><a href="/api/contract?${leadId ? `lead=${encodeURIComponent(leadId)}&` : ""}plan=${encodeURIComponent(p.id)}" target="_blank" rel="noopener">Read the agreement</a></p>
         </section>`;
       }).join("")}</div>
       <section class="show__box"><h2>Every plan includes</h2><ul class="show__every">${EVERY_PLAN.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>
@@ -1577,7 +1578,7 @@
     $app.innerHTML = `<p><a href="#/" id="back">← Back</a></p>
       <h1>Plans & answers</h1>
       <p class="muted">What each plan gets them, why it's worth it, and what to say when they push back.</p>
-      <p><a class="btn btn--primary" href="#/plans">📋 Show the customer the plans</a></p>
+      <p><a class="btn btn--primary" href="#/plans">📋 Show the customer the plans</a> <a class="btn" href="/api/contract" target="_blank" rel="noopener">📄 Read the agreement</a></p>
       <section class="card"><h2>Which plan fits?</h2><p class="small muted">Lead with the middle plan. Go down if price is the worry, up if they want it all done for them.</p>
         <ul class="list">${PLAN_QUESTIONS.map(([q, a]) => `<li>${esc(q)} → <strong>${esc(a)}</strong></li>`).join("")}</ul></section>
       ${plans.map(planCard).join("")}
@@ -2349,7 +2350,7 @@
 
       ${step(5, "Talk price, once they like it", `${mid ? say(`Most folks go with ${mid.name}. It's ${money(mid.monthly)} a month${noSetup}. We host it, keep it running, and make changes whenever you text us.`) : ""}
         <p class="small muted">Lead with the middle plan. Go down if price is the worry, up if they want everything done for them.</p>
-        <p><a class="btn" href="${l ? `#/plans/${id}` : "#/plans"}">📋 Show them the plans</a> <a class="btn btn--small" href="#/playbook">💬 Plans & answers</a></p>`)}
+        <p><a class="btn" href="${l ? `#/plans/${id}` : "#/plans"}">📋 Show them the plans</a> <a class="btn btn--small" href="/api/contract${l ? `?lead=${id}` : ""}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="#/playbook">💬 Plans & answers</a></p>`)}
 
       ${step(6, "Ask for the yes", `${say("Want me to get it live for you this week?")}
         ${list([

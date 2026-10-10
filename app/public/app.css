@@ -191,6 +191,7 @@ body.showing { background: #fff; }
 .show__plan li::before, .show__every li::before { content: "✓"; position: absolute; left: 4px; color: #15803d; font-weight: 800; }
 .show__choose { display: block; width: 100%; margin-top: 16px; min-height: 52px; border: 0; border-radius: 12px; font-weight: 800; font-size: 1.05rem; background: #eef1f6; color: var(--sn); cursor: pointer; }
 .show__plan--star .show__choose { background: var(--sn); color: #fff; }
+.show__agree { margin: 10px 0 0; text-align: center; font-size: .92rem; } .show__agree a { color: inherit; opacity: .8; }
 .show__box { max-width: 1100px; margin: 20px auto 0; border-radius: 18px; background: #f4f5f8; padding: 20px; }
 .show__box h2 { margin: 0 0 10px; color: var(--sn); font-size: 1.25rem; }
 .show__every { display: grid; gap: 0 20px; }
