@@ -85,7 +85,7 @@ Turnip greens | $3`),
     return {
       slug: "magnolia-table",
       kind: "Southern cafe",
-      design: "restaurant.garden_table~split",
+      design: "restaurant.garden_table~split~h1n0b0s1v0c0f0a0p0",
       record,
       copy: copy({
         heroTagline: "Scratch biscuits, plate lunches and Friday supper, served with a smile.",
@@ -114,7 +114,7 @@ Turnip greens | $3`),
     return {
       slug: "ridgeline-plumbing",
       kind: "Plumber",
-      design: "contractor.ridgeline~poster",
+      design: "contractor.ridgeline~poster~h2n0b4s3v1c1f1a0p2",
       record,
       copy: copy({
         heroTagline: "Leaks, clogs and water heaters fixed right the first time.",
@@ -152,7 +152,7 @@ Turnip greens | $3`),
     return {
       slug: "ivy-iron-barber",
       kind: "Barbershop",
-      design: "salon.night_shift~editorial",
+      design: "salon.night_shift~editorial~h3n1b3s2v4c2f0a1p3",
       record,
       copy: copy({
         heroTagline: "Classic cuts, sharp fades and hot towel shaves in downtown Cullman.",
@@ -185,7 +185,7 @@ Turnip greens | $3`),
     return {
       slug: "crossroads-auto",
       kind: "Auto repair shop",
-      design: "auto.clear_diagnostic~overlap",
+      design: "auto.clear_diagnostic~overlap~h4n2b2s0v2c0f2a0p0",
       record,
       copy: copy({
         heroTagline: "Honest auto repair, done right and explained in plain English.",
@@ -219,7 +219,7 @@ Turnip greens | $3`),
     return {
       slug: "green-acre-lawn",
       kind: "Lawn care",
-      design: "landscaping.fresh_stripe~soft",
+      design: "landscaping.fresh_stripe~soft~h1n0b4s2v2c1f1a1p0",
       record,
       copy: copy({
         heroTagline: "Weekly mowing and yard care that keeps your place looking sharp.",
@@ -255,7 +255,7 @@ Turnip greens | $3`),
     return {
       slug: "spotless-cottage",
       kind: "House cleaning",
-      design: "cleaning.magnolia_porch~minimal",
+      design: "cleaning.magnolia_porch~minimal~h4n1b1s2v4c2f0a0p2",
       record,
       copy: copy({
         heroTagline: "A clean home without lifting a finger.",
@@ -290,7 +290,7 @@ Turnip greens | $3`),
     return {
       slug: "main-street-tees",
       kind: "Screen printing shop",
-      design: "print.fresh_ink~classic",
+      design: "print.fresh_ink~classic~h3n2b2s1v2c0f2a1p1",
       record,
       copy: copy({
         heroTagline: "Custom shirts and hoodies for teams, schools, churches and businesses around Cullman.",
@@ -325,7 +325,7 @@ Turnip greens | $3`),
     return {
       slug: "willow-wren",
       kind: "Clothing boutique",
-      design: "retail.shop_window~split",
+      design: "retail.shop_window~split~h2n1b0s3v2c2f0a0p3",
       record,
       copy: copy({
         heroTagline: "Cute clothes, shoes and gifts in downtown Cullman.",
@@ -364,7 +364,7 @@ Turnip greens | $3`),
     return {
       slug: "sycamore-tax",
       kind: "Tax office",
-      design: "finance.bright_desk~ticker",
+      design: "finance.bright_desk~ticker~h4n0b3s0v4c2f1a0p2",
       record,
       copy: copy({
         heroTagline: "Tax returns, bookkeeping and payroll for families and small businesses around Cullman.",
@@ -419,7 +419,7 @@ Turnip greens | $3`),
     return {
       slug: "cedar-creek",
       kind: "Country church",
-      design: "church.country_chapel~letter",
+      design: "church.country_chapel~letter~h3n1b1s2v1c0f0a0p2",
       record,
       copy: copy({
         heroTagline: "There's a place here for every age, from little ones to senior adults.",
