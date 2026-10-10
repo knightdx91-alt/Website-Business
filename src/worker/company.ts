@@ -1,7 +1,7 @@
 import { notify } from "./notify.ts";
 import { addonPrice, billingOptions, defaultTerms, getSettings, GO_LIVE_TEXT, type AppSettings } from "./db.ts";
 import { dollars, pickerHtml, picksFromForm, priceSignup, type PricedOrder } from "./checkout.ts";
-import { agreementPage, manageBillingHtml, orderSummary, saveOrder } from "./signup.ts";
+import { agreementPage, agreementPdf, manageBillingHtml, orderSummary, saveOrder } from "./signup.ts";
 import { contractSectionsHtml, contractText } from "./contract.ts";
 import { esignHtml, readSignature } from "./esign.ts";
 import { extrasToken } from "./auth.ts";
@@ -97,7 +97,10 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   if (path === "/change") return changeRequest(env, req, url);
   if (path === "/start" && (req.method === "GET" || req.method === "POST")) return startOrder(env, req, url);
   if (path === "/start/thanks") return startThanks(env, url);
-  if (path.startsWith("/agreement/") && req.method === "GET") return agreementPage(env, path.slice("/agreement/".length));
+  if (path.startsWith("/agreement/") && req.method === "GET") {
+    const tok = path.slice("/agreement/".length);
+    return tok.endsWith(".pdf") ? agreementPdf(env, tok.slice(0, -4)) : agreementPage(env, tok);
+  }
   if (path === "/portfolio" && req.method === "GET") return portfolio(env);
   if (path === "/extras" && (req.method === "GET" || req.method === "POST")) return extrasRequest(env, req, url);
   if (path === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`, { headers: { "content-type": "text/plain" } });

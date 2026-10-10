@@ -6,6 +6,7 @@ import { HttpError, localDate, newId, now, type Env } from "./env.ts";
 import { escHtml, page } from "./page.ts";
 import { agreementToken, verifyAgreement } from "./auth.ts";
 import { contractSectionsHtml, contractText } from "./contract.ts";
+import { dataUrlBytes, pdfBytes, pdfResponse, pngToPdfImage } from "./pdf.ts";
 import { esignHtml, readSignature } from "./esign.ts";
 
 interface SignupRow {
@@ -347,24 +348,45 @@ ${env.STRIPE_SECRET_KEY ? `<p class="small muted">Payment is handled securely by
 }
 
 /** A signed agreement (sign-up or extras), for the client from their link or for the team from the app. */
-export async function agreementPage(env: Env, token: string, byId?: { kind: "s" | "p"; id: string }): Promise<Response> {
+interface SignedRow {
+  terms: string | null;
+  signer_name: string | null;
+  signer_title: string | null;
+  signer_email: string | null;
+  signature: string | null;
+  ip: string | null;
+  created_at: number;
+  paid: number;
+  business: string | null;
+}
+
+/** A signed agreement by its token or id, or null. */
+async function loadAgreement(env: Env, token: string, byId?: { kind: "s" | "p"; id: string }): Promise<{ ref: { kind: "s" | "p"; id: string }; row: SignedRow } | null> {
   const ref = byId ?? (await verifyAgreement(env, token));
-  const settings = await getSettings(env);
-  const brand = settings.companyName || "Agreement";
-  const notFound = () => page("Not found", `<div class="wrap"><div class="card"><h1>Agreement not found</h1><p>Please ask us for a copy${settings.companyPhone ? ` at ${escHtml(settings.companyPhone)}` : ""}.</p></div></div>`, { brand, status: 404 });
-  if (!ref) return notFound();
+  if (!ref) return null;
   const row =
     ref.kind === "s"
       ? await env.DB.prepare("SELECT s.terms, s.signer_name, s.signer_title, s.signer_email, s.signature, s.ip, s.created_at, s.paid, COALESCE(l.name, s.business) AS business FROM signups s LEFT JOIN leads l ON l.id = s.lead_id WHERE s.id = ?")
           .bind(ref.id)
-          .first<{ terms: string; signer_name: string; signer_title: string | null; signer_email: string | null; signature: string | null; ip: string | null; created_at: number; paid: number; business: string | null }>()
+          .first<SignedRow>()
       : await env.DB.prepare("SELECT p.terms, p.signer_name, NULL AS signer_title, p.signer_email, p.signature, p.ip, p.created_at, p.paid, l.name AS business FROM purchases p LEFT JOIN leads l ON l.id = p.lead_id WHERE p.id = ?")
           .bind(ref.id)
-          .first<{ terms: string | null; signer_name: string | null; signer_title: string | null; signer_email: string | null; signature: string | null; ip: string | null; created_at: number; paid: number; business: string | null }>();
-  if (!row || !row.terms) return notFound();
-  const when = new Date(row.created_at).toLocaleString("en-US", { timeZone: "America/Chicago", dateStyle: "long", timeStyle: "short" });
-  const signature = row.signature && /^data:image\/png;base64,/.test(row.signature) ? `<img src="${row.signature}" alt="Signature of ${escHtml(row.signer_name ?? "")}" style="max-width:320px;width:100%;border-bottom:2px solid #16181d;background:#fff">` : "";
-  const body = `<div class="noprint bar" style="max-width:640px;margin:16px auto;padding:0 16px"><button class="btn" type="button" onclick="window.print()">Print or save as PDF</button></div>
+          .first<SignedRow>();
+  return row && row.terms ? { ref, row } : null;
+}
+
+const signedWhen = (row: SignedRow) => new Date(row.created_at).toLocaleString("en-US", { timeZone: "America/Chicago", dateStyle: "long", timeStyle: "short" });
+
+export async function agreementPage(env: Env, token: string, byId?: { kind: "s" | "p"; id: string }): Promise<Response> {
+  const settings = await getSettings(env);
+  const brand = settings.companyName || "Agreement";
+  const found = await loadAgreement(env, token, byId);
+  if (!found) return page("Not found", `<div class="wrap"><div class="card"><h1>Agreement not found</h1><p>Please ask us for a copy${settings.companyPhone ? ` at ${escHtml(settings.companyPhone)}` : ""}.</p></div></div>`, { brand, status: 404 });
+  const { ref, row } = found;
+  const when = signedWhen(row);
+  const signature = row.signature && /^data:image\/png;base64,/.test(row.signature) ? `<img src="${row.signature}" alt="Signature of ${escHtml(row.signer_name ?? "")}" style="max-width:320px;width:100%;border:1px solid #e1e4ea;border-radius:8px;background:#fff">` : "";
+  const pdfHref = byId ? `/api/agreements/${ref.kind}/${ref.id}.pdf` : `/agreement/${token}.pdf`;
+  const body = `<div class="noprint bar" style="max-width:640px;margin:16px auto;padding:0 16px;display:flex;gap:10px;flex-wrap:wrap"><a class="btn" style="width:auto" href="${pdfHref}">Download PDF</a><button class="btn btn--ghost" style="width:auto" type="button" onclick="window.print()">Print</button></div>
 <div class="wrap"><div class="card"><div class="terms" style="max-height:none;white-space:pre-line">${escHtml(row.terms)}</div>
 <h2 style="margin-top:20px">Signed electronically</h2>
 ${signature}
@@ -375,24 +397,58 @@ ${ref.kind === "s" ? manageBillingHtml(settings) : ""}</div></div>`;
   return page(`Signed agreement${row.business ? `: ${row.business}` : ""}`, body, { brand, css: "@media print{.top{display:none}.card{border:0}}" });
 }
 
+/** The signed agreement as a PDF file (same access rules as the page). */
+export async function agreementPdf(env: Env, token: string, byId?: { kind: "s" | "p"; id: string }): Promise<Response> {
+  const found = await loadAgreement(env, token, byId);
+  if (!found) return new Response("Agreement not found", { status: 404 });
+  const settings = await getSettings(env);
+  const { row } = found;
+  const png = dataUrlBytes(row.signature);
+  const image = png ? ((await pngToPdfImage(png).catch(() => null)) ?? undefined) : undefined;
+  const lines = [
+    `${row.signer_name ?? ""}${row.signer_title ? `, ${row.signer_title}` : ""}${row.business ? ` for ${row.business}` : ""}`,
+    `Signed ${signedWhen(row)} Central${row.signer_email ? ` · ${row.signer_email}` : ""}${row.ip ? ` · IP ${row.ip}` : ""}`,
+    `Accepted for ${settings.legalName || settings.companyName || ""}${row.paid ? " · Payment received" : ""}`,
+  ];
+  const doc = { title: row.terms!.split("\n")[0] || "Agreement", text: row.terms!.split("\n").slice(1).join("\n"), signature: { heading: "Signed electronically", image, lines }, footer: settings.companyName || "" };
+  return pdfResponse(pdfBytes(doc, image), `agreement-${(row.business || "signed").toLowerCase().replace(/\s+/g, "-")}.pdf`);
+}
+
 /**
  * The agreement as it would read for a plan and way to pay, before anyone signs: for showing the business owner on
  * the phone ("here's what you'd be agreeing to"). Nothing is stored. Owner and callers (login cookie), any plan.
  */
-export async function contractPreviewPage(env: Env, q: { leadId?: string; plan?: string; billing?: string }): Promise<Response> {
+interface PreviewQuery {
+  leadId?: string;
+  plan?: string;
+  billing?: string;
+}
+
+async function previewData(env: Env, q: PreviewQuery) {
   const settings = await getSettings(env);
   const lead = q.leadId ? await getLead(env, q.leadId) : null;
   const record = lead?.record_json ? (JSON.parse(lead.record_json) as { name?: string }) : null;
   const business = record?.name || lead?.name || "your business";
   const plans = settings.plans.filter((p) => p.monthly);
   const plan = plans.find((p) => p.id === q.plan) ?? plans.find((p) => p.id === "plus") ?? plans[0];
-  const brand = settings.companyName || "Agreement";
-  if (!plan) return page("Agreement", `<div class="wrap"><div class="card"><h1>No plans set up yet</h1><p>Add plans in Settings first.</p></div></div>`, { brand, status: 404 });
+  if (!plan) return { settings, business, plans, plan: undefined, options: [], option: undefined, terms: "" };
   const options = billingOptions(plan, settings, { category: lead?.category ?? undefined });
   const option = options.find((o) => o.id === q.billing) ?? options.find((o) => o.id === "standard") ?? options[0]!;
   const order = priceSignup(settings, plan.id, option.id, [], { category: lead?.category ?? undefined });
   const terms = contractText(settings, order, { business, kind: "signup" });
-  const link = (planId: string, billing: string) => `/api/contract?${q.leadId ? `lead=${encodeURIComponent(q.leadId)}&` : ""}plan=${encodeURIComponent(planId)}&billing=${encodeURIComponent(billing)}`;
+  return { settings, business, plans, plan, options, option, terms };
+}
+
+/**
+ * The agreement as it would read for a plan and way to pay, before anyone signs: for showing the business owner on
+ * the phone ("here's what you'd be agreeing to"). Nothing is stored. Owner and callers (login cookie), any plan.
+ */
+export async function contractPreviewPage(env: Env, q: PreviewQuery): Promise<Response> {
+  const { settings, business, plans, plan, options, option, terms } = await previewData(env, q);
+  const brand = settings.companyName || "Agreement";
+  if (!plan || !option) return page("Agreement", `<div class="wrap"><div class="card"><h1>No plans set up yet</h1><p>Add plans in Settings first.</p></div></div>`, { brand, status: 404 });
+  const qs = (planId: string, billing: string) => `${q.leadId ? `lead=${encodeURIComponent(q.leadId)}&` : ""}plan=${encodeURIComponent(planId)}&billing=${encodeURIComponent(billing)}`;
+  const link = (planId: string, billing: string) => `/api/contract?${qs(planId, billing)}`;
   const pill = (href: string, label: string, on: boolean) =>
     `<a href="${href}" style="display:inline-block;width:auto;margin:0 8px 8px 0;padding:8px 14px;border-radius:999px;font-weight:700;font-size:.95rem;text-decoration:none;${
       on ? "background:#14213d;color:#fff;border:2px solid #14213d" : "background:#fff;color:#14213d;border:2px solid #c9d0dc"
@@ -402,7 +458,21 @@ export async function contractPreviewPage(env: Env, q: { leadId?: string; plan?:
 <p class="small muted" style="margin:0 0 4px">Plan</p><p class="noprint">${plans.map((p) => pill(link(p.id, option.id), p.name, p.id === plan.id)).join("")}</p>
 <p class="small muted" style="margin:0 0 4px">Way to pay</p><p class="noprint">${options.map((o) => pill(link(plan.id, o.id), o.label, o.id === option.id)).join("")}</p>
 <div class="terms" style="max-height:none;white-space:pre-line">${escHtml(terms)}</div>
-<p class="noprint" style="margin-top:16px"><button class="btn" type="button" onclick="window.print()">Print or save as PDF</button></p>
+<p class="noprint" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap"><a class="btn" style="width:auto" href="/api/contract.pdf?${qs(plan.id, option.id)}">Download PDF</a><button class="btn btn--ghost" style="width:auto" type="button" onclick="window.print()">Print</button></p>
 </div></div>`;
   return page(`Agreement preview: ${plan.name}`, body, { brand, css: "@media print{.top{display:none}.card{border:0}}" });
+}
+
+/** The unsigned agreement for a plan and way to pay as a PDF file, marked as a preview. */
+export async function contractPreviewPdf(env: Env, q: PreviewQuery): Promise<Response> {
+  const { settings, business, plan, option, terms } = await previewData(env, q);
+  if (!plan || !option) return new Response("No plans set up yet", { status: 404 });
+  const first = terms.split("\n")[0] || "Agreement";
+  const doc = {
+    title: first,
+    notice: `Unsigned preview for ${business}: ${plan.name} plan, ${option.label.toLowerCase()}. Nothing is signed; extras are added at sign-up.`,
+    text: terms.split("\n").slice(1).join("\n"),
+    footer: `${settings.companyName || ""} · Preview, not signed`,
+  };
+  return pdfResponse(pdfBytes(doc), `agreement-preview-${plan.id}.pdf`);
 }

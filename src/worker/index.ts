@@ -20,7 +20,7 @@ import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
 import { cadenceFor, nextCadenceStep, salesDashboard } from "./sales.ts";
 import { portalSession } from "./checkout.ts";
-import { agreementPage, contractPreviewPage, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
+import { agreementPage, agreementPdf, contractPreviewPage, contractPreviewPdf, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { EXPIRE_SQL } from "./expire.ts";
 import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
@@ -255,8 +255,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   };
 
   // The agreement a business would sign, before signing: owner and callers show it on the phone.
-  if (path === "/contract" && m === "GET") {
-    return contractPreviewPage(env, { leadId: url.searchParams.get("lead") ?? undefined, plan: url.searchParams.get("plan") ?? undefined, billing: url.searchParams.get("billing") ?? undefined });
+  if ((path === "/contract" || path === "/contract.pdf") && m === "GET") {
+    const q = { leadId: url.searchParams.get("lead") ?? undefined, plan: url.searchParams.get("plan") ?? undefined, billing: url.searchParams.get("billing") ?? undefined };
+    return path.endsWith(".pdf") ? contractPreviewPdf(env, q) : contractPreviewPage(env, q);
   }
   if (path === "/meta" && m === "GET") {
     const settings = await getSettings(env);
@@ -481,8 +482,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   }
 
   // A signed agreement, opened from the app (any team member who can see the lead).
-  const agreement = /^\/agreements\/([sp])\/([a-z0-9]+)$/.exec(path);
-  if (agreement && m === "GET") return agreementPage(env, "", { kind: agreement[1] as "s" | "p", id: agreement[2]! });
+  const agreement = /^\/agreements\/([sp])\/([a-z0-9]+)(\.pdf)?$/.exec(path);
+  if (agreement && m === "GET") return (agreement[3] ? agreementPdf : agreementPage)(env, "", { kind: agreement[1] as "s" | "p", id: agreement[2]! });
 
   if (path === "/sales" && m === "GET") {
     ownerOnly();
@@ -1201,7 +1202,10 @@ export default {
         return await serveSignup(env, req, leadId, plan, url.origin);
       }
       if (url.pathname === "/stripe/webhook" && req.method === "POST") return await stripeWebhook(env, req);
-      if (url.pathname.startsWith("/agreement/") && req.method === "GET") return await agreementPage(env, url.pathname.slice("/agreement/".length));
+      if (url.pathname.startsWith("/agreement/") && req.method === "GET") {
+        const tok = url.pathname.slice("/agreement/".length);
+        return tok.endsWith(".pdf") ? await agreementPdf(env, tok.slice(0, -4)) : await agreementPage(env, tok);
+      }
       const extras = /^\/x\/([a-z0-9]+)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(url.pathname);
       if (extras && (req.method === "GET" || req.method === "POST")) {
         const [, leadId, exp, sig] = extras as unknown as [string, string, string, string];

@@ -529,6 +529,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   exact agreement a business would sign for that plan and way to pay, with plan / way-to-pay switch pills, a "Preview, nothing
   is signed" notice and Print; nothing is stored. Buttons: lead page sign-up card "📄 Show them the agreement", Show plans
   ("Read the agreement" under each plan), the walk-in guide and Plans & answers.
+  PDF export (`src/worker/pdf.ts`, no dependencies: Letter pages, Helvetica, wrapped text, ALL-CAPS lines as headings, "- "
+  bullets, page numbers, the drawn signature PNG decoded here and embedded as RGB): signed copies at `/agreement/<token>.pdf`
+  (both hosts, public by token) and `/api/agreements/<s|p>/<id>.pdf` (app); the unsigned preview at `/api/contract.pdf?…` with a
+  "Preview, not signed" notice and footer. "Download PDF" buttons on both pages, "⬇ PDF" next to every agreement link in the app
+  and "⬇ Agreement PDF" on the sign-up card. `test/worker/pdf.test.ts` checks the PNG flattening and the PDF structure.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.
