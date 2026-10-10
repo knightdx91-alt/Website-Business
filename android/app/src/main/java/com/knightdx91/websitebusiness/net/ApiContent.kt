@@ -110,7 +110,11 @@ object AppContent {
 
 suspend fun Api.content(): Content = Content.from(getJson("/content"))
 
-data class BillingChoice(val id: String, val label: String, val detail: String, val monthlyEquivalent: Double, val dueTodayCents: Long)
+data class BillingChoice(
+    val id: String, val label: String, val detail: String, val monthlyEquivalent: Double, val dueTodayCents: Long,
+    /** What the plan alone renews at (cents) and how often ("month" / "year"); null when nothing renews. */
+    val renewsCents: Long? = null, val renewsInterval: String? = null,
+)
 
 data class PlanOffer(val id: String, val name: String, val monthly: Double, val setup: Double, val perDay: Double, val includes: List<String>, val options: List<BillingChoice>)
 
@@ -118,7 +122,7 @@ data class PayWay(val title: String, val detail: String)
 
 data class PlanTerms(val min: Int, val short: Int, val commits: List<Int>, val commitWords: String, val flex: Double, val free: Int)
 
-data class AddonInfo(val name: String, val about: String, val price: String, val unit: String)
+data class AddonInfo(val name: String, val about: String, val price: String, val unit: String, /** The raw price in dollars (0 for "priced per job"). */ val amount: Double = 0.0)
 
 data class PlanOptions(
     val church: Boolean,
@@ -147,18 +151,24 @@ data class PlanOptions(
                     PlanOffer(
                         id = p.optString("id"), name = p.optString("name"), monthly = p.optDouble("monthly", 0.0), setup = p.optDouble("setup", 0.0), perDay = p.optDouble("perDay", 0.0),
                         includes = p.optJSONArray("includes").strings(),
-                        options = p.optJSONArray("options").objects().map { o -> BillingChoice(o.optString("id"), o.optString("label"), o.optString("detail"), o.optDouble("monthlyEquivalent", 0.0), o.optLong("dueTodayCents", 0L)) },
+                        options = p.optJSONArray("options").objects().map { o ->
+                            val renews = o.optJSONObject("renews")
+                            BillingChoice(o.optString("id"), o.optString("label"), o.optString("detail"), o.optDouble("monthlyEquivalent", 0.0), o.optLong("dueTodayCents", 0L), renews?.optLong("amount"), renews?.str("interval"))
+                        },
                     )
                 },
                 terms = PlanTerms(t.optInt("min"), t.optInt("short"), commits, t.optString("commitWords"), t.optDouble("flex", 0.0), t.optInt("free")),
                 payWays = j.optJSONArray("payWays").objects().map { PayWay(it.optString("title"), it.optString("detail")) },
                 priceShort = j.optString("priceShort", "it's a low monthly price"),
                 invoice = j.optBoolean("invoice"),
-                addons = j.optJSONArray("addons").objects().map { AddonInfo(it.optString("name"), it.optString("about"), it.optString("price"), it.optString("unit")) },
+                addons = j.optJSONArray("addons").objects().map { AddonInfo(it.optString("name"), it.optString("about"), it.optString("price"), it.optString("unit"), it.optDouble("amount", priceInText(it.optString("price")))) },
             )
         }
     }
 }
+
+/** "$35 each" → 35.0: the price out of its text, for servers that don't send `amount` yet. */
+private fun priceInText(text: String): Double = Regex("""\d+(?:\.\d+)?""").find(text)?.value?.toDoubleOrNull() ?: 0.0
 
 /** Every plan's ways to pay, priced on the server; `leadId` makes churches get the ministry rate. */
 suspend fun Api.planOptions(leadId: String?): PlanOptions =
