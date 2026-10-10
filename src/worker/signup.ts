@@ -393,7 +393,10 @@ export async function contractPreviewPage(env: Env, q: { leadId?: string; plan?:
   const order = priceSignup(settings, plan.id, option.id, [], { category: lead?.category ?? undefined });
   const terms = contractText(settings, order, { business, kind: "signup" });
   const link = (planId: string, billing: string) => `/api/contract?${q.leadId ? `lead=${encodeURIComponent(q.leadId)}&` : ""}plan=${encodeURIComponent(planId)}&billing=${encodeURIComponent(billing)}`;
-  const pill = (href: string, label: string, on: boolean) => `<a class="btn btn--small${on ? " btn--primary" : ""}" href="${href}" style="margin:0 6px 6px 0">${escHtml(label)}</a>`;
+  const pill = (href: string, label: string, on: boolean) =>
+    `<a href="${href}" style="display:inline-block;width:auto;margin:0 8px 8px 0;padding:8px 14px;border-radius:999px;font-weight:700;font-size:.95rem;text-decoration:none;${
+      on ? "background:#14213d;color:#fff;border:2px solid #14213d" : "background:#fff;color:#14213d;border:2px solid #c9d0dc"
+    }"${on ? ' aria-current="true"' : ""}>${escHtml(label)}</a>`;
   const body = `<div class="wrap"><div class="card">
 <p class="small" style="margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#fff7e0;border:1px solid #f1d58a"><strong>Preview.</strong> This is the agreement ${escHtml(business)} would sign for the <strong>${escHtml(plan.name)}</strong> plan, paying <strong>${escHtml(option.label.toLowerCase())}</strong>. Nothing is signed or stored; extras are added at sign-up.</p>
 <p class="small muted" style="margin:0 0 4px">Plan</p><p class="noprint">${plans.map((p) => pill(link(p.id, option.id), p.name, p.id === plan.id)).join("")}</p>
