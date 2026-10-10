@@ -2357,6 +2357,7 @@
         <label class="field">Business email <span class="hint">Shown everywhere</span><input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
         <label class="field">Our Google review link <span class="hint">From your Google profile: “Ask for reviews” → copy link. Texted to happy clients.</span><input name="companyReviewUrl" type="url" value="${esc(s.companyReviewUrl || "")}" placeholder="https://g.page/r/…/review"></label>
         <label class="field">Our Facebook page <span class="hint">Linked in the website footer</span><input name="companyFacebookUrl" type="url" value="${esc(s.companyFacebookUrl || "")}" placeholder="https://www.facebook.com/…"></label>
+        <label class="field">Google tag ID <span class="hint">From Google Analytics / Ads, like G-XXXXXXXXXX. Added to every page of the company website; blank turns it off.</span><input name="gaMeasurementId" value="${esc(s.gaMeasurementId || "")}" placeholder="G-XXXXXXXXXX" style="text-transform:uppercase"></label>
         <label class="field">Owner's direct email <span class="hint">Shown on your website as "Need the owner directly?"</span><input name="directEmail" type="email" value="${esc(s.directEmail || "")}" placeholder="post@undergroundassociates.com"></label>
         <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
         ${!meta.me.id || meta.me.id === "owner" ? `<label class="field">Your name <span class="hint">Your texts say "Hi, this is ___ with ${esc(s.companyName || "your company")}". Everyone else's texts use their own login names.</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="e.g. Post"></label>` : ""}
@@ -2437,6 +2438,7 @@
             directEmail: v("directEmail") || undefined,
             companyReviewUrl: v("companyReviewUrl") || undefined,
             companyFacebookUrl: v("companyFacebookUrl") || undefined,
+            gaMeasurementId: v("gaMeasurementId").toUpperCase() || undefined,
             gbpEmail: v("gbpEmail") || undefined,
             // Only the owner's own login shows this field; others keep the owner's name as it is.
             callerName: f.elements.callerName ? v("callerName") || undefined : s.callerName,

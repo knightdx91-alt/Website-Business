@@ -227,6 +227,8 @@ export interface AppSettings {
   companyReviewUrl?: string;
   /** Our Facebook page, linked from the company website. */
   companyFacebookUrl?: string;
+  /** Google tag (Analytics) measurement ID, e.g. G-XXXXXXXXXX; put on every company website page when set. */
+  gaMeasurementId?: string;
   /** The Google account clients add as a Manager on their Business Profile. */
   gbpEmail?: string;
   callerName?: string;

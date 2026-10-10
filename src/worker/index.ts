@@ -306,6 +306,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         directEmail: z.string().trim().email().max(120).optional(),
         companyReviewUrl: WEB_URL(500).optional(),
         companyFacebookUrl: WEB_URL(500).optional(),
+        gaMeasurementId: z.string().trim().toUpperCase().regex(/^G-[A-Z0-9]{4,16}$/, "A Google tag ID looks like G-XXXXXXXXXX").optional(),
         gbpEmail: z.string().trim().email().max(120).optional(),
         callerName: z.string().trim().max(60).optional(),
         plans: z

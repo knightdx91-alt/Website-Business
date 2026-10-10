@@ -21,7 +21,7 @@ export const COMPANY_ORIGIN = ORIGIN;
 const FOUNDED = 2021;
 
 /** Shown on the Terms and Privacy pages; bump when either changes (last: minimum-term, renewal, late-payment and church-rate lines). */
-const POLICIES_UPDATED = "October 9, 2026";
+const POLICIES_UPDATED = "October 10, 2026";
 
 /** Contact form posts land in the app inbox under this pseudo lead id. */
 export const COMPANY_LEAD_ID = "company";
@@ -157,12 +157,13 @@ async function changeRequest(env: Env, req: Request, url: URL): Promise<Response
 <button class="btn" type="submit">Send request</button></form>
 ${s.companyPhone ? `<p class="direct">Or text or call <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>. Photos are easiest to text.</p>` : ""}`
     : `<h1>Request a change</h1><p>This link doesn't match one of our client websites. ${s.companyPhone ? `Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : `<a href="/#contact">Contact us</a>`} and we'll help.</p>`;
+  const n = nonce();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Request a change | ${e(name)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png"><style>${CSS}</style></head><body>
+<title>Request a change | ${e(name)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(s.gaMeasurementId, n)}<style>${CSS}</style></head><body>
 ${header(name, s.companyPhone)}
 <main id="main" class="sec sec--dark"><div class="wrap narrow">${body}</div></main>
 ${footer(s.legalName || name)}</body></html>`;
-  return new Response(html, { status: lead ? 200 : 404, headers: { ...HEADERS, "cache-control": "no-store" } });
+  return new Response(html, { status: lead ? 200 : 404, headers: { ...HEADERS, "cache-control": "no-store", "content-security-policy": csp(n, { ga: !!s.gaMeasurementId }) } });
 }
 
 /** Website "Buy now": pick a plan, way to pay and extras, give business details, sign, and pay online. */
@@ -187,7 +188,7 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
         order = priceSignup(s, field("plan", 20) || planId, field("billing", 20) || "standard", picks);
       } catch (err) {
         if (!(err instanceof HttpError)) throw err;
-        return policyShell(name, legal, "Get started", `<h1>Get started</h1><p class="note note--warn" role="alert">${e(err.message)}. <a href="/start">Pick a plan again</a>.</p>`, { phone: s.companyPhone, status: err.status });
+        return policyShell(name, legal, "Get started", `<h1>Get started</h1><p class="note note--warn" role="alert">${e(err.message)}. <a href="/start">Pick a plan again</a>.</p>`, { phone: s.companyPhone, ga: s.gaMeasurementId, status: err.status });
       }
       const saved = await saveOrder(env, req, {
         leadId: "web",
@@ -239,7 +240,7 @@ ${esignHtml({ sectionsHtml: contractSectionsHtml(s, { business: "your business",
 ${env.STRIPE_SECRET_KEY ? `<p class="small muted">Payment is handled securely by Stripe. We never see your card number.</p>` : `<p class="small muted">We'll send you an invoice by email.</p>`}
 </form>
 <p class="small muted" style="margin-top:20px">Rather see it before you pay? <a href="/#contact">Get a free preview</a> instead.</p>`;
-  return policyShell(name, legal, "Get started", body, { script: true, phone: s.companyPhone });
+  return policyShell(name, legal, "Get started", body, { script: true, phone: s.companyPhone, ga: s.gaMeasurementId });
 }
 
 async function startThanks(env: Env, url: URL): Promise<Response> {
@@ -252,7 +253,7 @@ async function startThanks(env: Env, url: URL): Promise<Response> {
 <p><strong>${GO_LIVE_TEXT}</strong></p>${copy}
 ${manageBillingHtml(s)}
 <p><a class="btn" href="/">Back to the home page</a></p>`;
-  return policyShell(name, s.legalName || name, "Thank you", body, { phone: s.companyPhone });
+  return policyShell(name, s.legalName || name, "Thank you", body, { phone: s.companyPhone, ga: s.gaMeasurementId });
 }
 
 const digits = (t: string) => t.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
@@ -277,7 +278,7 @@ async function extrasRequest(env: Env, req: Request, url: URL): Promise<Response
     const lead = to
       ? `<p class="lead">We just emailed your personal link to the email we have on file for your business (<strong>${e(to)}</strong>). Open it to review the agreement for your extras, sign it and pay. It can take a minute to arrive; check your spam folder if you don't see it.</p>`
       : `<p class="lead">We'll send you a link within one business day where you can review the agreement for your extras, sign it and pay.</p>`;
-    return policyShell(name, s.legalName || name, "Request sent", `<h1>Got it, thank you!</h1>${lead}<p>${s.companyPhone ? `Questions? Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>.` : ""}</p><p><a class="btn" href="/">Back to the home page</a></p>`, { phone: s.companyPhone });
+    return policyShell(name, s.legalName || name, "Request sent", `<h1>Got it, thank you!</h1>${lead}<p>${s.companyPhone ? `Questions? Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>.` : ""}</p><p><a class="btn" href="/">Back to the home page</a></p>`, { phone: s.companyPhone, ga: s.gaMeasurementId });
   }
   let note = "";
   if (req.method === "POST") {
@@ -366,21 +367,21 @@ ${s.addons.map((a, i) => `<label class="xopt"><input type="checkbox" name="x_${i
 <button class="btn" type="submit">Send my request</button>
 </form>
 <p class="small muted" style="margin-top:20px">Not a client yet? <a href="/start">Get started</a> or <a href="/#contact">get a free preview</a>.</p>`;
-  return policyShell(name, s.legalName || name, "Add extras", body, { phone: s.companyPhone });
+  return policyShell(name, s.legalName || name, "Add extras", body, { phone: s.companyPhone, ga: s.gaMeasurementId });
 }
 
 /** Simple light page in the company style (header, narrow column, footer). */
-function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean; wide?: boolean; phone?: string; description?: string; status?: number; from?: number | null }): Response {
+function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean; wide?: boolean; phone?: string; description?: string; status?: number; from?: number | null; ga?: string }): Response {
+  const n = nonce();
   const meta = o.description
     ? `<meta name="description" content="${e(o.description)}"><link rel="canonical" href="${ORIGIN}/portfolio"><meta property="og:image" content="${ORIGIN}/og.png">`
     : `<meta name="robots" content="noindex">`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${e(title)} | ${e(name)}</title>${meta}<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png"><style>${CSS}</style></head><body>
+<title>${e(title)} | ${e(name)}</title>${meta}<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(o.ga, n)}<style>${CSS}</style></head><body>
 ${header(name, o.phone, o.from)}
 <main id="main" class="sec"><div class="wrap${o.wide ? "" : " narrow"}">${body}</div></main>
 ${footer(legal)}</body></html>`;
-  const csp = `default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:;${o.script ? " script-src 'unsafe-inline';" : ""} form-action 'self' https://checkout.stripe.com; base-uri 'none'; frame-ancestors 'none'`;
-  return new Response(html, { status: o.status ?? 200, headers: { ...HEADERS, "cache-control": "no-store", "content-security-policy": csp } });
+  return new Response(html, { status: o.status ?? 200, headers: { ...HEADERS, "cache-control": "no-store", "content-security-policy": csp(n, { ga: !!o.ga, inlineScript: o.script, stripe: true }) } });
 }
 
 /** True when the owner has added app/public/owner.jpg (served as /owner.jpg); the About strip then shows it. */
@@ -444,11 +445,12 @@ async function home(env: Env, url: URL): Promise<Response> {
   const callBtn = phone ? `<a class="btn btn--ghost" href="${telHref(phone)}">Call ${e(phone)}</a>` : "";
   const owner = (s.callerName || "Post").split(" ")[0]!;
   const ownerPhoto = await ownerPhotoExists(env);
+  const n = nonce();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${e(title)}</title><meta name="description" content="${e(description)}"><link rel="canonical" href="${ORIGIN}/">
 <meta property="og:type" content="website"><meta property="og:title" content="${e(title)}"><meta property="og:description" content="${e(description)}"><meta property="og:url" content="${ORIGIN}/">
 <meta property="og:image" content="${ORIGIN}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">
+<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(s.gaMeasurementId, n)}
 <link rel="preload" href="/fonts/bricolage-grotesque-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>${CSS}</style><script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script></head><body>
 <a class="skip" href="#main">Skip to content</a>
@@ -556,7 +558,7 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
       "cache-control": "public, max-age=300",
       "x-content-type-options": "nosniff",
       "referrer-policy": "strict-origin-when-cross-origin",
-      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      "content-security-policy": csp(n, { ga: !!s.gaMeasurementId }),
     },
   });
 }
@@ -592,11 +594,29 @@ async function portfolio(env: Env): Promise<Response> {
 <div class="card" style="margin-top:32px"><h2 style="font-size:1.4rem">Want to see yours?</h2><p>We'll build a free preview of your website first. You only pay if you like it.</p>
 <div class="btns"><a class="btn" href="/#contact">Get my free preview</a><a class="btn btn--line" href="/#plans">See plans</a></div></div>`;
   const from = s.plans.length ? Math.min(...s.plans.map((p) => p.monthly)) : null;
-  return policyShell(name, s.legalName || name, "Portfolio", body, { wide: true, phone: s.companyPhone, from, description: `Example websites by ${name} for Cullman-area businesses: restaurants, contractors, salons, auto shops, lawn care, cleaning, print shops and boutiques.` });
+  return policyShell(name, s.legalName || name, "Portfolio", body, { wide: true, phone: s.companyPhone, ga: s.gaMeasurementId, from, description: `Example websites by ${name} for Cullman-area businesses: restaurants, contractors, salons, auto shops, lawn care, cleaning, print shops and boutiques.` });
 }
 
 function footer(legal: string, reviewUrl?: string, facebookUrl?: string): string {
   return `<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama · <a href="/extras">Clients: add extras</a> · <a href="/terms">Terms &amp; refunds</a> · <a href="/privacy">Privacy</a>${facebookUrl ? ` · <a href="${e(facebookUrl)}" rel="noopener">Facebook</a>` : ""}${reviewUrl ? ` · <a href="${e(reviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</div></footer>`;
+}
+
+/** Per-response CSP nonce for the inline Google tag snippet. */
+function nonce(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}
+const GA_SCRIPT = "https://www.googletagmanager.com";
+const GA_CONNECT = "https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com";
+/** Google tag (gtag.js) for the head of every company page; nothing when Settings has no ID. */
+function gaTag(id: string | undefined, n: string): string {
+  if (!id) return "";
+  return `<script async nonce="${n}" src="${GA_SCRIPT}/gtag/js?id=${e(id)}"></script><script nonce="${n}">window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","${e(id)}");</script>`;
+}
+/** The company site's CSP: no scripts at all unless a page has its own (inline) or the Google tag is on. */
+function csp(n: string, o: { ga?: boolean; inlineScript?: boolean; stripe?: boolean } = {}): string {
+  // A nonce makes browsers ignore 'unsafe-inline', so pages with their own inline scripts keep 'unsafe-inline' instead.
+  const script = o.inlineScript ? `'unsafe-inline'${o.ga ? ` ${GA_SCRIPT}` : ""}` : o.ga ? `'nonce-${n}' ${GA_SCRIPT}` : "";
+  return `default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:${o.ga ? ` ${GA_CONNECT}` : ""};${script ? ` script-src ${script};` : ""}${o.ga ? ` connect-src ${GA_CONNECT};` : ""} form-action 'self'${o.stripe ? " https://checkout.stripe.com" : ""}; base-uri 'none'; frame-ancestors 'none'`;
 }
 
 const HEADERS = {
@@ -673,10 +693,10 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
         "<strong>Preview links:</strong> when someone opens a preview link we sent, we note that it was opened and when, so we know when to follow up.",
         "<strong>Our clients' websites:</strong> we count page views and taps on buttons like Call and Directions, without cookies and without identifying visitors. Messages sent through a client's website form go to that business; we store them only to deliver them.",
       ])),
-      sec("How we use it", `<p>To answer you, build and run your website, handle billing, and follow up about a preview we made for you. We don't sell or rent personal information, and this website uses no advertising trackers or cookies.</p>`),
+      sec("How we use it", `<p>To answer you, build and run your website, handle billing, and follow up about a preview we made for you. We don't sell or rent personal information.</p><p>${s.gaMeasurementId ? "This website uses Google Analytics to count visits and see which pages people read, so we can improve it. Google sets cookies for this and may link visits to Google Ads clicks. You can opt out with Google's browser add-on (tools.google.com/dlpage/gaoptout) or by blocking cookies." : "This website uses no advertising trackers or cookies."} The websites we build for clients use no cookies at all.</p>`),
       sec("Calls, texts and email", `<p>We contact you only about your inquiry, your preview or your service. Ask us to stop, or reply STOP to a text, and we will.</p>`),
       sec("Who we share it with", ul([
-        "Service providers that run our business: Cloudflare (hosting), Google (email and business listings), Stripe (payments), and an AI writing tool that helps draft website text from public business details (never your personal contact information).",
+        "Service providers that run our business: Cloudflare (hosting), Google (email, business listings and website analytics), Stripe (payments), and an AI writing tool that helps draft website text from public business details (never your personal contact information).",
         "Anyone the law requires us to share with.",
       ])),
       sec("How long we keep it", `<p>Messages and sign-up records are kept as long as we need them for your service and our business records. Previews for businesses that don't sign up are deleted within 30 to 90 days; we keep only Google's listing ID so we don't contact the same business twice by mistake.</p>`),
@@ -684,15 +704,16 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
       sec("Children", `<p>Our services are for businesses and aren't meant for children under 13.</p>`),
     ].join("");
   }
+  const n = nonce();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${e(title)} | ${e(name)}</title><meta name="description" content="${e(`${title} for ${legal}, Cullman, Alabama.`)}"><link rel="canonical" href="${ORIGIN}/${kind}">
-<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png"><style>${CSS}</style></head><body>
+<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(s.gaMeasurementId, n)}<style>${CSS}</style></head><body>
 <a class="skip" href="#main">Skip to content</a>
 ${header(name, phone)}
 <main id="main" class="sec"><div class="wrap narrow legal"><h1>${e(title)}</h1><p class="small muted">Last updated ${POLICIES_UPDATED}</p>${body}</div></main>
 ${footer(legal)}
 </body></html>`;
-  return new Response(html, { headers: HEADERS });
+  return new Response(html, { headers: { ...HEADERS, "content-security-policy": csp(n, { ga: !!s.gaMeasurementId }) } });
 }
 
 const CSS = `@font-face{font-family:"Bricolage";src:url(/fonts/bricolage-grotesque-latin-800-normal.woff2) format("woff2");font-weight:800;font-display:swap}
