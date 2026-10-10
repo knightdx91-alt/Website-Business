@@ -203,6 +203,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Manager 1.5.0 + googleid 1.1.1, work 2.10.3, Stripe Terminal 6.0.0; Kotlin 2.3.21 (matches the Stripe SDK). The manifest forces
   `ACCESS_FINE_LOCATION` with `tools:node="replace"` (a library caps it at SDK 30, which would break Tap to Pay on Android 13+).
   Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first. `ASSET_LINKS` stays in index.ts.
+- Editor as data (Oct 2026, `src/worker/editform.ts`): `GET /api/leads/:id/editform` returns the Edit screen as cards and fields
+  (types text/textarea/check/select/number/url/tel/email/date/heading/note/hidden; special card kinds photo / gallery / spanish /
+  design carry the hero source, gallery thumbnails and whether a Spanish page exists) for the lead's category and variant, with the
+  same field names as the web editor's form elements; `PUT /api/leads/:id/editform {values}` turns the values back into the same
+  `/edits` payload (`editsFromForm`, a port of viewEdit's save handler and every `*EditValues` helper) and returns `warnings` for bad
+  event/offer dates. The Android `EditScreen` renders it generically. When a card or field is added to the web editor, add it here too
+  (`test/worker/editform.test.ts` round-trips every example business; the retail gift-card checkbox is `giftCardsSold` here because
+  the web form reuses `giftCards` for the link).
 - Google sign-in (Oct 2026, `src/worker/google.ts`, migration 0015 `users.email`): the team signs in with their company Google
   Workspace account. Web: the login page shows Google Identity Services' button when Settings → "Team sign-in (Google)" has a
   client ID (`googleClientId`; `index.html` loads accounts.google.com/gsi/client); Android: Credential Manager →
