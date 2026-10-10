@@ -87,9 +87,26 @@ async function body<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
 }
 
 /** `latest_signup_paid` comes from the list query (the newest sign-up's paid flag); lead GET passes it from signupsFor. */
-function summary(l: LeadRow & { latest_signup_paid?: number | null }) {
+/** Extra columns the Activity list (`/leads?activity=1`) selects: the newest note and how many there are. */
+interface ActivityCols {
+  last_note_json?: string | null;
+  note_count?: number | null;
+  last_activity?: number | null;
+}
+
+function summary(l: LeadRow & { latest_signup_paid?: number | null } & ActivityCols) {
   const lint = l.lint_json ? (JSON.parse(l.lint_json) as { publishBlockers?: string[]; errors?: string[]; todos?: string[] }) : null;
+  const activity =
+    l.last_note_json !== undefined
+      ? {
+          /** Newest call-log entry: {outcome, author, body, at}; null when the lead only has a task, sign-up or callback. */
+          lastNote: l.last_note_json ? (JSON.parse(l.last_note_json) as { outcome: string | null; author: string; body: string; at: number }) : null,
+          notes: l.note_count ?? 0,
+          lastActivity: l.last_activity ?? null,
+        }
+      : {};
   return {
+    ...activity,
     id: l.id,
     runId: l.run_id,
     category: l.category,
@@ -702,7 +719,17 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const category = url.searchParams.get("category");
     const callbacks = url.searchParams.get("callbacks");
     let order = "score DESC";
-    if (url.searchParams.get("opened") === "recent") {
+    let cols = "";
+    if (url.searchParams.get("activity")) {
+      // Leads somebody has worked: a call or note logged (not just "Added by hand"), a task, a sign-up, a typed-in contact or
+      // callback, or a prospect who opened their preview. Newest activity first, with the latest note on the card.
+      const worked = "lead_notes n WHERE n.lead_id = leads.id AND n.body NOT LIKE 'Added by hand%'";
+      where.push(
+        `(EXISTS (SELECT 1 FROM ${worked}) OR EXISTS (SELECT 1 FROM tasks t WHERE t.lead_id = leads.id) OR EXISTS (SELECT 1 FROM signups s WHERE s.lead_id = leads.id) OR contact IS NOT NULL OR follow_up IS NOT NULL OR preview_opens > 0)`,
+      );
+      cols = `, (SELECT json_object('outcome', n.outcome, 'author', n.author, 'body', n.body, 'at', n.created_at) FROM ${worked} ORDER BY n.created_at DESC LIMIT 1) AS last_note_json, (SELECT COUNT(*) FROM ${worked}) AS note_count, MAX(COALESCE((SELECT MAX(n.created_at) FROM ${worked}), 0), COALESCE(last_contact, 0), COALESCE(preview_opened_at, 0), COALESCE((SELECT MAX(t.updated_at) FROM tasks t WHERE t.lead_id = leads.id), 0), COALESCE((SELECT MAX(s.created_at) FROM signups s WHERE s.lead_id = leads.id), 0)) AS last_activity`;
+      order = "last_activity DESC";
+    } else if (url.searchParams.get("opened") === "recent") {
       // Prospects who opened their preview in the last 7 days and haven't bought yet: call them now.
       where.push("preview_opened_at >= ?", "sales_status IN ('new', 'shown')");
       binds.push(now() - 7 * 86_400_000);
@@ -724,10 +751,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       binds.push(category);
     }
     const rows = await env.DB.prepare(
-      `SELECT leads.*, (SELECT s.paid FROM signups s WHERE s.lead_id = leads.id ORDER BY s.created_at DESC LIMIT 1) AS latest_signup_paid FROM leads WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT 500`,
+      `SELECT leads.*, (SELECT s.paid FROM signups s WHERE s.lead_id = leads.id ORDER BY s.created_at DESC LIMIT 1) AS latest_signup_paid${cols} FROM leads WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT 500`,
     )
       .bind(...binds)
-      .all<LeadRow & { latest_signup_paid: number | null }>();
+      .all<LeadRow & { latest_signup_paid: number | null } & ActivityCols>();
     return json({ leads: rows.results.map(summary) });
   }
 
@@ -756,7 +783,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const fields: Partial<LeadRow> = {};
       if (input.contact !== undefined) fields.contact = input.contact || null;
       if (input.bestTime !== undefined) fields.best_time = input.bestTime || null;
-      if (Object.keys(fields).length) await updateLead(env, id, fields);
+      if (Object.keys(fields).length) {
+        await updateLead(env, id, fields);
+        const what = [fields.contact ? `Ask for: ${fields.contact}` : null, fields.best_time ? `best time: ${fields.best_time}` : null].filter(Boolean).join(" · ");
+        await notify(env, { kind: "status", actor: session, leadId: id, text: what ? `${session.name} noted ${lead.name}'s contact (${what})` : `${session.name} cleared ${lead.name}'s contact note` });
+      }
       return json(summary((await getLead(env, id))!));
     }
     // The client's Stripe billing portal (update card, see invoices), opened from the client screen.
@@ -1038,6 +1069,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const { date } = await body(req, z.object({ date: DATE.nullable() }));
       if (date && date < localDate()) throw new HttpError(400, "Pick today or a later day");
       await updateLead(env, id, { follow_up: date });
+      await notify(env, { kind: "status", actor: session, leadId: id, text: date ? `${session.name} set ${lead.name}'s callback to ${date}` : `${session.name} cleared ${lead.name}'s callback` });
       return json({ ok: true });
     }
     if (action === "/notes" && sub && m === "DELETE") {
@@ -1045,6 +1077,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       if (!note) throw new HttpError(404, "Note not found");
       if (!isOwner && note.author !== session.name) throw new HttpError(403, "You can only delete your own notes");
       await env.DB.prepare("DELETE FROM lead_notes WHERE id = ?").bind(sub).run();
+      await notify(env, { kind: "note", actor: session, leadId: id, text: `${session.name} deleted a note on ${lead.name}${note.body ? `: “${note.body.slice(0, 80)}”` : ""}` });
       return json({ ok: true });
     }
     if (action === "" && m === "DELETE") {

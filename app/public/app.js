@@ -32,7 +32,7 @@
   const CATEGORY_LABEL = { restaurant: "Restaurant", contractor: "Contractor", salon: "Salon", auto: "Auto", landscaping: "Landscaping", cleaning: "Cleaning", print: "Print & signs", retail: "Shop", finance: "Tax & finance", church: "Church & nonprofit" };
   const groupLabel = (id) => ((meta && meta.categories.find((c) => c.id === id)) || {}).label || CATEGORY_LABEL[id] || id;
   const GOOGLE_PER_SEARCH = 0.064; // up to 2 pages of Text Search per search phrase
-  const SALES = [["new", "New"], ["callbacks", "Callbacks"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
+  const SALES = [["new", "New"], ["callbacks", "Callbacks"], ["activity", "Activity"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
   const OUTCOME_LABEL = { no_answer: "📵 No answer", reached: "📞 Reached", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested", link_sent: "📲 Preview link texted", signup_sent: "📝 Sent sign-up link", signed: "✍️ Signed up" };
   const LOST_REASONS = [["price", "Price"], ["has_someone", "Has someone"], ["no_need", "No need"], ["timing", "Timing"], ["other", "Other"]];
   const NO_CONNECTION = "No connection. Check your signal and try again.";
@@ -305,6 +305,15 @@
     return `<span class="chip chip--good">Site ready</span>`;
   }
 
+  /** Activity tab: the newest call-log entry on the card, so the list reads like a log. */
+  function lastNoteLine(l) {
+    if (l.lastNote === undefined) return "";
+    if (!l.lastNote) return `<div class="lead__meta">📝 No notes yet${l.previewOpens ? ` · 👀 opened preview ${l.previewOpens}×` : ""}</div>`;
+    const n = l.lastNote;
+    const head = n.outcome && OUTCOME_LABEL[n.outcome] ? OUTCOME_LABEL[n.outcome] : "📝 Note";
+    return `<div class="lead__meta">${head} · ${esc(n.author)} · ${ago(n.at)}${l.notes > 1 ? ` · ${l.notes} entries` : ""}${n.body ? `<br><span class="small">${esc(n.body.length > 140 ? n.body.slice(0, 140) + "…" : n.body)}</span>` : ""}</div>`;
+  }
+
   function leadCard(l) {
     const rating = l.rating ? `<span class="stars">★ ${l.rating.toFixed(1)}</span>` : "";
     return `<li class="card lead">
@@ -312,6 +321,7 @@
       <div class="lead__meta">${esc(CATEGORY_LABEL[l.category] || l.category)} · ${esc(l.reason || "")} ${rating ? "· " + rating : ""}</div>
       <div class="lead__meta">${esc(l.address || "")}</div>
       ${contactLine(l) ? `<div class="lead__meta">${contactLine(l)}</div>` : ""}
+      ${lastNoteLine(l)}
       ${l.followUp && (l.salesStatus === "new" || l.salesStatus === "shown") ? `<div>${followChip(l.followUp)}</div>` : ""}
       <div class="btns btns--full">
         ${l.status === "ready" ? `<a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a>` : `<a class="btn btn--small" href="${telHref(l.phone)}">📞 Call</a>`}
@@ -411,7 +421,7 @@
     const ps = await pushState().catch(() => ({ supported: false }));
     if (!document.getElementById("pushask")) return;
     if (dismissed || !ps.supported || ps.permission === "denied" || (ps.permission === "granted" && ps.sub)) { el.innerHTML = ""; return; }
-    el.innerHTML = `<section class="card due"><h2>🔔 Turn on phone alerts?</h2><p class="small muted">${isOwner() ? "Get a notification when a prospect opens their preview, or a teammate logs a call, makes a sale or gets a sign-up." : "Get a notification when a prospect opens the preview link you sent, so you can call while it's fresh."}</p>
+    el.innerHTML = `<section class="card due"><h2>🔔 Turn on phone alerts?</h2><p class="small muted">Get a notification when a prospect opens their preview, or a teammate adds a note, logs a call, sets a callback, makes a sale or gets a sign-up.</p>
       <div class="btns"><button class="btn btn--primary btn--small" id="pask-on">Turn on</button><button class="btn btn--small" id="pask-no">Not now</button></div></section>`;
     el.querySelector("#pask-on").addEventListener("click", async (e) => {
       e.target.disabled = true;
@@ -430,6 +440,7 @@
     const my = renderSeq;
     const q = new URLSearchParams();
     if (filters.sales === "callbacks") q.set("callbacks", "all");
+    else if (filters.sales === "activity") q.set("activity", "1");
     else if (filters.sales) q.set("sales", filters.sales);
     if (filters.category) q.set("category", filters.category);
     const leadsEl0 = document.getElementById("leads");
@@ -461,6 +472,7 @@
       const empty = {
         new: isOwner() ? "No new leads yet. Tap Find new leads to run a search." : "No new leads right now. Check back after the next run.",
         callbacks: "No callbacks scheduled. Use “Call back…” after a call to schedule one.",
+        activity: "Nothing logged yet. Leads with a call or note, a task, a sign-up, a callback or an opened preview show here, newest first.",
       };
       leadsEl.innerHTML = leads.length ? leads.map(leadCard).join("") : `<li class="card muted">${empty[filters.sales] || "Nothing here yet."}</li>`;
       const busy = runs.some((r) => !r.done) || leads.some((l) => l.status === "queued" || l.status === "building");
@@ -3453,10 +3465,10 @@
     $app.innerHTML = `<h1>Notifications</h1>
       <section class="card"><h2>Phone notifications</h2>
         ${!ps.supported ? `<p class="small muted">This browser can't show phone notifications. Use the installed app or Chrome on Android.</p>`
-          : on ? `<p class="small">✅ On for this phone. ${isOwner() ? "You'll get a notification whenever someone else makes a change." : "You'll get a notification when a prospect opens their preview."}</p><div class="btns"><button class="btn btn--small" id="ptest">Send a test</button><button class="btn btn--small" id="poff">Turn off on this phone</button></div>`
-          : `<p class="small muted">${isOwner() ? "Get a notification on this phone when a prospect opens their preview, someone adds a note, logs a call, makes a sale, a client signs up, or a website gets a message." : "Get a notification on this phone when a prospect opens the preview link you sent, so you can call while it's fresh."}</p><button class="btn btn--primary" id="pon">🔔 Turn on phone notifications</button>`}
+          : on ? `<p class="small">✅ On for this phone. You'll get a notification whenever someone else adds or changes something on a lead.</p><div class="btns"><button class="btn btn--small" id="ptest">Send a test</button><button class="btn btn--small" id="poff">Turn off on this phone</button></div>`
+          : `<p class="small muted">Get a notification on this phone when a prospect opens their preview, someone adds a note, logs a call, sets a callback, makes a sale${isOwner() ? ", a client signs up, or a website gets a message" : " or a client signs up"}.</p><button class="btn btn--primary" id="pon">🔔 Turn on phone notifications</button>`}
       </section>
-      <ul class="list notifs">${rows || `<li class="muted">${isOwner() ? "Nothing yet. When someone else adds a note, logs a call, makes a sale, or a client signs up, it shows here." : "Nothing yet. When a prospect opens their preview, it shows here."}</li>`}</ul>`;
+      <ul class="list notifs">${rows || `<li class="muted">Nothing yet. When someone else adds a note, logs a call, sets a callback, makes a sale, or a client signs up, it shows here.</li>`}</ul>`;
     const pon = $app.querySelector("#pon");
     if (pon) pon.addEventListener("click", async () => { pon.disabled = true; try { await turnOnPush(); toast("Phone notifications are on"); viewNotifications(); } catch (err) { toast(err.message); pon.disabled = false; } });
     const ptest = $app.querySelector("#ptest");

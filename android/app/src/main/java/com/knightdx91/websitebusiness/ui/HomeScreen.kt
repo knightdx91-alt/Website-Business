@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavHostController
@@ -55,7 +56,7 @@ import com.knightdx91.websitebusiness.AppState
 import com.knightdx91.websitebusiness.net.Lead
 import kotlinx.coroutines.launch
 
-private val TABS = listOf("new" to "New", "shown" to "Shown", "callbacks" to "Callbacks", "sold" to "Sold", "live" to "Live")
+private val TABS = listOf("new" to "New", "callbacks" to "Callbacks", "activity" to "Activity", "shown" to "Shown", "sold" to "Sold", "live" to "Live")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +77,11 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
         loading = true
         error = null
         try {
-            leads = if (tab == "callbacks") state.api.leads(callbacks = "all", category = category.ifBlank { null }) else state.api.leads(sales = tab, category = category.ifBlank { null })
+            leads = when (tab) {
+                "callbacks" -> state.api.leads(callbacks = "all", category = category.ifBlank { null })
+                "activity" -> state.api.leads(activity = true, category = category.ifBlank { null })
+                else -> state.api.leads(sales = tab, category = category.ifBlank { null })
+            }
             due = state.api.leads(callbacks = "due")
             opened = state.api.leads(opened = "recent")
             state.unread = runCatching { state.api.unreadCount() }.getOrDefault(state.unread)
@@ -162,6 +167,7 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
                     when (tab) {
                         "new" -> if (meta?.isOwner == true) "No new leads. Tap Find new leads to run a search." else "No new leads right now. Check back after the next run."
                         "callbacks" -> "No callbacks scheduled. Log a call and pick “Call back” to schedule one."
+                        "activity" -> "Nothing logged yet. Leads with a call or note, a task, a sign-up, a callback or an opened preview show here, newest first."
                         else -> "Nothing here yet."
                     },
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp),
@@ -197,6 +203,15 @@ fun LeadCard(l: Lead, onOpen: () -> Unit, onCall: () -> Unit, onPreview: () -> U
             Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             l.address?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (l.contact != null || l.bestTime != null) Text("👤 ${listOfNotNull(l.contact?.let { "Ask for: $it" }, l.bestTime).joinToString(" · ")}", style = MaterialTheme.typography.bodySmall)
+            if (l.lastActivity != null) {
+                // Activity tab: the newest log entry on the card, so the list reads like a log.
+                val n = l.lastNote
+                if (n == null) Text("📝 No notes yet${if (l.previewOpens > 0) " · 👀 opened preview ${l.previewOpens}×" else ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else {
+                    Text("📝 ${n.outcome?.let { OUTCOME_LABEL[it] ?: it.replace('_', ' ') } ?: "Note"} · ${n.author} · ${ago(n.createdAt)}${if (l.notes > 1) " · ${l.notes} entries" else ""}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                    if (n.body.isNotBlank()) Text(n.body, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                }
+            }
             if (l.followUp != null && (l.salesStatus == "new" || l.salesStatus == "shown")) Text("📅 Call back ${niceDay(l.followUp)}", style = MaterialTheme.typography.bodySmall, color = Warn)
             if (l.unpaidSignup) Text("✍️ Signed, payment not finished", style = MaterialTheme.typography.bodySmall, color = Warn)
             Spacer(Modifier.height(8.dp))

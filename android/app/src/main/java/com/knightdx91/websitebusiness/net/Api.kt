@@ -132,8 +132,8 @@ class Api(context: Context) {
 
     suspend fun meta(): Meta = Meta.from(get("/meta"))
 
-    suspend fun leads(sales: String? = null, callbacks: String? = null, category: String? = null, opened: String? = null): List<Lead> =
-        get("/leads" + q("sales" to sales, "callbacks" to callbacks, "category" to category, "opened" to opened)).optJSONArray("leads").objects().map { Lead.from(it) }
+    suspend fun leads(sales: String? = null, callbacks: String? = null, category: String? = null, opened: String? = null, activity: Boolean = false): List<Lead> =
+        get("/leads" + q("sales" to sales, "callbacks" to callbacks, "category" to category, "opened" to opened, "activity" to (if (activity) "1" else null))).optJSONArray("leads").objects().map { Lead.from(it) }
 
     suspend fun lead(id: String): LeadDetail = LeadDetail.from(get("/leads/$id"))
 

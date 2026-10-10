@@ -184,6 +184,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   /api/signups/:id/refund {chargeId, amountCents, cancelPlan, reason}` (`refundSignup`: Stripe refund, optional subscription
   delete, sign-up unpaid on a full refund with the plan ended, call-log note, alert). The dialog restates the agreement's refund
   rules. Card-sheet payments now also store `stripe_payment_intent`.
+- Android app 2.4 (Oct 2026): Activity tab on Home; caller alerts cover every lead change (see Preview opened). 2.3 added refunds.
 - Android app 2.2 (Oct 2026): fully native, no web views. `SignupScreen` (in-person sign-up: plan / way to pay / extras picker,
   agreement sections from `/api/contract.json`, Canvas signature pad → PNG data URL, `POST /api/leads/:id/signups`; then Tap to
   Pay, Stripe's payment sheet (`com.stripe:stripe-android` 22.8.1, SetupIntent via `/api/signups/:id/pay/start|complete`), or
@@ -510,8 +511,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Preview opened (migration 0008, `leads.preview_opens` / `preview_opened_at`): share pages (`/s/…`) carry a tiny script that,
   after 3 s on a visible page and once per browser session, beacons `POST /s/<token>/opened`. Link-preview bots don't run it;
   logged-in team members don't count; at most one count per 30 min. Each count notifies everyone ("👀 X just opened their
-  preview (2nd time)"), callers included: `CALLER_KINDS` in notify.ts is the only kind callers get (their 🔔 list, count
-  and pushes are filtered to it). Home shows "Looked at their preview" (`/api/leads?opened=recent`, last 7 days, not yet sold), the lead
+  preview (2nd time)"), callers included. `CALLER_KINDS` in notify.ts (their 🔔 list, count and pushes are filtered to it)
+  is, since Oct 2026, every lead kind (note, call, status, signup_sent, signed, paid, published, added, preview_open, task);
+  only website messages and search runs stay owner/full access. Contact ("Ask for"), callback-day and note deletions
+  notify too (kind status / note). Home tab **Activity** (`/leads?activity=1`, web `SALES` + Android `TABS`): leads
+  somebody has worked (a call-log entry other than "Added by hand", a task, a sign-up, a typed contact or callback, or an
+  opened preview), newest activity first; the summary carries `lastNote {outcome, author, body, at}`, `notes`,
+  `lastActivity` only on that list and the card shows the newest entry. Home shows "Looked at their preview" (`/api/leads?opened=recent`, last 7 days, not yet sold), the lead
   screen shows the count. Home also asks once to turn on phone alerts (`pushAsk`, dismiss stored in localStorage).
 - Example sites (`src/examples/examples.ts`): 8 made-up businesses (555-01xx numbers, "Example" streets), one per pack,
   each a different look~layout. `npm run prepare:app && npm run examples` builds them (publish mode, fonts pointed at

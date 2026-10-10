@@ -81,6 +81,10 @@ data class Lead(
     val blockers: Int?,
     val lat: Double?,
     val lng: Double?,
+    /** Activity list only: the newest call-log entry and how many there are (null / 0 elsewhere). */
+    val lastNote: Note? = null,
+    val notes: Int = 0,
+    val lastActivity: Long? = null,
 ) {
     val ready get() = status == "ready"
 
@@ -111,6 +115,9 @@ data class Lead(
             blockers = if (j.isNull("blockers")) null else j.optInt("blockers"),
             lat = if (j.isNull("lat")) null else j.optDouble("lat"),
             lng = if (j.isNull("lng")) null else j.optDouble("lng"),
+            lastNote = j.optJSONObject("lastNote")?.let { n -> Note(id = "", author = n.optString("author"), outcome = n.str("outcome"), body = n.optString("body"), createdAt = n.optLong("at")) },
+            notes = j.optInt("notes", 0),
+            lastActivity = if (j.isNull("lastActivity")) null else j.optLong("lastActivity"),
         )
     }
 }

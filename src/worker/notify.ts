@@ -5,16 +5,16 @@ import { getSetting, setSetting } from "./db.ts";
 /**
  * Notifications: what other people did (notes, call outcomes, sales, sign-ups, publishes, website messages).
  * Everyone with full access (the owner and full-access team members) sees everything except their own actions.
- * Callers only get CALLER_KINDS (a prospect opening their preview, and tasks), so they know when to call.
+ * Callers get everything that happens on a lead (CALLER_KINDS: notes, calls, status and callback changes, sign-ups,
+ * payments, publishes, preview opens, tasks); only website messages and search runs stay with full access.
  * Phone pushes carry no data: the push just wakes the app's service worker, which asks /api/notifications/latest
  * what's new while logged in. That keeps details off the push service and needs no payload encryption.
  */
 
 export type EventKind = "note" | "call" | "status" | "signup_sent" | "signed" | "paid" | "published" | "added" | "message" | "run" | "preview_open" | "task";
 
-/** The only notifications callers get. */
-/** The only notifications callers get: a prospect opening their preview, and tasks (the team's shared list). */
-export const CALLER_KINDS: EventKind[] = ["preview_open", "task"];
+/** The notifications callers get: anything added or changed on a lead, plus tasks. Not website messages or search runs. */
+export const CALLER_KINDS: EventKind[] = ["note", "call", "status", "signup_sent", "signed", "paid", "published", "added", "preview_open", "task"];
 const callerFilter = `AND kind IN (${CALLER_KINDS.map((k) => `'${k}'`).join(",")})`;
 
 export interface EventInput {
@@ -102,7 +102,7 @@ export async function latestForPush(env: Env, userId: string, caller = false) {
   const test = Number((await getSetting(env, `push_test_${userId}`)) ?? 0);
   if (test && Date.now() - test < 120_000) {
     await setSetting(env, `push_test_${userId}`, "0");
-    return { title: "Website Business", body: caller ? "Test notification: you're all set. You'll get one when a prospect opens their preview." : "Test notification: you're all set. You'll get one whenever someone else makes a change.", url: "/#/notifications", unread: 0 };
+    return { title: "Website Business", body: "Test notification: you're all set. You'll get one whenever someone else adds or changes something on a lead.", url: "/#/notifications", unread: 0 };
   }
   const { items, unread } = await listEvents(env, userId, 5, caller);
   const top = items.find((i) => i.unread) ?? items[0];
