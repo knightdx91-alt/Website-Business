@@ -38,6 +38,16 @@ function openStatus(hours, now) {
   }
   return { open: false, text: "Closed" };
 }
+/** Today's hours for the info strip, e.g. "Today 11 AM – 8 PM" or "Closed today". */
+function todayText(hours, now) {
+  if (hours.open24_7) return "Open 24 hours";
+  var today = (hours.weekly && hours.weekly[now.day]) || [], parts = [];
+  for (var i = 0; i < today.length; i++) {
+    if (today[i].open === "00:00" && today[i].close === "24:00") return "Open all day today";
+    parts.push(fmtTime(today[i].open) + " \u2013 " + fmtTime(today[i].close));
+  }
+  return parts.length ? "Today " + parts.join(", ") : "Closed today";
+}
 function nowIn(tz) {
   var parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
   var get = function (t) { for (var i = 0; i < parts.length; i++) if (parts[i].type === t) return parts[i].value; return ""; };
@@ -76,6 +86,7 @@ if ("ResizeObserver" in window && hdr) new ResizeObserver(measureHdr).observe(hd
 window.addEventListener("scroll", function () {
   var y = window.scrollY;
   if (hdr && !(nav && nav.classList.contains("is-open"))) hdr.classList.toggle("is-hidden", y > last && y > 160);
+  if (hdr) hdr.classList.toggle("is-scrolled", y > 24);
   last = y;
 }, { passive: true });
 var bar = d.querySelector(".bar"), heroActions = d.querySelector("[data-hero-actions]");
@@ -94,6 +105,8 @@ if (hd) {
       els[i].classList.add(st.open ? "is-open" : "is-closed");
       els[i].hidden = false;
     }
+    var th = d.querySelectorAll("[data-today-hours]");
+    for (var t = 0; t < th.length; t++) th[t].textContent = todayText(data.hours, now);
     var rows = d.querySelectorAll("[data-day='" + now.day + "']");
     for (var j = 0; j < rows.length; j++) rows[j].classList.add("is-today");
   } catch (err) {}
@@ -111,6 +124,48 @@ if (sm && navigator.sendBeacon) {
     else if (h.indexOf("sms:") === 0) hit("text");
     else if (h.indexOf("google.com/maps") > -1 || h.indexOf("maps.apple.com") > -1) hit("directions");
   });
+}
+var evs = d.querySelectorAll("[data-event-end]");
+if (evs.length) {
+  try {
+    var tp = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    var tg = function (t) { for (var i = 0; i < tp.length; i++) if (tp[i].type === t) return tp[i].value; return ""; };
+    var todayIso = tg("year") + "-" + tg("month") + "-" + tg("day"), left = 0;
+    for (var ei = 0; ei < evs.length; ei++) { if (evs[ei].getAttribute("data-event-end") < todayIso) evs[ei].hidden = true; else left++; }
+    // A section whose dated items have all passed goes too (events, and the offers cards).
+    var secs = ["events", "offers"];
+    for (var si = 0; si < secs.length; si++) { var es = d.getElementById(secs[si]); if (es && !es.querySelector("[data-event-end]:not([hidden])")) es.hidden = true; }
+  } catch (err) {}
+}
+// Dated lines (closures, intro offers): hide once their day has passed; "soon" lines show inside a week.
+var dated = d.querySelectorAll("[data-until],[data-soon]");
+if (dated.length) {
+  try {
+    var dp = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    var dg = function (t) { for (var i = 0; i < dp.length; i++) if (dp[i].type === t) return dp[i].value; return ""; };
+    var dToday = dg("year") + "-" + dg("month") + "-" + dg("day");
+    for (var di = 0; di < dated.length; di++) {
+      var until = dated[di].getAttribute("data-until") || dated[di].getAttribute("data-soon");
+      if (until < dToday) { dated[di].hidden = true; continue; }
+      if (dated[di].hasAttribute("data-soon")) dated[di].hidden = (Date.parse(until) - Date.parse(dToday)) > 7 * 86400000;
+    }
+  } catch (err) {}
+}
+/* Churches: "Next: Sunday 10:30 AM" from the schedule rows the server could parse ([{d: 0-6, m: minutes}]). */
+var ns = d.querySelector("[data-next-service]");
+if (ns) {
+  try {
+    var rows = JSON.parse(ns.getAttribute("data-next-service")), nowS = nowIn(ns.getAttribute("data-tz") || "America/Chicago"), best = null;
+    for (var ri = 0; ri < rows.length; ri++) {
+      var delta = ((rows[ri].d - nowS.day) * 1440 + rows[ri].m - nowS.minutes + 10080) % 10080;
+      if (best === null || delta < best.delta) best = { delta: delta, row: rows[ri] };
+    }
+    if (best) {
+      var mm = best.row.m, hh = Math.floor(mm / 60), mi = mm % 60, pad = mi < 10 ? "0" + mi : "" + mi;
+      ns.textContent = "Next: " + ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][best.row.d] + " " + fmtTime((hh < 10 ? "0" + hh : hh) + ":" + pad);
+      ns.hidden = false;
+    }
+  } catch (err) {}
 }
 var fy = d.querySelectorAll("[data-year]");
 for (var y = 0; y < fy.length; y++) fy[y].textContent = String(new Date().getFullYear());
