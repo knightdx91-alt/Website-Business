@@ -1,5 +1,5 @@
 import { action, actions, type ActionId } from "../actions.ts";
-import { about, button, cardGrid, ctaBand, faq, gallery, hero, hoursTable, sectionHead, todo, type Ctx } from "../components.ts";
+import { about, button, cardGrid, ctaBand, faq, gallery, hero, hoursTable, sectionHead, todo, type Ctx, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html, raw, type Raw } from "../html.ts";
 import { icon } from "../icons.ts";
@@ -323,7 +323,7 @@ ${r.variant === "church" ? planVisit(ctx) : ""}
 <section class="section${r.variant === "church" ? " section--band" : ""}" id="ministries" aria-labelledby="ministries-title"><div class="wrap">
 <span class="section__label">${r.variant === "church" ? "Ministries" : "What we do"}</span><h2 class="section__title" id="ministries-title">${r.variant === "church" ? "Something for everyone" : "How we serve"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
-${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
+${serviceList(ctx, r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, r.variant === "church" ? "Tick your ministries" : "Tick what you do", "We started with the usual list. Tell us what to keep, remove or add, and when groups meet.", true)}
 </div></section>
 ${c.liveUrl || c.sermonsUrl ? html`<section class="section" id="watch" aria-labelledby="watch-title"><div class="wrap narrow">${sectionHead("Watch", "Join us online", undefined, "watch-title")}<div class="btns">${c.liveUrl ? button(action(r, "watch")!, "primary") : ""}${c.sermonsUrl ? html`<a class="btn btn--ghost" href="${c.sermonsUrl}" target="_blank" rel="noopener"><span>Past services</span><span class="sr"> (opens in new tab)</span></a>` : ""}</div></div></section>` : ""}

@@ -277,6 +277,7 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
   if (edits.look) {
     const d = parseDesign(edits.look);
     if (!packFor(r.category).looks.includes(d.look) || (edits.look.includes("~") && !d.layout)) throw new HttpError(400, "That look isn't available for this category");
+    if (d.dnaRaw && !d.dna) throw new HttpError(400, "That page structure code isn't valid");
     look = edits.look;
   }
   return { record: r, copy: c, look };

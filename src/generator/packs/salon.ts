@@ -1,5 +1,5 @@
 import { actions, type ActionId } from "../actions.ts";
-import { about, cardGrid, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx } from "../components.ts";
+import { about, cardGrid, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Faq, Service } from "../types.ts";
@@ -118,7 +118,7 @@ ${infoStrip(ctx, walk ? [WALK_IN_TEXT[walk]] : [])}
 <section class="section section--surface" id="services" aria-labelledby="services-title"><div class="wrap">
 ${sectionHead("Services", r.variant === "barber" ? "Cuts & prices" : "Services", undefined, "services-title")}
 ${ctx.copy.heroSub ? html`<p class="lead">${ctx.copy.heroSub}</p>` : ""}
-${cardGrid(r.services.map((s, i) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], price: prices[i] })))}
+${serviceList(ctx, r.services.map((s, i) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], price: prices[i] })))}
 ${confirmed ? "" : todo(ctx, "Send us your services and prices", "List what you offer and what you charge (or \"from $\" prices). We'll set it up so people can see it on their phones.", true)}
 ${walk ? "" : todo(ctx, "Walk-ins or appointments?", "Tell us whether you take walk-ins, appointments, or both. It's the first thing new customers want to know.", true)}
 ${r.variant === "massage" && !r.licenses.length ? todo(ctx, "Send us your Alabama license number", "Alabama asks massage businesses to show their license number in ads, so we'll put it at the bottom of every page.", true) : ""}

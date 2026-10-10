@@ -1,4 +1,6 @@
+import { pickDna } from "./dna.ts";
 import { LAYOUT_IDS, type LayoutId } from "./layouts.ts";
+import type { CategoryId } from "./types.ts";
 import { designId, LOOKS, parseDesign } from "./themes.ts";
 
 function hash(s: string): number {
@@ -42,5 +44,10 @@ export function pickDesign(o: { leadId: string; looks: string[]; used: string[];
     const fit = (look === o.preferred ? -0.6 : 0) + (look === o.preferred && layout === LOOKS[look]?.layout ? -0.3 : 0);
     return (combo.get(d) ?? 0) * 1000 + (takenLooks.has(look) ? 100 : 0) + (byLook.get(look) ?? 0) * 3 + (byLayout.get(layout) ?? 0) * 2 + fit;
   };
-  return options.sort((a, b) => score(a) - score(b) || hash(o.leadId + a) - hash(o.leadId + b))[0]!;
+  const best = options.sort((a, b) => score(a) - score(b) || hash(o.leadId + a) - hash(o.leadId + b))[0]!;
+  // Page structure (DNA) comes from the lead id, avoiding structures already in use in the category.
+  const look = parseDesign(best).look;
+  const category = look.split(".")[0] as CategoryId;
+  const avoid = o.used.map((d) => parseDesign(d).dna).filter((d): d is NonNullable<typeof d> => !!d);
+  return designId(look, layoutOf(best), pickDna(o.leadId, category, { avoid }));
 }

@@ -3,6 +3,7 @@ import { action, reviewUrl } from "./actions.ts";
 import { hasAnyHours, hoursSummary, weeklyRows } from "./hours.ts";
 import { html, join, raw, type Html, type Raw } from "./html.ts";
 import { icon, type IconName } from "./icons.ts";
+import type { Dna } from "./dna.ts";
 import type { Theme } from "./themes.ts";
 import type { BuildMode, BusinessRecord, Copy, Faq, Image, Site } from "./types.ts";
 
@@ -23,6 +24,8 @@ export interface Ctx {
   /** Set once the photo gallery is on the page, so render.ts doesn't add it twice. */
   galleryShown?: boolean;
   credit?: { company: string; url: string; changeUrl: string };
+  /** False for categories that may not show reviews anywhere (financial advisors, churches). */
+  reviewsAllowed?: boolean;
 }
 
 export interface NavItem {
@@ -77,30 +80,70 @@ export interface HeroOpts {
 }
 
 export function hero(ctx: Ctx, o: HeroOpts): Raw {
-  const img = ctx.r.media.hero;
-  const showImg = img && (ctx.mode === "preview" || img.source !== "google");
-  const cls = `hero hero--${ctx.theme.knobs.hero}${showImg ? " hero--photo" : ""}`;
-  return html`<section class="${cls}" aria-labelledby="hero-title">
-${showImg ? html`<div class="hero__media"><img src="${img!.src}" alt="" width="${img!.width ?? 1200}" height="${img!.height ?? 800}" fetchpriority="high" decoding="async"></div>` : ""}
-<div class="hero__in">
-${o.badge ? html`<p class="badge">${o.badge}</p>` : ""}
-${o.eyebrow ? html`<p class="hero__eyebrow">${o.eyebrow}</p>` : ""}
-<h1 id="hero-title">${o.h1}</h1>
-<p class="hero__sub">${o.sub}</p>
-${o.showStatus ? html`<p class="status" data-open-status hidden></p>` : ""}
-${o.trust.length ? html`<ul class="hero__trust">${o.trust.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : ""}
-<div class="btns" data-hero-actions>${o.actions.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>
-</div>
-${showImg && img!.attribution ? html`<p class="hero__credit">Photo: ${img!.attribution.uri ? html`<a href="${img!.attribution.uri}" target="_blank" rel="noopener">${img!.attribution.name}</a>` : img!.attribution.name}</p>` : ""}
+  const r = ctx.r;
+  const img = r.media.hero;
+  const showImg = !!img && (ctx.mode === "preview" || img.source !== "google");
+  // The DNA's opening; a full-screen photo needs a photo, so it falls back to the classic stack without one.
+  let kind = ctx.theme.dna.hero;
+  if (kind === "cover" && !showImg) kind = "stack";
+  const backdrop = showImg && (kind === "stack" || kind === "cover");
+  const cls = `hero hero--${ctx.theme.knobs.hero}${backdrop ? " hero--photo" : ""} hero--${kind}`;
+  const imgAttrs = raw(`src="${img?.src ?? ""}" alt="" width="${img?.width ?? 1200}" height="${img?.height ?? 800}" decoding="async"`);
+  const media = backdrop ? html`<div class="hero__media"><img ${imgAttrs} fetchpriority="high"></div>` : "";
+  const photo = showImg && !backdrop ? html`<div class="ph"><img ${imgAttrs} fetchpriority="high"></div>` : "";
+  const credit = showImg && img!.attribution ? html`<p class="hero__credit">Photo: ${img!.attribution.uri ? html`<a href="${img!.attribution.uri}" target="_blank" rel="noopener">${img!.attribution.name}</a>` : img!.attribution.name}</p>` : "";
+  const badge = o.badge ? html`<p class="badge">${o.badge}</p>` : "";
+  const eyebrow = o.eyebrow ? html`<p class="hero__eyebrow">${o.eyebrow}</p>` : "";
+  const h1 = html`<h1 id="hero-title">${o.h1}</h1>`;
+  const sub = html`<p class="hero__sub">${o.sub}</p>`;
+  const status = o.showStatus ? html`<p class="status" data-open-status hidden></p>` : "";
+  // Proof up top: the Google rating, when it's good and based on enough reviews (never for categories that can't show reviews).
+  const rep = r.reputation;
+  const proof = ctx.reviewsAllowed !== false && rep.rating && rep.count && rep.rating >= 4.3 && rep.count >= 10 && r.mapsUrl
+    ? html`<li class="hero__proof"><a href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("star", 18)}${rep.rating.toFixed(1)} on Google · ${rep.count} reviews<span class="sr"> (opens in new tab)</span></a></li>`
+    : "";
+  const trust = o.trust.length || proof ? html`<ul class="hero__trust">${proof}${o.trust.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : "";
+  const btns = html`<div class="btns" data-hero-actions>${o.actions.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>`;
+  switch (kind) {
+    case "split": {
+      // Headline on the left; an "at a glance" panel (photo, open/closed, hours, address, phone, buttons) on the right.
+      const dir = action(r, "directions")!;
+      const call = action(r, "call")!;
+      const addr = r.showStreetAddress && r.address.street ? `${r.address.street}, ${r.address.city}` : `${r.address.city}, ${r.address.state}`;
+      return html`<section class="${cls}" aria-labelledby="hero-title">
+<div class="hero__in hero__grid"><div class="hero__text">${badge}${eyebrow}${h1}${sub}${trust}</div>
+<aside class="hero__panel" aria-label="At a glance">${photo}${status}${hasAnyHours(r.hours) ? html`<p class="hero__row">${icon("clock")}<span>${hoursSummary(r.hours)}</span></p>` : ""}
+<p class="hero__row">${icon("pin")}<a href="${dir.href}" target="_blank" rel="noopener">${addr}<span class="sr"> (opens directions in new tab)</span></a></p>
+<p class="hero__row">${icon("phone")}<a href="${call.href}">${r.phone.display}</a></p>${btns}</aside></div>
 </section>`;
+    }
+    case "banner":
+      // A short color band with the name and headline, then the details (and the photo) on the page background.
+      return html`<section class="${cls}" aria-labelledby="hero-title"><div class="hero__in">${badge}${eyebrow}${h1}</div></section>
+<div class="lede"><div class="lede__in"><div>${sub}${status}${trust}${btns}</div>${photo ? html`<div>${photo}${credit}</div>` : ""}</div></div>`;
+    case "statement":
+      // Big words on the hero color, no photo behind them; the photo (if any) runs as a wide band underneath.
+      return html`<section class="${cls}" aria-labelledby="hero-title"><div class="hero__in">${badge}${eyebrow}${h1}${sub}${status}${btns}${trust}</div></section>
+${photo ? html`<div class="hero__band">${photo}${credit}</div>` : ""}`;
+    default:
+      return html`<section class="${cls}" aria-labelledby="hero-title">
+${media}
+<div class="hero__in">
+${badge}${eyebrow}${h1}${sub}${status}${trust}${btns}
+</div>
+${credit}
+</section>`;
+  }
 }
 
 export function infoStrip(ctx: Ctx, chips: string[]): Raw {
   const r = ctx.r;
+  const kind = ctx.theme.dna.strip;
+  if (kind === "none") return raw("");
   const call = action(r, "call")!;
   const dir = action(r, "directions")!;
   const addr = r.showStreetAddress && r.address.street ? `${r.address.street}, ${r.address.city}` : `${r.address.city}, ${r.address.state}`;
-  return html`<div class="strip"><div class="strip__in">
+  return html`<div class="strip strip--${kind}"><div class="strip__in">
 <a class="strip__item" href="${dir.href}" target="_blank" rel="noopener">${icon("pin")}<span>${addr}<span class="sr"> (opens directions in new tab)</span></span></a>
 <a class="strip__item" href="${call.href}">${icon("phone")}<span>${r.phone.display}</span></a>
 ${hasAnyHours(r.hours) ? html`<a class="strip__item" href="#visit">${icon("clock")}<span><span data-open-status hidden></span><span class="strip__more"> See all hours</span></span></a>` : ""}
@@ -121,6 +164,29 @@ export function cardGrid(items: CardItem[], cols: 2 | 3 = 3): Raw {
       c.body ? html`<p>${c.body}</p>` : ""
     }</li>`,
   )}</ul>`;
+}
+
+/**
+ * The main services section in the shape the DNA chose: cards (classic), a ruled list, compact tiles,
+ * tap-to-expand rows or text columns. Same items, same copy; only the structure changes.
+ */
+export function serviceList(ctx: Ctx, items: CardItem[], cols: 2 | 3 = 3): Raw {
+  const price = (p?: string) => (p ? html`<span class="price">${p}</span>` : "");
+  const body = (b?: string) => (b ? html`<p>${b}</p>` : "");
+  switch (ctx.theme.dna.services) {
+    case "list":
+      return html`<ul class="svc svc--list">${items.map((it) => html`<li><span class="svc__i">${it.icon ? icon(it.icon, 28) : ""}</span><div><h3>${it.title}${price(it.price)}</h3>${body(it.body)}</div></li>`)}</ul>`;
+    case "tiles":
+      return html`<ul class="svc svc--tiles">${items.map((it) => html`<li>${it.icon ? html`<span class="svc__i">${icon(it.icon, 34)}</span>` : ""}<h3>${it.title}</h3>${price(it.price)}${body(it.body)}</li>`)}</ul>`;
+    case "accordion":
+      return html`<div class="svc svc--acc">${items.map(
+        (it, i) => html`<details${i === 0 ? raw(" open") : ""}><summary><h3>${it.icon ? html`<span class="svc__i">${icon(it.icon, 22)}</span>` : ""}${it.title}${price(it.price)}</h3></summary>${body(it.body)}</details>`,
+      )}</div>`;
+    case "columns":
+      return html`<div class="svc svc--cols">${items.map((it) => html`<div><h3>${it.title}${price(it.price)}</h3>${body(it.body)}</div>`)}</div>`;
+    default:
+      return cardGrid(items, cols);
+  }
 }
 
 export function steps(items: Array<{ title: string; body: string }>): Raw {
@@ -246,7 +312,7 @@ ${towns.length ? html`<label>Town<select name="town"><option value="">Choose one
 }
 
 export function ctaBand(ctx: Ctx, acts: Action[]): Raw {
-  return html`<section class="cta" aria-labelledby="cta-title"><div class="wrap narrow">
+  return html`<section class="cta cta--${ctx.theme.dna.cta}" aria-labelledby="cta-title"><div class="wrap${ctx.theme.dna.cta === "band" ? " narrow" : ""}">
 <h2 id="cta-title">${ctx.copy.ctaTitle}</h2><p>${ctx.copy.ctaLine}</p>
 <div class="btns">${acts.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>
 </div></section>`;
@@ -260,7 +326,8 @@ export function footer(ctx: Ctx, nav: NavItem[], extra: { note?: Raw; reviews?: 
     r.showStreetAddress && r.address.street
       ? html`${r.address.street}<br>${r.address.city}, ${r.address.state} ${r.address.zip ?? ""}`
       : html`${r.address.county ? `Serving ${r.address.county} County, ${r.address.state}` : `${r.address.city}, ${r.address.state}`}`;
-  return html`<footer class="ftr"><div class="wrap">
+  return html`<footer class="ftr ftr--${ctx.theme.dna.footer}"><div class="wrap">
+${ctx.theme.dna.footer === "bigcta" ? html`<div class="ftr__cta"><p>${ctx.copy.ctaTitle}</p>${button(action(r, "call")!, "primary")}</div>` : ""}
 <div class="ftr__grid">
 <div><h2>${r.name}</h2><address style="font-style:normal">${where}</address><p><a href="${action(r, "call")!.href}">${r.phone.display}</a></p></div>
 <div>${hasAnyHours(r.hours) ? html`<h2>Hours</h2><p>${hoursSummary(r.hours)}</p>` : ""}${
@@ -277,7 +344,12 @@ ${extra.note ?? ""}
 </div></footer>`;
 }
 
-export function actionBar(acts: Action[]): Raw {
+export function actionBar(acts: Action[], dna?: Dna): Raw {
+  if (dna?.bar === "fab") {
+    const call = acts.find((a) => a.href.startsWith("tel:")) ?? acts[0];
+    if (!call) return raw("");
+    return html`<nav class="bar bar--fab" aria-label="Quick actions"><a href="${call.href}">${icon(call.icon)}<span>${call.short}</span></a></nav>`;
+  }
   return html`<nav class="bar" aria-label="Quick actions">${acts
     .slice(0, 3)
     .map(

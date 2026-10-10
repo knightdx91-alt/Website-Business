@@ -1,5 +1,5 @@
 import { action, actions } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, steps, todo, visit, type Ctx } from "../components.ts";
+import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, steps, todo, visit, type Ctx, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Service } from "../types.ts";
@@ -110,7 +110,7 @@ export const printPack: CategoryPack = {
     const services = html`<section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
 <span class="section__label">What we make</span><h2 class="section__title" id="services-title">${r.variant === "signs" ? "Signs for every job" : r.variant === "print_shop" ? "What we print" : "What we make"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
-${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: "check" as const })))}
+${serviceList(ctx, r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: "check" as const })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Check what you make", "We guessed at your services from your Google listing. Tell us what to add or remove (shirts, signs, cards, embroidery…).", true)}
 </div></section>`;
     const photos = gallery(ctx, "Send photos of your work", "Three to nine photos of shirts, signs or prints you've made. Real work is what sells a shop like yours. (We can't use Google's photos on the live site.)");

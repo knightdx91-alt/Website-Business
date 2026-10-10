@@ -3,6 +3,7 @@ import { actionBar, footer, gallery, header, hiring, sectionHead, type Ctx } fro
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
 import { html, jsonForScript, raw, type Raw } from "./html.ts";
+import { dnaAttrs } from "./dna.ts";
 import { lintSite, type LintResult } from "./lint.ts";
 import { packFor } from "./packs/index.ts";
 import type { CategoryPack } from "./packs/types.ts";
@@ -61,7 +62,7 @@ function doc(ctx: Ctx, pack: CategoryPack, o: DocOpts): string {
   // Link previews (texts, Facebook) get the hero photo when it's one we may show; Google photos stay out of the HTML.
   const heroImg = ctx.r.media.hero;
   const ogImage = heroImg && heroImg.source !== "google" ? new URL(heroImg.src, origin).toString() : undefined;
-  return `<!doctype html>${html`<html lang="${o.lang ?? "en"}" class="no-js"><head>
+  return `<!doctype html>${html`<html lang="${o.lang ?? "en"}" class="no-js"${raw(dnaAttrs(ctx.theme.dna))}><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${o.title}</title>
@@ -83,7 +84,7 @@ ${hasAnyHours(ctx.r.hours) ? html`<script type="application/json" id="hours-data
 ${header(ctx, nav)}
 ${o.body}
 ${footer(ctx, nav, { note: pack.footerNote?.(ctx), reviews: pack.reviewsAllowed?.(ctx.r) ?? true })}
-${actionBar(pack.actionBar(ctx))}
+${actionBar(pack.actionBar(ctx), ctx.theme.dna)}
 </body></html>`}`;
 }
 
@@ -95,7 +96,7 @@ function withExtras(ctx: Ctx, body: Raw): Raw {
     if (photos) out = out.includes('id="reviews"') ? out.replace(/<section class="section[^"]*" id="reviews"/, (m) => photos + m) : out.replace("</main>", `${photos}</main>`);
   }
   const jobs = hiring(ctx).value;
-  if (jobs) out = out.includes('<section class="cta"') ? out.replace('<section class="cta"', `${jobs}<section class="cta"`) : out.replace("</main>", `${jobs}</main>`);
+  if (jobs) out = /<section class="cta[ "]/.test(out) ? out.replace(/<section class="cta[ "]/, (m) => jobs + m) : out.replace("</main>", `${jobs}</main>`);
   return raw(out);
 }
 
@@ -125,6 +126,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     statsEndpoint: input.mode === "publish" ? input.statsEndpoint : undefined,
     hasForm: pack.hasForm(input.record),
     credit: input.mode === "publish" ? input.credit : undefined,
+    reviewsAllowed: pack.reviewsAllowed?.(input.record) ?? true,
   };
   const files = new Map<string, string | Uint8Array>();
   const pages: Array<{ path: string; html: string }> = [];

@@ -1,5 +1,5 @@
 import { actions } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, hero, reviews, sectionHead, serviceArea, steps, type Ctx } from "../components.ts";
+import { about, cardGrid, contactForm, ctaBand, faq, hero, reviews, sectionHead, serviceArea, steps, type Ctx, serviceList } from "../components.ts";
 import { html } from "../html.ts";
 import type { IconName } from "../icons.ts";
 import type { BusinessRecord, Service } from "../types.ts";
@@ -309,7 +309,7 @@ export const contractorPack: CategoryPack = {
 <section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
 <span class="section__label">Services</span><h2 class="section__title" id="services-title">What we do</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
-${cardGrid(services)}
+${serviceList(ctx, services)}
 </div></section>
 <section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">
 <span class="section__label">How it works</span><h2 class="section__title" id="how-title">Simple from the first call</h2>

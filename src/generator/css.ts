@@ -1,4 +1,6 @@
 import { bestText, withAlpha } from "./color.ts";
+import { scopeLayoutCss } from "./dna.ts";
+import { dnaCss } from "./dna-css.ts";
 import { layoutCss } from "./layouts.ts";
 import type { FontSpec, Theme } from "./themes.ts";
 
@@ -108,6 +110,8 @@ body.nav-open{overflow:hidden}
 .hero__sub{font-size:clamp(1.1rem,3.2vw,1.35rem);max-width:38rem;margin:0 0 1.2rem}
 .hero__trust{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 1.4rem;padding:0;list-style:none;font-weight:700;font-size:.98rem}
 .hero__trust li{display:inline-flex;align-items:center;gap:.4em}
+.hero__proof a{color:inherit;display:inline-flex;align-items:center;gap:.4em;text-decoration-color:${withAlpha(c.onHero, 0.5)}}
+.hero__proof .i{color:var(--accent)}
 .status{align-self:flex-start;display:inline-flex;align-items:center;gap:.5em;font-weight:700;padding:6px 14px;border-radius:999px;background:var(--surface);color:var(--text);margin:0 0 1rem;font-size:.98rem}
 .status::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--muted)}
 .status.is-open{color:var(--open)}.status.is-open::before{background:var(--open)}
@@ -238,5 +242,6 @@ ${divider}
 .about{display:grid;gap:28px}
 @media (min-width:900px){.about--photo{grid-template-columns:1fr 1fr;align-items:center}}
 .about img{border-radius:var(--radius)}
-${layoutCss(t)}`;
+${dnaCss(t)}
+${scopeLayoutCss(layoutCss(t), t.dna)}`;
 }

@@ -89,7 +89,7 @@ ${hasAnyHours(r.hours) ? html`<section class="section section--band" aria-labell
   )}</tbody></table><p>${where}</p>${dir ? html`<div class="btns">${button(dir, "secondary")}</div>` : ""}</div></section>` : ""}
 ${s.about.length ? html`<section class="section" aria-labelledby="es-about"><div class="wrap narrow"><span class="section__label">Quiénes somos</span><h2 class="section__title" id="es-about">Sobre ${r.name}</h2>${s.about.map((p) => html`<p>${p}</p>`)}</div></section>` : ""}
 ${faq(s.faq, true, "Preguntas", "Preguntas frecuentes")}
-<section class="cta" aria-labelledby="es-cta"><div class="wrap narrow"><h2 id="es-cta">${s.ctaTitle}</h2><p>${s.ctaLine}</p><div class="btns">${acts.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div></div></section>
+<section class="cta cta--${ctx.theme.dna.cta}" aria-labelledby="es-cta"><div class="wrap${ctx.theme.dna.cta === "band" ? " narrow" : ""}"><h2 id="es-cta">${s.ctaTitle}</h2><p>${s.ctaLine}</p><div class="btns">${acts.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div></div></section>
 </main>`;
   return { title: `${r.name} | En español`.slice(0, 60), description: s.metaDescription, body };
 }

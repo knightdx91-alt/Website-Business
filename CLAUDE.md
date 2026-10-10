@@ -209,6 +209,20 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   first open if still New (`restyleOldPreview` in preview.ts). Checking designs by eye:
   `npx tsx scripts/design-sheet.ts <scratchDir> "<look>~<layout>,..." [--no-photo]` (phone + desktop sheets, flags
   overflow) and `npx tsx scripts/check-looks.ts <category>`.
+- Design DNA (Oct 2026, `src/generator/dna.ts` + `dna-css.ts`): a third part of the design id, `<look>~<layout>~<dna>`
+  (e.g. `h1n2b3s2v1c1f1a1p1`), that changes the page *structure*: opening (`hero`: stack / cover / split with an at-a-glance
+  panel / banner + lede / statement with a photo band), top bar (`nav`), buttons, address bar (`strip`), services
+  presentation (`services`: cards / list / tiles / accordion / columns via `serviceList()` in every pack), closing call
+  (`cta`), footer, phone bar (`bar`: bottom bar or round call button) and in-flow photo treatment (`photo`). Every knob's
+  first value is the pre-DNA page, so ids without a third part build exactly as before (test: byte-identical). The values
+  live on `<html data-hero=… data-nav=…>`; `dnaCss()` styles the non-legacy values; `scopeLayoutCss()` prefixes a layout's
+  rules for a part the DNA owns with `html[data-<part>="<legacy>"]`, so any DNA mixes with any of the 25 layouts (the
+  layout keeps its character elsewhere). `pickDna(seed, category, {avoid})` is deterministic from the lead id with per-
+  category preferences (`PREFS`: a CPA never gets a full-screen photo; churches/finance keep the bottom bar) and
+  consistency rules (split opening ⇒ no strip, etc.); `pickDesign` appends it. The hero also shows the Google rating as
+  proof when ≥4.3 with ≥10 reviews and the pack allows reviews (`ctx.reviewsAllowed`). App: Edit → Design → "Page
+  structure" pickers + 🎲 Surprise me (`dnaCode()` encodes; `/api/leads/:id` carries `dna` + `dnaOrder`); "Try another
+  design" rerolls everything. Design sheets accept the full id. Research behind it: `research/design-upgrade-2026.md`.
 - Tax & finance (`packs/finance.ts`, research/tax-finance.md): variants tax_prep / accounting / insurance / financial_advisor
   from `financeVariant` (names decide; banks, lenders, pawn, payday, captive agents and franchise tax offices return null and are
   skipped in runs). Search groups "Tax preparers & bookkeepers", "Accountants & CPAs", "Insurance agencies"; advisors only by hand

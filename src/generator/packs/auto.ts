@@ -1,5 +1,5 @@
 import { actions } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, hero, infoStrip, reviews, serviceArea, steps, visit, type Ctx } from "../components.ts";
+import { about, cardGrid, contactForm, ctaBand, faq, hero, infoStrip, reviews, serviceArea, steps, visit, type Ctx, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html } from "../html.ts";
 import type { IconName } from "../icons.ts";
@@ -143,7 +143,7 @@ ${infoStrip(ctx, [])}
 <section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
 <span class="section__label">Services</span><h2 class="section__title" id="services-title">${FIX_TITLE[r.variant] ?? "What we fix"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
-${cardGrid(r.services.map((s, i) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: ICONS[i % ICONS.length] })))}
+${serviceList(ctx, r.services.map((s, i) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: ICONS[i % ICONS.length] })))}
 </div></section>
 <section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">
 <span class="section__label">How it works</span><h2 class="section__title" id="how-title">No surprises</h2>

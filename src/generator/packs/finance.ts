@@ -1,5 +1,5 @@
 import { actions, type ActionId } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, steps, todo, visit, type Ctx } from "../components.ts";
+import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, steps, todo, visit, type Ctx, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html, raw, type Raw } from "../html.ts";
 import type { BusinessRecord, Faq, Service } from "../types.ts";
@@ -220,7 +220,7 @@ ${infoStrip(ctx, chips)}
 <section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
 <span class="section__label">${label}</span><h2 class="section__title" id="services-title">${r.variant === "insurance" ? "Coverage we can help with" : "How we can help"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
-${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
+${serviceList(ctx, r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Tick the services you offer", "We started with the usual list for an office like yours. Tell us what to keep, remove or add.", true)}
 </div></section>
 <section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">

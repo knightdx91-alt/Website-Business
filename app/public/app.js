@@ -663,7 +663,8 @@
     const lint = l.lint || { publishBlockers: [], errors: [], warnings: [], todos: [], suggestions: [] };
     const blockers = [...lint.errors, ...lint.publishBlockers];
     const ready = l.status === "ready";
-    const lookName = [(l.looks.find((x) => x.id === l.lookBase) || {}).name, ((l.layouts || []).find((x) => x.id === l.layout) || {}).name].filter(Boolean).join(" · ");
+    const dnaName = (k) => { const o = (l.dnaOrder || []).find((x) => x.id === k); const v = o && o.values.find((v) => v.id === (l.dna || {})[k]); return v ? v.name : ""; };
+    const lookName = [(l.looks.find((x) => x.id === l.lookBase) || {}).name, ((l.layouts || []).find((x) => x.id === l.layout) || {}).name, dnaName("hero")].filter(Boolean).join(" · ");
     const owner = isOwner();
     const open = l.salesStatus === "new" || l.salesStatus === "shown";
     $app.innerHTML = `<p><a href="#/">← Leads</a></p>
@@ -1003,7 +1004,11 @@
         .join("")}</select></label>
         <label class="field">Layout<select name="layout">${(l.layouts || [])
         .map((x) => `<option value="${esc(x.id)}"${x.id === l.layout ? " selected" : ""}>${esc(x.name)}: ${esc(x.about)}</option>`)
-        .join("")}</select></label></section>
+        .join("")}</select></label>
+        <h3 style="margin:6px 0 4px">Page structure</h3>
+        <p class="small muted">How the page is put together: the opening, the top bar, buttons, how services are shown. Mix these with any colors and layout.</p>
+        <div class="row" style="flex-wrap:wrap">${(l.dnaOrder || []).map((k) => `<label class="field" style="flex:1 1 150px">${esc(k.label)}<select name="dna_${esc(k.id)}">${k.values.map((v) => `<option value="${esc(v.id)}"${((l.dna || {})[k.id] || k.values[0].id) === v.id ? " selected" : ""}>${esc(v.name)}</option>`).join("")}</select></label>`).join("")}</div>
+        <button class="btn btn--small" type="button" data-act="shuffle">🎲 Surprise me</button></section>
       <section class="card"><h2>Facts (only if the owner says so)</h2>
         <label class="field">Year they started<input name="foundedYear" type="number" inputmode="numeric" min="1800" max="2100" value="${r.foundedYear || ""}"></label>
         ${cb("familyOwned", "Family-owned", r.ownershipTags.includes("family_owned"))}
@@ -1138,7 +1143,7 @@
       const blurbs = {};
       if (hasServices) r.services.forEach((s) => { const v = val("blurb_" + s.id); if (v !== undefined) blurbs[s.id] = v; });
       const edits = {
-        look: val("lookBase") + "~" + val("layout"),
+        look: val("lookBase") + "~" + val("layout") + dnaCode(f, l.dnaOrder),
         record: {
           name: val("name"),
           phone: val("phone"),
@@ -2768,6 +2773,29 @@
     }
   }
 
+  /** "~h1n0b2…" from the Edit form's structure pickers, or "" when every pick is the classic one. */
+  function dnaCode(f, order) {
+    if (!order || !order.length) return "";
+    let code = "", any = false;
+    for (const k of order) {
+      const sel = f.elements["dna_" + k.id];
+      const i = sel ? Math.max(0, k.values.findIndex((v) => v.id === sel.value)) : 0;
+      code += k.letter + i;
+      if (i) any = true;
+    }
+    return any ? "~" + code : "";
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest && e.target.closest("[data-act=shuffle]");
+    if (!b) return;
+    const f = b.closest("form") || $app.querySelector("form");
+    if (!f) return;
+    for (const sel of f.querySelectorAll("select[name^=dna_]")) sel.selectedIndex = Math.floor(Math.random() * sel.options.length);
+    // The split opening carries the address itself, so the address bar goes away with it; otherwise keep one.
+    const hero = f.elements.dna_hero, strip = f.elements.dna_strip;
+    if (hero && strip) { if (hero.value === "split") strip.value = "none"; else if (strip.value === "none") strip.value = "bar"; }
+    toast("New structure picked. Save to see it.");
+  });
   addEventListener("hashchange", render);
   addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

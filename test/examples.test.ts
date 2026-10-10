@@ -31,7 +31,7 @@ test("owner gallery photos and hiring show on the home page", async () => {
   assert.match(home, /class="gallery"[\s\S]*Bay with a lifted truck/);
   assert.match(home, /id="jobs"[\s\S]*Service writer/);
   assert.ok(home.indexOf('id="photos"') < home.indexOf('id="reviews"'), "gallery sits before reviews");
-  assert.ok(home.indexOf('id="jobs"') < home.indexOf('class="cta"'), "hiring sits before the closing call to action");
+  assert.ok(home.indexOf('id="jobs"') < home.indexOf('class="cta '), "hiring sits before the closing call to action");
 });
 
 test("a Spanish page renders at /es/ with Spanish hours and a menu link", async () => {

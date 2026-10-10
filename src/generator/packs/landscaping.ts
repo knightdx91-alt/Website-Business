@@ -1,5 +1,5 @@
 import { actions } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, reviews, serviceArea, steps, todo, type Ctx } from "../components.ts";
+import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, reviews, serviceArea, steps, todo, type Ctx, serviceList } from "../components.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
@@ -91,7 +91,7 @@ export const landscapingPack: CategoryPack = {
 <section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
 <span class="section__label">Services</span><h2 class="section__title" id="services-title">What we do</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
-${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: "check" as const })))}
+${serviceList(ctx, r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: "check" as const })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Check the services list", "We guessed at what you offer. Tell us what to add or remove.", true)}
 </div></section>
 <section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">

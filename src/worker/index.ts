@@ -1,6 +1,7 @@
 import { layoutOf } from "../generator/design.ts";
 import { LAYOUT_IDS, LAYOUTS } from "../generator/layouts.ts";
 import { z } from "zod";
+import { DNA_ORDER, LEGACY_DNA } from "../generator/dna.ts";
 import { LOOKS, parseDesign } from "../generator/themes.ts";
 import { menuToText } from "../generator/menu.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
@@ -176,6 +177,8 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
     variantLabel: record ? pack.variantLabel(record) : null,
     looks: pack.looks.map((id) => ({ id, name: LOOKS[id]?.name ?? id })),
     layouts: LAYOUT_IDS.map((id) => ({ id, name: LAYOUTS[id].name, about: LAYOUTS[id].about })),
+    dnaOrder: DNA_ORDER,
+    dna: l.look ? (parseDesign(l.look).dna ?? LEGACY_DNA) : null,
     layout: l.look ? layoutOf(l.look) : null,
     lookBase: l.look ? parseDesign(l.look).look : null,
     /** Shown leads: days since they were shown and the next follow-up step; null otherwise. */

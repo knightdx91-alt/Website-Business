@@ -1,5 +1,5 @@
 import { actions, type ActionId } from "../actions.ts";
-import { about, cardGrid, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx } from "../components.ts";
+import { about, cardGrid, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Faq, Service } from "../types.ts";
@@ -116,7 +116,7 @@ ${infoStrip(ctx, [])}
 <section class="section" id="carry" aria-labelledby="carry-title"><div class="wrap">
 <span class="section__label">What we carry</span><h2 class="section__title" id="carry-title">${r.variant === "florist" ? "Flowers for every occasion" : r.variant === "farm_feed" || r.variant === "hardware" ? "What you'll find here" : "Come see what's in store"}</h2>
 ${ctx.copy.heroSub ? html`<p class="lead">${ctx.copy.heroSub}</p>` : ""}
-${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
+${serviceList(ctx, r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Tick what you carry", "We guessed at what you sell. Tell us which of these to keep, what to add, and any brands you'd like listed.", true)}
 </div></section>
 <section class="section section--band" id="new" aria-labelledby="new-title"><div class="wrap">

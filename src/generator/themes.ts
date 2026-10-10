@@ -1,4 +1,5 @@
 import { bestText, contrast, luminance, repairBackground } from "./color.ts";
+import { type Dna, LEGACY_DNA, encodeDna, isLegacyDna, parseDna } from "./dna.ts";
 import { isLayout, type LayoutId } from "./layouts.ts";
 import { MORE_LOOKS } from "./looks-more.ts";
 import { SHOP_LOOKS } from "./looks-shops.ts";
@@ -71,6 +72,8 @@ export interface LookDef {
 
 export interface Theme extends LookDef {
   layout: LayoutId;
+  /** Page structure (dna.ts); LEGACY_DNA when the design id has no third part. */
+  dna: Dna;
   colors: Palette & { onPrimary: string; onSecondary: string; focus: string };
   contrastReport: Array<{ pair: string; ratio: number; min: number; ok: boolean }>;
 }
@@ -244,7 +247,7 @@ export const LOOKS: Record<string, LookDef> = {
  * that would fail WCAG AA, then checks every text/background pair the components use.
  */
 export function resolveTheme(designId: string): Theme {
-  const { look: lookId, layout } = parseDesign(designId);
+  const { look: lookId, layout, dna } = parseDesign(designId);
   const look = LOOKS[lookId];
   if (!look) throw new Error(`Unknown look "${lookId}"`);
   const p = { ...look.palette };
@@ -285,17 +288,21 @@ export function resolveTheme(designId: string): Theme {
   if (failing.length) {
     throw new Error(`Look ${lookId} fails contrast: ${failing.map((f) => `${f.pair} ${f.ratio}:1`).join(", ")}`);
   }
-  return { ...look, layout: layout ?? look.layout ?? "classic", colors, contrastReport };
+  return { ...look, layout: layout ?? look.layout ?? "classic", dna: dna ?? LEGACY_DNA, colors, contrastReport };
 }
 
-/** A site's design is "<look>" or "<look>~<layout>", e.g. "contractor.toolbox~editorial". */
-export function parseDesign(designId: string): { look: string; layout?: LayoutId } {
-  const [look, layout] = designId.split("~");
-  return { look: look!, layout: isLayout(layout) ? layout : undefined };
+/**
+ * A site's design is "<look>", "<look>~<layout>" or "<look>~<layout>~<dna>", e.g.
+ * "contractor.toolbox~editorial~h2n0b1s3v1c0f0a0p0". `dnaRaw` is set when a third part was present at all.
+ */
+export function parseDesign(designId: string): { look: string; layout?: LayoutId; dna?: Dna; dnaRaw?: string } {
+  const [look, layout, dnaRaw] = designId.split("~");
+  return { look: look!, layout: isLayout(layout) ? layout : undefined, dna: parseDna(dnaRaw), dnaRaw };
 }
 
-export function designId(look: string, layout?: LayoutId): string {
-  return layout ? `${look}~${layout}` : look;
+export function designId(look: string, layout?: LayoutId, dna?: Dna): string {
+  const base = layout ? `${look}~${layout}` : look;
+  return dna && !isLegacyDna(dna) && layout ? `${base}~${encodeDna(dna)}` : base;
 }
 
 export function looksFor(category: CategoryId): string[] {

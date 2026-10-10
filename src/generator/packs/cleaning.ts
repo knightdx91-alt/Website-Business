@@ -1,5 +1,5 @@
 import { actions } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, hero, reviews, serviceArea, steps, todo, todoBlock, type Ctx } from "../components.ts";
+import { about, cardGrid, contactForm, ctaBand, faq, hero, reviews, serviceArea, steps, todo, todoBlock, type Ctx, serviceList } from "../components.ts";
 import { html } from "../html.ts";
 import type { BusinessRecord, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
@@ -85,7 +85,7 @@ export const cleaningPack: CategoryPack = {
 <section class="section" id="services" aria-labelledby="services-title"><div class="wrap">
 <span class="section__label">Services</span><h2 class="section__title" id="services-title">${r.variant === "commercial" ? "What we clean" : r.variant === "exterior" ? "What we wash" : "Cleaning options"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
-${cardGrid(r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: "check" as const })), 2)}
+${serviceList(ctx, r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], icon: "check" as const })), 2)}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Check the services list", "We guessed at what you offer. Tell us what to add or remove, and if you'd like starting prices shown.", true)}
 </div></section>
 <section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">
