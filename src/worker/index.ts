@@ -31,6 +31,7 @@ import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, u
 import { stripeWebhook } from "./stripe.ts";
 import { completeTap, connectionToken, reconcileTaps, setupTap, startTap, tapAuth, tapSession, tapStatus } from "./tap.ts";
 import { DEFAULT_DOMAIN, googleSession, verifyGoogleIdToken } from "./google.ts";
+import { editForm, editsFromForm } from "./editform.ts";
 import { extraTerms } from "./contract.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
 import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
@@ -1006,6 +1007,20 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       } else look = await chooseLook(env, record, `${id}:${Date.now()}`, lead.look ?? undefined);
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), look);
       return json({ ok: true, look });
+    }
+    // The site editor as data for the Android app: cards + fields in, field values out (same edits as the web editor).
+    if (action === "/editform" && m === "GET") {
+      if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");
+      return json(editForm(detail(lead) as Parameters<typeof editForm>[0]));
+    }
+    if (action === "/editform" && m === "PUT") {
+      if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");
+      const { values } = await body(req, z.object({ values: z.record(z.string(), z.union([z.string(), z.boolean()])) }));
+      const built = editsFromForm(detail(lead) as Parameters<typeof editForm>[0], values);
+      const edits = EditsSchema.parse(built.edits);
+      const next = applyEdits(JSON.parse(lead.record_json), JSON.parse(lead.copy_json), edits);
+      await renderPreview(env, lead, next.record, next.copy, next.look ?? lead.look ?? "");
+      return json({ ...detail((await getLead(env, id))!), warnings: built.warnings });
     }
     if (action === "/edits" && m === "PUT") {
       if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");

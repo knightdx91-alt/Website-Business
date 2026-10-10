@@ -10,7 +10,7 @@ function b64url(bytes: Uint8Array | string): string {
 }
 
 async function makeKey() {
-  const pair = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
+  const pair = (await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"])) as CryptoKeyPair;
   const jwk = (await crypto.subtle.exportKey("jwk", pair.publicKey)) as { n: string; e: string; kty: string };
   return { priv: pair.privateKey, jwk: { kid: "k1", kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256" } };
 }
