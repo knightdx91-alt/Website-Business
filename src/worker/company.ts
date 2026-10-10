@@ -606,7 +606,8 @@ function nonce(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
 const GA_SCRIPT = "https://www.googletagmanager.com";
-const GA_CONNECT = "https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com";
+// Where gtag.js sends hits: Analytics (regional hosts), Ads signals (google.com, doubleclick), plus 'self' for Cloudflare's own beacons.
+const GA_CONNECT = "'self' https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.googletagmanager.com https://www.google.com https://stats.g.doubleclick.net";
 /** Google tag (gtag.js) for the head of every company page; nothing when Settings has no ID. */
 function gaTag(id: string | undefined, n: string): string {
   if (!id) return "";
