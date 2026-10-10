@@ -12,3 +12,4 @@ android/local.properties
 *.keystore
 .dev.vars
 .claude/worktrees/
+android/.kotlin/
