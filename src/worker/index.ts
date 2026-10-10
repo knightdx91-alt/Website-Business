@@ -33,6 +33,8 @@ import { completeTap, connectionToken, reconcileTaps, setupTap, startTap, tapAut
 import { DEFAULT_DOMAIN, googleSession, verifyGoogleIdToken } from "./google.ts";
 import { editForm, editsFromForm } from "./editform.ts";
 import { extraTerms } from "./contract.ts";
+import { appContent } from "./content.ts";
+import { plansOptions } from "./plan-options.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
 import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
@@ -307,6 +309,16 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/tap/setup" && m === "POST") {
     ownerOnly();
     return json(await setupTap(env));
+  }
+  // Android app: the sales copy (Plans & answers, In-person guide, follow-up texts) and the per-plan ways to pay
+  // with what is due today, so the native screens never carry their own copy or billing math. Owner and callers.
+  if ((path === "/content" || path === "/plans/options") && m === "GET") {
+    const settings = await getSettings(env);
+    if (path === "/content") return json(appContent(settings));
+    const leadId = url.searchParams.get("lead");
+    const forLead = leadId ? await getLead(env, leadId) : null;
+    if (leadId && !forLead) throw new HttpError(404, "Lead not found");
+    return json(plansOptions(settings, forLead?.category));
   }
   if (path === "/meta" && m === "GET") {
     const settings = await getSettings(env);
