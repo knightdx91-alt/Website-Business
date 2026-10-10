@@ -1,5 +1,5 @@
 import { hoursSummary } from "./hours.ts";
-import { normalizeUsPhone } from "./phone.ts";
+import { extraPhones, normalizeUsPhone } from "./phone.ts";
 import type { BuildMode, BusinessRecord, Copy } from "./types.ts";
 
 export interface LintResult {
@@ -111,7 +111,7 @@ export function lintSite(input: LintInput): LintResult {
   const blockers: string[] = [];
   const warnings: string[] = [];
   // The only numbers a tel: link may dial: the business number, plus a contractor's after-hours line.
-  const okTel = new Set([`tel:${r.phone.e164}`]);
+  const okTel = new Set([`tel:${r.phone.e164}`, ...extraPhones(r).map((p) => `tel:${p}`)]);
   const afterHours = r.ext.contractor?.afterHours?.phone ? normalizeUsPhone(r.ext.contractor.afterHours.phone) : null;
   if (afterHours) okTel.add(`tel:${afterHours.e164}`);
 

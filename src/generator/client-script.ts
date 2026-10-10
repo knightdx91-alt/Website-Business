@@ -158,6 +158,22 @@ if (dated.length) {
     }
   } catch (err) {}
 }
+/* Churches: "Next: Sunday 10:30 AM" from the schedule rows the server could parse ([{d: 0-6, m: minutes}]). */
+var ns = d.querySelector("[data-next-service]");
+if (ns) {
+  try {
+    var rows = JSON.parse(ns.getAttribute("data-next-service")), nowS = nowIn(ns.getAttribute("data-tz") || "America/Chicago"), best = null;
+    for (var ri = 0; ri < rows.length; ri++) {
+      var delta = ((rows[ri].d - nowS.day) * 1440 + rows[ri].m - nowS.minutes + 10080) % 10080;
+      if (best === null || delta < best.delta) best = { delta: delta, row: rows[ri] };
+    }
+    if (best) {
+      var mm = best.row.m, hh = Math.floor(mm / 60), mi = mm % 60, pad = mi < 10 ? "0" + mi : "" + mi;
+      ns.textContent = "Next: " + ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][best.row.d] + " " + fmtTime((hh < 10 ? "0" + hh : hh) + ":" + pad);
+      ns.hidden = false;
+    }
+  } catch (err) {}
+}
 var fy = d.querySelectorAll("[data-year]");
 for (var y = 0; y < fy.length; y++) fy[y].textContent = String(new Date().getFullYear());
 })();

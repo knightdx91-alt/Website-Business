@@ -9,6 +9,8 @@ const FIELDS = [
   "event_date", "guests", "needs", "location", "occasion", "budget_range", "needed_by", "placements", "artwork_status", "rush", "booth",
   // Oct 2026: trades / lawn / cleaning forms.
   "reach", "urgent", "facility", "sq_ft",
+  // Oct 2026: tire quotes.
+  "tire_size", "brand",
 ] as const;
 
 /** True when the form's "Is this an emergency?" answer was yes. */
@@ -37,12 +39,18 @@ const ARTWORK: Array<[RegExp, string]> = [
  */
 export function requestSummary(data: Record<string, string>): string {
   const vehicle = [data.year, data.make, data.model].filter(Boolean).join(" ") || data.vehicle;
-  const what = data.quantity && data.service ? `${data.quantity} ${data.service}` : data.service || (data.quantity ? `qty ${data.quantity}` : "");
+  // "265/70R17 ×4" or "2014 Ford F-150 ×4": a tire quantity rides on the thing being quoted; otherwise "48 Custom T-shirts".
+  const qty = data.quantity && /^\d+$/.test(data.quantity) ? ` ×${data.quantity}` : data.quantity ? ` (${data.quantity})` : "";
+  const sized = data.tire_size ? `${data.tire_size}${qty}` : "";
+  const what = sized ? data.service || "" : data.quantity && data.service ? `${data.quantity} ${data.service}` : data.service || (data.quantity && !vehicle ? `qty ${data.quantity}` : "");
+  const vehicleBit = sized ? vehicle : vehicle && data.quantity && !data.service ? `${vehicle}${qty}` : vehicle;
   const art = data.artwork_status ? (ARTWORK.find(([re]) => re.test(data.artwork_status!))?.[1] ?? data.artwork_status) : "";
   const bits = [
     what,
     data.part,
-    vehicle,
+    sized,
+    vehicleBit,
+    data.brand,
     data.items,
     data.facility,
     data.sq_ft ? `${data.sq_ft} sq ft` : "",

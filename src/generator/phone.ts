@@ -1,3 +1,5 @@
+import type { BusinessRecord } from "./types.ts";
+
 /** Normalizes a US number to E.164 and "(256) 555-0123". Returns null if it isn't a valid 10-digit NANP number. */
 export function normalizeUsPhone(input: string): { e164: string; display: string } | null {
   let digits = input.replace(/\D/g, "");
@@ -16,4 +18,15 @@ export function telHref(e164: string): string {
 
 export function smsHref(e164: string): string {
   return `sms:${e164}`;
+}
+
+/**
+ * Other numbers a site may legitimately link with tel: besides the main line: a towing shop's tow line and an
+ * insurance agency's carrier claims numbers. The lint allows these; anything else is a wrong number.
+ */
+export function extraPhones(r: BusinessRecord): string[] {
+  const raw: string[] = [];
+  if (r.ext.auto?.tow?.phone) raw.push(r.ext.auto.tow.phone);
+  for (const c of r.ext.finance?.carriers ?? []) if (typeof c !== "string" && c.claimsPhone) raw.push(c.claimsPhone);
+  return raw.map((p) => normalizeUsPhone(p)?.e164).filter((p): p is string => !!p);
 }

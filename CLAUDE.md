@@ -253,6 +253,44 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   delivery (only with `commercial`), reviews, and a Reserve a part form (`contactForm` opts: id/topic/title; extra fields year, make,
   model, part). `program` shows as a trust chip; `orderUrl` adds "Order online for pickup" and lets the copy mention it. `partsBannedPhrases`
   blocks shipping/price/stock claims and common brands the owner didn't type. Edit → "Auto parts details" (`partsEditCard` in app.js).
+- Auto shop modules (Oct 2026, research/trends-2026/auto-finance-church.md §1; `AutoExt` tail, Edit → "Auto shop details"
+  `autoEditCard` in app.js): `amenities` (ids in `AUTO_AMENITIES`, a "Good to know" chip row under the opening), `programs`
+  (text chips, never logos) + `financing {lender, url?}` + the warranty term in one `#warranty` band after services (no approval
+  or credit-check wording; `autoBannedPhrases` also bans "EV certified" and 24/7 unless confirmed). Towing variant: `tow {phone,
+  always, yardNote}` → "Need a tow?" strip after the opening (`towLine()`: the tow number when it normalizes, else the shop line;
+  `extraPhones()` in phone.ts lets lint accept the second tel:), `sms:` "Text us your location" when `smsEnabled`, "24/7" only
+  with `always`; REQUIRED to-do "Confirm 24/7 towing" whenever the copy, services or amenities say 24/7 and `always` is off.
+  Tire variant: the #contact form becomes "Get a tire quote" (`tire_size`, year/make/model, `quantity`, `brand`; Inbox line
+  "Tire quote: 265/70R17 ×4" from `requestSummary`), `tireBrands` chips + `storeUrl` "Shop tires online"; the quote action is
+  "Get a tire quote". Body variant: `#claims` "What to do after a wreck" (3 steps), `body.insurers` / `certifications` chips,
+  "You choose the shop." line only with `rightToChooseConfirmed` (suggested to-do), `estimateNote` as the intro, gallery to-do
+  "Send 3 before/after pairs". `header()` utility bar adds "★ 4.8 · 386 reviews" (Google link) wherever `reviewsAllowed` and
+  count ≥ 10; packs may replace its hours with `utilityLine(ctx)`. Edit → Links has a booking-link help line (Tekmetric /
+  Shopmonkey / ShopGenie / AutoLeap). Copy facts carry all of it (`write.ts`); `previewFeatures` has one line per module.
+- Finance modules (Oct 2026, research §2; `FinanceExt` tail, Edit → "Tax & finance details"): `people[]` (`Name | Title |
+  Credentials | One line` textarea) → `#people` "Who you'll work with" cards after services, REQUIRED "Confirm names and
+  credentials" until `peopleConfirmed`; `whoWeServe` → "Who we serve:" line under services and a hero-sub hint in the brief;
+  `fees[] {service, price}` + `feesAsOf` → `#fees` price list (svc--table markup) with "Fees shown as of <month>; call to
+  confirm" (suggested to-do when the month is missing); tax_prep `seasonHours {from, to (MM-DD, may wrap), summary}` → Visit
+  shows "Tax season hours" first with a Now chip inside the window (`inSeason`), under "Rest of the year" otherwise, plus a
+  strip chip; the open/closed pill stays on Google hours. Insurance: #contact is "Start a quote" with the coverage select first
+  (`serviceFirst`/`serviceLabel`/`note` opts on `contactForm`; Medicare only with `medicare`) and the Google count beside it;
+  `carriers` may be strings (old records) or `{name, payUrl?, claimsPhone?, claimsUrl?}` (`carrierItems()` normalizes; Edit
+  line `Name | pay URL | claims phone | claims URL`) → "Pay a bill or report a claim" list (`.svcctr`, claims tel: allowed by
+  `extraPhones`); `memberships` chips. Advisors: reviews stay off unless `advisorReviewsApproved {by, on}` (Alabama dropped
+  its testimonial ban 4 Dec 2025), then the reviews section renders with "These reviews were given by clients; no compensation
+  was paid. Conflicts of interest: none." under it; hero/util/footer rating stays off. TPMO to-do says "current (October 2026)
+  CMS wording … SHIP reference was removed".
+- Church modules (Oct 2026, research §3; `ChurchExt` tail, Edit → "Church & nonprofit details"): confirmed schedule rows with a
+  parseable day + time (`parseScheduleRow`) give a times line under the H1 (`timesLine`, first two rows) with a "Next: Sunday
+  10:30 AM" chip the client script fills from `data-next-service` (`hero()` `note` opt), and the utility top bar shows Sunday
+  times (`sundayTimes`, pack `utilityLine`) instead of office hours; `reviewsAllowed` is false for the whole category. Schedule
+  rows take `lang: "es"` (`Day | Time | What | es`) → "en español" badge. `planVisitUrl` makes the Plan a visit action an
+  external link (actions.ts), `connectCardUrl` a button in Plan a visit; `kids {nursery, kids, students, checkIn}` → `#kids`
+  cards + nav "Kids"; `liveNote` / `podcastUrl` extend `#watch`; `prayerUrl` (https, mailto: or sms:, `contactUrl` validator;
+  never a form of ours), `bulletinUrl`, `appUrl` → `#connect` row. `announcements()` is called right after the opening for every
+  church variant ("This season" / "Coming up"); charities get `volunteerUrl` ("Sign up to volunteer"); posts and centers get
+  `hallDetails {capacity, kitchen, tables, how}` chips + "To book:" next to the `hall` paragraph (which stays a string).
 - Thrift donations (retail pack, `ext.retail.donations`, Oct 2026): on by default for `thrift` (`donationsOn` in actions.ts), any shop can
   turn it on in Edit → "Donations" (`donationsEditCard`). Section #donations after What's new: intro `note`, "We gladly take" /
   "We can't take" chips (`accepts` / `doesNotAccept`), `dropOffHours`, nonprofit `receipts` line, and with `pickup` a "Request a furniture

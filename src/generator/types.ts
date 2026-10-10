@@ -218,11 +218,27 @@ export interface AutoPartsExt {
   orderUrl?: string;
 }
 
+/** Amenity ids an auto shop can tick in Edit; labels live in AUTO_AMENITIES (packs/auto.ts). */
+export type AutoAmenity = "loaner" | "shuttle" | "key_drop" | "wifi" | "digital_inspection" | "second_opinion" | "walk_ins" | "same_day" | "towing" | "spanish";
+
 export interface AutoExt {
   warranty?: { months?: number; miles?: number; nationwide?: boolean };
   ase?: boolean;
   freeEstimates?: boolean;
   parts?: AutoPartsExt;
+  /** Owner-ticked amenities ("Good to know" chip row under the opening). */
+  amenities?: AutoAmenity[];
+  /** Program names the shop belongs to (NAPA AutoCare, TechNet, Jasper, AAA Approved…), shown as text only, never logos. */
+  programs?: string[];
+  /** "Financing available through <lender>" with an optional apply link; never approval or credit claims. */
+  financing?: { lender: string; url?: string };
+  /** Towing variant: a separate tow line (display form), whether it's staffed 24/7 (owner-confirmed), and yard/pickup notes. */
+  tow?: { phone?: string; always: boolean; yardNote?: string };
+  /** Tire variant: brands carried (owner's list) and an online tire storefront. */
+  tireBrands?: string[];
+  storeUrl?: string;
+  /** Body variant: insurers and certifications in the owner's words; the right-to-choose line shows only once confirmed. */
+  body?: { insurers: string[]; certifications: string[]; rightToChooseConfirmed: boolean; estimateNote?: string };
 }
 
 export interface LandscapingExt {
@@ -313,7 +329,8 @@ export interface FinanceExt {
   whatToBring?: string[];
   /** insurance */
   independent?: boolean;
-  carriers?: string[];
+  /** Carriers as names (older records) or with service-centre links (Oct 2026). */
+  carriers?: Array<string | FinanceCarrier>;
   licensesConfirmed?: boolean;
   licenseNo?: string;
   medicare?: boolean;
@@ -325,6 +342,35 @@ export interface FinanceExt {
   complianceApprovedOn?: string;
   brokercheckUrl?: string;
   crsUrl?: string;
+  /** "Who you'll work with": names, titles and credentials exactly as the owner gave them (no photos yet). */
+  people?: FinancePerson[];
+  /** Owner confirmed every name and credential in `people` (required to publish while people are listed). */
+  peopleConfirmed?: boolean;
+  /** tax_prep: hours during the window (MM-DD from/to, may wrap the year) in the owner's words; Google hours stay the regular set. */
+  seasonHours?: { from: string; to: string; summary: string };
+  /** insurance: memberships shown as chips (Trusted Choice, Big "I"). */
+  memberships?: string[];
+  /** Owner-stated niche, e.g. "farms, trucking companies and small contractors"; the copy may carry it into the hero. */
+  whoWeServe?: string;
+  /** Published fees (Circular 230 allows them; they must be honored 30 days), with the month they were last set. */
+  fees?: Array<{ service: string; price: string }>;
+  feesAsOf?: string;
+  /** financial_advisor: compliance approval that allows a reviews section (with the SEC disclosure line under it). */
+  advisorReviewsApproved?: { by: string; on: string };
+}
+
+export interface FinancePerson {
+  name: string;
+  title: string;
+  credentials?: string;
+  line?: string;
+}
+
+export interface FinanceCarrier {
+  name: string;
+  payUrl?: string;
+  claimsPhone?: string;
+  claimsUrl?: string;
 }
 
 /** Churches & nonprofits (research/churches-nonprofits.md §9). Everything here is the organization's own words. */
@@ -334,7 +380,7 @@ export interface ChurchExt {
   /** Display words, e.g. "Missionary Baptist church". Shown only once confirmed; otherwise plain "Church". */
   traditionLabel?: string;
   traditionConfirmed?: boolean;
-  schedule?: Array<{ day: string; time: string; label: string }>;
+  schedule?: ChurchScheduleRow[];
   scheduleConfirmed?: boolean;
   firstVisit?: { parking?: string; dress?: string; kids?: string; length?: string; music?: string; accessibility?: string };
   pastor?: { name: string; title?: string; bio?: string };
@@ -358,6 +404,30 @@ export interface ChurchExt {
   /** Only with deductibleConfirmed: the organization's own status line, e.g. "We're a 501(c)(3); gifts are tax-deductible." */
   statusText?: string;
   deductibleConfirmed?: boolean;
+  /** The church's own Plan-a-visit / connect-card form (Church Center, Tithely, Breeze); Plan a visit links there when set. */
+  planVisitUrl?: string;
+  connectCardUrl?: string;
+  /** Where prayer requests go: an https link, mailto: or sms:. The site never stores them. */
+  prayerUrl?: string;
+  bulletinUrl?: string;
+  appUrl?: string;
+  podcastUrl?: string;
+  /** Owner line for Watch, e.g. "Live Sundays at 10:30 on Facebook". */
+  liveNote?: string;
+  /** Kids & students, in the church's words; the section shows when any field is set. */
+  kids?: { nursery?: string; kids?: string; students?: string; checkIn?: string };
+  /** Charities: a volunteer sign-up link. */
+  volunteerUrl?: string;
+  /** Posts and centers: hall rental facts as chips plus how to book (the `hall` paragraph stays as is). */
+  hallDetails?: { capacity?: string; kitchen?: boolean; tables?: string; how?: string };
+}
+
+/** One schedule line; `lang: "es"` marks a Spanish-language service. */
+export interface ChurchScheduleRow {
+  day: string;
+  time: string;
+  label: string;
+  lang?: "es";
 }
 
 /** What's included, room by room. A task may end in tier tags ("Dust ceiling fans @deep"); untagged tasks are in every tier. */

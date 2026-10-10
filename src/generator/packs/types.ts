@@ -44,6 +44,8 @@ export interface CategoryPack {
   footerNote?(ctx: Ctx): Raw;
   /** Phrases the AI copy may never use in this category, checked by the copy writer and the publish lint. */
   bannedPhrases?(r: BusinessRecord): RegExp[];
+  /** What the "utility" top bar shows in place of today's hours (churches: Sunday service times). Default: hours. */
+  utilityLine?(ctx: Ctx): Raw;
 }
 
 /** Fits "{a} | {b}" into 60 chars by trying shorter variants in order. */

@@ -1,9 +1,9 @@
 import { action, actions, type ActionId } from "../actions.ts";
-import { about, button, cardGrid, ctaBand, faq, gallery, hero, hoursTable, sectionHead, todo, type Ctx, serviceList } from "../components.ts";
+import { about, announcements, button, cardGrid, chips, ctaBand, faq, gallery, hero, hoursTable, sectionHead, todo, type Ctx, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
-import { html, raw, type Raw } from "../html.ts";
+import { html, jsonForScript, raw, type Raw } from "../html.ts";
 import { icon } from "../icons.ts";
-import type { BusinessRecord, Faq, Service } from "../types.ts";
+import type { BusinessRecord, ChurchScheduleRow, Faq, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 /**
@@ -119,17 +119,65 @@ function first(r: BusinessRecord): ActionId[] {
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+/** A schedule row as a weekday + minutes, when both can be read ("Sunday | 10:30 AM"); rows like "Weekdays" or "Time?" are skipped. */
+export function parseScheduleRow(row: ChurchScheduleRow): { d: number; m: number } | null {
+  const d = DAYS.findIndex((n) => new RegExp(`^${n.slice(0, 3)}`, "i").test(row.day.trim()));
+  const t = /^(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?$/i.exec(row.time.trim());
+  if (d < 0 || !t) return null;
+  let h = Number(t[1]);
+  const min = Number(t[2] ?? 0);
+  const ap = t[3]?.toLowerCase().replace(/\./g, "");
+  if (h > 23 || min > 59) return null;
+  if (ap === "pm" && h < 12) h += 12;
+  else if (ap === "am" && h === 12) h = 0;
+  // No AM/PM given: church times from 1 to 7 are evenings (6:30 Wednesday), 8 to 12 are mornings.
+  else if (!ap && h >= 1 && h <= 7) h += 12;
+  return { d, m: h * 60 + min };
+}
+
+/** Confirmed rows with a time, in week order. */
+function timedRows(r: BusinessRecord): ChurchScheduleRow[] {
+  const c = r.ext.church ?? {};
+  return c.scheduleConfirmed ? (c.schedule ?? []).filter((x) => x.time && parseScheduleRow(x)) : [];
+}
+
+/** "Sundays · 9:45 AM Sunday School · 11:00 AM Worship": the first two rows, for the opening. */
+export function timesLine(r: BusinessRecord): string {
+  const rows = timedRows(r).slice(0, 2);
+  if (!rows.length) return "";
+  const same = rows.length === 2 && rows[0]!.day === rows[1]!.day;
+  if (same) return `${rows[0]!.day}s · ${rows.map((x) => `${x.time} ${x.label}`).join(" · ")}`;
+  return rows.map((x) => `${x.day} ${x.time} ${x.label}`).join(" · ");
+}
+
+/** The "Next service" chip: a hidden span the client script fills from the parsed rows (data-next-service). */
+function nextServiceChip(r: BusinessRecord): Raw {
+  const rows = timedRows(r).map((x) => parseScheduleRow(x)!);
+  if (!rows.length) return raw("");
+  return html`<span class="chip" data-next-service="${jsonForScript(rows).value}" data-tz="${r.timezone}" hidden></span>`;
+}
+
+/** Sunday times for the utility top bar ("Sundays 9:45 AM · 11:00 AM"), never Google's office hours or an open/closed state. */
+export function sundayTimes(r: BusinessRecord): string {
+  const rows = timedRows(r);
+  const sun = rows.filter((x) => /^sun/i.test(x.day));
+  const use = sun.length ? sun : rows.slice(0, 2);
+  if (!use.length) return "";
+  const day = sun.length ? "Sundays" : use[0]!.day;
+  return `${day} ${[...new Set(use.map((x) => x.time))].slice(0, 3).join(" · ")}`;
+}
+
 /** The weekly schedule, grouped by day. Before the church confirms it, the preview shows the usual names with times to fill in. */
 function schedule(ctx: Ctx): Raw {
   const r = ctx.r;
   const c = r.ext.church ?? {};
-  const lines = c.schedule?.length ? c.schedule : churchScheduleSeeds(c.tradition ?? "default").map((label) => ({ day: label.startsWith("Wednesday") ? "Wednesday" : label.startsWith("Saturday") ? "Saturday" : label.startsWith("Weekday") ? "Weekdays" : "Sunday", time: "", label }));
+  const lines: ChurchScheduleRow[] = c.schedule?.length ? c.schedule : churchScheduleSeeds(c.tradition ?? "default").map((label) => ({ day: label.startsWith("Wednesday") ? "Wednesday" : label.startsWith("Saturday") ? "Saturday" : label.startsWith("Weekday") ? "Weekdays" : "Sunday", time: "", label }));
   const days = [...new Set(lines.map((l) => l.day))].sort((a, b) => (DAYS.indexOf(a) + 7) % 7 - (DAYS.indexOf(b) + 7) % 7);
   const isCatholic = c.tradition === "catholic";
   return html`<section class="section section--band" id="times" aria-labelledby="times-title"><div class="wrap narrow">
 ${sectionHead(isCatholic ? "Mass times" : "Service times", "Join us", c.spanish ? "Servicios en español también. Pregúntenos." : undefined, "times-title")}
 <div class="schedule">${days.map(
-    (d) => html`<div class="schedule__day"><h3>${d}</h3><ul>${lines.filter((l) => l.day === d).map((l) => html`<li><span class="schedule__time">${l.time || "Time?"}</span><span>${l.label}</span></li>`)}</ul></div>`,
+    (d) => html`<div class="schedule__day"><h3>${d}</h3><ul>${lines.filter((l) => l.day === d).map((l) => html`<li><span class="schedule__time">${l.time || "Time?"}</span><span${l.lang === "es" ? raw(' lang="es"') : ""}>${l.label}</span>${l.lang === "es" ? html`<span class="schedule__lang" lang="es">en español</span>` : ""}</li>`)}</ul></div>`,
   )}</div>
 ${c.scheduleConfirmed ? "" : todo(ctx, "Confirm your service times", "Google's hours are usually office hours, so we need your real schedule: each service, class and Wednesday night, with times.", true)}
 <div class="btns">${button(action(r, "directions")!, "primary")}${c.liveUrl ? button(action(r, "watch")!, "ghost") : ""}</div>
@@ -138,7 +186,8 @@ ${c.scheduleConfirmed ? "" : todo(ctx, "Confirm your service times", "Google's h
 
 /** "Plan a visit": each card shows only what the church told us (parking, dress, kids, length, music, access). */
 function planVisit(ctx: Ctx): Raw {
-  const v = ctx.r.ext.church?.firstVisit ?? {};
+  const c = ctx.r.ext.church ?? {};
+  const v = c.firstVisit ?? {};
   const cards = (
     [
       ["Where to park", v.parking],
@@ -153,8 +202,52 @@ function planVisit(ctx: Ctx): Raw {
 <span class="section__label">Plan a visit</span><h2 class="section__title" id="plan-title">Your first Sunday</h2>
 <p class="lead">${ctx.copy.serviceAreaIntro || "It's normal to wonder what to expect. Here's what to know before you come."}</p>
 ${cards.length ? cardGrid(cards.map(([title, body]) => ({ title, body }))) : ""}
+${c.planVisitUrl || c.connectCardUrl ? html`<div class="btns">${c.planVisitUrl ? button(action(ctx.r, "visit")!, "primary") : ""}${c.connectCardUrl ? html`<a class="btn btn--ghost" href="${c.connectCardUrl}" target="_blank" rel="noopener"><span>Fill out a connect card</span><span class="sr"> (opens in new tab)</span></a>` : ""}</div>` : ""}
 ${cards.length >= 3 ? "" : todo(ctx, "Help first-time visitors", "Tell us where to park and which door to use, what people usually wear, what's there for kids, and how long the service runs. We'll put your answers here, word for word.")}
 </div></section>`;
+}
+
+/** Kids & students, in the church's words; its own section when anything is set. */
+function kids(ctx: Ctx): Raw {
+  const k = ctx.r.ext.church?.kids;
+  const cards = ([["Nursery", k?.nursery], ["Kids", k?.kids], ["Students", k?.students], ["Check-in", k?.checkIn]] as Array<[string, string | undefined]>).filter(([, t]) => t);
+  if (!cards.length) return raw("");
+  return html`<section class="section" id="kids" aria-labelledby="kids-title"><div class="wrap">
+${sectionHead("Kids & students", "For your family", undefined, "kids-title")}
+${cardGrid(cards.map(([title, body]) => ({ title, body })), cards.length > 2 ? 3 : 2)}
+</div></section>`;
+}
+
+/** Watch: live link, the owner's "Live Sundays at…" line, past services and a podcast. */
+function watch(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const c = r.ext.church ?? {};
+  if (!c.liveUrl && !c.sermonsUrl && !c.podcastUrl && !c.liveNote) return raw("");
+  const ext = (href: string, label: string) => html`<a class="btn btn--ghost" href="${href}" target="_blank" rel="noopener"><span>${label}</span><span class="sr"> (opens in new tab)</span></a>`;
+  return html`<section class="section" id="watch" aria-labelledby="watch-title"><div class="wrap narrow">${sectionHead("Watch", "Join us online", c.liveNote || undefined, "watch-title")}<div class="btns">${c.liveUrl ? button(action(r, "watch")!, "primary") : ""}${c.sermonsUrl ? ext(c.sermonsUrl, "Past services") : ""}${c.podcastUrl ? ext(c.podcastUrl, "Podcast") : ""}</div></div></section>`;
+}
+
+/** Connect: prayer request (a link to the church's email, text line or form, never a form of ours), connect card, bulletin, app. */
+function connect(ctx: Ctx): Raw {
+  const c = ctx.r.ext.church ?? {};
+  const items: Array<[string, string]> = [];
+  if (c.prayerUrl) items.push([c.prayerUrl, "Send a prayer request"]);
+  if (c.connectCardUrl) items.push([c.connectCardUrl, "Connect card"]);
+  if (c.bulletinUrl) items.push([c.bulletinUrl, "This week's bulletin"]);
+  if (c.appUrl) items.push([c.appUrl, "Get our app"]);
+  if (!items.length) return raw("");
+  const external = (href: string) => /^https?:/i.test(href);
+  return html`<section class="section section--band" id="connect" aria-labelledby="connect-title"><div class="wrap narrow">${sectionHead("Connect", "Stay in touch", undefined, "connect-title")}<div class="btns">${items.map(
+    ([href, label], i) => html`<a class="btn btn--${i === 0 ? "secondary" : "ghost"}" href="${href}"${external(href) ? raw(' target="_blank" rel="noopener"') : ""}><span>${label}</span>${external(href) ? html`<span class="sr"> (opens in new tab)</span>` : ""}</a>`,
+  )}</div></div></section>`;
+}
+
+/** Hall rental facts as chips plus how to book (posts and community centers). */
+function hallChips(ctx: Ctx): Raw {
+  const h = ctx.r.ext.church?.hallDetails;
+  if (!h || !(h.capacity || h.kitchen || h.tables || h.how)) return raw("");
+  const list = [h.capacity ? `Seats ${h.capacity}` : "", h.kitchen ? "Kitchen" : "", h.tables ? `Tables & chairs: ${h.tables}` : ""].filter(Boolean);
+  return html`${chips(list, "Hall")}${h.how ? html`<p><strong>To book:</strong> ${h.how}</p>` : ""}`;
 }
 
 function pastor(ctx: Ctx): Raw {
@@ -182,7 +275,7 @@ function give(ctx: Ctx): Raw {
   const r = ctx.r;
   const c = r.ext.church ?? {};
   const url = r.variant === "church" ? c.givingUrl : c.donateUrl;
-  if (!url && !c.needed && !c.volunteer) {
+  if (!url && !c.needed && !c.volunteer && !c.volunteerUrl) {
     if (r.variant === "church" && c.tradition === "church_of_christ") return raw("");
     return ctx.mode === "preview" ? html`<section class="section"><div class="wrap narrow">${todo(ctx, r.variant === "church" ? "Online giving (optional)" : "How people can help (optional)", r.variant === "church" ? "If you take gifts online (Tithe.ly, Givelify, Pushpay, Planning Center or similar), send us the link for a Give button. The website never handles money itself." : "Send us your donate link, items you need, and how to volunteer.")}</div></section>` : raw("");
   }
@@ -191,7 +284,7 @@ function give(ctx: Ctx): Raw {
 ${c.needed ? html`<p><strong>What we need:</strong> ${c.needed}</p>` : ""}
 ${c.volunteer ? html`<p><strong>Volunteer:</strong> ${c.volunteer}</p>` : ""}
 ${c.deductibleConfirmed && c.statusText ? html`<p class="muted">${c.statusText}</p>` : ""}
-${url ? html`<div class="btns">${button(action(r, r.variant === "church" ? "give" : "donate")!, "primary")}</div>` : ""}
+${url || c.volunteerUrl ? html`<div class="btns">${url ? button(action(r, r.variant === "church" ? "give" : "donate")!, "primary") : ""}${c.volunteerUrl ? html`<a class="btn btn--${url ? "ghost" : "primary"}" href="${c.volunteerUrl}" target="_blank" rel="noopener"><span>Sign up to volunteer</span><span class="sr"> (opens in new tab)</span></a>` : ""}</div>` : ""}
 </div></section>`;
 }
 
@@ -211,12 +304,13 @@ ${sectionHead("Meetings", "Come to a meeting", undefined, "join-title")}
 ${c.meetings ? html`<p class="big">${c.meetings}</p>` : todo(ctx, "When and where you meet", "For example “2nd Tuesday of the month, 6:30 PM, at the post home”. Guests welcome?", true)}
 ${c.joinText ? html`<p>${c.joinText}</p>` : todo(ctx, "Who can join", "Who's eligible and how to join, in your words (membership rules come from your charter, so we don't guess).")}
 <div class="btns">${c.joinUrl ? button(action(r, "join")!, "primary") : ""}${button(action(r, "call")!, c.joinUrl ? "ghost" : "primary")}</div>
-${c.hall ? html`<h3>Hall rental</h3><p>${c.hall}</p>` : ""}
+${c.hall || c.hallDetails ? html`<h3>Hall rental</h3>${c.hall ? html`<p>${c.hall}</p>` : ""}${hallChips(ctx)}` : ""}
 </div></section>`;
   if (r.variant === "community_center")
     return html`<section class="section section--band" id="hall" aria-labelledby="hall-title"><div class="wrap narrow">
 ${sectionHead("Rent the hall", "Have your event here", undefined, "hall-title")}
-${c.hall ? html`<p>${c.hall}</p>` : todo(ctx, "Tell people about renting the hall", "How many people it holds, the kitchen, tables and chairs, and how to book. Rates only if you want them shown; otherwise “call for rates”.")}
+${c.hall ? html`<p>${c.hall}</p>` : c.hallDetails ? "" : todo(ctx, "Tell people about renting the hall", "How many people it holds, the kitchen, tables and chairs, and how to book. Rates only if you want them shown; otherwise “call for rates”.")}
+${hallChips(ctx)}
 <div class="btns">${button(action(r, "call")!, "primary")}</div>
 </div></section>`;
   return raw("");
@@ -248,7 +342,7 @@ function dataFaq(ctx: Ctx): Faq[] {
     if (c.liveUrl) out.push({ q: "Can I watch online?", a: "Yes. Tap Watch live to join us online." });
   }
   if (r.variant === "civic_post" && c.meetings) out.push({ q: "When do you meet?", a: c.meetings });
-  if (c.facility || c.hall) out.push({ q: "Can I rent the building?", a: c.hall || c.facility || "" });
+  if (c.facility || c.hall || c.hallDetails?.how) out.push({ q: "Can I rent the building?", a: c.hall || c.facility || c.hallDetails?.how || "" });
   return out;
 }
 
@@ -280,6 +374,7 @@ export const churchPack: CategoryPack = {
       return [
         { label: c.tradition === "catholic" ? "Mass times" : "Service times", href: "/#times" },
         { label: "Plan a visit", href: "/#plan" },
+        ...(c.kids && Object.values(c.kids).some(Boolean) ? [{ label: "Kids", href: "/#kids" }] : []),
         { label: "Ministries", href: "/#ministries" },
         ...(c.givingUrl ? [{ label: "Give", href: "/#give" }] : []),
         { label: "Find us", href: "/#visit" },
@@ -294,6 +389,15 @@ export const churchPack: CategoryPack = {
   },
   actionBar: (ctx) => actions(ctx.r, ctx.r.variant === "church" ? ["visit", "directions", "call"] : [...first(ctx.r), "directions"]).slice(0, 3),
   homeFaq: (ctx) => [...dataFaq(ctx), ...ctx.copy.faq].slice(0, 6),
+  // No reviews or star counts anywhere for churches and nonprofits (research/trends-2026 §3D).
+  reviewsAllowed: () => false,
+  // The thin top bar carries the Sunday times, never Google's office hours as "open now".
+  utilityLine: (ctx) => {
+    const t = sundayTimes(ctx.r);
+    const c = ctx.r.ext.church ?? {};
+    const label = c.tradition === "catholic" ? "Mass times" : "Service times";
+    return ctx.r.variant === "church" ? html`<a href="#times">${icon("clock", 16)}${t || label}</a>` : raw("");
+  },
   bannedPhrases: (r) => churchBannedPhrases(r),
   footerNote: (ctx) => (hasAnyHours(ctx.r.hours) ? html`<p class="ftr__note">The hours listed are office hours. See service times above.</p>` : raw("")),
   home(ctx: Ctx) {
@@ -303,6 +407,7 @@ export const churchPack: CategoryPack = {
     if (r.foundedYear) trust.push(r.variant === "church" ? `Gathering since ${r.foundedYear}` : `Since ${r.foundedYear}`);
     if (c.spanish) trust.push("Servicios en español");
     if (c.liveUrl) trust.push("Watch online");
+    const times = r.variant === "church" ? timesLine(r) : "";
     return html`${hero(ctx, {
       eyebrow: `${label(r)} · ${r.address.city}, ${r.address.state}`,
       h1: r.name,
@@ -311,6 +416,7 @@ export const churchPack: CategoryPack = {
       showStatus: false,
       actions: actions(r, first(r)),
       badge: r.foundedYear && ctx.theme.knobs.badge === "seal" ? `Since ${r.foundedYear}` : undefined,
+      note: times ? html`${nextServiceChip(r)}<span>${times}</span>` : undefined,
     })}
 <div class="strip"><div class="strip__in">
 <a class="strip__item" href="${action(r, "directions")!.href}" target="_blank" rel="noopener">${icon("pin")}<span>${r.showStreetAddress && r.address.street ? `${r.address.street}, ${r.address.city}` : `${r.address.city}, ${r.address.state}`}<span class="sr"> (opens directions in new tab)</span></span></a>
@@ -318,15 +424,18 @@ export const churchPack: CategoryPack = {
 ${r.variant === "church" ? html`<a class="strip__item" href="#times">${icon("clock")}<span>${c.tradition === "catholic" ? "Mass times" : "Service times"}</span></a>` : ""}
 </div></div>
 <main id="main">
+${announcements(ctx, { label: "This season", title: "Coming up" })}
 ${r.variant === "church" ? schedule(ctx) : variantBlock(ctx)}
 ${r.variant === "church" ? planVisit(ctx) : ""}
+${r.variant === "church" ? kids(ctx) : ""}
 <section class="section${r.variant === "church" ? " section--band" : ""}" id="ministries" aria-labelledby="ministries-title"><div class="wrap">
 <span class="section__label">${r.variant === "church" ? "Ministries" : "What we do"}</span><h2 class="section__title" id="ministries-title">${r.variant === "church" ? "Something for everyone" : "How we serve"}</h2>
 ${ctx.copy.heroTagline ? html`<p class="lead">${ctx.copy.heroTagline}</p>` : ""}
 ${serviceList(ctx, r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, r.variant === "church" ? "Tick your ministries" : "Tick what you do", "We started with the usual list. Tell us what to keep, remove or add, and when groups meet.", true)}
 </div></section>
-${c.liveUrl || c.sermonsUrl ? html`<section class="section" id="watch" aria-labelledby="watch-title"><div class="wrap narrow">${sectionHead("Watch", "Join us online", undefined, "watch-title")}<div class="btns">${c.liveUrl ? button(action(r, "watch")!, "primary") : ""}${c.sermonsUrl ? html`<a class="btn btn--ghost" href="${c.sermonsUrl}" target="_blank" rel="noopener"><span>Past services</span><span class="sr"> (opens in new tab)</span></a>` : ""}</div></div></section>` : ""}
+${watch(ctx)}
+${connect(ctx)}
 ${r.variant === "church" ? pastor(ctx) : ""}
 ${r.variant === "church" ? beliefs(ctx) : ""}
 ${give(ctx)}

@@ -56,20 +56,32 @@ export function sectionHead(label: string | undefined, title: string, intro?: st
   }`;
 }
 
+/** A row of fact chips (amenities, brands, insurers…); nothing at all when the list is empty. */
+export function chips(items: string[], label: string, iconName: IconName = "check"): Raw {
+  if (!items.length) return raw("");
+  return html`<ul class="chips" aria-label="${label}">${items.map((c) => html`<li class="chip">${icon(iconName, 16)}${c}</li>`)}</ul>`;
+}
+
 /** A to-do in its own `.wrap`, or nothing at all when it isn't rendered (published sites get no empty wrapper). */
 export function todoBlock(ctx: Ctx, title: string, body: string, required = false): Raw {
   const t = todo(ctx, title, body, required);
   return t.value ? html`<div class="wrap">${t}</div>` : raw("");
 }
 
-export function header(ctx: Ctx, nav: NavItem[]): Raw {
+export function header(ctx: Ctx, nav: NavItem[], extra: { utilityLine?: Raw } = {}): Raw {
   const r = ctx.r;
   const call = action(r, "call")!;
-  // "utility" top bar: a thin line of facts above the header (address, today's hours, Español, phone).
+  // "utility" top bar: a thin line of facts above the header (address, today's hours or the pack's own line, the
+  // Google review count when there are enough reviews to mean something, Español, phone).
   const addr = r.showStreetAddress && r.address.street ? `${r.address.street}, ${r.address.city}` : `${r.address.city}, ${r.address.state}`;
+  const rep = r.reputation;
+  const reviewsLine = ctx.reviewsAllowed !== false && rep.rating && rep.count && rep.count >= 10 && r.mapsUrl
+    ? html`<a class="util__rev" href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("star", 16)}${rep.rating.toFixed(1)} · ${rep.count} reviews<span class="sr"> on Google (opens in new tab)</span></a>`
+    : "";
+  const hoursLine = extra.utilityLine?.value ? extra.utilityLine : hasAnyHours(r.hours) ? html`<span>${icon("clock", 16)}<span data-today-hours>Hours</span></span>` : "";
   const util =
     ctx.theme.dna.nav === "utility"
-      ? html`<div class="util"><div class="wrap util__in"><span>${icon("pin", 16)}${addr}</span>${hasAnyHours(r.hours) ? html`<span>${icon("clock", 16)}<span data-today-hours>Hours</span></span>` : ""}${
+      ? html`<div class="util"><div class="wrap util__in"><span>${icon("pin", 16)}${addr}</span>${hoursLine}${reviewsLine}${
           ctx.copy.es ? html`<a href="/es/" lang="es">Español</a>` : ""
         }<a href="${call.href}">${icon("phone", 16)}${r.phone.display}</a></div></div>`
       : "";
@@ -92,6 +104,8 @@ export interface HeroOpts {
   badge?: string;
   /** Shops: the street address in the first screen (research: shoppers need it before anything else). */
   address?: boolean;
+  /** A bold fact line under the intro (churches: service times with a "Next service" chip). Already-built HTML is passed as Raw. */
+  note?: Raw;
 }
 
 /** Owner proof as trust-row lines: "Best of the Best 2024", "Cullman Chamber member", "40 dealers". Nothing invented. */
@@ -148,7 +162,7 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   const eyebrow = eyebrowText ? html`<p class="hero__eyebrow">${eyebrowText}</p>` : "";
   const h1 = html`<h1 id="hero-title">${h1Text}</h1>`;
   const addrLine = o.address && r.showStreetAddress && r.address.street ? html`<p class="hero__addr">${icon("pin", 18)}<a href="${action(r, "directions")!.href}" target="_blank" rel="noopener">${r.address.street}, ${r.address.city}<span class="sr"> (opens directions in new tab)</span></a></p>` : "";
-  const sub = html`${subText ? html`<p class="hero__sub">${subText}</p>` : ""}${addrLine}`;
+  const sub = html`${subText ? html`<p class="hero__sub">${subText}</p>` : ""}${o.note?.value ? html`<p class="hero__note">${o.note}</p>` : ""}${addrLine}`;
   const status = o.showStatus ? html`<p class="status" data-open-status hidden></p>` : "";
   if (o.showStatus && hasAnyHours(r.hours)) ctx.statusShown = true;
   // Proof up top: the Google rating, when it's good and based on enough reviews (never for categories that can't show reviews).
@@ -359,13 +373,14 @@ export function hoursTable(ctx: Ctx): Raw {
  * Hours and address for storefront businesses. Google's hours are used when it has them; otherwise the owner is asked
  * for theirs (a suggestion, never a publish blocker) and the section is a single column so no empty box ships.
  */
-export function visit(ctx: Ctx, title = "Visit us"): Raw {
+export function visit(ctx: Ctx, title = "Visit us", opts: { before?: Raw; after?: Raw } = {}): Raw {
   const r = ctx.r;
   const dir = action(r, "directions")!;
   const call = action(r, "call")!;
   const hasHours = hasAnyHours(r.hours);
   const hoursTodo = hasHours ? raw("") : todo(ctx, "Add your hours", "Google doesn't list hours for you yet. Tell us your hours and we'll add them here.");
-  const left = hasHours ? hoursTable(ctx) : hoursTodo;
+  // Packs may put something above or below the hours (a tax office's season hours); the column stays one block.
+  const left = html`${opts.before ?? ""}${hasHours ? hoursTable(ctx) : hoursTodo}${opts.after ?? ""}`;
   return html`<section class="section" id="visit" aria-labelledby="visit-title"><div class="wrap">
 <span class="section__label">Hours &amp; location</span><h2 class="section__title" id="visit-title">${title}</h2>
 <div class="visit${left.value ? "" : " visit--solo"}">${left.value ? html`<div>${left}</div>` : ""}
@@ -489,7 +504,9 @@ export interface FormField {
     | "reach"
     | "urgent"
     | "facility"
-    | "sq_ft";
+    | "sq_ft"
+    | "tire_size"
+    | "brand";
   label: string;
   options?: string[];
   /** Preselected option (selects only). */
@@ -499,6 +516,7 @@ export interface FormField {
   autocomplete?: string;
   required?: boolean;
   inputmode?: string;
+  placeholder?: string;
 }
 
 export interface ContactFormOpts {
@@ -514,6 +532,11 @@ export interface ContactFormOpts {
   details?: string;
   /** With a texting number: "Faster: text us a photo of <this>" under the form, e.g. "the problem" or "your yard". */
   photoHint?: string;
+  /** Label for the services select ("What do you need?"); with `serviceFirst` it comes before name and phone (insurance: coverage type first). */
+  serviceLabel?: string;
+  serviceFirst?: boolean;
+  /** A line between the intro and the form, e.g. the Google rating beside a quote form. */
+  note?: Raw;
 }
 
 export function contactForm(ctx: Ctx, services: string[], towns: string[], extra: FormField[] = [], intro = "Tell us what's going on and we'll call you back.", opts: ContactFormOpts = {}): Raw {
@@ -521,19 +544,22 @@ export function contactForm(ctx: Ctx, services: string[], towns: string[], extra
   const endpoint = ctx.formEndpoint ?? "/__preview/form";
   const q = action(r, "quote")!;
   const id = opts.id ?? "contact";
+  const serviceSel = services.length ? html`<label>${opts.serviceLabel ?? "What do you need?"}<select name="service"><option value="">Choose one</option>${services.map((s) => html`<option>${s}</option>`)}<option>Something else</option></select></label>` : "";
   return html`<section class="section section--band" id="${id}" aria-labelledby="${id}-title"><div class="wrap narrow">
 ${sectionHead(opts.label ?? "Contact", opts.title ?? q.label, intro, `${id}-title`)}
+${opts.note ?? ""}
 <form class="form" method="post" action="${endpoint}">
 <input type="hidden" name="place_id" value="${r.placeId}">
 ${opts.topic ? html`<input type="hidden" name="topic" value="${opts.topic}">` : ""}
+${opts.serviceFirst ? serviceSel : ""}
 <label>Your name<input name="name" autocomplete="name" required></label>
 <label>Phone<input name="phone" type="tel" autocomplete="tel" inputmode="tel" required></label>
 <label>Email (optional)<input name="email" type="email" autocomplete="email"></label>
-${services.length ? html`<label>What do you need?<select name="service"><option value="">Choose one</option>${services.map((s) => html`<option>${s}</option>`)}<option>Something else</option></select></label>` : ""}
+${opts.serviceFirst ? "" : serviceSel}
 ${extra.map((f) =>
   f.options
     ? html`<label>${f.label}<select name="${f.name}"${f.required ? raw(" required") : ""}><option value="">Choose one</option>${f.options.map((o) => html`<option${o === f.value ? raw(" selected") : ""}>${o}</option>`)}</select></label>`
-    : html`<label>${f.label}<input name="${f.name}"${f.type ? raw(` type="${f.type}"`) : ""}${f.autocomplete ? raw(` autocomplete="${f.autocomplete}"`) : ""}${f.inputmode ? raw(` inputmode="${f.inputmode}"`) : ""}${f.required ? raw(" required") : ""}></label>`,
+    : html`<label>${f.label}<input name="${f.name}"${f.type ? raw(` type="${f.type}"`) : ""}${f.autocomplete ? raw(` autocomplete="${f.autocomplete}"`) : ""}${f.inputmode ? raw(` inputmode="${f.inputmode}"`) : ""}${f.placeholder ? html` placeholder="${f.placeholder}"` : ""}${f.required ? raw(" required") : ""}></label>`,
 )}
 ${towns.length ? html`<label>Town<select name="town"><option value="">Choose one</option>${towns.map((t) => html`<option>${t}</option>`)}<option>Other</option></select></label>` : ""}
 <label>${opts.details ?? "Details"} (optional)<textarea name="message"></textarea></label>

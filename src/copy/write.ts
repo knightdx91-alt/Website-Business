@@ -3,7 +3,8 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { hasAnyHours, hoursSummary } from "../generator/hours.ts";
 import { donationsOn } from "../generator/actions.ts";
-import { partsCounter } from "../generator/packs/auto.ts";
+import { autoAmenityLabels, partsCounter } from "../generator/packs/auto.ts";
+import { carrierItems } from "../generator/packs/finance.ts";
 import { BANNED_PHRASES, bannedPhraseIn, quotesReview, SUPERLATIVE, unsupportedNumbers } from "../generator/lint.ts";
 import type { CategoryPack } from "../generator/packs/types.ts";
 import type { BusinessRecord, Copy } from "../generator/types.ts";
@@ -80,6 +81,33 @@ function facts(r: BusinessRecord, pack: CategoryPack, primaryTypeLabel?: string)
     walk_ins: r.ext.salon?.walkIns,
     ase_certified: r.ext.auto?.ase,
     warranty: r.ext.auto?.warranty,
+    ...(r.category === "auto" && r.variant !== "parts"
+      ? {
+          amenities: autoAmenityLabels(r).length ? autoAmenityLabels(r) : undefined,
+          programs: r.ext.auto?.programs?.length ? r.ext.auto.programs : undefined,
+          financing_through: r.ext.auto?.financing?.lender,
+          ...(r.variant === "towing" ? { tow_line: r.ext.auto?.tow?.phone ? "separate number (shown on the page)" : "the shop's number", tow_24_7: r.ext.auto?.tow?.always ? true : "not confirmed (never claim it)", tow_notes: r.ext.auto?.tow?.yardNote } : {}),
+          ...(r.variant === "tire" ? { tire_brands: r.ext.auto?.tireBrands?.length ? r.ext.auto.tireBrands : undefined, online_tire_store: r.ext.auto?.storeUrl ? true : undefined } : {}),
+          ...(r.variant === "body" ? { insurers_worked_with: r.ext.auto?.body?.insurers?.length ? r.ext.auto.body.insurers : undefined, certifications: r.ext.auto?.body?.certifications?.length ? r.ext.auto.body.certifications : undefined, estimate_note: r.ext.auto?.body?.estimateNote } : {}),
+        }
+      : {}),
+    ...(r.category === "finance"
+      ? {
+          team: r.ext.finance?.people?.length ? r.ext.finance.people.map((p) => ({ name: p.name, title: p.title, credentials: p.credentials })) : undefined,
+          who_we_serve: r.ext.finance?.whoWeServe,
+          tax_season_hours: r.ext.finance?.seasonHours?.summary ? `${r.ext.finance.seasonHours.from} to ${r.ext.finance.seasonHours.to}: ${r.ext.finance.seasonHours.summary}` : undefined,
+          carriers: carrierItems(r.ext.finance).length ? carrierItems(r.ext.finance).map((c) => c.name) : undefined,
+          memberships: r.ext.finance?.memberships?.length ? r.ext.finance.memberships : undefined,
+          published_fees: r.ext.finance?.fees?.length ? r.ext.finance.fees : undefined,
+        }
+      : {}),
+    ...(r.category === "church"
+      ? {
+          kids_and_students: r.ext.church?.kids && Object.values(r.ext.church.kids).some(Boolean) ? r.ext.church.kids : undefined,
+          watch_online: r.ext.church?.liveNote || (r.ext.church?.liveUrl ? "yes (link)" : undefined),
+          hall_rental: r.ext.church?.hallDetails && Object.values(r.ext.church.hallDetails).some(Boolean) ? r.ext.church.hallDetails : undefined,
+        }
+      : {}),
     ...(r.category === "auto" && r.variant === "parts"
       ? {
           counter_services: partsCounter(r).map((c) => c.label),

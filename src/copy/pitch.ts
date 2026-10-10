@@ -3,6 +3,8 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { hasAnyHours, hoursSummary } from "../generator/hours.ts";
 import { donationsOn } from "../generator/actions.ts";
+import { autoAmenityLabels } from "../generator/packs/auto.ts";
+import { advisorReviewsOk, carrierItems } from "../generator/packs/finance.ts";
 import type { CategoryPack } from "../generator/packs/types.ts";
 import type { BusinessRecord } from "../generator/types.ts";
 import { DEFAULT_COPY_MODEL } from "./write.ts";
@@ -71,13 +73,47 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
   if (r.events?.length) f.push(`a "Coming up" section with their dated events and specials (${r.events.slice(0, 2).map((e) => e.title).join(", ")}), which drop off on their own once they've passed`);
   if (r.smsEnabled) f.push("a Text us button (their number takes texts), in the hero, the call bar and the closing section");
   if (r.category === "print") f.push("a 'send us your design' section with buttons to email or text their artwork");
-  if (r.category === "church") f.push(r.variant === "church" ? "a service-times section right under the welcome, plus a 'Plan a visit' section for first-time visitors" : "a section for their meetings, help hours or hall rental, filled in with their own details");
+  if (r.category === "church") {
+    const c = r.ext.church ?? {};
+    f.push(r.variant === "church" ? "service times in the first screen (under the welcome and in the top bar, with a 'Next service' chip), a service-times section and a 'Plan a visit' section for first-time visitors" : "a section for their meetings, help hours or hall rental, filled in with their own details");
+    if (c.planVisitUrl) f.push("a Plan a visit button that opens the church's own form");
+    if (c.kids && Object.values(c.kids).some(Boolean)) f.push("a Kids & students section in their words");
+    if (c.liveUrl || c.sermonsUrl || c.podcastUrl || c.liveNote) f.push(`a Watch section${c.liveNote ? ` ('${c.liveNote}')` : ""}${c.podcastUrl ? " with a podcast link" : ""}`);
+    if (c.prayerUrl || c.connectCardUrl || c.bulletinUrl || c.appUrl) f.push("a Connect row (prayer request link, connect card, bulletin, app) that links out and stores nothing");
+    if (c.schedule?.some((x) => x.lang === "es")) f.push("Spanish-language services marked 'en español' in the schedule");
+    if (c.volunteerUrl) f.push("a 'Sign up to volunteer' button");
+    if (c.hallDetails && Object.values(c.hallDetails).some(Boolean)) f.push("hall rental facts (capacity, kitchen, tables) and how to book");
+  }
   if (r.category === "finance" && r.variant === "tax_prep") f.push("a printable 'what to bring' checklist page for tax appointments");
-  if (r.category === "finance" && r.variant === "financial_advisor") f.push("a disclosures page for the firm's required disclosure text (no reviews, as advisor rules require)");
+  if (r.category === "finance" && r.variant === "financial_advisor") f.push(advisorReviewsOk(r) ? "a disclosures page for the firm's required disclosure text, and a compliance-approved reviews section with the SEC disclosure line" : "a disclosures page for the firm's required disclosure text (no reviews unless their compliance department approves it in writing)");
+  if (r.category === "finance") {
+    const fi = r.ext.finance ?? {};
+    if (fi.people?.length) f.push(`a 'Who you'll work with' section with ${fi.people.map((p) => p.name).slice(0, 3).join(", ")} (names and credentials exactly as they gave them)`);
+    else f.push("a 'Who you'll work with' section ready for their names, titles and credentials");
+    if (r.variant === "tax_prep") f.push(fi.seasonHours?.summary ? "tax season hours that switch with the regular hours by date" : "a place for tax season hours that switch with the regular hours by date");
+    if (fi.whoWeServe) f.push(`a 'Who we serve' line (${fi.whoWeServe})`);
+    if (fi.fees?.length) f.push(`a fee list with the as-of month (${fi.feesAsOf || "to be set"})`);
+    if (r.variant === "insurance") {
+      f.push(`a 'Start a quote' form that asks the coverage type first (auto, home, life, business${fi.medicare ? ", Medicare" : ""})`);
+      const centre = carrierItems(fi).filter((c) => c.payUrl || c.claimsPhone || c.claimsUrl);
+      if (centre.length) f.push(`a 'Pay a bill / Report a claim' list for ${centre.map((c) => c.name).slice(0, 4).join(", ")}`);
+      if (fi.memberships?.length) f.push(`membership chips (${fi.memberships.join(", ")})`);
+    }
+  }
   if (r.category === "retail") f.push("a 'what's new' section that sends shoppers to their Facebook or Instagram for new arrivals");
   if (r.category === "retail" && donationsOn(r)) f.push("a Donations section (what they take and can't take, drop-off hours, and a furniture-pickup request form if they offer pickups), filled in with their own list");
   if (r.category === "auto" && r.variant === "parts") f.push("a 'what we carry' list, a 'can't find it? we'll order it' section, counter services (battery testing and the like), and a Reserve a part form that asks for year, make, model and the part");
   f.push(...fsrpFeatures(r));
+  if (r.category === "auto" && r.variant !== "parts") {
+    const a = r.ext.auto ?? {};
+    if (autoAmenityLabels(r).length) f.push(`a 'Good to know' row under the opening with their amenities (${autoAmenityLabels(r).slice(0, 4).join(", ")})`);
+    else f.push("room for a 'Good to know' row (loaner cars, shuttle, key drop, Wi-Fi, digital inspections) once they tick what they offer");
+    if (a.warranty?.months || a.warranty?.miles || a.programs?.length || a.financing) f.push(`a warranty & programs band${a.programs?.length ? ` naming ${a.programs.join(", ")}` : ""}${a.financing ? ` with 'financing available through ${a.financing.lender}'` : ""}`);
+    if (r.reputation.count && r.reputation.count >= 10 && r.reputation.rating) f.push(`their Google rating and review count (${r.reputation.rating} · ${r.reputation.count} reviews) linked at the top of the page`);
+    if (r.variant === "towing") f.push(`a 'Need a tow?' strip under the opening with the tow number${a.tow?.always ? " and 24/7" : " (24/7 only once they confirm the line is staffed)"}${r.smsEnabled ? " and a 'text us your location' link" : ""}`);
+    if (r.variant === "tire") f.push(`a tire quote form (tire size or year/make/model, how many, brand preference)${a.tireBrands?.length ? `, the brands they carry (${a.tireBrands.slice(0, 4).join(", ")})` : ""}${a.storeUrl ? " and a 'Shop tires online' button" : ""}`);
+    if (r.variant === "body") f.push(`an 'After an accident' section (call us, we work with your insurance, we handle the rest)${a.body?.insurers?.length ? ` naming the insurers they work with` : ""}${a.body?.certifications?.length ? ", their certifications" : ""}, and a spot for before/after photos`);
+  }
   if (hasForm) f.push("a request form that sends customer requests to an inbox (once live)");
   f.push(...tlcFeatures(r));
   f.push("an FAQ section");
