@@ -2,7 +2,7 @@ import { smsHref, telHref } from "./phone.ts";
 import type { IconName } from "./icons.ts";
 import type { BusinessRecord } from "./types.ts";
 
-export type ActionId = "call" | "text" | "directions" | "order" | "reserve" | "book" | "quote" | "menu" | "review" | "shop" | "portal" | "visit" | "watch" | "give" | "donate" | "help" | "join" | "rent";
+export type ActionId = "call" | "text" | "directions" | "order" | "reserve" | "book" | "quote" | "menu" | "review" | "shop" | "portal" | "visit" | "watch" | "give" | "donate" | "help" | "join" | "rent" | "giftcard" | "rewards" | "store";
 
 export interface Action {
   id: ActionId;
@@ -113,6 +113,12 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
       return { id, label: "Rent the hall", short: "Rent", href: "#hall", external: false, icon: "calendar" };
     case "review":
       return { id, label: "Leave us a review", short: "Review", href: reviewUrl(r), external: true, icon: "star" };
+    case "giftcard":
+      return r.links.giftCards ? { id, label: "Gift cards", short: "Gift cards", href: r.links.giftCards, external: true, icon: "bag" } : null;
+    case "rewards":
+      return r.ext.restaurant?.rewardsUrl ? { id, label: "Join our rewards", short: "Rewards", href: r.ext.restaurant.rewardsUrl, external: true, icon: "star" } : null;
+    case "store":
+      return r.ext.print?.storeUrl ? { id, label: "Shop our online store", short: "Store", href: r.ext.print.storeUrl, external: true, icon: "bag" } : null;
   }
 }
 

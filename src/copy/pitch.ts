@@ -77,8 +77,59 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
   if (r.category === "retail") f.push("a 'what's new' section that sends shoppers to their Facebook or Instagram for new arrivals");
   if (r.category === "retail" && donationsOn(r)) f.push("a Donations section (what they take and can't take, drop-off hours, and a furniture-pickup request form if they offer pickups), filled in with their own list");
   if (r.category === "auto" && r.variant === "parts") f.push("a 'what we carry' list, a 'can't find it? we'll order it' section, counter services (battery testing and the like), and a Reserve a part form that asks for year, make, model and the part");
+  f.push(...fsrpFeatures(r));
   if (hasForm) f.push("a request form that sends customer requests to an inbox (once live)");
   f.push("an FAQ section");
+  return f;
+}
+
+/** Owner proof, visit lines and the Oct 2026 restaurant / salon / retail / print features, named only when they really render. */
+function fsrpFeatures(r: BusinessRecord): string[] {
+  const f: string[] = [];
+  const p = r.proof;
+  if (p && (p.awards?.length || p.memberships?.length || p.stats?.length)) f.push("their awards, memberships and numbers in the opening's proof line (only what they gave us)");
+  if (p?.clients?.length) f.push(`a "Trusted by" line naming clients (${p.clients.slice(0, 3).join(", ")})`);
+  if (r.closures?.length) f.push("holiday closures under the hours, which show in the top strip the week before and drop off after");
+  if (r.visit?.paymentMethods?.length || r.visit?.parking) f.push("how to pay and where to park, next to the address");
+  if (r.links.giftCards) f.push("a Gift cards button");
+  const re = r.ext.restaurant;
+  if (r.category === "restaurant") {
+    const items = re?.menu?.sections.flatMap((s) => s.items) ?? [];
+    if (items.some((i) => i.image || i.tags?.includes("popular"))) f.push("photo tiles of their popular dishes on the home page (their own photos) and dietary tags on the menu");
+    else if (re?.menu) f.push("room for photo tiles of their 3-4 best sellers (they send phone photos) and dietary tags on the menu");
+    if (re?.catering) f.push("a Catering section with a request form (date, headcount, what they need)");
+    if (r.variant === "food_truck") f.push(`a "Where to find us" block for this week's stops${re?.calendarUrl ? " with a Full schedule button" : ""}, plus a Book the truck form`);
+    if (re?.deliveryLinks && Object.keys(re.deliveryLinks).length) f.push(`an "Order through" row (${Object.keys(re.deliveryLinks).join(", ")})`);
+    if (r.links.reserve) f.push("Reserve a table as the main button, since they take reservations");
+  }
+  const sa = r.ext.salon;
+  if (r.category === "salon") {
+    if (sa?.team?.length) f.push(`Meet the team cards (${sa.team.slice(0, 3).map((m) => m.name).join(", ")}) with Book with <name> buttons where they have their own link`);
+    else f.push("room for Meet the team cards, each with their own booking link (people book people)");
+    if (r.services.some((s) => s.durationMin)) f.push("service durations next to the prices");
+    if (r.variant === "massage") f.push(sa?.rates?.length ? "a 30/60/90 rates table" : "room for a 30/60/90 rates table");
+    if (sa?.policies && Object.values(sa.policies).some(Boolean)) f.push("a Good to know block with their deposit, cancellation, late and kids policies");
+    if (sa?.introOffer?.text) f.push(`their new-client offer in the opening (${sa.introOffer.text})`);
+    if (r.variant === "pet") f.push("a Before your appointment section for vaccinations, pricing-from, matting and what to bring");
+  }
+  const rt = r.ext.retail;
+  if (r.category === "retail") {
+    if (r.variant === "florist") f.push("occasion tiles (sympathy, weddings, birthdays), their delivery rule once they give it, and a sympathy & weddings inquiry form");
+    if (rt?.vendors?.boothsAvailable) f.push("a Vendors & booths section with a booth inquiry form");
+    if (rt?.departments?.length || rt?.brands?.length) f.push("department and brand chips in What we carry");
+    if (rt?.financing?.lender || rt?.deliveryNote) f.push("a Delivery & financing block in their words");
+    if (rt?.dropDay) f.push(`their new-arrivals day in What's new (${rt.dropDay})`);
+    if (rt?.holdNote) f.push("a call-to-hold line with a Call button");
+    if (r.showStreetAddress && r.address.street) f.push("the street address right in the opening (shoppers look for it first)");
+  }
+  const pr = r.ext.print;
+  if (r.category === "print") {
+    f.push("a quote form that asks what, how many, needed-by date, print locations, artwork status and rush");
+    if (pr?.uploadUrl) f.push("an Upload your artwork button (their Dropbox/Drive file-request link)");
+    else f.push("room for an Upload your artwork button once they make a Dropbox or Drive file-request link");
+    if (pr?.turnaround || pr?.quantityTiers?.length) f.push("a Good to know block with their turnaround and price breaks");
+    if (pr?.storeUrl) f.push("a button to their online / team store");
+  }
   return f;
 }
 

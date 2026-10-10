@@ -10,7 +10,7 @@ import type { BusinessRecord, Copy } from "../generator/types.ts";
 
 export const DEFAULT_COPY_MODEL = "claude-opus-5-5";
 /** Bump when the prompt changes so cached copy is regenerated. */
-export const COPY_PROMPT_VERSION = 3;
+export const COPY_PROMPT_VERSION = 4;
 
 const CopySchema = z.object({
   cuisineLabel: z.string().describe("Restaurants only; empty string otherwise"),
@@ -101,8 +101,63 @@ function facts(r: BusinessRecord, pack: CategoryPack, primaryTypeLabel?: string)
     background_checked: r.ext.cleaning?.backgroundChecked,
     brings_supplies: r.ext.cleaning?.suppliesIncluded,
     pet_safe_products: r.ext.cleaning?.petSafe,
+    ...fsrpFacts(r),
     owner_story: "unknown",
   };
+}
+
+/** Owner proof, visit lines and the Oct 2026 restaurant / salon / retail / print facts; only what the owner typed. */
+function fsrpFacts(r: BusinessRecord): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const p = r.proof;
+  if (p?.awards?.length) out.awards = p.awards.map((a) => (a.year ? `${a.name} (${a.year})` : a.name));
+  if (p?.memberships?.length) out.memberships = p.memberships;
+  if (p?.clients?.length) out.named_clients = p.clients;
+  if (p?.stats?.length) out.stats = p.stats.map((s) => `${s.value} ${s.label}`);
+  if (r.visit?.paymentMethods?.length) out.payment_methods = r.visit.paymentMethods;
+  if (r.visit?.parking) out.parking = r.visit.parking;
+  if (r.links.giftCards) out.gift_cards = true;
+  const re = r.ext.restaurant;
+  if (r.category === "restaurant") {
+    out.catering = re?.catering ? re.cateringNote || true : false;
+    if (r.variant === "food_truck") out.schedule_link = re?.calendarUrl ? true : "none (stops are typed in as events)";
+    const d = Object.keys(re?.deliveryLinks ?? {});
+    if (d.length) out.delivery_partners = d;
+    if (re?.rewardsUrl) out.rewards_program = true;
+    const items = re?.menu?.sections.flatMap((s) => s.items) ?? [];
+    const pop = items.filter((i) => i.tags?.includes("popular") || i.tags?.includes("house_favorite")).map((i) => i.name);
+    if (pop.length) out.popular_dishes = pop;
+  }
+  const sa = r.ext.salon;
+  if (r.category === "salon") {
+    if (sa?.team?.length) out.team = sa.team.map((m) => [m.name, m.role, m.days].filter(Boolean).join(", "));
+    if (sa?.rates?.length) out.session_rates = sa.rates.map((x) => `${x.minutes} min ${x.price}`);
+    if (sa?.policies && Object.values(sa.policies).some(Boolean)) out.policies = sa.policies;
+    if (sa?.introOffer?.text) out.new_client_offer = sa.introOffer;
+    if (sa?.pet && Object.values(sa.pet).some(Boolean)) out.grooming_rules = sa.pet;
+    const durations = r.services.filter((s) => s.durationMin).map((s) => `${s.name}: ${s.durationMin} min`);
+    if (durations.length) out.service_durations = durations;
+  }
+  const rt = r.ext.retail;
+  if (r.category === "retail") {
+    if (rt?.florist) out.florist = { occasions: rt.florist.occasions, delivery_area: rt.florist.deliveryArea ?? "unknown", same_day_cutoff: rt.florist.cutoff ?? "none given", delivery_fee: rt.florist.deliveryFee ?? "unknown", designers_choice: rt.florist.designersChoice ?? false };
+    if (rt?.vendors) out.vendor_booths = rt.vendors;
+    if (rt?.departments?.length) out.departments = rt.departments;
+    if (rt?.brands?.length) out.brands_carried = rt.brands;
+    if (rt?.financing?.lender) out.financing_through = rt.financing.lender;
+    if (rt?.deliveryNote) out.delivery_rule = rt.deliveryNote;
+    if (rt?.dropDay) out.new_arrivals_day = rt.dropDay;
+    if (rt?.holdNote) out.hold_policy = rt.holdNote;
+    if (rt?.occasions?.length) out.occasions = rt.occasions;
+  }
+  const pr = r.ext.print;
+  if (r.category === "print") {
+    if (pr?.turnaround) out.typical_turnaround = pr.turnaround;
+    if (pr?.quantityTiers?.length) out.price_breaks_at = pr.quantityTiers.map((t) => t.from);
+    if (pr?.uploadUrl) out.artwork_upload_link = true;
+    if (pr?.storeUrl) out.online_store = true;
+  }
+  return out;
 }
 
 function brief(pack: CategoryPack, r: BusinessRecord): string {

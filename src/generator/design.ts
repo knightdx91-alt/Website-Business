@@ -1,4 +1,4 @@
-import { pickDna } from "./dna.ts";
+import { pickDna, type DnaHints } from "./dna.ts";
 import { LAYOUT_IDS, type LayoutId } from "./layouts.ts";
 import type { CategoryId } from "./types.ts";
 import { designId, LOOKS, parseDesign } from "./themes.ts";
@@ -21,7 +21,7 @@ export function layoutOf(design: string): LayoutId {
  * look and layout used least on their own. Ties break on the lead id, so a batch built at
  * the same moment still spreads out. The best-fit look for the business wins a tie.
  */
-export function pickDesign(o: { leadId: string; looks: string[]; used: string[]; taken: string[]; preferred?: string }): string {
+export function pickDesign(o: { leadId: string; looks: string[]; used: string[]; taken: string[]; preferred?: string; hints?: DnaHints }): string {
   const combo = new Map<string, number>();
   const byLook = new Map<string, number>();
   const byLayout = new Map<string, number>();
@@ -49,5 +49,5 @@ export function pickDesign(o: { leadId: string; looks: string[]; used: string[];
   const look = parseDesign(best).look;
   const category = look.split(".")[0] as CategoryId;
   const avoid = o.used.map((d) => parseDesign(d).dna).filter((d): d is NonNullable<typeof d> => !!d);
-  return designId(look, layoutOf(best), pickDna(o.leadId, category, { avoid }));
+  return designId(look, layoutOf(best), pickDna(o.leadId, category, { avoid, hints: o.hints }));
 }

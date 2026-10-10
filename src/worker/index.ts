@@ -33,7 +33,7 @@ import { extraTerms } from "./contract.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
 import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
-import { chooseLook, renderPreview, runBuild, runSearch } from "./pipeline.ts";
+import { chooseLook, dnaHints, renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
 import { publishLead, zipLead } from "./publish.ts";
 
@@ -896,7 +896,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       let look: string;
       if ((recipe || want.structureOnly) && lead.look) {
         const cur = parseDesign(lead.look);
-        const base = pickDna(`${id}:${Date.now()}`, record.category, { avoid: cur.dna ? [cur.dna] : [] });
+        const base = pickDna(`${id}:${Date.now()}`, record.category, { avoid: cur.dna ? [cur.dna] : [], hints: dnaHints(record) });
         look = designId(cur.look, layoutOf(lead.look), recipe ? settleDna({ ...base, ...recipe.dna }) : base);
       } else look = await chooseLook(env, record, `${id}:${Date.now()}`, lead.look ?? undefined);
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), look);

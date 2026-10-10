@@ -315,6 +315,43 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `must-revalidate`, finance/church banned lists fixed for everyday phrases (`SCRIPTURE_REF` needs a book name),
   `copy.issues` + loose-number warnings in lint, `sectionHead(..., id)` for aria-labelledby, Spanish nav labels + a. m./
   p. m. hours, bot-challenge 503s aren't "down". `test/fixes.test.ts`, `test/worker/review-fixes.test.ts`.
+- Shared owner facts (Oct 2026, research/trends-2026/food-salon-retail-print.md): `record.proof` {awards [{name, year}], memberships,
+  clients, stats [{value, label}]} feeds the opening's trust row / proof band on every pack (`ownerProof()` in components.ts) and a
+  "Trusted by …" line under it; `pickDna(seed, cat, { avoid, hints })` takes `hints.proof` (prefer the band) and `hints.noPhoto` (no owner
+  hero photo: a statement / billboard / banner opening, light tone allowed) from `dnaHints(record)` in pipeline.ts via `pickDesign`.
+  `record.closures` [{date, label}] show under the hours ("Closed Nov 26 for Thanksgiving", `data-until`, auto-expiring) and in the info
+  strip the week before (`data-soon`, the page script shows/hides by date); `record.visit` {paymentMethods, parking} are lines under the
+  address (`visitExtras()`); salons also put the pay list in the trust row. `links.giftCards` → `giftcard` action (restaurant order row,
+  retail What's new, salon closing band). Edit: "Awards & proof" and "Closures, parking & payment" cards; Links → Gift cards link.
+  Shared helpers: `factList()` (`.facts` dl), `tiles()` (`.tiles` photo tiles), `FormField.type: "date"`.
+- Restaurants (Oct 2026): `MenuItem.image` (an owner gallery photo, picked per item in Edit → Menu → "Dish photos & tags"; kept when the
+  menu is retyped; Google photos never) and `MenuItem.tags` (`MENU_TAGS`: popular/new/vegetarian/vegan/gluten_free/spicy) → ≥2 items with a
+  photo or the popular tag become "Popular" photo tiles on the home page; tags + a legend on /menu/. `ext.restaurant.catering` (+
+  `cateringNote`) → #catering band + "Request catering" form (event_date, guests, needs); food trucks get "Where to find us" (shared events
+  as "This week", `calendarUrl` → Full schedule, else the Facebook link) and a "Book the truck" form (event_date, guests, location);
+  `hasForm` is true for both. `deliveryLinks` {doordash, ubereats, grubhub} + gift cards + `rewardsUrl` → #order "Order through" row.
+  Reserve is the hero primary (Order second) when `links.reserve` is set and dine-in. `restaurantBannedPhrases`: no catering / partner /
+  rewards / gift-card wording unless given. Edit → "Restaurant details".
+- Salons (Oct 2026): `ext.salon.team` [{name, role, days, bookingUrl, line}] → "Meet the team" cards with "Book with <first>" (own link,
+  else the shop's); REQUIRED "Confirm the team list" until `teamConfirmed`. `Service.durationMin` ("Haircut | $25 | 45 min" in Edit) shows
+  "$25 · 45 min". Massage `rates` [{minutes, price}] → #rates table. `policies` {deposit, cancellation, lateness, kids} → "Good to know";
+  `introOffer` {text, until} → a trust-row line "(through Nov 30)" that expires; pet `pet` {vaccinations, pricingFrom, mattingNote, prep}
+  → "Before your appointment" (vaccination line only suggested). `salonBannedPhrases`: massage health claims, offers / deposits / team
+  mentions the owner didn't give. Edit → "Salon / Massage / Grooming details".
+- Retail (Oct 2026): hero shows the street line (`HeroOpts.address`). Florists: `ext.retail.florist` {occasions (default
+  `FLORIST_OCCASIONS`), deliveryArea, cutoff, deliveryFee, designersChoice} → occasion tiles (sympathy/weddings → #inquiry, else the order
+  page or Call), `deliveryLine()` ("Same-day …" only with a cutoff), designer's-choice note, and a "Sympathy & weddings" form (occasion,
+  event_date, budget_range; `hasForm`). `vendors` {boothsAvailable, note} → #vendors + booth form (`booth`, best_day); `departments` /
+  `brands` chips in What we carry (feed, hardware, furniture; events show as "This season" there); `financing` {lender, url} +
+  `deliveryNote` → #delivery "Getting it home"; `dropDay` (What's new intro), `occasions` (boutique/gift chips), `holdNote` ("Call to
+  hold…" + Call). `retailBannedPhrases`: no same-day / free delivery / financing / booth wording unless given. Edit → "Shop details".
+- Print (Oct 2026): quote form (topic "Quote") asks quantity, needed_by (date), placements (per variant), artwork_status, rush;
+  `ext.print.uploadUrl` (owner's Dropbox/Drive file-request link) → "Upload your artwork" primary button in Send us your design;
+  `turnaround` + `quantityTiers` [{from, note}] (+ proof / design help) → #details "Good to know"; `storeUrl` → `store` action in the
+  closing band. `printBannedPhrases`: no turnaround / rush / minimum / store wording unless given. Edit → "Print shop details".
+  `FIELDS` in forms.ts carries the new names; `requestSummary` → "Quote: 48 Custom T-shirts · needed by Nov 3 · front · has artwork · RUSH".
+  Tests: `test/fsrp-features.test.ts`, `test/worker/fsrp-features.test.ts`. Copy facts: `fsrpFacts()` in write.ts (COPY_PROMPT_VERSION 4);
+  call guide lines: `fsrpFeatures()` in pitch.ts.
 - Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
   retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
   Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).
