@@ -213,33 +213,51 @@ export function faq(items: Faq[], band = false, label = "FAQ", title = "Question
 }
 
 export interface FormField {
-  name: "vehicle" | "frequency" | "home_size" | "property" | "quantity";
+  /** Every name here must also be in FIELDS in src/worker/forms.ts, or the live site drops it. */
+  name: "vehicle" | "frequency" | "home_size" | "property" | "quantity" | "year" | "make" | "model" | "part" | "items" | "address" | "best_day";
   label: string;
   options?: string[];
   autocomplete?: string;
+  required?: boolean;
+  inputmode?: string;
 }
 
-export function contactForm(ctx: Ctx, services: string[], towns: string[], extra: FormField[] = [], intro = "Tell us what's going on and we'll call you back."): Raw {
+export interface ContactFormOpts {
+  /** Section id and the heading's aria id; the default form is #contact. */
+  id?: string;
+  label?: string;
+  /** Heading; defaults to the record's quote action label ("Request an appointment", "Get a quote"…). */
+  title?: string;
+  /** Stored with the submission and shown in the Inbox, e.g. "Reserve a part". */
+  topic?: string;
+  button?: string;
+  /** Label for the Details box; it is optional in every form. */
+  details?: string;
+}
+
+export function contactForm(ctx: Ctx, services: string[], towns: string[], extra: FormField[] = [], intro = "Tell us what's going on and we'll call you back.", opts: ContactFormOpts = {}): Raw {
   const r = ctx.r;
   const endpoint = ctx.formEndpoint ?? "/__preview/form";
   const q = action(r, "quote")!;
-  return html`<section class="section section--band" id="contact" aria-labelledby="contact-title"><div class="wrap narrow">
-${sectionHead("Contact", q.label, intro, "contact-title")}
+  const id = opts.id ?? "contact";
+  return html`<section class="section section--band" id="${id}" aria-labelledby="${id}-title"><div class="wrap narrow">
+${sectionHead(opts.label ?? "Contact", opts.title ?? q.label, intro, `${id}-title`)}
 <form class="form" method="post" action="${endpoint}">
 <input type="hidden" name="place_id" value="${r.placeId}">
+${opts.topic ? html`<input type="hidden" name="topic" value="${opts.topic}">` : ""}
 <label>Your name<input name="name" autocomplete="name" required></label>
 <label>Phone<input name="phone" type="tel" autocomplete="tel" inputmode="tel" required></label>
 <label>Email (optional)<input name="email" type="email" autocomplete="email"></label>
 ${services.length ? html`<label>What do you need?<select name="service"><option value="">Choose one</option>${services.map((s) => html`<option>${s}</option>`)}<option>Something else</option></select></label>` : ""}
 ${extra.map((f) =>
   f.options
-    ? html`<label>${f.label}<select name="${f.name}"><option value="">Choose one</option>${f.options.map((o) => html`<option>${o}</option>`)}</select></label>`
-    : html`<label>${f.label}<input name="${f.name}"${f.autocomplete ? raw(` autocomplete="${f.autocomplete}"`) : ""}></label>`,
+    ? html`<label>${f.label}<select name="${f.name}"${f.required ? raw(" required") : ""}><option value="">Choose one</option>${f.options.map((o) => html`<option>${o}</option>`)}</select></label>`
+    : html`<label>${f.label}<input name="${f.name}"${f.autocomplete ? raw(` autocomplete="${f.autocomplete}"`) : ""}${f.inputmode ? raw(` inputmode="${f.inputmode}"`) : ""}${f.required ? raw(" required") : ""}></label>`,
 )}
 ${towns.length ? html`<label>Town<select name="town"><option value="">Choose one</option>${towns.map((t) => html`<option>${t}</option>`)}<option>Other</option></select></label>` : ""}
-<label>Details (optional)<textarea name="message"></textarea></label>
+<label>${opts.details ?? "Details"} (optional)<textarea name="message"></textarea></label>
 <label class="hp" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
-<button class="btn btn--primary" type="submit">Send request</button>
+<button class="btn btn--primary" type="submit">${opts.button ?? "Send request"}</button>
 <p class="form__alt">Or call <a href="${action(r, "call")!.href}">${r.phone.display}</a>${r.smsEnabled ? html` or <a href="${action(r, "text")!.href}">text us</a>` : ""}.</p>
 </form>
 </div></section>`;

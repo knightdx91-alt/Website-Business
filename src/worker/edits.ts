@@ -3,6 +3,7 @@ import { z } from "zod";
 import { parseMenuText } from "../generator/menu.ts";
 import { parsePrice } from "../generator/price.ts";
 import { packFor } from "../generator/packs/index.ts";
+import { PARTS_COUNTER } from "../generator/packs/auto.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import type { BusinessRecord, ConfirmableField, Copy, Service } from "../generator/types.ts";
 import { HttpError } from "./env.ts";
@@ -44,6 +45,33 @@ export const EditsSchema = z.object({
       install: z.boolean().optional(),
       giftCards: z.boolean().optional(),
       delivery: z.boolean().optional(),
+      /** Auto parts stores (auto pack, variant parts). What they carry is `services`. */
+      parts: z
+        .object({
+          counter: z.object(Object.fromEntries(PARTS_COUNTER.map((c) => [c.id, z.boolean()]))).partial(),
+          counterConfirmed: z.boolean(),
+          turnaround: z.string().trim().max(200),
+          commercial: z.boolean(),
+          commercialText: z.string().trim().max(500),
+          program: z.string().trim().max(60),
+          orderUrl: url,
+        })
+        .partial()
+        .optional(),
+      /** Shops: the Donations section (on by default for thrift stores). */
+      donations: z
+        .object({
+          enabled: z.boolean(),
+          accepts: z.array(z.string().trim().min(1).max(80)).max(30),
+          doesNotAccept: z.array(z.string().trim().min(1).max(80)).max(30),
+          dropOffHours: z.string().trim().max(200),
+          pickup: z.boolean(),
+          pickupNote: z.string().trim().max(300),
+          receipts: z.boolean(),
+          note: z.string().trim().max(400),
+        })
+        .partial()
+        .optional(),
       church: z
         .object({
           variant: z.enum(["church", "civic_post", "charity", "community_center"]),
@@ -182,6 +210,11 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
           ? { months: e.warranty.months ?? undefined, miles: e.warranty.miles ?? undefined, nationwide: e.warranty.nationwide }
           : undefined;
     }
+    if (e.parts && r.variant === "parts") {
+      const x: Record<string, unknown> = { ...(r.ext.auto.parts ?? {}) };
+      for (const [k, v] of Object.entries(e.parts)) x[k] = v === "" ? undefined : v;
+      r.ext.auto.parts = x as typeof r.ext.auto.parts;
+    }
   }
   if (r.category === "landscaping") {
     r.ext.landscaping = r.ext.landscaping ?? {};
@@ -199,6 +232,11 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
     if (e.giftCards !== undefined) x.giftCards = e.giftCards;
     if (e.delivery !== undefined) x.delivery = e.delivery;
     if (e.links?.shop !== undefined) x.shopUrl = e.links.shop || undefined;
+    if (e.donations) {
+      const d: Record<string, unknown> = { ...(x.donations ?? {}) };
+      for (const [k, v] of Object.entries(e.donations)) d[k] = v === "" || (Array.isArray(v) && !v.length) ? undefined : v;
+      x.donations = d as typeof x.donations;
+    }
   }
   if (r.category === "church" && e.church) {
     const { variant, pastor, firstVisit, ...rest } = e.church;

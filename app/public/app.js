@@ -956,16 +956,17 @@
     const isF = cat === "finance";
     const isCh = cat === "church";
     const isM = isS && r.variant === "massage";
+    const isParts = isA && r.variant === "parts";
     const serviceArea = isC || isL || isK;
     const hasServices = !isR;
-    const hasTowns = isC || isL || isK || isA;
+    const hasTowns = isC || isL || isK || (isA && !isParts);
     const ext = r.ext[cat] || {};
     const conf = new Set(r.confirmed);
     const t = r.testimonials.concat([{}, {}, {}]).slice(0, 3);
     const cb = (name, label, on) => `<label class="check"><input type="checkbox" name="${name}"${on ? " checked" : ""}> ${label}</label>`;
     const confirmable = [["name", "Business name is right"], ["phone", "Phone number is right"], ["address", "Address is right"]];
     if (r.hours) confirmable.push(["hours", "Hours are right"]);
-    if (hasServices) confirmable.push(["services", isS ? "Services and prices are right" : "Services list is right"]);
+    if (hasServices) confirmable.push(["services", isS ? "Services and prices are right" : isParts ? "The what-we-carry list is right" : "Services list is right"]);
     if (hasTowns) confirmable.push(["service_area", "Service area towns are right"]);
     if (isR) confirmable.push(["menu", "Menu is right"]);
     const priceOf = (s) => {
@@ -1013,15 +1014,17 @@
         ${isC || isL || isM ? `<div class="row"><label class="field">License type<input name="licenseLabel" value="${esc(lic.label || "")}" placeholder="${isC ? "AL Plumbing License" : isM ? "AL Massage Therapist License" : "License"}"></label>
           <label class="field">License #<input name="licenseNumber" value="${esc(lic.number || "")}"></label></div>` : ""}
         ${isC ? cb("emergencyService", "Offers emergency service", !!ext.emergencyService) : ""}
-        ${isA ? `${cb("ase", "ASE-certified", !!ext.ase)}
-          <div class="row"><label class="field">Warranty months<input name="warrantyMonths" type="number" inputmode="numeric" value="${w.months || ""}"></label>
+        ${isA ? `${cb("ase", isParts ? "ASE-certified parts specialists" : "ASE-certified", !!ext.ase)}
+          ${isParts ? "" : `<div class="row"><label class="field">Warranty months<input name="warrantyMonths" type="number" inputmode="numeric" value="${w.months || ""}"></label>
           <label class="field">Warranty miles<input name="warrantyMiles" type="number" inputmode="numeric" value="${w.miles || ""}"></label></div>
-          ${cb("warrantyNationwide", "Warranty is nationwide", !!w.nationwide)}` : ""}
+          ${cb("warrantyNationwide", "Warranty is nationwide", !!w.nationwide)}`}` : ""}
         ${isK ? `${cb("backgroundChecked", "Team is background-checked", !!ext.backgroundChecked)}${cb("suppliesIncluded", "They bring their own supplies", !!ext.suppliesIncluded)}${cb("petSafe", "Uses pet-safe products", !!ext.petSafe)}` : ""}
-        ${isC || isA || isL || isK ? cb("freeEstimates", isA || isC ? "Free estimates" : "Free quotes", !!ext.freeEstimates) : ""}
+        ${isC || (isA && !isParts) || isL || isK ? cb("freeEstimates", isA || isC ? "Free estimates" : "Free quotes", !!ext.freeEstimates) : ""}
         ${isP ? `${cb("designHelp", "They help design artwork", !!ext.designHelp)}${cb("proofBeforePrint", "They send a proof before printing", !!ext.proofBeforePrint)}${r.variant === "signs" ? cb("install", "They install signs", !!ext.install) : ""}` : ""}
         ${isRt ? `${cb("giftCards", "They sell gift cards", !!ext.giftCards)}${cb("delivery", "They deliver", !!ext.delivery)}` : ""}
       </section>
+      ${isParts ? partsEditCard(r, ext, cb, serviceLines) : ""}
+      ${isRt ? donationsEditCard(r, ext, cb) : ""}
       ${isF ? financeEditCard(r, ext, cb) : ""}
       ${isCh ? churchEditCard(r, ext, cb) : ""}
       <section class="card"><h2>Links</h2>
@@ -1045,7 +1048,7 @@
       </section>
       ${isR ? `<section class="card"><h2>Menu</h2><p class="small muted">One item per line: <code>Name | $Price | Description</code>. Start a section with <code># Section name</code>.</p>
         <label class="field"><span class="sr-only">Menu</span><textarea name="menuText" rows="12" placeholder="# Plates&#10;Pulled pork plate | $12 | Two sides and bread">${esc(l.menuText)}</textarea></label></section>` : ""}
-      ${hasServices ? `<section class="card"><h2>${hasTowns ? "Services &amp; area" : "Services"}</h2>
+      ${hasServices && !isParts ? `<section class="card"><h2>${hasTowns ? "Services &amp; area" : "Services"}</h2>
         <label class="field">${isS ? "Services and prices, one per line <span class=\"hint\">e.g. <code>Haircut | $25</code> or <code>Color | from $80</code></span>" : "Services (one per line)"}<textarea name="services" rows="7">${esc(serviceLines)}</textarea></label>
         ${hasTowns ? `<label class="field">Towns served (comma separated)<textarea name="towns" rows="3">${esc((r.serviceArea || { towns: [] }).towns.join(", "))}</textarea></label>` : ""}</section>` : ""}
       <section class="card"><h2>Customer quotes</h2><p class="small muted">Only real quotes the customer said you can use. Never copy Google reviews.</p>
@@ -1153,14 +1156,15 @@
           freeEstimates: on("freeEstimates"),
           walkIns: isS ? val("walkIns") || null : undefined,
           ase: on("ase"),
-          warranty: isA ? { months: num("warrantyMonths"), miles: num("warrantyMiles"), nationwide: !!on("warrantyNationwide") } : undefined,
+          warranty: isA && !isParts ? { months: num("warrantyMonths"), miles: num("warrantyMiles"), nationwide: !!on("warrantyNationwide") } : undefined,
           backgroundChecked: on("backgroundChecked"),
           suppliesIncluded: on("suppliesIncluded"),
           petSafe: on("petSafe"),
           links: { order: val("order"), reserve: val("reserve"), booking: val("booking"), facebook: val("facebook"), instagram: val("instagram"), ...(isRt ? { shop: val("shop") } : {}) },
           hiring: (() => { const roles = (val("hiringRoles") || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 8); return roles.length ? { roles, how: val("hiringHow") || "" } : null; })(),
           ...(isP ? { email: val("email"), designHelp: on("designHelp"), proofBeforePrint: on("proofBeforePrint"), ...(r.variant === "signs" ? { install: on("install") } : {}) } : {}),
-          ...(isRt ? { giftCards: on("giftCards"), delivery: on("delivery") } : {}),
+          ...(isRt ? { giftCards: on("giftCards"), delivery: on("delivery"), donations: donationsEditValues(f) } : {}),
+          ...(isParts ? { parts: partsEditValues(f) } : {}),
           ...(isF ? { finance: financeEditValues(f, r) } : {}),
           ...(isCh ? { church: churchEditValues(f) } : {}),
           testimonials,
@@ -1540,6 +1544,60 @@
 
   /* ---------- churches & nonprofits: everything comes from the organization (research/churches-nonprofits.md §8) ---------- */
   const CH_VARIANTS = [["church", "Church"], ["civic_post", "VFW, Legion, Lions, lodge or club"], ["charity", "Food pantry or charity"], ["community_center", "Community center"]];
+  /* ---------- auto parts stores: the counter (what they carry is the services list) ---------- */
+  const PARTS_COUNTER = [["battery", "Battery testing & charging"], ["install", "Wiper & bulb install"], ["loaner", "Loaner tools"], ["hose", "Hydraulic hose assembly"], ["machine", "Machine shop"], ["keys", "Key cutting"], ["paint", "Paint mixing"]];
+  const PARTS_DEFAULT_ON = ["battery", "install", "loaner"];
+  function partsEditCard(r, x, cb, serviceLines) {
+    const p = x.parts || {};
+    const counter = p.counter || {};
+    const isOn = (id) => (id in counter ? !!counter[id] : PARTS_DEFAULT_ON.includes(id));
+    return `<section class="card"><h2>Auto parts details</h2>
+      <p class="small muted">The site sells the counter: call to check stock, special orders, people who know the part. Only what the owner tells you.</p>
+      <label class="field">What they carry (one per line)<textarea name="services" rows="8">${esc(serviceLines)}</textarea></label>
+      <h3>Services at the counter</h3>
+      ${PARTS_COUNTER.map(([id, label]) => cb("pc_" + id, label, isOn(id))).join("")}
+      ${cb("partsCounterOk", "Owner confirmed this is the list (required)", !!p.counterConfirmed)}
+      <label class="field">Special-order turnaround <span class="hint">Their words, e.g. “Most parts by the next morning.”</span><input name="partsTurnaround" maxlength="200" value="${esc(p.turnaround || "")}"></label>
+      ${cb("partsCommercial", "They offer commercial accounts / delivery to shops", !!p.commercial)}
+      <label class="field">Commercial accounts line (optional)<textarea name="partsCommercialText" rows="2" placeholder="Shops and fleets: ask about a commercial account and twice-daily delivery.">${esc(p.commercialText || "")}</textarea></label>
+      <div class="row"><label class="field">Buying group / program<input name="partsProgram" maxlength="60" value="${esc(p.program || "")}" placeholder="NAPA, Carquest, Parts Plus…"></label>
+      <label class="field">Its online ordering page (for pickup)<input name="partsOrderUrl" type="url" value="${esc(p.orderUrl || "")}" placeholder="https://"></label></div>
+      <p class="small muted">With an ordering link, the site gets an “Order online for pickup” button and the text may mention it. Without one it never claims online ordering, shipping or prices.</p>
+    </section>`;
+  }
+  function partsEditValues(f) {
+    const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
+    const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
+    const counter = {};
+    PARTS_COUNTER.forEach(([id]) => { counter[id] = !!on("pc_" + id); });
+    return { counter, counterConfirmed: on("partsCounterOk"), turnaround: v("partsTurnaround"), commercial: on("partsCommercial"), commercialText: v("partsCommercialText"), program: v("partsProgram"), orderUrl: v("partsOrderUrl") };
+  }
+
+  /* ---------- shops: donations (on by default for thrift stores) ---------- */
+  function donationsEditCard(r, x, cb) {
+    const d = x.donations || {};
+    const thrift = r.variant === "thrift";
+    const enabled = d.enabled === undefined ? thrift : !!d.enabled;
+    return `<section class="card"><h2>Donations</h2>
+      <p class="small muted">${thrift ? "Thrift sites have two jobs: are you open, and what can I donate. Required until the lists and hours are filled in." : "For shops that take donations (resale, church stores, animal rescue shops)."} Only their own list.</p>
+      ${cb("donEnabled", "Show a Donations section", enabled)}
+      <label class="field">We gladly take (one per line)<textarea name="donAccepts" rows="5" placeholder="Clothing and shoes&#10;Housewares&#10;Furniture in good shape&#10;Books and toys">${esc((d.accepts || []).join("\n"))}</textarea></label>
+      <label class="field">We can't take (one per line)<textarea name="donNo" rows="4" placeholder="Mattresses&#10;TVs and old electronics&#10;Car seats and cribs">${esc((d.doesNotAccept || []).join("\n"))}</textarea></label>
+      <label class="field">Drop-off hours<input name="donHours" maxlength="200" value="${esc(d.dropOffHours || "")}" placeholder="Monday to Saturday, 10 to 4, at the back door"></label>
+      ${cb("donPickup", "They pick up furniture (adds a pickup request form)", !!d.pickup)}
+      <label class="field">Pickup note (optional)<input name="donPickupNote" maxlength="300" value="${esc(d.pickupNote || "")}" placeholder="We pick up in Cullman County on Tuesdays and Thursdays."></label>
+      ${cb("donReceipts", "They're a nonprofit and give donation receipts", !!d.receipts)}
+      <label class="field">Intro line (optional)<input name="donNote" maxlength="400" value="${esc(d.note || "")}" placeholder="Every donation helps fund the food pantry next door."></label>
+    </section>`;
+  }
+  function donationsEditValues(f) {
+    const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
+    const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
+    const lines = (n) => (f.elements[n] ? f.elements[n].value.split("\n").map((x) => x.trim()).filter(Boolean) : undefined);
+    const out = { enabled: on("donEnabled"), accepts: lines("donAccepts"), doesNotAccept: lines("donNo"), dropOffHours: v("donHours"), pickup: on("donPickup"), pickupNote: v("donPickupNote"), receipts: on("donReceipts"), note: v("donNote") };
+    return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
+  }
+
   function churchEditCard(r, x, cb) {
     const v = r.variant;
     const fv = x.firstVisit || {};
@@ -2201,6 +2259,12 @@
   }
 
   /* ---------- inbox ---------- */
+  // What they asked for, in one line: the service, or the part + vehicle (Reserve a part), or the pickup items.
+  function requestLine(d) {
+    const vehicle = [d.year, d.make, d.model].filter(Boolean).join(" ") || d.vehicle;
+    const bits = [d.service, d.part, vehicle, d.items, d.address, d.best_day ? "best day " + d.best_day : "", d.town, d.frequency, d.home_size, d.property, d.quantity].filter(Boolean).join(" · ");
+    return d.topic ? d.topic + (bits ? ": " + bits : "") : bits;
+  }
   async function viewInbox() {
     setNav("inbox");
     const my = renderSeq;
@@ -2210,7 +2274,7 @@
     $app.innerHTML = `<h1>Inbox</h1><p class="muted">Requests customers send through your clients' live websites.</p>
       <ul class="list">${items.length ? items.map((i) => `<li class="card"><div class="lead__top"><strong>${esc(i.data.name)}</strong>${i.read ? "" : '<span class="chip chip--warn">New</span>'}</div>
         <p class="small muted">For ${esc(i.business || "a client")} · ${ago(i.createdAt)}</p>
-        ${i.data.service ? `<p>${esc(i.data.service)}${i.data.town ? " · " + esc(i.data.town) : ""}</p>` : ""}
+        ${requestLine(i.data) ? `<p>${esc(requestLine(i.data))}</p>` : ""}
         ${i.data.message ? `<p style="white-space:pre-line">${esc(i.data.message)}</p>` : ""}
         <div class="btns"><a class="btn btn--small btn--primary" href="${telHref(i.data.phone)}">📞 ${esc(i.data.phone)}</a>
         ${i.data.email ? `<a class="btn btn--small" href="mailto:${esc(i.data.email)}">Email</a>` : ""}

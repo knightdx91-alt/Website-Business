@@ -140,9 +140,10 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
       ...base,
       variant,
       services: seedAutoServices(variant),
-      serviceArea: { towns: townsWithin(geo, 20, 8), counties: county ? [county] : [] },
+      // A parts store is a storefront people drive to; repair shops list the towns they draw from.
+      serviceArea: variant === "parts" ? undefined : { towns: townsWithin(geo, 20, 8), counties: county ? [county] : [] },
       confirmed: [],
-      ext: { auto: {} },
+      ext: { auto: variant === "parts" ? { parts: {} } : {} },
     };
   }
   if (category === "landscaping" || category === "cleaning") {

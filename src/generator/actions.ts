@@ -40,6 +40,11 @@ export function freeEstimates(r: BusinessRecord): boolean {
   return !!(e.contractor?.freeEstimates || e.auto?.freeEstimates || e.landscaping?.freeEstimates || e.cleaning?.freeEstimates);
 }
 
+/** A shop's Donations section is on by default for thrift stores; any other shop can turn it on from Edit. */
+export function donationsOn(r: BusinessRecord): boolean {
+  return r.category === "retail" && (r.ext.retail?.donations?.enabled ?? r.variant === "thrift");
+}
+
 export function detectProvider(url: string): string | undefined {
   return PROVIDERS.find(([re]) => re.test(url))?.[1];
 }
@@ -73,6 +78,7 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
         const ins = r.variant === "insurance";
         return { id, label: ins ? "Get a quote" : "Request a call back", short: ins ? "Quote" : "Call back", href: "#contact", external: false, icon: "clipboard" };
       }
+      if (r.category === "auto" && r.variant === "parts") return { id, label: "Reserve a part", short: "Reserve", href: "#reserve", external: false, icon: "clipboard" };
       const free = freeEstimates(r);
       const label = free ? (r.category === "contractor" || r.category === "auto" ? "Get a free estimate" : "Get a free quote") : r.category === "auto" ? "Request an appointment" : r.category === "contractor" ? "Request service" : r.category === "print" ? "Get a quote" : "Request a quote";
       return { id, label, short: free ? (r.category === "contractor" || r.category === "auto" ? "Estimate" : "Free quote") : r.category === "auto" ? "Request" : "Quote", href: "#contact", external: false, icon: "clipboard" };
@@ -97,6 +103,7 @@ export function action(r: BusinessRecord, id: ActionId): Action | null {
     case "give":
       return r.ext.church?.givingUrl ? { id, label: "Give online", short: "Give", href: r.ext.church.givingUrl, external: true, icon: "check" } : null;
     case "donate":
+      if (r.category === "retail") return donationsOn(r) ? { id, label: "Donate items", short: "Donate", href: "#donations", external: false, icon: "bag" } : null;
       return r.ext.church?.donateUrl ? { id, label: "Donate", short: "Donate", href: r.ext.church.donateUrl, external: true, icon: "check" } : null;
     case "help":
       return { id, label: "Get help", short: "Get help", href: "#help", external: false, icon: "list" };

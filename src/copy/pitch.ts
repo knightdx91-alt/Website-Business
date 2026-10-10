@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { hasAnyHours, hoursSummary } from "../generator/hours.ts";
+import { donationsOn } from "../generator/actions.ts";
 import type { CategoryPack } from "../generator/packs/types.ts";
 import type { BusinessRecord } from "../generator/types.ts";
 import { DEFAULT_COPY_MODEL } from "./write.ts";
@@ -72,6 +73,8 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
   if (r.category === "finance" && r.variant === "tax_prep") f.push("a printable 'what to bring' checklist page for tax appointments");
   if (r.category === "finance" && r.variant === "financial_advisor") f.push("a disclosures page for the firm's required disclosure text (no reviews, as advisor rules require)");
   if (r.category === "retail") f.push("a 'what's new' section that sends shoppers to their Facebook or Instagram for new arrivals");
+  if (r.category === "retail" && donationsOn(r)) f.push("a Donations section (what they take and can't take, drop-off hours, and a furniture-pickup request form if they offer pickups), filled in with their own list");
+  if (r.category === "auto" && r.variant === "parts") f.push("a 'what we carry' list, a 'can't find it? we'll order it' section, counter services (battery testing and the like), and a Reserve a part form that asks for year, make, model and the part");
   if (hasForm) f.push("a request form that sends customer requests to an inbox (once live)");
   f.push("an FAQ section");
   return f;
