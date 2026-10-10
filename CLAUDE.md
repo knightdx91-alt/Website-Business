@@ -315,6 +315,39 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `must-revalidate`, finance/church banned lists fixed for everyday phrases (`SCRIPTURE_REF` needs a book name),
   `copy.issues` + loose-number warnings in lint, `sectionHead(..., id)` for aria-labelledby, Spanish nav labels + a. m./
   p. m. hours, bot-challenge 503s aren't "down". `test/fixes.test.ts`, `test/worker/review-fixes.test.ts`.
+- Trades, lawn & cleaning shared modules (Oct 2026, research/trends-2026/trades-lawn-cleaning.md §5; `test/tlc-features.test.ts`,
+  `test/worker/tlc-features.test.ts`): `record.plans` (1–3 cards: name, price text shown as "from $X"/unit, includes, badge, note;
+  `plans(ctx, opts, items)` adds "Prices are starting points" only when a price is set), `record.guarantee` {window, remedy, text}
+  (`guaranteeChip` "24-hour guarantee", `guaranteeBand` under the services, `guaranteeFaq`; nothing until typed), `record.offers`
+  (existing `Offer` type: title/code/expiresOn optional/detail; `promoBar` under the opening = first active offer, `offersSection`
+  (#offers) the rest, both `data-event-end` so the page hides them itself; Edit textarea `offer | code | expires | details`),
+  gallery captions and before/after pairs (`Image.caption/town/pairWith` = file key of the "after"; `gallery()` renders `.pairs`
+  first, captions as figcaptions; Edit → Photo gallery has caption/town and a "BEFORE of" select per photo, saved via
+  `galleryMeta`), form upgrades (`FormField` names `reach`, `urgent`, `facility`, `sq_ft` + `value` preselect; `property`
+  Residential/Commercial/Not sure; `contactForm` opt `photoHint` → "text us a photo of …" when `smsEnabled`; `requestSummary` puts
+  🔴 Emergency first and "prefers a text" last), DNA `headline` values `question` / `benefit` (appended; `copy.heroQuestion` /
+  `heroBenefit` ≤60 chars from the copy writer, editable in Edit → Text, fall back to what+where). Edit cards: Plans & pricing,
+  Guarantee, Offers & coupons (all three packs). Lint accepts a contractor's after-hours number as a tel: link. Pack
+  `bannedPhrases` for all three stop "licensed" without a license line and guarantee/warranty wording unless set.
+- Contractor (`ContractorExt` + `packs/contractor.ts`): `financing` renders a "Financing available" chip, #financing section with
+  "Apply with <lender>" and a FAQ entry (copy may never state rates/0%/no credit check: `contractorBannedPhrases`); `warrantyText`
+  = band + FAQ; `afterHours` {phone, note, confirmed} + `emergencyService` → `.emerg` line under the header ("Emergency? Call <after-
+  hours or main> · <note or 24/7>" + "Not urgent? Request service"), REQUIRED to-do "Confirm the emergency terms (hours, extra
+  charges)" until confirmed; the form asks "Is this an emergency?". Alabama: HVAC shows "AL# <number>" in the eyebrow and footer
+  (`alLicense`, `licenseText`) and has a REQUIRED to-do until a license is typed; remodeling gets a suggested HBLB to-do, REQUIRED
+  with `jobsOver10k`; labels mentioning Alabama/HVAC print "AL#". `serves` residential|commercial|both → chip, services line and the
+  form's property default. Plan card wording by trade (`PLAN_WORDS`). Edit → "Contractor details".
+- Landscaping (`LandscapingExt` + `packs/landscaping.ts`): `seasonal` (owner toggle) → #seasons "What we do when", 4 cards built only
+  from matching services with Alabama timing (`seasonBlocks`); `adaiPermit` → "ADAI permit #" chip, REQUIRED to-do when a service
+  matches `ADAI_SERVICE` (fertiliz|weed|pest|spray|herbicide) and it's empty; `crew` line in About (`.crew`); lawn_crew without owner
+  plans shows default "Ways to work with us" (Weekly / Every 2 weeks / One-time, from the services, no prices, suggested to-do).
+  Edit → "Lawn & landscape details".
+- Cleaning (`CleaningExt` + `packs/cleaning.ts`): residential `checklist` {rooms[{room,tasks}], tiers, extras} → #included comparison
+  table (tasks tagged `@deep`/`@move` are only in those tiers, `parseTask`/`tagMatches`) + "May cost extra" chips, suggested to-do
+  "Send us your cleaning checklist" when empty; commercial: `facilities` (from `CLEANING_FACILITIES`), `frequency`, `afterHours` →
+  #facilities, "Request a walkthrough" primary/bar/form (topic Walkthrough, fields facility/sq_ft/frequency), walkthrough → written
+  scope → schedule steps, no residential tiers; exterior: plans as "Simple flat-rate pricing" and a before/after gallery to-do.
+  Edit → "What's included" / "Commercial cleaning details".
 - Print & sign shops (`packs/print.ts`, variants screen_printing/embroidery/signs/print_shop, `ext.print.lines`) and
   retail (`packs/retail.ts`, boutique/gift/antique/thrift/florist/farm_feed/furniture, `ext.retail.shopUrl` → Shop online /
   Order flowers). Print sites have a "Send us your design" section (email/text; static sites can't take uploads).

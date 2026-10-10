@@ -4,6 +4,7 @@ import { parseMenuText } from "../generator/menu.ts";
 import { parsePrice } from "../generator/price.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { PARTS_COUNTER } from "../generator/packs/auto.ts";
+import { CLEANING_FACILITIES } from "../generator/packs/cleaning.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import type { BusinessRecord, ConfirmableField, Copy, Service } from "../generator/types.ts";
 import { HttpError } from "./env.ts";
@@ -157,6 +158,55 @@ export const EditsSchema = z.object({
         .optional(),
       galleryAlts: z.record(z.string(), z.string().trim().max(150)).optional(),
       confirmed: z.array(z.enum(["name", "phone", "address", "hours", "services", "service_area", "variant", "menu"])).optional(),
+      /* ---- trades, lawn and cleaning modules (Oct 2026); empty strings clear a field ---- */
+      /** Plans & pricing cards; an empty list removes them (a lawn crew then shows the no-price defaults again). */
+      plans: z
+        .array(
+          z.object({
+            name: z.string().trim().min(1).max(60),
+            price: z.string().trim().max(30).optional(),
+            unit: z.string().trim().max(30).optional(),
+            badge: z.string().trim().max(30).optional(),
+            note: z.string().trim().max(160).optional(),
+            includes: z.array(z.string().trim().min(1).max(80)).max(8),
+          }),
+        )
+        .max(3)
+        .optional(),
+      guarantee: z.object({ window: z.string().trim().max(40), remedy: z.string().trim().max(160), text: z.string().trim().max(240) }).partial().nullable().optional(),
+      offers: z
+        .array(z.object({ title: z.string().trim().min(1).max(80), code: z.string().trim().max(30).optional(), expiresOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).optional(), detail: z.string().trim().max(160).optional() }))
+        .max(6)
+        .optional(),
+      /** Per gallery photo (by src): caption, town, and the file key of the "after" photo it is the "before" of. */
+      galleryMeta: z.record(z.string(), z.object({ caption: z.string().trim().max(80), town: z.string().trim().max(40), pairWith: z.string().trim().max(80) }).partial()).optional(),
+      contractor: z
+        .object({
+          financingLender: z.string().trim().max(60),
+          financingUrl: url,
+          warrantyText: z.string().trim().max(300),
+          afterHoursPhone: z.string().trim().max(30),
+          afterHoursNote: z.string().trim().max(160),
+          afterHoursConfirmed: z.boolean(),
+          jobsOver10k: z.boolean(),
+          serves: z.enum(["residential", "commercial", "both"]).or(z.literal("")),
+        })
+        .partial()
+        .optional(),
+      landscaping: z.object({ seasonal: z.boolean(), adaiPermit: z.string().trim().max(40), crew: z.string().trim().max(160) }).partial().optional(),
+      cleaning: z
+        .object({
+          checklist: z.object({
+            rooms: z.array(z.object({ room: z.string().trim().min(1).max(40), tasks: z.array(z.string().trim().min(1).max(100)).max(30) })).max(8),
+            tiers: z.array(z.string().trim().min(1).max(30)).max(4),
+            extras: z.array(z.string().trim().min(1).max(60)).max(20),
+          }),
+          facilities: z.array(z.enum(CLEANING_FACILITIES)).max(CLEANING_FACILITIES.length),
+          frequency: z.string().trim().max(120),
+          afterHours: z.boolean(),
+        })
+        .partial()
+        .optional(),
     })
     .optional(),
   copy: z
@@ -170,6 +220,8 @@ export const EditsSchema = z.object({
       serviceBlurbs: z.record(z.string(), z.string().trim().max(400)),
       faq: z.array(z.object({ q: z.string().trim().max(200), a: z.string().trim().max(800) })).max(8),
       approved: z.boolean(),
+      heroQuestion: z.string().trim().max(80),
+      heroBenefit: z.string().trim().max(80),
     })
     .partial()
     .optional(),
@@ -314,6 +366,7 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
       : undefined;
   }
   if (e.confirmed) r.confirmed = e.confirmed as ConfirmableField[];
+  applyTlcEdits(r, e);
 
   const ce = edits.copy ?? {};
   if (ce.heroTagline !== undefined) c.heroTagline = ce.heroTagline;
@@ -324,6 +377,8 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
   if (ce.metaDescription !== undefined) c.meta.description = ce.metaDescription;
   if (ce.serviceBlurbs !== undefined) c.serviceBlurbs = { ...c.serviceBlurbs, ...ce.serviceBlurbs };
   if (ce.faq !== undefined) c.faq = ce.faq.filter((f) => f.q && f.a);
+  if (ce.heroQuestion !== undefined) c.heroQuestion = ce.heroQuestion || undefined;
+  if (ce.heroBenefit !== undefined) c.heroBenefit = ce.heroBenefit || undefined;
   if (ce.approved !== undefined) c.approved = ce.approved;
   // Any text change after approval needs a fresh look from the owner.
   else if (Object.keys(ce).length) c.approved = false;
@@ -336,4 +391,75 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
     look = edits.look;
   }
   return { record: r, copy: c, look };
+}
+
+/** Trades, lawn and cleaning modules (Oct 2026): plans, guarantee, offers, photo captions/pairs, and the per-category details. */
+function applyTlcEdits(r: BusinessRecord, e: NonNullable<Edits["record"]>): void {
+  const clear = (v: string | undefined) => (v && v.trim() ? v.trim() : undefined);
+  if (e.plans !== undefined) {
+    r.plans = e.plans.length ? e.plans.map((p) => ({ name: p.name, price: clear(p.price), unit: clear(p.unit), badge: clear(p.badge), note: clear(p.note), includes: p.includes })) : undefined;
+  }
+  if (e.guarantee !== undefined) {
+    const g = e.guarantee ? { window: clear(e.guarantee.window), remedy: clear(e.guarantee.remedy), text: clear(e.guarantee.text) } : undefined;
+    r.guarantee = g && (g.window || g.remedy || g.text) ? g : undefined;
+  }
+  if (e.offers !== undefined) {
+    r.offers = e.offers.map((o) => ({ title: o.title, code: clear(o.code), expiresOn: clear(o.expiresOn), detail: clear(o.detail) }));
+  }
+  if (e.galleryMeta) {
+    const keys = new Set(r.media.gallery.map((p) => (p.src.split("/").pop() ?? p.src).split(".")[0]));
+    for (const p of r.media.gallery) {
+      const m = e.galleryMeta[p.src];
+      if (!m) continue;
+      if (m.caption !== undefined) p.caption = clear(m.caption);
+      if (m.town !== undefined) p.town = clear(m.town);
+      // A pair only points at another photo that is on the record (and not at itself).
+      if (m.pairWith !== undefined) {
+        const key = clear(m.pairWith);
+        const own = (p.src.split("/").pop() ?? p.src).split(".")[0];
+        p.pairWith = key && key !== own && keys.has(key) ? key : undefined;
+      }
+    }
+  }
+  if (r.category === "contractor" && e.contractor) {
+    const x = (r.ext.contractor = r.ext.contractor ?? { residential: true });
+    const c = e.contractor;
+    if (c.financingLender !== undefined || c.financingUrl !== undefined) {
+      const lender = c.financingLender !== undefined ? clear(c.financingLender) : x.financing?.lender;
+      const link = c.financingUrl !== undefined ? clear(c.financingUrl) : x.financing?.url;
+      x.financing = lender ? { lender, url: link ?? "" } : undefined;
+    }
+    if (c.warrantyText !== undefined) x.warrantyText = clear(c.warrantyText);
+    if (c.afterHoursPhone !== undefined || c.afterHoursNote !== undefined || c.afterHoursConfirmed !== undefined) {
+      const prev = x.afterHours ?? { confirmed: false };
+      let phone = c.afterHoursPhone !== undefined ? clear(c.afterHoursPhone) : prev.phone;
+      if (phone) {
+        const n = normalizeUsPhone(phone);
+        if (!n) throw new HttpError(400, "That after-hours number doesn't look like a US number");
+        phone = n.display;
+      }
+      const note = c.afterHoursNote !== undefined ? clear(c.afterHoursNote) : prev.note;
+      const confirmed = c.afterHoursConfirmed ?? prev.confirmed;
+      x.afterHours = phone || note || confirmed ? { phone, note, confirmed } : undefined;
+    }
+    if (c.jobsOver10k !== undefined) x.jobsOver10k = c.jobsOver10k || undefined;
+    if (c.serves !== undefined) x.serves = c.serves || undefined;
+  }
+  if (r.category === "landscaping" && e.landscaping) {
+    const x = (r.ext.landscaping = r.ext.landscaping ?? {});
+    if (e.landscaping.seasonal !== undefined) x.seasonal = e.landscaping.seasonal || undefined;
+    if (e.landscaping.adaiPermit !== undefined) x.adaiPermit = clear(e.landscaping.adaiPermit);
+    if (e.landscaping.crew !== undefined) x.crew = clear(e.landscaping.crew);
+  }
+  if (r.category === "cleaning" && e.cleaning) {
+    const x = (r.ext.cleaning = r.ext.cleaning ?? {});
+    const k = e.cleaning;
+    if (k.checklist !== undefined) {
+      const rooms = k.checklist.rooms.filter((room) => room.tasks.length);
+      x.checklist = rooms.length || k.checklist.extras.length ? { rooms, tiers: k.checklist.tiers, extras: k.checklist.extras } : undefined;
+    }
+    if (k.facilities !== undefined) x.facilities = k.facilities.length ? [...new Set(k.facilities)] : undefined;
+    if (k.frequency !== undefined) x.frequency = clear(k.frequency);
+    if (k.afterHours !== undefined) x.afterHours = k.afterHours || undefined;
+  }
 }

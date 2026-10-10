@@ -5,7 +5,7 @@ import { html, join, raw, type Html, type Raw } from "./html.ts";
 import { icon, type IconName } from "./icons.ts";
 import type { Dna } from "./dna.ts";
 import type { Theme } from "./themes.ts";
-import type { BuildMode, BusinessRecord, Copy, EventItem, Faq, Image, Site } from "./types.ts";
+import type { BuildMode, BusinessRecord, Copy, EventItem, Faq, Guarantee, Image, License, Offer, Plan, Site } from "./types.ts";
 
 export interface Ctx {
   r: BusinessRecord;
@@ -113,6 +113,10 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
     h1Text = promise;
     eyebrowText = o.h1;
     subText = o.sub === promise ? ctx.copy.heroSub : o.sub;
+  } else if ((dna.headline === "question" || dna.headline === "benefit") && headlineLine(ctx.copy, dna.headline)) {
+    // A question ("Is your AC blowing warm air?") or a benefit ("Take your weekend back"); without the copy field it stays "what + where".
+    h1Text = headlineLine(ctx.copy, dna.headline)!;
+    eyebrowText = o.h1;
   }
   const backdrop = showImg && (kind === "stack" || kind === "cover");
   const cls = `hero hero--${ctx.theme.knobs.hero}${backdrop ? " hero--photo" : ""} hero--${kind}`;
@@ -366,11 +370,12 @@ ${btns}
 </div></section>`;
 }
 
-export function about(ctx: Ctx, title: string, label = "About us"): Raw {
+export function about(ctx: Ctx, title: string, label = "About us", extra?: Raw): Raw {
   if (!ctx.copy.about.length) return raw("");
   return html`<section class="section" id="about" aria-labelledby="about-title"><div class="wrap narrow">
 <span class="section__label">${label}</span><h2 class="section__title" id="about-title">${title}</h2>
 ${ctx.copy.about.map((p) => html`<p>${p}</p>`)}
+${extra ?? ""}
 ${ctx.copy.approved ? "" : todo(ctx, "Tell us your story", "Who started it, when, and what you're proud of. We'll turn it into a short, warm About section.")}
 </div></section>`;
 }
@@ -385,9 +390,11 @@ export function faq(items: Faq[], band = false, label = "FAQ", title = "Question
 
 export interface FormField {
   /** Every name here must also be in FIELDS in src/worker/forms.ts, or the live site drops it. */
-  name: "vehicle" | "frequency" | "home_size" | "property" | "quantity" | "year" | "make" | "model" | "part" | "items" | "address" | "best_day";
+  name: "vehicle" | "frequency" | "home_size" | "property" | "quantity" | "year" | "make" | "model" | "part" | "items" | "address" | "best_day" | "reach" | "urgent" | "facility" | "sq_ft";
   label: string;
   options?: string[];
+  /** Preselected option (selects only). */
+  value?: string;
   autocomplete?: string;
   required?: boolean;
   inputmode?: string;
@@ -404,6 +411,8 @@ export interface ContactFormOpts {
   button?: string;
   /** Label for the Details box; it is optional in every form. */
   details?: string;
+  /** With a texting number: "Faster: text us a photo of <this>" under the form, e.g. "the problem" or "your yard". */
+  photoHint?: string;
 }
 
 export function contactForm(ctx: Ctx, services: string[], towns: string[], extra: FormField[] = [], intro = "Tell us what's going on and we'll call you back.", opts: ContactFormOpts = {}): Raw {
@@ -422,7 +431,7 @@ ${opts.topic ? html`<input type="hidden" name="topic" value="${opts.topic}">` : 
 ${services.length ? html`<label>What do you need?<select name="service"><option value="">Choose one</option>${services.map((s) => html`<option>${s}</option>`)}<option>Something else</option></select></label>` : ""}
 ${extra.map((f) =>
   f.options
-    ? html`<label>${f.label}<select name="${f.name}"${f.required ? raw(" required") : ""}><option value="">Choose one</option>${f.options.map((o) => html`<option>${o}</option>`)}</select></label>`
+    ? html`<label>${f.label}<select name="${f.name}"${f.required ? raw(" required") : ""}><option value="">Choose one</option>${f.options.map((o) => html`<option${o === f.value ? raw(" selected") : ""}>${o}</option>`)}</select></label>`
     : html`<label>${f.label}<input name="${f.name}"${f.autocomplete ? raw(` autocomplete="${f.autocomplete}"`) : ""}${f.inputmode ? raw(` inputmode="${f.inputmode}"`) : ""}${f.required ? raw(" required") : ""}></label>`,
 )}
 ${towns.length ? html`<label>Town<select name="town"><option value="">Choose one</option>${towns.map((t) => html`<option>${t}</option>`)}<option>Other</option></select></label>` : ""}
@@ -430,6 +439,7 @@ ${towns.length ? html`<label>Town<select name="town"><option value="">Choose one
 <label class="hp" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
 <button class="btn btn--primary" type="submit">${opts.button ?? "Send request"}</button>
 <p class="form__alt">Or call <a href="${action(r, "call")!.href}">${r.phone.display}</a>${r.smsEnabled ? html` or <a href="${action(r, "text")!.href}">text us</a>` : ""}.</p>
+${opts.photoHint && r.smsEnabled ? html`<p class="form__alt">Faster: <a href="${action(r, "text")!.href}">text us a photo of ${opts.photoHint}</a> at ${r.phone.display}.</p>` : ""}
 </form>
 </div></section>`;
 }
@@ -465,7 +475,7 @@ ${ctx.theme.dna.footer === "bigcta" ? html`<div class="ftr__cta"><p>${ctx.copy.c
 <div class="ftr__grid">
 <div><h2>${r.name}</h2><address style="font-style:normal">${where}</address><p><a href="${action(r, "call")!.href}">${r.phone.display}</a></p></div>
 <div>${hasAnyHours(r.hours) ? html`<h2>Hours</h2><p>${hoursSummary(r.hours)}</p>` : ""}${
-    r.licenses.length ? html`<p>${r.licenses.map((l) => `${l.label} #${l.number}`).join(" · ")}</p>` : ""
+    r.licenses.length ? html`<p>${r.licenses.map((l) => licenseText(l, r)).join(" · ")}</p>` : ""
   }</div>
 <div><h2>Links</h2><ul>${nav.map((n) => html`<li><a href="${n.href}">${n.label}</a></li>`)}${social.map(
     ([k, u]) => html`<li><a href="${u}" target="_blank" rel="noopener">${label[k] ?? k}<span class="sr"> (opens in new tab)</span></a></li>`,
@@ -499,10 +509,41 @@ export function gallery(ctx: Ctx, todoTitle?: string, todoBody?: string): Raw {
   const photos = ctx.r.media.gallery.filter((p) => ctx.mode === "preview" || p.source !== "google");
   if (!photos.length) return todoTitle ? todoBlock(ctx, todoTitle, todoBody ?? "") : raw("");
   ctx.galleryShown = true;
+  // Before/after pairs first (the "after" photo leaves the grid), then the rest with their captions.
+  const pairs = photoPairs(photos);
+  const inPair = new Set(pairs.flatMap((p) => [p.before, p.after]));
+  const rest = photos.filter((p) => !inPair.has(p));
+  const cap = (p: Image) => [p.caption, p.town].filter(Boolean).join(", ");
   return html`<section class="section" id="photos" aria-labelledby="photos-title"><div class="wrap">
-${sectionHead("Photos", "Take a look", undefined, "photos-title")}
-<ul class="gallery">${photos.map((p) => html`<li>${imageTag(p)}</li>`)}</ul>
+${sectionHead("Photos", pairs.length ? "Before and after" : "Take a look", undefined, "photos-title")}
+${pairs.length ? html`<ul class="pairs">${pairs.map(
+    (p) => html`<li class="pair"><div class="pair__pics"><figure><img src="${p.before.src}" alt="${p.before.alt}"${p.before.width ? raw(` width="${p.before.width}" height="${p.before.height}"`) : ""} loading="lazy" decoding="async"><figcaption>Before</figcaption></figure><figure><img src="${p.after.src}" alt="${p.after.alt}"${p.after.width ? raw(` width="${p.after.width}" height="${p.after.height}"`) : ""} loading="lazy" decoding="async"><figcaption>After</figcaption></figure></div>${
+      cap(p.before) || cap(p.after) ? html`<p class="pair__cap">${cap(p.before) || cap(p.after)}</p>` : ""
+    }</li>`,
+  )}</ul>` : ""}
+${rest.length ? html`<ul class="gallery${pairs.length ? " gallery--more" : ""}">${rest.map((p) => html`<li>${cap(p) ? html`<figure>${imageTag(p)}<figcaption>${cap(p)}</figcaption></figure>` : imageTag(p)}</li>`)}</ul>` : ""}
 </div></section>`;
+}
+
+/** The file name a gallery photo is known by in Edit and in `Image.pairWith`: "/assets/owner/g3.jpg" → "g3". */
+export function photoKey(src: string): string {
+  return (src.split("/").pop() ?? src).split(".")[0] ?? src;
+}
+
+/** Before/after pairs among the photos: each "before" names its "after" by file key; dangling or self pairs are ignored. */
+export function photoPairs(photos: Image[]): Array<{ before: Image; after: Image }> {
+  const byKey = new Map(photos.map((p) => [photoKey(p.src), p]));
+  const used = new Set<Image>();
+  const out: Array<{ before: Image; after: Image }> = [];
+  for (const p of photos) {
+    if (!p.pairWith || used.has(p)) continue;
+    const after = byKey.get(p.pairWith);
+    if (!after || after === p || used.has(after)) continue;
+    used.add(p);
+    used.add(after);
+    out.push({ before: p, after });
+  }
+  return out;
 }
 
 /** "We're hiring": the jobs the owner listed and how to apply (call, text or email). */
@@ -524,6 +565,127 @@ export function imageTag(img: Image, opts: { lazy?: boolean; cls?: string } = {}
   return html`<img src="${img.src}" alt="${img.alt}"${img.width ? raw(` width="${img.width}" height="${img.height}"`) : ""}${
     opts.lazy === false ? "" : raw(' loading="lazy" decoding="async"')
   }${opts.cls ? raw(` class="${opts.cls}"`) : ""}>`;
+}
+
+/* ---------- shared modules added Oct 2026 (research/trends-2026/trades-lawn-cleaning.md §5) ---------- */
+
+/** The headline line a DNA headline form uses, when the copy has it and it's short enough to be a headline. */
+export function headlineLine(copy: Copy, form: "question" | "benefit"): string | undefined {
+  const t = (form === "question" ? copy.heroQuestion : copy.heroBenefit)?.trim();
+  return t && t.length <= 72 ? t : undefined;
+}
+
+/** "AL Plumbing License #123", or "AL# 123" wording where Alabama's HVAC board wants it (and whenever the label says Alabama/HVAC). */
+export function licenseText(l: License, r?: BusinessRecord): string {
+  const al = /\b(alabama|al|hvac|heating|refrigeration)\b/i.test(l.label) || (r?.category === "contractor" && r.variant === "hvac");
+  return al ? `${l.label} AL# ${l.number}` : `${l.label} #${l.number}`;
+}
+
+export interface PlansOpts {
+  label?: string;
+  title?: string;
+  intro?: string;
+  /** Section id (default "plans"). */
+  id?: string;
+  /** A to-do rendered under the cards, e.g. "check these ways to work with us". */
+  todo?: Raw;
+}
+
+/** "from $49" for a bare amount, else the owner's own words ("Flat $150", "Call for pricing"). */
+function planPrice(p: Plan): string | undefined {
+  const t = p.price?.trim();
+  if (!t) return undefined;
+  return /^\$?\d/.test(t) ? `from ${t.startsWith("$") ? t : `$${t}`}` : t;
+}
+
+/**
+ * Plans & pricing: 1–3 cards (memberships, recurring tiers, "ways to work with us"), each with an optional
+ * starting price, an inclusion checklist and a badge. Prices show with a "starting points" line. Nothing without plans.
+ */
+export function plans(ctx: Ctx, o: PlansOpts = {}, items: Plan[] | undefined = ctx.r.plans): Raw {
+  const list = (items ?? []).filter((p) => p.name).slice(0, 3);
+  if (!list.length) return raw("");
+  const id = o.id ?? "plans";
+  const anyPrice = list.some((p) => planPrice(p));
+  const quote = action(ctx.r, "quote")!;
+  return html`<section class="section" id="${id}" aria-labelledby="${id}-title"><div class="wrap">
+${sectionHead(o.label ?? "Plans & pricing", o.title ?? "Pick what fits", o.intro, `${id}-title`)}
+<ul class="plans plans--${list.length}">${list.map((p) => {
+    const price = planPrice(p);
+    return html`<li class="plan${p.badge ? " plan--badged" : ""}">${p.badge ? html`<span class="plan__badge">${p.badge}</span>` : ""}<h3>${p.name}</h3>${
+      price ? html`<p class="plan__price"><strong>${price}</strong>${p.unit ? html`<span>/${p.unit}</span>` : ""}</p>` : ""
+    }${p.includes.length ? html`<ul class="plan__list">${p.includes.map((i) => html`<li>${icon("check", 18)}${i}</li>`)}</ul>` : ""}${p.note ? html`<p class="plan__note">${p.note}</p>` : ""}</li>`;
+  })}</ul>
+${anyPrice ? html`<p class="plans__note">Prices are starting points; we'll confirm after a quick look.</p>` : ""}
+<div class="btns">${button(quote, "primary")}${button(action(ctx.r, "call")!, "ghost")}</div>
+${o.todo ?? ""}
+</div></section>`;
+}
+
+/** The guarantee as one sentence in the owner's words, or nothing when none is set. */
+export function guaranteeLine(g: Guarantee | undefined): string | undefined {
+  if (!g) return undefined;
+  const text = g.text?.trim();
+  if (text) return text;
+  const w = g.window?.trim();
+  const rem = g.remedy?.trim().replace(/\.$/, "");
+  if (w && rem) return `Not happy? Tell us within ${w} and ${rem}.`;
+  if (rem) return `Not happy? ${rem.charAt(0).toUpperCase()}${rem.slice(1)}.`;
+  if (w) return `Not happy? Tell us within ${w} and we'll make it right.`;
+  return undefined;
+}
+
+/** Short chip wording: "24-hour guarantee" from a window of "24 hours", else "Satisfaction guarantee". */
+export function guaranteeChip(g: Guarantee | undefined): string | undefined {
+  if (!guaranteeLine(g)) return undefined;
+  const w = g!.window?.trim();
+  if (!w) return "Satisfaction guarantee";
+  const m = /^(\d+)\s*[- ]?\s*(hour|day|week)s?$/i.exec(w);
+  return `${m ? `${m[1]}-${m[2]!.toLowerCase()}` : w} guarantee`;
+}
+
+/** One-line band for the services section. */
+export function guaranteeBand(ctx: Ctx): Raw {
+  const line = guaranteeLine(ctx.r.guarantee);
+  return line ? html`<p class="guarantee">${icon("check", 22)}<span><strong>Our guarantee.</strong> ${line}</span></p>` : raw("");
+}
+
+export function guaranteeFaq(r: BusinessRecord): Faq | undefined {
+  const line = guaranteeLine(r.guarantee);
+  return line ? { q: "What if I'm not happy with the work?", a: line } : undefined;
+}
+
+/** Offers that haven't expired, in the order the owner listed them. */
+export function activeOffers(r: BusinessRecord, today = todayIso()): Offer[] {
+  return (r.offers ?? []).filter((o) => o.title && (!o.expiresOn || o.expiresOn >= today) && (!o.startsOn || o.startsOn <= today)).slice(0, 6);
+}
+
+function offerMeta(o: Offer): Raw {
+  const bits: Raw[] = [];
+  if (o.code) bits.push(html`<span class="offer__code">Code <strong>${o.code}</strong></span>`);
+  if (o.expiresOn) {
+    const d = eventDate(o.expiresOn);
+    bits.push(html`<span>Through ${d.mon} ${d.day}</span>`);
+  }
+  return bits.length ? html`<span class="offer__meta">${join(bits, " · ")}</span>` : raw("");
+}
+
+/** A thin promo bar under the opening with the first active offer (the page hides it itself once it expires). */
+export function promoBar(ctx: Ctx): Raw {
+  const o = activeOffers(ctx.r)[0];
+  if (!o) return raw("");
+  return html`<div class="promo"${o.expiresOn ? raw(` data-event-end="${o.expiresOn}"`) : ""}><div class="wrap promo__in">${icon("star", 18)}<span><strong>${o.title}</strong>${o.detail ? html` · ${o.detail}` : ""}</span>${offerMeta(o)}<a href="${action(ctx.r, "quote")!.href}">Claim it</a></div></div>`;
+}
+
+/** The rest of the offers (after the one in the bar) as cards; with `all`, every active offer. Nothing without offers. */
+export function offersSection(ctx: Ctx, o: { all?: boolean; label?: string; title?: string } = {}): Raw {
+  const items = activeOffers(ctx.r).slice(o.all ? 0 : 1);
+  if (!items.length) return raw("");
+  return html`<section class="section section--band" id="offers" aria-labelledby="offers-title"><div class="wrap">
+${sectionHead(o.label ?? "Specials", o.title ?? "Current offers", undefined, "offers-title")}
+<ul class="offers">${items.map((x) => html`<li class="offer"${x.expiresOn ? raw(` data-event-end="${x.expiresOn}"`) : ""}><h3>${x.title}</h3>${x.detail ? html`<p>${x.detail}</p>` : ""}${offerMeta(x)}</li>`)}</ul>
+<p class="muted">Mention the offer when you call or send a request.</p>
+</div></section>`;
 }
 
 export { join };

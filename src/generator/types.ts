@@ -36,6 +36,11 @@ export interface Image {
   height?: number;
   /** Required by Google for Places photos shown in previews. */
   attribution?: { name: string; uri?: string };
+  /** Owner photos: a short caption ("Patio") and the town it was taken in, shown under the photo. */
+  caption?: string;
+  town?: string;
+  /** This photo is the "before" of a pair: the file name (without folder or extension) of its "after" photo. */
+  pairWith?: string;
 }
 
 export type PriceMode = "none" | "exact" | "from" | "range" | "quote";
@@ -61,11 +66,34 @@ export interface License {
   state?: string;
 }
 
+/** A coupon or promotion in the owner's words. Hidden once `expiresOn` passes; without one it stays up until removed. */
 export interface Offer {
   title: string;
   detail?: string;
   startsOn?: string;
-  expiresOn: string;
+  expiresOn?: string;
+  /** Promo code to mention, e.g. "WEB25". */
+  code?: string;
+}
+
+/** A plan, membership or way to work with the business (research/trends-2026/trades-lawn-cleaning.md §5.1). Owner-entered. */
+export interface Plan {
+  name: string;
+  /** Price text as the owner wrote it, e.g. "$49" or "$120"; shown with a "starting points" note. */
+  price?: string;
+  /** "month", "visit", "year"… */
+  unit?: string;
+  includes: string[];
+  /** "Most popular" and the like. */
+  badge?: string;
+  note?: string;
+}
+
+/** A guarantee in the owner's words: the window to report a problem and what they do about it, or one full sentence. */
+export interface Guarantee {
+  window?: string;
+  remedy?: string;
+  text?: string;
 }
 
 export interface MenuItem {
@@ -123,6 +151,11 @@ export interface ContractorExt {
   freeEstimates?: boolean;
   warrantyText?: string;
   financing?: { lender: string; url: string };
+  /** Emergency path (with emergencyService): after-hours number if different, terms in the owner's words; confirmed is required to publish. */
+  afterHours?: { phone?: string; note?: string; confirmed: boolean };
+  /** Remodelers: jobs over $10,000 need the HBLB license number in advertising (Act 2024-443). */
+  jobsOver10k?: boolean;
+  serves?: "residential" | "commercial" | "both";
 }
 
 export interface SalonExt {
@@ -157,6 +190,12 @@ export interface AutoExt {
 export interface LandscapingExt {
   freeEstimates?: boolean;
   commercial?: boolean;
+  /** Show the 4-season "what we do when" block, built only from the services on the record. */
+  seasonal?: boolean;
+  /** Alabama Dept. of Agriculture & Industries permit, required before fertilizing/weed/pest services can publish. */
+  adaiPermit?: string;
+  /** "Owner-operated: Jake runs every job", in the About section. */
+  crew?: string;
 }
 
 export interface PrintExt {
@@ -258,12 +297,27 @@ export interface ChurchExt {
   deductibleConfirmed?: boolean;
 }
 
+/** What's included, room by room. A task may end in tier tags ("Dust ceiling fans @deep"); untagged tasks are in every tier. */
+export interface CleaningChecklist {
+  rooms: Array<{ room: string; tasks: string[] }>;
+  tiers: string[];
+  /** "May cost extra" items. */
+  extras: string[];
+}
+
 export interface CleaningExt {
   freeEstimates?: boolean;
   backgroundChecked?: boolean;
   suppliesIncluded?: boolean;
   petSafe?: boolean;
   commercial?: boolean;
+  checklist?: CleaningChecklist;
+  /** Commercial: facility types they clean for, from CLEANING_FACILITIES. */
+  facilities?: string[];
+  /** Commercial: "Nightly, weekly or on your schedule", in the owner's words. */
+  frequency?: string;
+  /** Commercial: cleans after hours. */
+  afterHours?: boolean;
 }
 
 /** One dated item for the "What's happening" section: an event, a special, a coupon, a deadline. */
@@ -329,6 +383,9 @@ export interface BusinessRecord {
     church?: ChurchExt;
   };
   confirmed: ConfirmableField[];
+  /** Plans & pricing cards (memberships, recurring tiers, ways to work with us). Owner-entered; 1–3. */
+  plans?: Plan[];
+  guarantee?: Guarantee;
 }
 
 export interface Faq {
@@ -354,6 +411,9 @@ export interface Copy {
   es?: SpanishCopy;
   /** Problems the copy writer still saw after its retries (hype, invented numbers). Shown as a lint warning; never blocks. */
   issues?: string[];
+  /** Headline forms for the DNA `headline` knob: a question ("Is your AC blowing warm air?") and a benefit ("Take your weekend back"). ≤60 chars, no claims. */
+  heroQuestion?: string;
+  heroBenefit?: string;
 }
 
 export interface SpanishCopy {

@@ -3,14 +3,24 @@ import { getLead } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 
 // Every FormField name the generator can render (src/generator/components.ts), plus the hidden topic a special form sets.
-const FIELDS = ["topic", "name", "phone", "email", "service", "vehicle", "frequency", "home_size", "property", "quantity", "year", "make", "model", "part", "items", "address", "best_day", "town", "message"] as const;
+const FIELDS = ["topic", "name", "phone", "email", "service", "vehicle", "frequency", "home_size", "property", "quantity", "year", "make", "model", "part", "items", "address", "best_day", "town", "message", "reach", "urgent", "facility", "sq_ft"] as const;
 
-/** One line for the notification: what they asked for (service, the part and vehicle, or the pickup items). */
+/** True when the form's "Is this an emergency?" answer was yes. */
+export function isUrgent(data: Record<string, string>): boolean {
+  return /^y/i.test(data.urgent ?? "");
+}
+
+/**
+ * One line for the notification: what they asked for (service, the part and vehicle, the pickup items, the building),
+ * with 🔴 in front of an emergency and how they'd rather be reached at the end.
+ */
 export function requestSummary(data: Record<string, string>): string {
   const vehicle = [data.year, data.make, data.model].filter(Boolean).join(" ") || data.vehicle;
-  const bits = [data.service, data.part, vehicle, data.items, data.address, data.best_day ? `best day ${data.best_day}` : "", data.town].filter(Boolean);
+  const bits = [data.service, data.part, vehicle, data.items, data.facility, data.sq_ft ? `${data.sq_ft} sq ft` : "", data.home_size, data.frequency, data.property, data.address, data.best_day ? `best day ${data.best_day}` : "", data.town].filter(Boolean);
+  if (data.reach) bits.push(`prefers ${data.reach.toLowerCase() === "text" ? "a text" : "a call"}`);
   const what = bits.join(" · ");
-  return data.topic ? `${data.topic}${what ? `: ${what}` : ""}` : what;
+  const line = data.topic ? `${data.topic}${what ? `: ${what}` : ""}` : what;
+  return isUrgent(data) ? `🔴 Emergency${line ? ` · ${line}` : ""}` : line;
 }
 
 /** Lead form posts from published client sites. Works without JavaScript (plain POST + redirect). */
@@ -44,6 +54,6 @@ export async function handleFormPost(env: Env, req: Request, leadId: string): Pr
     .bind(newId(), leadId, now(), JSON.stringify(data), ip)
     .run();
   const what = requestSummary(data);
-  await notify(env, { kind: "message", actorName: data.name, leadId, text: `💬 New request from ${lead.name}'s website: ${data.name}${what ? `, ${what}` : ""}` });
+  await notify(env, { kind: "message", actorName: data.name, leadId, text: `${isUrgent(data) ? "🔴" : "💬"} New request from ${lead.name}'s website: ${data.name}${what ? `, ${what}` : ""}` });
   return back("/thanks/");
 }

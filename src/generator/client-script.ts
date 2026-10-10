@@ -139,7 +139,9 @@ if (evs.length) {
     var tg = function (t) { for (var i = 0; i < tp.length; i++) if (tp[i].type === t) return tp[i].value; return ""; };
     var todayIso = tg("year") + "-" + tg("month") + "-" + tg("day"), left = 0;
     for (var ei = 0; ei < evs.length; ei++) { if (evs[ei].getAttribute("data-event-end") < todayIso) evs[ei].hidden = true; else left++; }
-    if (!left) { var es = d.getElementById("events"); if (es) es.hidden = true; }
+    // A section whose dated items have all passed goes too (events, and the offers cards).
+    var secs = ["events", "offers"];
+    for (var si = 0; si < secs.length; si++) { var es = d.getElementById(secs[si]); if (es && !es.querySelector("[data-event-end]:not([hidden])")) es.hidden = true; }
   } catch (err) {}
 }
 var fy = d.querySelectorAll("[data-year]");
