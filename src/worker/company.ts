@@ -438,6 +438,7 @@ async function home(env: Env, url: URL): Promise<Response> {
     ...(email ? { email } : {}),
     address: { "@type": "PostalAddress", addressLocality: "Cullman", addressRegion: "AL", addressCountry: "US" },
     areaServed: ["Cullman", "Hanceville", "Good Hope", "Vinemont", "Hartselle", "Arab"].map((n) => ({ "@type": "City", name: `${n}, AL` })),
+    ...(s.companyFacebookUrl ? { sameAs: [s.companyFacebookUrl] } : {}),
     description,
   };
   const callBtn = phone ? `<a class="btn btn--ghost" href="${telHref(phone)}">Call ${e(phone)}</a>` : "";
@@ -546,7 +547,7 @@ ${phone || email ? `<p class="direct">Rather talk? ${phone ? `<a href="${telHref
 ${s.directEmail && s.directEmail !== email ? `<p class="direct">Need ${s.callerName ? e(s.callerName.split(" ")[0]!) : "the owner"} directly? <a href="mailto:${e(s.directEmail)}">${e(s.directEmail)}</a></p>` : ""}
 </div></section>
 </main>
-${footer(legal, s.companyReviewUrl)}
+${footer(legal, s.companyReviewUrl, s.companyFacebookUrl)}
 ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)}">Call</a><a href="#contact">Free preview</a></nav>` : ""}
 </body></html>`;
   return new Response(html, {
@@ -594,8 +595,8 @@ async function portfolio(env: Env): Promise<Response> {
   return policyShell(name, s.legalName || name, "Portfolio", body, { wide: true, phone: s.companyPhone, from, description: `Example websites by ${name} for Cullman-area businesses: restaurants, contractors, salons, auto shops, lawn care, cleaning, print shops and boutiques.` });
 }
 
-function footer(legal: string, reviewUrl?: string): string {
-  return `<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama · <a href="/extras">Clients: add extras</a> · <a href="/terms">Terms &amp; refunds</a> · <a href="/privacy">Privacy</a>${reviewUrl ? ` · <a href="${e(reviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</div></footer>`;
+function footer(legal: string, reviewUrl?: string, facebookUrl?: string): string {
+  return `<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama · <a href="/extras">Clients: add extras</a> · <a href="/terms">Terms &amp; refunds</a> · <a href="/privacy">Privacy</a>${facebookUrl ? ` · <a href="${e(facebookUrl)}" rel="noopener">Facebook</a>` : ""}${reviewUrl ? ` · <a href="${e(reviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</div></footer>`;
 }
 
 const HEADERS = {

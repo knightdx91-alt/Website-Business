@@ -225,6 +225,8 @@ export interface AppSettings {
   directEmail?: string;
   /** Our own Google "write a review" link, texted to happy clients. */
   companyReviewUrl?: string;
+  /** Our Facebook page, linked from the company website. */
+  companyFacebookUrl?: string;
   /** The Google account clients add as a Manager on their Business Profile. */
   gbpEmail?: string;
   callerName?: string;
@@ -294,6 +296,7 @@ export async function getSettings(env: Env): Promise<AppSettings> {
     annualMonthsFree: s.annualMonthsFree ?? 2,
     churchAnnualMonthsFree: s.churchAnnualMonthsFree ?? 4,
     dailyCalls: s.dailyCalls ?? 0,
+    companyFacebookUrl: s.companyFacebookUrl ?? "https://www.facebook.com/undergroundassociates",
     defaultCap: s.defaultCap ?? 50,
     copyModel: s.copyModel && MODEL_PRICES[s.copyModel] ? s.copyModel : "claude-opus-5-5",
   };

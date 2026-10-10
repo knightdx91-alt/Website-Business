@@ -309,6 +309,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   link opens undergroundassociates.com/change?b=<lead> (sold/live leads only), which posts to the app Inbox and notifies.
 - Review asks: Settings → "Our Google review link" (`companyReviewUrl`) adds "Ask for a review" (text) on sold/live
   leads and a "Review us on Google" link in the company site footer.
+- Facebook page: Settings → "Our Facebook page" (`companyFacebookUrl`, default facebook.com/undergroundassociates) is linked
+  in the company site footer and as `sameAs` in its structured data. Client sites don't link it (their footer credit points
+  at undergroundassociates.com, which carries it).
 - Online checkout (`src/worker/checkout.ts`, migration 0010): with Worker secret STRIPE_SECRET_KEY, orders go to a Stripe
   Checkout Session built from Settings (`priceSignup` / `priceExtras`; the browser only sends picks, never prices):
   plan as a monthly subscription (yearly = 12 − annualMonthsFree months, interval year), the month-to-month setup fee and
