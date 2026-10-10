@@ -5,7 +5,7 @@ import { parsePrice } from "../generator/price.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { PARTS_COUNTER } from "../generator/packs/auto.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
-import type { BusinessRecord, ConfirmableField, Copy, Service } from "../generator/types.ts";
+import { MENU_TAGS, type BusinessRecord, type ConfirmableField, type Copy, type MenuItem, type MenuTag, type Service } from "../generator/types.ts";
 import { HttpError } from "./env.ts";
 
 // z.string().url() alone accepts javascript: links; only web addresses may go on a site.
@@ -131,7 +131,68 @@ export const EditsSchema = z.object({
         .partial()
         .optional(),
       links: z
-        .object({ order: url, reserve: url, booking: url, facebook: url, instagram: url, shop: url })
+        .object({ order: url, reserve: url, booking: url, facebook: url, instagram: url, shop: url, giftCards: url })
+        .partial()
+        .optional(),
+      /** Owner proof (every category): awards, memberships, named clients, stats. Empty lists clear. */
+      proof: z
+        .object({
+          awards: z.array(z.object({ name: z.string().trim().min(1).max(80), year: z.string().trim().max(12).optional() })).max(12),
+          memberships: z.array(z.string().trim().min(1).max(80)).max(12),
+          clients: z.array(z.string().trim().min(1).max(80)).max(20),
+          stats: z.array(z.object({ value: z.string().trim().min(1).max(20), label: z.string().trim().min(1).max(60) })).max(6),
+        })
+        .partial()
+        .optional(),
+      /** Holiday closures and the visit lines (how to pay, where to park). */
+      closures: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), label: z.string().trim().min(1).max(80) })).max(20).optional(),
+      visit: z.object({ paymentMethods: z.array(z.string().trim().min(1).max(30)).max(10), parking: z.string().trim().max(240) }).partial().optional(),
+      /** Restaurants: per-item photo (a gallery file) and tags, matched to the menu by item name. */
+      menuItems: z.array(z.object({ name: z.string().trim().min(1).max(120), image: z.string().trim().max(200).optional(), tags: z.array(z.enum(MENU_TAGS as [MenuTag, ...MenuTag[]])).max(4).optional() })).max(200).optional(),
+      restaurant: z
+        .object({
+          catering: z.boolean(),
+          cateringNote: z.string().trim().max(300),
+          calendarUrl: url,
+          deliveryLinks: z.object({ doordash: url, ubereats: url, grubhub: url }).partial(),
+          rewardsUrl: url,
+        })
+        .partial()
+        .optional(),
+      salon: z
+        .object({
+          team: z
+            .array(z.object({ name: z.string().trim().min(1).max(60), role: z.string().trim().max(60).optional(), days: z.string().trim().max(60).optional(), bookingUrl: url.optional(), line: z.string().trim().max(200).optional() }))
+            .max(20),
+          teamConfirmed: z.boolean(),
+          rates: z.array(z.object({ minutes: z.number().int().min(5).max(600), price: z.string().trim().min(1).max(20) })).max(10),
+          policies: z.object({ deposit: z.string().trim().max(300), cancellation: z.string().trim().max(300), lateness: z.string().trim().max(300), kids: z.string().trim().max(300) }).partial(),
+          introOffer: z.object({ text: z.string().trim().max(120), until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).optional() }),
+          pet: z.object({ vaccinations: z.string().trim().max(300), pricingFrom: z.string().trim().max(300), mattingNote: z.string().trim().max(300), prep: z.string().trim().max(300) }).partial(),
+        })
+        .partial()
+        .optional(),
+      retail: z
+        .object({
+          florist: z.object({ occasions: z.array(z.string().trim().min(1).max(40)).max(8), deliveryArea: z.string().trim().max(120), cutoff: z.string().trim().max(40), deliveryFee: z.string().trim().max(60), designersChoice: z.boolean() }).partial(),
+          vendors: z.object({ boothsAvailable: z.boolean(), note: z.string().trim().max(400) }).partial(),
+          departments: z.array(z.string().trim().min(1).max(40)).max(16),
+          brands: z.array(z.string().trim().min(1).max(40)).max(24),
+          financing: z.object({ lender: z.string().trim().max(60), url: url.optional() }),
+          deliveryNote: z.string().trim().max(240),
+          dropDay: z.string().trim().max(120),
+          holdNote: z.string().trim().max(160),
+          occasions: z.array(z.string().trim().min(1).max(40)).max(10),
+        })
+        .partial()
+        .optional(),
+      print: z
+        .object({
+          uploadUrl: url,
+          quantityTiers: z.array(z.object({ from: z.number().int().min(1).max(100_000), note: z.string().trim().max(40).optional() })).max(8),
+          turnaround: z.string().trim().max(160),
+          storeUrl: url,
+        })
         .partial()
         .optional(),
       testimonials: z
@@ -181,6 +242,81 @@ function serviceId(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+/** Drops empty strings and empty arrays so a cleared field disappears from the record instead of lingering as "". */
+function compact<T extends object>(o: T): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) {
+    if (v === "" || v === undefined || (Array.isArray(v) && !v.length)) continue;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const inner = compact(v as object);
+      if (Object.keys(inner).length) out[k] = inner;
+      continue;
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
+/** Owner proof, closures, visit lines and the Oct 2026 restaurant / salon / retail / print fields (research/trends-2026). */
+function applyFsrpEdits(r: BusinessRecord, e: NonNullable<Edits["record"]>): void {
+  if (e.proof !== undefined) {
+    const p = compact({ ...(r.proof ?? {}), ...e.proof }) as BusinessRecord["proof"];
+    r.proof = p && Object.keys(p).length ? p : undefined;
+  }
+  if (e.closures !== undefined) r.closures = e.closures.length ? e.closures : undefined;
+  if (e.visit !== undefined) {
+    const v = compact({ ...(r.visit ?? {}), ...e.visit }) as BusinessRecord["visit"];
+    r.visit = v && Object.keys(v).length ? v : undefined;
+  }
+  if (r.category === "restaurant" && e.restaurant) {
+    const x = (r.ext.restaurant = r.ext.restaurant ?? { serviceOptions: {} });
+    const { deliveryLinks, ...rest } = e.restaurant;
+    for (const [k, v] of Object.entries(rest)) (x as unknown as Record<string, unknown>)[k] = v === "" ? undefined : v;
+    if (deliveryLinks) {
+      const d = compact({ ...(x.deliveryLinks ?? {}), ...deliveryLinks }) as typeof x.deliveryLinks;
+      x.deliveryLinks = d && Object.keys(d).length ? d : undefined;
+    }
+  }
+  if (r.category === "salon" && e.salon) {
+    const x = (r.ext.salon = r.ext.salon ?? {});
+    const { team, rates, policies, introOffer, pet, ...rest } = e.salon;
+    for (const [k, v] of Object.entries(rest)) (x as unknown as Record<string, unknown>)[k] = v;
+    if (team !== undefined) x.team = team.length ? team.map((m) => compact(m) as typeof m) : undefined;
+    if (rates !== undefined) x.rates = rates.length ? rates : undefined;
+    if (policies !== undefined) {
+      const p = compact(policies);
+      x.policies = Object.keys(p).length ? (p as typeof x.policies) : undefined;
+    }
+    if (introOffer !== undefined) x.introOffer = introOffer.text ? { text: introOffer.text, until: introOffer.until || undefined } : undefined;
+    if (pet !== undefined) {
+      const p = compact(pet);
+      x.pet = Object.keys(p).length ? (p as typeof x.pet) : undefined;
+    }
+  }
+  if (r.category === "retail" && e.retail) {
+    const x = (r.ext.retail = r.ext.retail ?? {});
+    const { florist, vendors, financing, ...rest } = e.retail;
+    for (const [k, v] of Object.entries(rest)) (x as unknown as Record<string, unknown>)[k] = v === "" || (Array.isArray(v) && !v.length) ? undefined : v;
+    if (florist !== undefined) {
+      const f = compact({ ...(x.florist ?? {}), ...florist });
+      if (florist.designersChoice === false) delete f.designersChoice;
+      x.florist = Object.keys(f).length ? (f as typeof x.florist) : undefined;
+    }
+    if (vendors !== undefined) {
+      const v = compact({ ...(x.vendors ?? {}), ...vendors });
+      if (vendors.boothsAvailable === false) delete v.boothsAvailable;
+      x.vendors = Object.keys(v).length ? (v as typeof x.vendors) : undefined;
+    }
+    if (financing !== undefined) x.financing = financing.lender ? { lender: financing.lender, url: financing.url || undefined } : undefined;
+  }
+  if (r.category === "print" && e.print) {
+    const x = (r.ext.print = r.ext.print ?? {});
+    const { quantityTiers, ...rest } = e.print;
+    for (const [k, v] of Object.entries(rest)) (x as unknown as Record<string, unknown>)[k] = v === "" ? undefined : v;
+    if (quantityTiers !== undefined) x.quantityTiers = quantityTiers.length ? quantityTiers.map((t) => ({ from: t.from, note: t.note || undefined })) : undefined;
+  }
 }
 
 export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { record: BusinessRecord; copy: Copy; look?: string } {
@@ -279,8 +415,10 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
     if (e.suppliesIncluded !== undefined) c.suppliesIncluded = e.suppliesIncluded;
     if (e.petSafe !== undefined) c.petSafe = e.petSafe;
   }
+  applyFsrpEdits(r, e);
   if (e.links) {
     const l = e.links;
+    if (l.giftCards !== undefined) r.links.giftCards = l.giftCards || undefined;
     if (l.order !== undefined) r.links.order = l.order || undefined;
     if (l.reserve !== undefined) r.links.reserve = l.reserve || undefined;
     if (l.booking !== undefined) r.links.booking = l.booking || undefined;
@@ -298,20 +436,44 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
   if (e.services) {
     const keep = new Map(r.services.map((s) => [s.name.toLowerCase(), s]));
     r.services = e.services.map((line) => {
-      const [rawName, rawPrice] = line.split("|").map((x) => x.trim());
+      const [rawName, rawPrice, rawDuration] = line.split("|").map((x) => x.trim());
       const name = rawName || line;
       const existing = keep.get(name.toLowerCase());
       const svc: Service = existing ? { ...existing, name } : { id: serviceId(name), name, featured: true };
       if (rawPrice !== undefined) svc.price = parsePrice(rawPrice);
+      // Salons: a third part is the duration ("Haircut | $25 | 45 min").
+      if (rawDuration !== undefined) {
+        const mins = /^(\d{1,3})\s*(?:min(?:ute)?s?)?$/i.exec(rawDuration)?.[1];
+        svc.durationMin = mins ? Number(mins) : undefined;
+      }
       return svc;
     });
   }
   if (e.menuText !== undefined && r.category === "restaurant") {
     r.ext.restaurant = r.ext.restaurant ?? { serviceOptions: {} };
+    // Photos and tags ride on the item name, so retyping the menu keeps them.
+    const prior = new Map<string, MenuItem>();
+    for (const sec of r.ext.restaurant.menu?.sections ?? []) for (const it of sec.items) prior.set(it.name.toLowerCase(), it);
     const sections = parseMenuText(e.menuText);
+    for (const sec of sections) for (const it of sec.items) {
+      const was = prior.get(it.name.toLowerCase());
+      if (was?.image) it.image = was.image;
+      if (was?.tags?.length) it.tags = was.tags;
+    }
     r.ext.restaurant.menu = sections.length
       ? { sections, lastUpdated: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }) }
       : undefined;
+  }
+  if (e.menuItems && r.category === "restaurant" && r.ext.restaurant?.menu) {
+    // A menu photo is one of the owner's gallery files (never a Google photo); an empty image or tag list clears.
+    const gallery = new Map(r.media.gallery.filter((g) => g.source !== "google").map((g) => [g.src, g]));
+    const wanted = new Map(e.menuItems.map((m) => [m.name.toLowerCase(), m]));
+    for (const sec of r.ext.restaurant.menu.sections) for (const it of sec.items) {
+      const m = wanted.get(it.name.toLowerCase());
+      if (!m) continue;
+      if (m.image !== undefined) it.image = m.image && gallery.has(m.image) ? gallery.get(m.image) : undefined;
+      if (m.tags !== undefined) it.tags = m.tags.length ? [...new Set(m.tags)] : undefined;
+    }
   }
   if (e.confirmed) r.confirmed = e.confirmed as ConfirmableField[];
 

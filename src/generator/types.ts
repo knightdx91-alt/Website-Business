@@ -46,6 +46,8 @@ export interface Service {
   group?: string;
   featured?: boolean;
   price?: { mode: PriceMode; amount?: number; min?: number; max?: number; unit?: string; note?: string };
+  /** Salons, barbers, massage: how long it takes, shown as "45 min" next to the price. */
+  durationMin?: number;
 }
 
 export interface Testimonial {
@@ -72,8 +74,14 @@ export interface MenuItem {
   name: string;
   description?: string;
   price?: string;
-  tags?: Array<"spicy" | "vegetarian" | "gluten_free" | "house_favorite" | "new">;
+  tags?: MenuTag[];
+  /** An owner photo (one of the gallery files); Google photos never go on menu items. */
+  image?: Image;
 }
+
+export type MenuTag = "spicy" | "vegetarian" | "vegan" | "gluten_free" | "house_favorite" | "new" | "popular";
+export const MENU_TAGS: MenuTag[] = ["popular", "new", "vegetarian", "vegan", "gluten_free", "spicy", "house_favorite"];
+export const MENU_TAG_LABEL: Record<MenuTag, string> = { popular: "Popular", new: "New", vegetarian: "Vegetarian", vegan: "Vegan", gluten_free: "Gluten-free", spicy: "Spicy", house_favorite: "House favorite" };
 
 export interface MenuSection {
   name: string;
@@ -114,6 +122,14 @@ export interface RestaurantExt {
   menu?: { sections: MenuSection[]; lastUpdated: string; pdfUrl?: string };
   highlights?: string[];
   catering?: boolean;
+  /** What they cater, in the owner's words ("Plates and pans for 20 to 200; church suppers, reunions, work lunches."). */
+  cateringNote?: string;
+  /** Food trucks: where the weekly schedule lives (Google Calendar, Facebook events page). "This week" comes from `events`. */
+  calendarUrl?: string;
+  /** Third-party ordering pages the owner gives; shown as an "Order through" row, never guessed. */
+  deliveryLinks?: Partial<Record<"doordash" | "ubereats" | "grubhub", string>>;
+  /** Loyalty / rewards sign-up page (Toast, Square, their app). */
+  rewardsUrl?: string;
 }
 
 export interface ContractorExt {
@@ -127,6 +143,28 @@ export interface ContractorExt {
 
 export interface SalonExt {
   walkIns?: "welcome" | "appointment_only" | "both";
+  /** "People book people": the stylists, barbers, techs or groomers, each with their own booking link if they have one. */
+  team?: SalonTeamMember[];
+  /** Owner confirmed the team list (required to publish once a team is listed). */
+  teamConfirmed?: boolean;
+  /** Massage: a minutes × price table ("30 | $45"). */
+  rates?: Array<{ minutes: number; price: string }>;
+  /** "Good to know": the shop's own policy lines. */
+  policies?: { deposit?: string; cancellation?: string; lateness?: string; kids?: string };
+  /** One new-client offer shown in the opening until `until` (YYYY-MM-DD) has passed. */
+  introOffer?: { text: string; until?: string };
+  /** Pet groomers: "Before your appointment" in the groomer's words. */
+  pet?: { vaccinations?: string; pricingFrom?: string; mattingNote?: string; prep?: string };
+}
+
+export interface SalonTeamMember {
+  name: string;
+  role?: string;
+  /** Days they work, free text ("Tue–Sat"). */
+  days?: string;
+  bookingUrl?: string;
+  /** One line about them, in their own words. */
+  line?: string;
 }
 
 /** Counter services an auto parts store may offer; the owner confirms the set before publish. */
@@ -165,6 +203,14 @@ export interface PrintExt {
   designHelp?: boolean;
   proofBeforePrint?: boolean;
   install?: boolean;
+  /** The owner's Dropbox / Google Drive file-request link: "Upload your artwork" with no server of ours. */
+  uploadUrl?: string;
+  /** Price breaks, e.g. [{ from: 12, note: "" }, { from: 48, note: "best price" }]; the site never states prices. */
+  quantityTiers?: Array<{ from: number; note?: string }>;
+  /** Typical turnaround in the owner's words ("About 10 business days after proof approval"). */
+  turnaround?: string;
+  /** Online / team store (spirit wear) link. */
+  storeUrl?: string;
 }
 
 /** Thrift-store donations (on by default for the thrift variant; any shop can turn it on). All owner-entered. */
@@ -187,6 +233,23 @@ export interface RetailExt {
   giftCards?: boolean;
   delivery?: boolean;
   donations?: RetailDonations;
+  /** Florists: occasions, delivery rule (same-day only with a cutoff), designer's-choice note. */
+  florist?: { occasions?: string[]; deliveryArea?: string; cutoff?: string; deliveryFee?: string; designersChoice?: boolean };
+  /** Antique malls, thrift and vendor boutiques: booth rental. A booth-inquiry form renders when booths are available. */
+  vendors?: { boothsAvailable?: boolean; note?: string };
+  /** Feed, hardware, furniture: departments and brand names the owner typed (text only, no logos). */
+  departments?: string[];
+  brands?: string[];
+  /** Furniture: financing partner (named only with the owner's say-so). */
+  financing?: { lender: string; url?: string };
+  /** Delivery rule in the owner's words ("Free delivery in Cullman County on orders over $499"). `delivery` is the yes/no chip. */
+  deliveryNote?: string;
+  /** Boutiques: "New arrivals every Thursday at 10". */
+  dropDay?: string;
+  /** "Call to hold an item for 24 hours." */
+  holdNote?: string;
+  /** Boutique / gift occasion tiles (homecoming, game day, prom…). Florists use `florist.occasions`. */
+  occasions?: string[];
 }
 
 /** Tax & finance (research/tax-finance.md §9). Every claim field is owner-entered and owner-confirmed. */
@@ -316,6 +379,12 @@ export interface BusinessRecord {
   /** Dated events, specials and announcements in the owner's words; past ones drop off on their own. */
   events?: EventItem[];
   reputation: { rating?: number; count?: number; displayMode: "link_only" | "owner_stated"; ownerStatedText?: string };
+  /** Owner proof: awards, memberships, named clients (with permission) and stats, shown in the opening's trust row / proof band. */
+  proof?: OwnerProof;
+  /** Holiday closures (YYYY-MM-DD); past ones drop off on their own. */
+  closures?: Array<{ date: string; label: string }>;
+  /** Visit details every storefront needs: how to pay, where to park. */
+  visit?: { paymentMethods?: string[]; parking?: string };
   ext: {
     restaurant?: RestaurantExt;
     contractor?: ContractorExt;
@@ -329,6 +398,14 @@ export interface BusinessRecord {
     church?: ChurchExt;
   };
   confirmed: ConfirmableField[];
+}
+
+export interface OwnerProof {
+  awards?: Array<{ name: string; year?: string }>;
+  memberships?: string[];
+  /** Named clients, text only, with their permission. "Trusted by …" under the proof band. */
+  clients?: string[];
+  stats?: Array<{ value: string; label: string }>;
 }
 
 export interface Faq {

@@ -376,7 +376,17 @@ export function settleDna(d: Dna): Dna {
  * A deterministic DNA for a site: the same seed always gives the same structure, different seeds spread
  * across the category's preferred values. About half the time a curated recipe sets the big knobs first.
  */
-export function pickDna(seed: string, category: CategoryId, o: { avoid?: Dna[] } = {}): Dna {
+/** What's known about the business when its structure is picked (see pickDesign / chooseLook). */
+export interface DnaHints {
+  /** The owner gave awards, memberships, clients or stats: the proof band under the opening shows them off. */
+  proof?: boolean;
+  /** No owner photo (none, or only a Google one that can't go live): open without a photo, so the live site never looks worse than the preview. */
+  noPhoto?: boolean;
+}
+
+const PHOTO_LESS: Array<Dna["hero"]> = ["statement", "billboard", "banner"];
+
+export function pickDna(seed: string, category: CategoryId, o: { avoid?: Dna[]; hints?: DnaHints } = {}): Dna {
   const prefs = PREFS[category] ?? {};
   const roll = (salt: string) => (hash(`${seed}|${salt}`) % 10_000) / 10_000;
   const pick = <K extends DnaKnob>(k: K, salt = ""): Dna[K] => {
@@ -395,6 +405,15 @@ export function pickDna(seed: string, category: CategoryId, o: { avoid?: Dna[] }
     const d = Object.fromEntries(DNA_KNOB_IDS.map((k) => [k, pick(k, salt)])) as Dna;
     const recipes = RECIPES[category] ?? [];
     if (recipes.length && roll(`recipe|${salt}`) < 0.55) Object.assign(d, recipes[Math.floor(roll(`which|${salt}`) * recipes.length)]!.dna);
+    if (o.hints?.proof) d.proof = "band";
+    if (o.hints?.noPhoto && !PHOTO_LESS.includes(d.hero)) {
+      // Photo-led openings fall back to a plain band without a photo; pick one meant to stand on its own instead.
+      const pool = PHOTO_LESS.filter((h) => (prefs.hero ?? PHOTO_LESS).includes(h));
+      const opts = pool.length ? pool : PHOTO_LESS;
+      d.hero = opts[Math.floor(roll(`nophoto|${salt}`) * opts.length)]!;
+      // A light opening is allowed here even where the category normally keeps its brand color.
+      if (roll(`light|${salt}`) < 0.35) d.tone = "light";
+    }
     return settleDna(d);
   };
   // "Used" means the parts people notice first match (opening, services, address bar, headline), not every knob.

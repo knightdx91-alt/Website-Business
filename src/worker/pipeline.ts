@@ -4,6 +4,7 @@ import { packFor } from "../generator/packs/index.ts";
 import { churchVariant } from "../generator/packs/church.ts";
 import { financeVariant } from "../generator/packs/finance.ts";
 import { pickDesign } from "../generator/design.ts";
+import type { DnaHints } from "../generator/dna.ts";
 import { buildSite } from "../generator/render.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
@@ -88,7 +89,15 @@ export async function chooseLook(env: Env, record: BusinessRecord, leadId: strin
     preferred: pack.defaultLook(record),
     used: rows.results.map((r) => r.look),
     taken: [...rows.results.filter((r) => r.sales_status === "sold" || r.sales_status === "live").map((r) => r.look), ...(current ? [current] : [])],
+    hints: dnaHints(record),
   });
+}
+
+/** What the structure picker should know about this business: owner proof to show off, and whether a photo can go live. */
+export function dnaHints(record: BusinessRecord): DnaHints {
+  const p = record.proof;
+  const proof = !!p && !!(p.awards?.length || p.memberships?.length || p.clients?.length || p.stats?.length);
+  return { proof, noPhoto: !record.media.hero || record.media.hero.source === "google" };
 }
 
 export function heroFromPlace(record: BusinessRecord, place: Place): void {

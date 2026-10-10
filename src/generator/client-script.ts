@@ -142,6 +142,20 @@ if (evs.length) {
     if (!left) { var es = d.getElementById("events"); if (es) es.hidden = true; }
   } catch (err) {}
 }
+// Dated lines (closures, intro offers): hide once their day has passed; "soon" lines show inside a week.
+var dated = d.querySelectorAll("[data-until],[data-soon]");
+if (dated.length) {
+  try {
+    var dp = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    var dg = function (t) { for (var i = 0; i < dp.length; i++) if (dp[i].type === t) return dp[i].value; return ""; };
+    var dToday = dg("year") + "-" + dg("month") + "-" + dg("day");
+    for (var di = 0; di < dated.length; di++) {
+      var until = dated[di].getAttribute("data-until") || dated[di].getAttribute("data-soon");
+      if (until < dToday) { dated[di].hidden = true; continue; }
+      if (dated[di].hasAttribute("data-soon")) dated[di].hidden = (Date.parse(until) - Date.parse(dToday)) > 7 * 86400000;
+    }
+  } catch (err) {}
+}
 var fy = d.querySelectorAll("[data-year]");
 for (var y = 0; y < fy.length; y++) fy[y].textContent = String(new Date().getFullYear());
 })();

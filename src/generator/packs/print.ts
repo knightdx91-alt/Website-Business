@@ -1,8 +1,8 @@
 import { action, actions } from "../actions.ts";
-import { about, cardGrid, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, steps, todo, visit, type Ctx, serviceList } from "../components.ts";
+import { about, contactForm, ctaBand, factList, faq, gallery, hero, infoStrip, reviews, sectionHead, steps, todo, visit, type Ctx, type FormField, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
-import { html } from "../html.ts";
-import type { BusinessRecord, Service } from "../types.ts";
+import { html, raw, type Raw } from "../html.ts";
+import type { BusinessRecord, PrintExt, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 /** research/print-signs-apparel.md §13: the name decides first, because Google has no print or sign shop type. */
@@ -64,18 +64,65 @@ function trust(r: BusinessRecord): string[] {
   return out;
 }
 
-/** "Send us your artwork": static sites can't take uploads, so it's email or a text. */
+function ext(r: BusinessRecord): PrintExt {
+  return r.ext.print ?? {};
+}
+
+/** "Send us your artwork": static sites can't take uploads, so it's the owner's file-request link, email or a text. */
 function artwork(ctx: Ctx) {
   const r = ctx.r;
   const text = action(r, "text");
+  const up = ext(r).uploadUrl;
   const subject = encodeURIComponent(`Artwork for a quote: ${r.name}`);
   const what = r.variant === "signs" ? "a photo of the wall, window, truck or trailer" : "your logo or a photo of your design";
   return html`<section class="section" id="artwork" aria-labelledby="art-title"><div class="wrap narrow">
-${sectionHead("Artwork", "Send us your design", `Have a file? ${r.email ? "Email it to us." : "Send it our way."} Have a sketch, an old shirt or a photo? ${r.smsEnabled ? "Text us" : "Show us"} ${what}. No design yet? Call and tell us what you have in mind.`, "art-title")}
-<div class="btns">${r.email ? html`<a class="btn btn--secondary" href="mailto:${r.email}?subject=${subject}"><span>Email your artwork</span></a>` : ""}${text ? html`<a class="btn btn--ghost" href="${text.href}"><span>Text us a photo</span></a>` : ""}<a class="btn btn--ghost" href="${action(r, "call")!.href}"><span>Call ${r.phone.display}</span></a></div>
+${sectionHead("Artwork", "Send us your design", `Have a file? ${up ? "Upload it, or email it to us." : r.email ? "Email it to us." : "Send it our way."} Have a sketch, an old shirt or a photo? ${r.smsEnabled ? "Text us" : "Show us"} ${what}. No design yet? Call and tell us what you have in mind.`, "art-title")}
+<div class="btns">${up ? html`<a class="btn btn--primary" href="${up}" target="_blank" rel="noopener"><span>Upload your artwork</span><span class="sr"> (opens in new tab)</span></a>` : ""}${r.email ? html`<a class="btn btn--${up ? "ghost" : "secondary"}" href="mailto:${r.email}?subject=${subject}"><span>Email your artwork</span></a>` : ""}${text ? html`<a class="btn btn--ghost" href="${text.href}"><span>Text us a photo</span></a>` : ""}<a class="btn btn--ghost" href="${action(r, "call")!.href}"><span>Call ${r.phone.display}</span></a></div>
 ${r.email ? "" : todo(ctx, "Add an email for artwork", "Customers will want to email you their logo or design files. Tell us which email to use.")}
+${up ? "" : todo(ctx, "Add an upload link", "Make a free Dropbox or Google Drive \"file request\" link and send it to us: customers get an Upload your artwork button and the files land in your folder.")}
 ${r.smsEnabled ? "" : todo(ctx, "Can customers text this number?", "If your shop number takes texts, we'll add a Text us a photo button. Most folks find it easier than email.")}
 </div></section>`;
+}
+
+/** "Good to know": turnaround and price breaks in the owner's words (the copy never states them). */
+function details(ctx: Ctx): Raw {
+  const x = ext(ctx.r);
+  const tiers = (x.quantityTiers ?? []).filter((t) => t.from > 0).sort((a, b) => a.from - b.from);
+  const breaks = tiers.length ? `Price breaks at ${tiers.map((t, i) => `${t.from}${i === tiers.length - 1 ? "+" : ""}${t.note ? ` (${t.note})` : ""}`).join(", ")}. Ask for a quote with your quantity.` : undefined;
+  const list = factList([
+    { label: "Typical turnaround", text: x.turnaround },
+    { label: "Price breaks", text: breaks },
+    { label: "Proofs", text: x.proofBeforePrint ? "You approve a proof before anything is made." : undefined },
+    { label: "Design help", text: x.designHelp ? "Don't have artwork? We can help you design it." : undefined },
+  ]);
+  if (!list.value) return raw("");
+  return html`<section class="section section--band" id="details" aria-labelledby="details-title"><div class="wrap narrow">
+${sectionHead("Good to know", "Before you order", undefined, "details-title")}
+${list}
+</div></section>`;
+}
+
+/** The quote form's extra fields: what, how many, when, where it goes, artwork status, rush. */
+function quoteFields(r: BusinessRecord): FormField[] {
+  const signs = r.variant === "signs";
+  const emb = r.variant === "embroidery";
+  return [
+    { name: "quantity", label: signs ? "Size (about how big?)" : "How many?", autocomplete: "off", inputmode: signs ? undefined : "numeric" },
+    { name: "needed_by", label: "Needed by", type: "date", autocomplete: "off" },
+    { name: "placements", label: signs ? "Where will it go? (window, truck, yard, building)" : emb ? "Placement (left chest, back, hat front)" : "Print locations (front, back, sleeve)", autocomplete: "off" },
+    { name: "artwork_status", label: "Artwork", options: ["I have a print-ready file", "I have a sketch or photo", "I need design help", "Not sure yet"] },
+    { name: "rush", label: "Is this a rush?", options: ["No, normal timing is fine", "Yes, I need it fast"] },
+  ];
+}
+
+/** Turnaround, rush and minimum claims the copy may not make unless the owner gave them. */
+export function printBannedPhrases(r: BusinessRecord): RegExp[] {
+  const x = ext(r);
+  const out: RegExp[] = [];
+  if (!x.turnaround) out.push(/\b\d+\s*(?:business |working )?days?\b/i, /\b(?:fast|quick|rush) turnaround\b/i, /\bsame[- ]day\b/i);
+  if (!x.quantityTiers?.length) out.push(/\b(?:no|low) minimums?\b/i, /\bminimum (?:order|of)\b/i);
+  if (!x.storeUrl) out.push(/\b(?:online|team|spirit[- ]wear) store\b/i);
+  return out;
 }
 
 export const printPack: CategoryPack = {
@@ -136,6 +183,7 @@ ${infoStrip(ctx, [])}
 ${r.variant === "signs" ? html`${photos}${services}` : html`${services}${photos}`}
 ${r.variant === "screen_printing" ? html`${who}${how}` : html`${how}${who}`}
 ${artwork(ctx)}
+${details(ctx)}
 ${reviews(ctx)}
 ${about(ctx, `About ${r.name}`)}
 ${visit(ctx, r.variant === "print_shop" ? "Stop by the shop" : "Visit the shop")}
@@ -144,13 +192,15 @@ ${contactForm(
   ctx,
   r.services.map((s) => s.name),
   [],
-  [{ name: "quantity", label: r.variant === "signs" ? "Size (about how big?)" : "How many?", autocomplete: "off" }],
+  quoteFields(r),
   "Tell us what you need, how many and when you need it. We'll get back to you with a price.",
+  { topic: "Quote", details: "Colors, sizes, anything else" },
 )}
-${ctaBand(ctx, actions(r, ["quote", "call"]))}
+${ctaBand(ctx, [...actions(r, ["quote", "call"]), ...actions(r, ["store"])])}
 </main>`;
   },
   pages: () => [],
+  bannedPhrases: printBannedPhrases,
   copyBrief: (r) => ({
     voice:
       "Practical, friendly, shop-floor confident. Short sentences, second person ('your shirts', 'your sign'). Never state or hint at turnaround or rush times, minimums, prices, setup or digitizing fees, years in business, equipment, in-house claims, ink types, named clients, licensed products, install areas or shipping. Where those matter, say to ask or to tell us your date.",

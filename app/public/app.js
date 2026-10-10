@@ -1000,7 +1000,7 @@
       if (p.mode === "quote") return "consult";
       return "";
     };
-    const serviceLines = r.services.map((s) => (isS && priceOf(s) ? `${s.name} | ${priceOf(s)}` : s.name)).join("\n");
+    const serviceLines = r.services.map((s) => (isS ? [s.name, priceOf(s), s.durationMin ? `${s.durationMin} min` : ""].join(" | ").replace(/( \|\s*)+$/, "") : s.name)).join("\n");
     const lic = r.licenses[0] || {};
     const w = ext.warranty || {};
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p><h1>Edit ${esc(r.name)}</h1>
@@ -1054,6 +1054,12 @@
         ${isP ? `${cb("designHelp", "They help design artwork", !!ext.designHelp)}${cb("proofBeforePrint", "They send a proof before printing", !!ext.proofBeforePrint)}${r.variant === "signs" ? cb("install", "They install signs", !!ext.install) : ""}` : ""}
         ${isRt ? `${cb("giftCards", "They sell gift cards", !!ext.giftCards)}${cb("delivery", "They deliver", !!ext.delivery)}` : ""}
       </section>
+      ${proofEditCard(r)}
+      ${visitEditCard(r)}
+      ${isR ? restaurantEditCard(r, ext, cb) : ""}
+      ${isS ? salonEditCard(r, ext, cb) : ""}
+      ${isRt ? retailEditCard(r, ext, cb) : ""}
+      ${isP ? printEditCard(r, ext) : ""}
       ${isParts ? partsEditCard(r, ext, cb, serviceLines) : ""}
       ${isRt ? donationsEditCard(r, ext, cb) : ""}
       ${isF ? financeEditCard(r, ext, cb) : ""}
@@ -1064,6 +1070,7 @@
         ${isRt ? `<label class="field">${r.variant === "florist" ? "Online flower order page" : "Online shop (Shopify, Etsy, Facebook shop)"}<input name="shop" type="url" value="${esc(ext.shopUrl || "")}" placeholder="https://"></label>` : ""}
         ${isP ? `<label class="field">Email for artwork<input name="email" type="email" value="${esc(r.email || "")}" placeholder="orders@…"></label>` : ""}
         <label class="field">Online booking link<input name="booking" type="url" value="${esc(r.links.booking || "")}" placeholder="https://"></label>
+        ${isR || isS || isRt ? `<label class="field">Gift cards link (Square, Toast, their booking tool)<input name="giftCards" type="url" value="${esc(r.links.giftCards || "")}" placeholder="https://"></label>` : ""}
         <label class="field">Facebook page<input name="facebook" type="url" value="${esc(r.links.social.facebook || "")}" placeholder="https://facebook.com/…"></label>
         <label class="field">Instagram<input name="instagram" type="url" value="${esc(r.links.social.instagram || "")}" placeholder="https://instagram.com/…"></label>
       </section>
@@ -1078,9 +1085,10 @@
         ${hasServices ? r.services.map((s) => `<label class="field">${esc(s.name)}<textarea name="blurb_${esc(s.id)}" rows="3">${esc(c.serviceBlurbs[s.id] || "")}</textarea></label>`).join("") : ""}
       </section>
       ${isR ? `<section class="card"><h2>Menu</h2><p class="small muted">One item per line: <code>Name | $Price | Description</code>. Start a section with <code># Section name</code>.</p>
-        <label class="field"><span class="sr-only">Menu</span><textarea name="menuText" rows="12" placeholder="# Plates&#10;Pulled pork plate | $12 | Two sides and bread">${esc(l.menuText)}</textarea></label></section>` : ""}
+        <label class="field"><span class="sr-only">Menu</span><textarea name="menuText" rows="12" placeholder="# Plates&#10;Pulled pork plate | $12 | Two sides and bread">${esc(l.menuText)}</textarea></label>
+        ${menuItemsEditHtml(id, r)}</section>` : ""}
       ${hasServices && !isParts ? `<section class="card"><h2>${hasTowns ? "Services &amp; area" : "Services"}</h2>
-        <label class="field">${isS ? "Services and prices, one per line <span class=\"hint\">e.g. <code>Haircut | $25</code> or <code>Color | from $80</code></span>" : "Services (one per line)"}<textarea name="services" rows="7">${esc(serviceLines)}</textarea></label>
+        <label class="field">${isS ? "Services, prices and how long, one per line <span class=\"hint\">e.g. <code>Haircut | $25 | 30 min</code> or <code>Color | from $80 | 90 min</code></span>" : "Services (one per line)"}<textarea name="services" rows="7">${esc(serviceLines)}</textarea></label>
         ${hasTowns ? `<label class="field">Towns served (comma separated)<textarea name="towns" rows="3">${esc((r.serviceArea || { towns: [] }).towns.join(", "))}</textarea></label>` : ""}</section>` : ""}
       <section class="card"><h2>Customer quotes</h2><p class="small muted">Only real quotes the customer said you can use. Never copy Google reviews.</p>
         ${t.map((q, i) => `<label class="field">Quote ${i + 1}<textarea name="q${i}" rows="2">${esc(q.quote || "")}</textarea></label>
@@ -1191,7 +1199,13 @@
           backgroundChecked: on("backgroundChecked"),
           suppliesIncluded: on("suppliesIncluded"),
           petSafe: on("petSafe"),
-          links: { order: val("order"), reserve: val("reserve"), booking: val("booking"), facebook: val("facebook"), instagram: val("instagram"), ...(isRt ? { shop: val("shop") } : {}) },
+          links: { order: val("order"), reserve: val("reserve"), booking: val("booking"), facebook: val("facebook"), instagram: val("instagram"), ...(isRt ? { shop: val("shop") } : {}), ...(isR || isS || isRt ? { giftCards: val("giftCards") } : {}) },
+          proof: proofEditValues(f),
+          ...visitEditValues(f),
+          ...(isR ? { restaurant: restaurantEditValues(f), menuItems: menuItemsEditValues(f) } : {}),
+          ...(isS ? { salon: salonEditValues(f, r) } : {}),
+          ...(isRt ? { retail: retailEditValues(f, r) } : {}),
+          ...(isP ? { print: printEditValues(f) } : {}),
           hiring: (() => { const roles = (val("hiringRoles") || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 8); return roles.length ? { roles, how: val("hiringHow") || "" } : null; })(),
           events: parseEventLines(val("events") || ""),
           ...(isP ? { email: val("email"), designHelp: on("designHelp"), proofBeforePrint: on("proofBeforePrint"), ...(r.variant === "signs" ? { install: on("install") } : {}) } : {}),
@@ -1733,6 +1747,188 @@
       portalUrl: v("finPortal"),
     };
     return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
+  }
+
+  /* ---------- Oct 2026 (research/trends-2026): owner proof, visit lines, restaurant / salon / retail / print details ---------- */
+  const MENU_TAGS = [["popular", "Popular"], ["new", "New"], ["vegetarian", "Vegetarian"], ["vegan", "Vegan"], ["gluten_free", "Gluten-free"], ["spicy", "Spicy"]];
+  const fsLines = (f, n) => (f.elements[n] ? f.elements[n].value.split("\n").map((x) => x.trim()).filter(Boolean) : undefined);
+  const fsVal = (f, n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
+  const fsOn = (f, n) => (f.elements[n] ? f.elements[n].checked : undefined);
+  const fsPipe = (line) => line.split("|").map((x) => x.trim());
+  const fsClean = (o) => Object.fromEntries(Object.entries(o).filter(([, x]) => x !== undefined));
+
+  function proofEditCard(r) {
+    const p = r.proof || {};
+    return `<section class="card"><h2>Awards &amp; proof</h2>
+      <p class="small muted">Only what the owner can back up. Awards and memberships show in the opening; named clients show as “Trusted by” (ask permission first).</p>
+      <label class="field">Awards (one per line: <code>Award | Year</code>)<textarea name="prAwards" rows="3" placeholder="Best of the Best, Cullman Times | 2025">${esc((p.awards || []).map((a) => [a.name, a.year || ""].join(" | ").replace(/ \| $/, "")).join("\n"))}</textarea></label>
+      <label class="field">Memberships (one per line)<textarea name="prMemberships" rows="2" placeholder="Cullman Area Chamber of Commerce">${esc((p.memberships || []).join("\n"))}</textarea></label>
+      <label class="field">Clients we can name (one per line)<textarea name="prClients" rows="2" placeholder="Cullman City Schools&#10;Wallace State">${esc((p.clients || []).join("\n"))}</textarea></label>
+      <label class="field">Numbers (one per line: <code>Value | Label</code>)<textarea name="prStats" rows="2" placeholder="40 | vendor booths&#10;20,000 | square feet">${esc((p.stats || []).map((x) => `${x.value} | ${x.label}`).join("\n"))}</textarea></label>
+    </section>`;
+  }
+  function proofEditValues(f) {
+    const awards = (fsLines(f, "prAwards") || []).map((l) => { const [name, year] = fsPipe(l); return name ? { name: name.slice(0, 80), year: (year || "").slice(0, 12) || undefined } : null; }).filter(Boolean);
+    const stats = (fsLines(f, "prStats") || []).map((l) => { const [value, label] = fsPipe(l); return value && label ? { value: value.slice(0, 20), label: label.slice(0, 60) } : null; }).filter(Boolean);
+    return { awards: awards.slice(0, 12), memberships: (fsLines(f, "prMemberships") || []).slice(0, 12), clients: (fsLines(f, "prClients") || []).slice(0, 20), stats: stats.slice(0, 6) };
+  }
+
+  function visitEditCard(r) {
+    const v = r.visit || {};
+    return `<section class="card"><h2>Closures, parking &amp; payment</h2>
+      <p class="small muted">Holiday closures show under the hours and in the top strip the week before, then drop off on their own.</p>
+      <label class="field">Closures (one per line: <code>YYYY-MM-DD | Why</code>)<textarea name="vsClosures" rows="3" placeholder="2026-11-26 | Thanksgiving&#10;2026-12-25 | Christmas">${esc((r.closures || []).map((c) => `${c.date} | ${c.label}`).join("\n"))}</textarea></label>
+      <label class="field">Ways to pay (comma separated)<input name="vsPay" value="${esc((v.paymentMethods || []).join(", "))}" placeholder="Cash, Visa, Mastercard, Venmo"></label>
+      <label class="field">Parking<input name="vsParking" maxlength="240" value="${esc(v.parking || "")}" placeholder="Free lot behind the building; enter from 2nd Ave."></label>
+    </section>`;
+  }
+  function visitEditValues(f) {
+    const closures = (fsLines(f, "vsClosures") || []).map((l) => { const [date, label] = fsPipe(l); return /^\d{4}-\d{2}-\d{2}$/.test(date || "") && label ? { date, label: label.slice(0, 80) } : null; }).filter(Boolean).slice(0, 20);
+    const pay = (fsVal(f, "vsPay") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 10);
+    return { closures, visit: { paymentMethods: pay, parking: fsVal(f, "vsParking") || "" } };
+  }
+
+  /** Per-item photo (from the gallery) and tags; items come from the saved menu, so type the menu first. */
+  function menuItemsEditHtml(id, r) {
+    const items = ((((r.ext || {}).restaurant || {}).menu || {}).sections || []).flatMap((s) => s.items).slice(0, 60);
+    const photos = (r.media.gallery || []).filter((g) => g.source !== "google");
+    if (!items.length) return `<p class="small muted">Save the menu first, then come back to add dish photos and tags.</p>`;
+    const opt = (it) => photos.map((g, i) => `<option value="${esc(g.src)}"${it.image && it.image.src === g.src ? " selected" : ""}>Photo ${i + 1}: ${esc(g.alt)}</option>`).join("");
+    return `<details class="more"><summary>Dish photos &amp; tags (${items.length} items)</summary>
+      <p class="small muted">${photos.length ? "Pick a gallery photo for 3 or 4 best sellers and tag them Popular: they become photo tiles on the home page." : "Add the owner's dish photos in Photo gallery first, then pick one per item here. Tags show on the menu."}</p>
+      ${items.map((it, i) => `<div class="row" style="align-items:flex-start;margin-bottom:8px"><div style="flex:1 1 180px"><b>${esc(it.name)}</b><input type="hidden" name="mi_name_${i}" value="${esc(it.name)}">
+        ${photos.length ? `<select name="mi_img_${i}"><option value="">No photo</option>${opt(it)}</select>` : ""}</div>
+        <div style="flex:1 1 200px">${MENU_TAGS.map(([t, label]) => `<label class="check" style="display:inline-block;margin-right:8px"><input type="checkbox" name="mi_tag_${i}_${t}"${(it.tags || []).includes(t) ? " checked" : ""}> ${label}</label>`).join("")}</div></div>`).join("")}
+    </details>`;
+  }
+  function menuItemsEditValues(f) {
+    const out = [];
+    for (let i = 0; i < 60; i++) {
+      const name = fsVal(f, `mi_name_${i}`);
+      if (!name) break;
+      const tags = MENU_TAGS.map(([t]) => t).filter((t) => fsOn(f, `mi_tag_${i}_${t}`));
+      const img = fsVal(f, `mi_img_${i}`);
+      out.push({ name, image: img === undefined ? undefined : img, tags });
+    }
+    return out;
+  }
+
+  function restaurantEditCard(r, x, cb) {
+    const truck = r.variant === "food_truck";
+    const d = x.deliveryLinks || {};
+    return `<section class="card"><h2>Restaurant details</h2>
+      ${cb("rsCatering", "They cater (adds a Catering section and request form)", !!x.catering)}
+      <label class="field">What they cater (their words)<input name="rsCateringNote" maxlength="300" value="${esc(x.cateringNote || "")}" placeholder="Pans and plates for 20 to 200: church suppers, reunions, work lunches."></label>
+      ${truck ? `<label class="field">Schedule link (Google Calendar or Facebook events) <span class="hint">This week's stops go in Events &amp; specials as <code>date | Place | time</code></span><input name="rsCalendar" type="url" value="${esc(x.calendarUrl || "")}" placeholder="https://"></label>` : ""}
+      <h3>Order through (their own pages)</h3>
+      <div class="row"><label class="field">DoorDash<input name="rsDoordash" type="url" value="${esc(d.doordash || "")}" placeholder="https://"></label>
+      <label class="field">Uber Eats<input name="rsUbereats" type="url" value="${esc(d.ubereats || "")}" placeholder="https://"></label>
+      <label class="field">Grubhub<input name="rsGrubhub" type="url" value="${esc(d.grubhub || "")}" placeholder="https://"></label></div>
+      <label class="field">Rewards / loyalty sign-up link<input name="rsRewards" type="url" value="${esc(x.rewardsUrl || "")}" placeholder="https://"></label>
+      <p class="small muted">With a reservations link (Links card), Reserve a table becomes the main button for dine-in places. Gift cards: paste the link in the Links card.</p>
+    </section>`;
+  }
+  function restaurantEditValues(f) {
+    return fsClean({
+      catering: fsOn(f, "rsCatering"), cateringNote: fsVal(f, "rsCateringNote"), calendarUrl: fsVal(f, "rsCalendar"), rewardsUrl: fsVal(f, "rsRewards"),
+      deliveryLinks: { doordash: fsVal(f, "rsDoordash") || "", ubereats: fsVal(f, "rsUbereats") || "", grubhub: fsVal(f, "rsGrubhub") || "" },
+    });
+  }
+
+  function salonEditCard(r, x, cb) {
+    const massage = r.variant === "massage";
+    const pet = r.variant === "pet";
+    const pol = x.policies || {};
+    const io = x.introOffer || {};
+    const pt = x.pet || {};
+    const teamLines = (x.team || []).map((m) => [m.name, m.role || "", m.days || "", m.bookingUrl || "", m.line || ""].join(" | ").replace(/( \|\s*)+$/, "")).join("\n");
+    return `<section class="card"><h2>${pet ? "Grooming details" : massage ? "Massage details" : "Salon details"}</h2>
+      <p class="small muted">People book people. One person per line: <code>Name | Role | Days | Booking link | One line about them</code>. Required to confirm before the site goes live.</p>
+      <label class="field">Team<textarea name="slTeam" rows="4" placeholder="Jess Carter | Owner, stylist | Tue–Sat | https://booksy.com/… | Color and balayage">${esc(teamLines)}</textarea></label>
+      ${cb("slTeamOk", "Owner confirmed the team list (required once a team is listed)", !!x.teamConfirmed)}
+      ${massage ? `<label class="field">Session rates (one per line: <code>Minutes | Price</code>)<textarea name="slRates" rows="3" placeholder="30 | $45&#10;60 | $80&#10;90 | $115">${esc((x.rates || []).map((t) => `${t.minutes} | ${t.price}`).join("\n"))}</textarea></label>` : ""}
+      <h3>Good to know (their wording)</h3>
+      <label class="field">Deposits<input name="slDeposit" maxlength="300" value="${esc(pol.deposit || "")}" placeholder="A $20 deposit holds color appointments."></label>
+      <label class="field">Cancellations<input name="slCancel" maxlength="300" value="${esc(pol.cancellation || "")}" placeholder="Please give us 24 hours' notice."></label>
+      <label class="field">Running late<input name="slLate" maxlength="300" value="${esc(pol.lateness || "")}" placeholder="15 minutes late may mean a shorter service."></label>
+      <label class="field">Kids<input name="slKids" maxlength="300" value="${esc(pol.kids || "")}" placeholder="Kids are welcome for their own appointments."></label>
+      <h3>New-client offer</h3>
+      <div class="row"><label class="field">Offer<input name="slOffer" maxlength="120" value="${esc(io.text || "")}" placeholder="$10 off your first cut"></label>
+      <label class="field">Ends on<input name="slOfferUntil" type="date" value="${esc(io.until || "")}"></label></div>
+      ${pet ? `<h3>Before your appointment</h3>
+      <label class="field">Vaccinations they require<input name="slVax" maxlength="300" value="${esc(pt.vaccinations || "")}" placeholder="Proof of current rabies and DHPP, please."></label>
+      <label class="field">Pricing line<input name="slPricing" maxlength="300" value="${esc(pt.pricingFrom || "")}" placeholder="Full grooms start at $45 for small dogs; price depends on size and coat."></label>
+      <label class="field">Matting / de-shedding note<input name="slMatting" maxlength="300" value="${esc(pt.mattingNote || "")}" placeholder="Heavy matting may mean a shorter cut and an extra charge."></label>
+      <label class="field">What to bring / prep<input name="slPrep" maxlength="300" value="${esc(pt.prep || "")}" placeholder="A potty break before you arrive, and their vaccine record the first time."></label>` : ""}
+    </section>`;
+  }
+  function salonEditValues(f, r) {
+    const team = (fsLines(f, "slTeam") || []).map((l) => { const [name, role, days, bookingUrl, line] = fsPipe(l); return name ? fsClean({ name: name.slice(0, 60), role: role || undefined, days: days || undefined, bookingUrl: bookingUrl && /^https?:\/\//.test(bookingUrl) ? bookingUrl : undefined, line: line || undefined }) : null; }).filter(Boolean).slice(0, 20);
+    const out = {
+      team, teamConfirmed: fsOn(f, "slTeamOk"),
+      policies: { deposit: fsVal(f, "slDeposit") || "", cancellation: fsVal(f, "slCancel") || "", lateness: fsVal(f, "slLate") || "", kids: fsVal(f, "slKids") || "" },
+      introOffer: { text: fsVal(f, "slOffer") || "", until: fsVal(f, "slOfferUntil") || "" },
+    };
+    if (r.variant === "massage") out.rates = (fsLines(f, "slRates") || []).map((l) => { const [m, price] = fsPipe(l); const minutes = Number((m || "").replace(/\D/g, "")); return minutes && price ? { minutes, price: price.slice(0, 20) } : null; }).filter(Boolean).slice(0, 10);
+    if (r.variant === "pet") out.pet = { vaccinations: fsVal(f, "slVax") || "", pricingFrom: fsVal(f, "slPricing") || "", mattingNote: fsVal(f, "slMatting") || "", prep: fsVal(f, "slPrep") || "" };
+    return fsClean(out);
+  }
+
+  function retailEditCard(r, x, cb) {
+    const v = r.variant;
+    const fl = x.florist || {};
+    const vd = x.vendors || {};
+    const fin = x.financing || {};
+    const booths = v === "antique" || v === "thrift" || v === "boutique" || v === "gift";
+    const stock = v === "farm_feed" || v === "hardware" || v === "furniture";
+    return `<section class="card"><h2>Shop details</h2>
+      ${v === "florist" ? `<h3>Florist</h3>
+      <label class="field">Occasions (one per line; leave empty for the usual four)<textarea name="rtOccasions" rows="3" placeholder="Sympathy &amp; funeral&#10;Weddings &amp; events&#10;Birthdays &amp; anniversaries&#10;Just because">${esc((fl.occasions || []).join("\n"))}</textarea></label>
+      <div class="row"><label class="field">Delivery area<input name="rtArea" maxlength="120" value="${esc(fl.deliveryArea || "")}" placeholder="Cullman and Hanceville"></label>
+      <label class="field">Same-day cutoff<input name="rtCutoff" maxlength="40" value="${esc(fl.cutoff || "")}" placeholder="1 PM"></label>
+      <label class="field">Delivery fee<input name="rtFee" maxlength="60" value="${esc(fl.deliveryFee || "")}" placeholder="$10 in town"></label></div>
+      ${cb("rtDesigners", "Offer designer's choice (we pick what's freshest)", !!fl.designersChoice)}
+      <p class="small muted">The site only says “same-day” once a cutoff time is typed here.</p>` : ""}
+      ${booths ? `<h3>Vendors &amp; booths</h3>
+      ${cb("rtBooths", "Booths available (adds a booth inquiry form)", !!vd.boothsAvailable)}
+      <label class="field">Vendor note (their words)<input name="rtVendorNote" maxlength="400" value="${esc(vd.note || "")}" placeholder="Booths from 8x10; month-to-month. Ask about rates."></label>` : ""}
+      ${stock ? `<h3>Departments &amp; brands</h3>
+      <label class="field">Departments (one per line)<textarea name="rtDepartments" rows="3" placeholder="Cattle &amp; horse&#10;Poultry&#10;Pets&#10;Lawn &amp; garden">${esc((x.departments || []).join("\n"))}</textarea></label>
+      <label class="field">Brands they carry (one per line, names only)<textarea name="rtBrands" rows="3" placeholder="Purina&#10;Nutrena&#10;Stihl">${esc((x.brands || []).join("\n"))}</textarea></label>` : ""}
+      ${v === "furniture" || v === "farm_feed" || v === "hardware" ? `<h3>Delivery &amp; financing</h3>
+      <label class="field">Delivery rule (their words)<input name="rtDeliveryNote" maxlength="240" value="${esc(x.deliveryNote || "")}" placeholder="Free delivery in Cullman County on orders over $499."></label>
+      <div class="row"><label class="field">Financing partner<input name="rtLender" maxlength="60" value="${esc(fin.lender || "")}" placeholder="Synchrony, Acima…"></label>
+      <label class="field">Apply link<input name="rtLenderUrl" type="url" value="${esc(fin.url || "")}" placeholder="https://"></label></div>` : ""}
+      ${v === "boutique" || v === "gift" ? `<h3>New arrivals</h3>
+      <label class="field">Drop day<input name="rtDropDay" maxlength="120" value="${esc(x.dropDay || "")}" placeholder="New arrivals every Thursday at 10, in store and on Facebook Live."></label>
+      <label class="field">Occasions (one per line)<textarea name="rtOcc2" rows="3" placeholder="Homecoming&#10;Game day&#10;Prom&#10;Baby showers">${esc((x.occasions || []).join("\n"))}</textarea></label>` : ""}
+      ${booths || v === "furniture" ? `<label class="field">Hold line<input name="rtHold" maxlength="160" value="${esc(x.holdNote || "")}" placeholder="Call to hold an item for 24 hours."></label>` : ""}
+    </section>`;
+  }
+  function retailEditValues(f, r) {
+    const v = r.variant;
+    const out = {};
+    if (v === "florist") out.florist = { occasions: fsLines(f, "rtOccasions") || [], deliveryArea: fsVal(f, "rtArea") || "", cutoff: fsVal(f, "rtCutoff") || "", deliveryFee: fsVal(f, "rtFee") || "", designersChoice: !!fsOn(f, "rtDesigners") };
+    if (f.elements.rtBooths) out.vendors = { boothsAvailable: !!fsOn(f, "rtBooths"), note: fsVal(f, "rtVendorNote") || "" };
+    if (f.elements.rtDepartments) { out.departments = fsLines(f, "rtDepartments"); out.brands = fsLines(f, "rtBrands"); }
+    if (f.elements.rtDeliveryNote) { out.deliveryNote = fsVal(f, "rtDeliveryNote"); out.financing = { lender: fsVal(f, "rtLender") || "", url: fsVal(f, "rtLenderUrl") || "" }; }
+    if (f.elements.rtDropDay) { out.dropDay = fsVal(f, "rtDropDay"); out.occasions = fsLines(f, "rtOcc2"); }
+    if (f.elements.rtHold) out.holdNote = fsVal(f, "rtHold");
+    return fsClean(out);
+  }
+
+  function printEditCard(r, x) {
+    return `<section class="card"><h2>Print shop details</h2>
+      <label class="field">Artwork upload link <span class="hint">A Dropbox or Google Drive “file request” link: customers upload, files land in their folder</span><input name="ptUpload" type="url" value="${esc(x.uploadUrl || "")}" placeholder="https://www.dropbox.com/request/…"></label>
+      <label class="field">Typical turnaround (their words)<input name="ptTurnaround" maxlength="160" value="${esc(x.turnaround || "")}" placeholder="About 10 business days after you approve the proof."></label>
+      <label class="field">Price breaks at (quantities, comma separated)<input name="ptTiers" value="${esc((x.quantityTiers || []).map((t) => (t.note ? `${t.from} ${t.note}` : String(t.from))).join(", "))}" placeholder="12, 24, 48, 72"></label>
+      <label class="field">Online / team store link<input name="ptStore" type="url" value="${esc(x.storeUrl || "")}" placeholder="https://"></label>
+      <p class="small muted">The quote form asks what, how many, needed-by date, print locations, artwork status and rush. The text never states turnaround or minimums unless typed here.</p>
+    </section>`;
+  }
+  function printEditValues(f) {
+    const tiers = (fsVal(f, "ptTiers") || "").split(",").map((x) => x.trim()).filter(Boolean).map((x) => { const m = /^(\d+)\+?\s*(.*)$/.exec(x); return m ? { from: Number(m[1]), note: (m[2] || "").slice(0, 40) || undefined } : null; }).filter((t) => t && t.from > 0).slice(0, 8);
+    return fsClean({ uploadUrl: fsVal(f, "ptUpload"), turnaround: fsVal(f, "ptTurnaround"), quantityTiers: tiers, storeUrl: fsVal(f, "ptStore") });
   }
 
   /* ---------- in-person guide (walk-ins) ---------- */

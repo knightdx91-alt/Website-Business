@@ -80,7 +80,14 @@ Fried okra | $3
 Turnip greens | $3`),
         lastUpdated: "October 2026",
       },
+      catering: true,
+      cateringNote: "Pans and plates for 20 to 200: church suppers, reunions and work lunches. Call a few days ahead.",
     };
+    // Favorites: these show as the "Popular" tiles on the home page (with photos once the owner sends them).
+    for (const sec of record.ext.restaurant.menu!.sections) for (const it of sec.items) {
+      if (["Biscuits & sausage gravy", "Meat & three", "Fried chicken plate"].includes(it.name)) it.tags = ["popular"];
+      if (["Fried okra", "Turnip greens", "Mac & cheese"].includes(it.name)) it.tags = ["vegetarian"];
+    }
     record.testimonials = [said("Best biscuits we've had in years. The staff knows everybody by name.", "Linda P."), said("Meat and three every Friday. Never had a bad meal.", "Jerry W."), said("Fast, friendly and the sweet tea is just right.", "Amanda R.")];
     return {
       slug: "magnolia-table",

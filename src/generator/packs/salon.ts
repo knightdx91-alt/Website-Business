@@ -1,8 +1,8 @@
-import { actions, type ActionId } from "../actions.ts";
-import { about, cardGrid, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx, serviceList } from "../components.ts";
+import { action, actions, type ActionId } from "../actions.ts";
+import { about, ctaBand, factList, faq, gallery, hero, infoStrip, reviews, sectionHead, todayIso, todo, visit, type Ctx, serviceList } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
-import { html } from "../html.ts";
-import type { BusinessRecord, Faq, Service } from "../types.ts";
+import { html, raw, type Raw } from "../html.ts";
+import type { BusinessRecord, Faq, SalonExt, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 export function salonVariant(primaryType: string | undefined, types: string[], name: string): string {
@@ -55,6 +55,96 @@ function priceText(s: Service): string | undefined {
 
 const WALK_IN_TEXT = { welcome: "Walk-ins welcome", appointment_only: "By appointment", both: "Walk-ins & appointments" } as const;
 
+function ext(r: BusinessRecord): SalonExt {
+  return r.ext.salon ?? {};
+}
+
+/** "$35 · 45 min": price and duration side by side when both are known. */
+function priceAndTime(s: Service): string | undefined {
+  const p = priceText(s);
+  const t = s.durationMin ? `${s.durationMin} min` : undefined;
+  return [p, t].filter(Boolean).join(" · ") || undefined;
+}
+
+/** The intro offer, while it lasts (YYYY-MM-DD end date; the page hides it itself after). */
+export function activeIntroOffer(r: BusinessRecord, today = todayIso(r.timezone)): { text: string; until?: string } | undefined {
+  const o = ext(r).introOffer;
+  if (!o?.text) return undefined;
+  if (o.until && o.until < today) return undefined;
+  return o;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function shortDate(iso: string): string {
+  const [, m, d] = iso.split("-").map(Number);
+  return `${MONTHS[(m ?? 1) - 1]} ${d}`;
+}
+
+/** "Meet the team": one card per person, with their own Book button when they have a link. Required to confirm before publish. */
+function team(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const members = (ext(r).team ?? []).filter((m) => m.name);
+  if (!members.length) return raw("");
+  const shopBook = r.links.booking;
+  return html`<section class="section" id="team" aria-labelledby="team-title"><div class="wrap">
+${sectionHead("Our team", "Meet the team", undefined, "team-title")}
+<ul class="team">${members.map((m) => {
+    const first = m.name.split(/\s+/)[0]!;
+    const url = m.bookingUrl || shopBook;
+    return html`<li><h3>${m.name}</h3>${m.role || m.days ? html`<p class="team__role">${[m.role, m.days].filter(Boolean).join(" · ")}</p>` : ""}${m.line ? html`<p>${m.line}</p>` : ""}${
+      url ? html`<a class="btn btn--secondary" href="${url}" target="_blank" rel="noopener"><span>Book with ${first}</span><span class="sr"> (opens in new tab)</span></a>` : ""
+    }</li>`;
+  })}</ul>
+${ext(r).teamConfirmed ? "" : todo(ctx, "Confirm the team list", "Check every name, title, days and booking link with the owner. People book people, so this has to be right before the site goes live.", true)}
+</div></section>`;
+}
+
+/** Massage: the minutes × price table. */
+function rates(ctx: Ctx): Raw {
+  const rows = (ext(ctx.r).rates ?? []).filter((x) => x.minutes && x.price);
+  if (ctx.r.variant !== "massage" || !rows.length) return raw("");
+  return html`<section class="section section--band" id="rates" aria-labelledby="rates-title"><div class="wrap narrow">
+${sectionHead("Rates", "Session rates", "Pick the length that fits. Call or book online to set a time.", "rates-title")}
+<table class="rates"><caption class="sr">Massage rates by session length</caption><thead><tr><th scope="col">Length</th><th scope="col">Price</th></tr></thead><tbody>${rows.map((x) => html`<tr><td>${x.minutes} minutes</td><td>${x.price}</td></tr>`)}</tbody></table>
+</div></section>`;
+}
+
+/** "Good to know": deposit, cancellations, running late, kids, in the shop's own words. */
+function policies(ctx: Ctx): Raw {
+  const p = ext(ctx.r).policies;
+  const list = factList([
+    { label: "Deposits", text: p?.deposit },
+    { label: "Cancellations", text: p?.cancellation },
+    { label: "Running late", text: p?.lateness },
+    { label: "Kids", text: p?.kids },
+  ]);
+  if (!list.value) return raw("");
+  return html`<section class="section" id="policies" aria-labelledby="policies-title"><div class="wrap narrow">
+${sectionHead("Good to know", "Before you book", undefined, "policies-title")}
+${list}
+</div></section>`;
+}
+
+/** Pet groomers: vaccination rule, starting prices, matting note and what to bring, in the groomer's words. */
+function petPrep(ctx: Ctx): Raw {
+  const r = ctx.r;
+  if (r.variant !== "pet") return raw("");
+  const p = ext(r).pet;
+  const list = factList([
+    { label: "Vaccinations", text: p?.vaccinations },
+    { label: "Pricing", text: p?.pricingFrom },
+    { label: "Matting & de-shedding", text: p?.mattingNote },
+    { label: "What to bring", text: p?.prep },
+  ]);
+  const ask = p?.vaccinations ? raw("") : todo(ctx, "What vaccinations do you require?", "Most groomers ask for proof of rabies (and often DHPP). Tell us your rule in your words and it goes in Before your appointment.");
+  if (!list.value) return ask.value ? html`<div class="wrap">${ask}</div>` : raw("");
+  return html`<section class="section section--band" id="prep" aria-labelledby="prep-title"><div class="wrap narrow">
+${sectionHead("Before your appointment", "What to know before you come", undefined, "prep-title")}
+${list}
+${ask}
+</div></section>`;
+}
+
 function primary(r: BusinessRecord): ActionId {
   return r.links.booking ? "book" : "call";
 }
@@ -68,6 +158,16 @@ function dataFaq(r: BusinessRecord): Faq[] {
   if (r.links.booking) out.push({ q: "How do I book?", a: "Tap Book online to pick a time that works for you, or call us." });
   if (hasAnyHours(r.hours)) out.push({ q: "When are you open?", a: "Our hours are listed below, with today highlighted." });
   if (r.smsEnabled) out.push({ q: "Can I text you?", a: `Yes. Text us at ${r.phone.display}.` });
+  return out;
+}
+
+/** Health claims (massage), and offers, deposits or team mentions the owner didn't give. */
+export function salonBannedPhrases(r: BusinessRecord): RegExp[] {
+  const out: RegExp[] = [];
+  if (r.variant === "massage") out.push(/\b(?:cures?|heals?|treats?|therapeutic for|relieves? (?:pain|anxiety|depression)|medical)\b/i);
+  if (!activeIntroOffer(r)) out.push(/\b(?:new[- ]client|first[- ]time|intro(?:ductory)?) (?:special|offer|discount|deal)\b/i, /\$\d+ off\b/i);
+  if (!ext(r).policies?.deposit) out.push(/\bdeposit\b/i);
+  if (!ext(r).team?.length) out.push(/\b(?:our|the) (?:stylists|barbers|groomers|therapists|team of)\b/i);
   return out;
 }
 
@@ -87,8 +187,10 @@ export const salonPack: CategoryPack = {
     const l = LABEL[r.variant] ?? "Hair salon";
     return fitTitle([`${r.name} | ${l} in ${r.address.city}, ${r.address.state}`, `${r.name} | ${l} in ${r.address.city}`, `${r.name} | ${r.address.city}, ${r.address.state}`, r.name]);
   },
-  nav: () => [
+  nav: (ctx) => [
     { label: "Services", href: "/#services" },
+    ...(ctx.r.variant === "massage" && ext(ctx.r).rates?.length ? [{ label: "Rates", href: "/#rates" }] : []),
+    ...(ext(ctx.r).team?.length ? [{ label: "Team", href: "/#team" }] : []),
     { label: "Reviews", href: "/#reviews" },
     { label: "About", href: "/#about" },
     { label: "Hours & location", href: "/#visit" },
@@ -100,10 +202,15 @@ export const salonPack: CategoryPack = {
     const walk = r.ext.salon?.walkIns;
     const trust: string[] = [];
     if (walk) trust.push(WALK_IN_TEXT[walk]);
+    const offer = activeIntroOffer(r);
+    if (offer) trust.push(offer.until ? `${offer.text} (through ${shortDate(offer.until)})` : offer.text);
+    const pay = (r.visit?.paymentMethods ?? []).filter(Boolean);
+    if (pay.length) trust.push(`${pay.slice(0, 4).join(", ")} accepted`);
     if (r.foundedYear) trust.push(`Since ${r.foundedYear}`);
     if (r.ownershipTags.includes("family_owned")) trust.push("Family-owned");
-    const prices = r.services.map(priceText);
+    const prices = r.services.map(priceAndTime);
     const confirmed = r.confirmed.includes("services");
+    const ctaActs = [...actions(r, [primary(r), primary(r) === "book" ? "call" : "directions"]), ...actions(r, ["giftcard"])];
     return html`${hero(ctx, {
       eyebrow: `${LABEL[r.variant] ?? "Hair salon"} · ${r.address.city}, ${r.address.state}`,
       h1: r.name,
@@ -124,15 +231,20 @@ ${walk ? "" : todo(ctx, "Walk-ins or appointments?", "Tell us whether you take w
 ${r.variant === "massage" && !r.licenses.length ? todo(ctx, "Send us your Alabama license number", "Alabama asks massage businesses to show their license number in ads, so we'll put it at the bottom of every page.", true) : ""}
 ${r.links.booking ? "" : todo(ctx, "Add your booking link", "If you use Square, Booksy, Vagaro or similar, send us the link and the Book button will open it.")}
 </div></section>
+${rates(ctx)}
+${team(ctx)}
+${policies(ctx)}
+${petPrep(ctx)}
 ${reviews(ctx, true)}
 ${about(ctx, `About ${r.name}`, "Our story")}
 ${gallery(ctx, "Add photos of your work", `A few photos of ${WORK_PHOTOS[r.variant] ?? WORK_PHOTOS.salon} make the biggest difference for a site like this.`)}
 ${visit(ctx)}
 ${faq(dataFaq(r), true)}
-${ctaBand(ctx, actions(r, [primary(r), primary(r) === "book" ? "call" : "directions"]))}
+${ctaBand(ctx, ctaActs)}
 </main>`;
   },
   pages: () => [],
+  bannedPhrases: salonBannedPhrases,
   copyBrief: (r) => ({
     voice:
       r.variant === "barber"

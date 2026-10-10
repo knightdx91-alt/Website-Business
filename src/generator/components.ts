@@ -90,6 +90,26 @@ export interface HeroOpts {
   showStatus: boolean;
   actions: Action[];
   badge?: string;
+  /** Shops: the street address in the first screen (research: shoppers need it before anything else). */
+  address?: boolean;
+}
+
+/** Owner proof as trust-row lines: "Best of the Best 2024", "Cullman Chamber member", "40 dealers". Nothing invented. */
+export function ownerProof(r: BusinessRecord): string[] {
+  const p = r.proof;
+  if (!p) return [];
+  return [
+    ...(p.awards ?? []).map((a) => (a.year ? `${a.name} ${a.year}` : a.name)),
+    ...(p.memberships ?? []).map((m) => (/\b(member|association|chamber)\b/i.test(m) ? m : `${m} member`)),
+    ...(p.stats ?? []).map((st) => `${st.value} ${st.label}`),
+  ].filter(Boolean);
+}
+
+/** "Trusted by …": named clients the owner has permission to list, as a quiet line under the opening. */
+function clientsLine(r: BusinessRecord): Raw {
+  const c = (r.proof?.clients ?? []).filter(Boolean);
+  if (!c.length) return raw("");
+  return html`<div class="proof proof--clients"><div class="proof__in"><p class="proof__clients"><strong>Trusted by</strong> ${c.join(" · ")}</p></div></div>`;
 }
 
 export function hero(ctx: Ctx, o: HeroOpts): Raw {
@@ -123,7 +143,8 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   const badge = o.badge ? html`<p class="badge">${o.badge}</p>` : "";
   const eyebrow = eyebrowText ? html`<p class="hero__eyebrow">${eyebrowText}</p>` : "";
   const h1 = html`<h1 id="hero-title">${h1Text}</h1>`;
-  const sub = subText ? html`<p class="hero__sub">${subText}</p>` : "";
+  const addrLine = o.address && r.showStreetAddress && r.address.street ? html`<p class="hero__addr">${icon("pin", 18)}<a href="${action(r, "directions")!.href}" target="_blank" rel="noopener">${r.address.street}, ${r.address.city}<span class="sr"> (opens directions in new tab)</span></a></p>` : "";
+  const sub = html`${subText ? html`<p class="hero__sub">${subText}</p>` : ""}${addrLine}`;
   const status = o.showStatus ? html`<p class="status" data-open-status hidden></p>` : "";
   if (o.showStatus && hasAnyHours(r.hours)) ctx.statusShown = true;
   // Proof up top: the Google rating, when it's good and based on enough reviews (never for categories that can't show reviews).
@@ -131,16 +152,20 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   const proof = ctx.reviewsAllowed !== false && rep.rating && rep.count && rep.rating >= 4.3 && rep.count >= 10 && r.mapsUrl
     ? html`<li class="hero__proof"><a href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("star", 18)}${rep.rating.toFixed(1)} on Google · ${rep.count} reviews<span class="sr"> (opens in new tab)</span></a></li>`
     : "";
+  // Owner proof (awards, memberships, stats) joins the pack's trust lines; the pack's own lines come first.
+  const trustItems = [...o.trust, ...ownerProof(r).filter((t) => !o.trust.includes(t))];
   // Proof either rides in the opening (trust row) or gets its own band right under it.
-  const bandProof = dna.proof === "band" && !!(proof || o.trust.length);
-  const trust = !bandProof && (o.trust.length || proof) ? html`<ul class="hero__trust">${proof}${o.trust.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : "";
-  const band = bandProof
-    ? html`<div class="proof"><div class="proof__in">${
-        proof && rep.rating && rep.count
-          ? html`<div class="proof__rating"><a href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("star", 28)}<strong>${rep.rating.toFixed(1)}</strong><span>${rep.count} Google reviews<span class="sr"> (opens in new tab)</span></span></a></div>`
-          : ""
-      }${o.trust.length ? html`<ul class="proof__list">${o.trust.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : ""}</div></div>`
-    : "";
+  const bandProof = dna.proof === "band" && !!(proof || trustItems.length);
+  const trust = !bandProof && (trustItems.length || proof) ? html`<ul class="hero__trust">${proof}${trustItems.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : "";
+  const band = html`${
+    bandProof
+      ? html`<div class="proof"><div class="proof__in">${
+          proof && rep.rating && rep.count
+            ? html`<div class="proof__rating"><a href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("star", 28)}<strong>${rep.rating.toFixed(1)}</strong><span>${rep.count} Google reviews<span class="sr"> (opens in new tab)</span></span></a></div>`
+            : ""
+        }${trustItems.length ? html`<ul class="proof__list">${trustItems.map((t) => html`<li>${icon("check", 18)}${t}</li>`)}</ul>` : ""}</div></div>`
+      : ""
+  }${clientsLine(r)}`;
   // Texting is how many people would rather reach a plumber or a barber: when the number takes texts and the
   // buttons don't already offer it, a quiet line under them does, without a third stacked button.
   const btns = html`<div class="btns" data-hero-actions>${o.actions.map((a, i) => button(a, i === 0 ? "primary" : "ghost"))}</div>${textLine(ctx, o.actions)}`;
@@ -204,7 +229,27 @@ export function infoStrip(ctx: Ctx, chips: string[]): Raw {
 <a class="strip__item" href="${call.href}">${icon("phone")}<span>${r.phone.display}</span></a>
 ${hasAnyHours(r.hours) ? html`<a class="strip__item" href="#visit">${icon("clock")}<span>${ctx.statusShown ? html`<span data-today-hours>Hours</span>` : html`<span data-open-status hidden></span>`}<span class="strip__more"> See all hours</span></span></a>` : ""}
 ${chips.length ? html`<ul class="chips" aria-label="Services">${chips.map((c) => html`<li class="chip">${icon("check", 16)}${c}</li>`)}</ul>` : ""}
+${closureNote(r)}
 </div></div>`;
+}
+
+const DAY_MS = 86_400_000;
+/** Closures that haven't passed, soonest first. */
+export function upcomingClosures(r: BusinessRecord, today = todayIso(r.timezone)): Array<{ date: string; label: string }> {
+  return (r.closures ?? []).filter((c) => /^\d{4}-\d{2}-\d{2}$/.test(c.date) && c.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 8);
+}
+
+export function closureText(c: { date: string; label: string }): string {
+  const d = eventDate(c.date);
+  return /^clos/i.test(c.label) ? `${c.label} ${d.mon} ${d.day}` : `Closed ${d.mon} ${d.day} for ${c.label}`;
+}
+
+/** The next closure, as one line in the info strip when it's within a week (the page shows/hides it by date too). */
+function closureNote(r: BusinessRecord): Raw {
+  const next = upcomingClosures(r)[0];
+  if (!next) return raw("");
+  const soon = Date.parse(next.date) - Date.parse(todayIso(r.timezone)) <= 7 * DAY_MS;
+  return html`<p class="strip__note" data-soon="${next.date}"${soon ? "" : raw(" hidden")}>${icon("calendar", 16)}<span>${closureText(next)}</span></p>`;
 }
 
 export interface CardItem {
@@ -322,8 +367,35 @@ export function visit(ctx: Ctx, title = "Visit us"): Raw {
 <div class="visit${left.value ? "" : " visit--solo"}">${left.value ? html`<div>${left}</div>` : ""}
 <div><address class="addr">${r.name}<br>${r.showStreetAddress && r.address.street ? html`${r.address.street}<br>` : ""}${r.address.city}, ${r.address.state} ${r.address.zip ?? ""}</address>
 <p><a href="${call.href}">${r.phone.display}</a></p>
+${visitExtras(ctx)}
 <div class="btns">${button(dir, "primary")}${button(call, "ghost")}</div></div></div>
 </div></section>`;
+}
+
+/** Closures, how to pay and where to park: owner-entered lines under the address. Nothing renders when empty. */
+export function visitExtras(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const closures = upcomingClosures(r);
+  const pay = (r.visit?.paymentMethods ?? []).filter(Boolean);
+  return html`${closures.length ? html`<ul class="closures" aria-label="Upcoming closures">${closures.map((c) => html`<li data-until="${c.date}">${icon("calendar", 16)}<span>${closureText(c)}</span></li>`)}</ul>` : ""}${
+    pay.length ? html`<p class="visit__line"><strong>We take:</strong> ${pay.join(", ")}</p>` : ""
+  }${r.visit?.parking ? html`<p class="visit__line"><strong>Parking:</strong> ${r.visit.parking}</p>` : ""}`;
+}
+
+/** A labeled list of owner-stated lines ("Deposit: …", "Cancellations: …"); rows with no text are skipped. */
+export function factList(items: Array<{ label: string; text?: string }>): Raw {
+  const rows = items.filter((i) => i.text);
+  if (!rows.length) return raw("");
+  return html`<dl class="facts">${rows.map((i) => html`<div><dt>${i.label}</dt><dd>${i.text}</dd></div>`)}</dl>`;
+}
+
+/** Photo tiles (menu favorites, team): an image when there is one, a colored block otherwise. */
+export function tiles(items: Array<{ title: string; body?: string; price?: string; image?: Image; href?: string; tags?: string[] }>): Raw {
+  return html`<ul class="tiles">${items.map(
+    (t) => html`<li class="tile${t.image ? "" : " tile--text"}">${t.image ? imageTag(t.image, { cls: "tile__img" }) : ""}<div class="tile__body"><h3>${t.href ? html`<a href="${t.href}">${t.title}</a>` : t.title}${t.price ? html`<span class="price">${t.price}</span>` : ""}</h3>${
+      t.tags?.length ? html`<p class="tags">${t.tags.map((g) => html`<span class="tag">${g}</span>`)}</p>` : ""
+    }${t.body ? html`<p>${t.body}</p>` : ""}</div></li>`,
+  )}</ul>`;
 }
 
 export function serviceArea(ctx: Ctx): Raw {
@@ -385,9 +457,34 @@ export function faq(items: Faq[], band = false, label = "FAQ", title = "Question
 
 export interface FormField {
   /** Every name here must also be in FIELDS in src/worker/forms.ts, or the live site drops it. */
-  name: "vehicle" | "frequency" | "home_size" | "property" | "quantity" | "year" | "make" | "model" | "part" | "items" | "address" | "best_day";
+  name:
+    | "vehicle"
+    | "frequency"
+    | "home_size"
+    | "property"
+    | "quantity"
+    | "year"
+    | "make"
+    | "model"
+    | "part"
+    | "items"
+    | "address"
+    | "best_day"
+    | "event_date"
+    | "guests"
+    | "needs"
+    | "location"
+    | "occasion"
+    | "budget_range"
+    | "needed_by"
+    | "placements"
+    | "artwork_status"
+    | "rush"
+    | "booth";
   label: string;
   options?: string[];
+  /** Input type for text fields; "date" gives the phone's date picker. */
+  type?: "date" | "text";
   autocomplete?: string;
   required?: boolean;
   inputmode?: string;
@@ -423,7 +520,7 @@ ${services.length ? html`<label>What do you need?<select name="service"><option 
 ${extra.map((f) =>
   f.options
     ? html`<label>${f.label}<select name="${f.name}"${f.required ? raw(" required") : ""}><option value="">Choose one</option>${f.options.map((o) => html`<option>${o}</option>`)}</select></label>`
-    : html`<label>${f.label}<input name="${f.name}"${f.autocomplete ? raw(` autocomplete="${f.autocomplete}"`) : ""}${f.inputmode ? raw(` inputmode="${f.inputmode}"`) : ""}${f.required ? raw(" required") : ""}></label>`,
+    : html`<label>${f.label}<input name="${f.name}"${f.type ? raw(` type="${f.type}"`) : ""}${f.autocomplete ? raw(` autocomplete="${f.autocomplete}"`) : ""}${f.inputmode ? raw(` inputmode="${f.inputmode}"`) : ""}${f.required ? raw(" required") : ""}></label>`,
 )}
 ${towns.length ? html`<label>Town<select name="town"><option value="">Choose one</option>${towns.map((t) => html`<option>${t}</option>`)}<option>Other</option></select></label>` : ""}
 <label>${opts.details ?? "Details"} (optional)<textarea name="message"></textarea></label>
