@@ -255,7 +255,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   liability/Alabama law, policy-by-reference and yearly-renewal-reminder lines (`CORE_TERMS`, appended to custom terms).
   `portalSession()` + `GET /api/leads/:id/portal` (owner) → Stripe billing portal. App: render sequence guards stale
   loads; Edit refreshes single cards and keeps drafts in sessionStorage with a leave guard; log card moves under the
-  header on phones; status tabs confirm; `phoneDigits()` helper; sw.js v34 only falls back to the shell for `/`.
+  header on phones; status tabs confirm; `phoneDigits()` helper; sw.js v35 (v34 only falls back to the shell for `/`; v35 adds the Settings "Send me a test email" button, `POST /api/mail/test`, owner-only, to the direct or business email).
   Generator: banned phrases checked on AI text only (whole words), `--hdr-h` keeps the open menu below tall headers,
   chain list per category with whole-name matching (`isChain(name, category)`), booking/ordering pages count as no
   website, 40 km cut + phone dedupe in `qualify` (pipeline passes `center`), 6 new search groups (septic/dirt work, doors/

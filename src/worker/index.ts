@@ -29,7 +29,7 @@ import { handleFormPost } from "./forms.ts";
 import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
 import { stripeWebhook } from "./stripe.ts";
 import { extraTerms } from "./contract.ts";
-import { mailReady } from "./mail.ts";
+import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
 import { chooseLook, renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
@@ -354,6 +354,25 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return new Response(apk.body, {
       headers: { "content-type": "application/vnd.android.package-archive", "content-disposition": 'attachment; filename="website-business.apk"', "cache-control": "no-store" },
     });
+  }
+
+  // Settings → "Send me a test email": proves the email key and the sender domain work, to the owner's own address.
+  if (path === "/mail/test" && m === "POST") {
+    ownerOnly();
+    const s = await getSettings(env);
+    const to = s.directEmail || s.companyEmail;
+    if (!s.companyEmail) throw new HttpError(400, "Add your business email in Settings first; emails are sent from it.");
+    if (!to) throw new HttpError(400, "Add a business or direct email in Settings first.");
+    if (!mailReady(env)) throw new HttpError(400, "No email key is set. Add RESEND_API_KEY as a Worker secret.");
+    const r = await sendEmailDetailed(env, {
+      from: s.companyEmail,
+      fromName: s.companyName || "Underground Associates",
+      to,
+      replyTo: s.companyEmail,
+      subject: "Test email from your app",
+      text: `This is a test from the ${s.companyName || "Underground Associates"} app. If you're reading it, client emails (Buy extras links) will go out fine.\n\nSent as ${s.companyEmail}.`,
+    });
+    return json({ ok: r.ok, provider: r.provider, to: maskEmail(to), error: r.error ?? null });
   }
 
   // Everything in the database as one JSON file (the weekly cron writes the same to R2 _backup/).
