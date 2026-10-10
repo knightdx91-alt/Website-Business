@@ -5,15 +5,16 @@ import { getSetting, setSetting } from "./db.ts";
 /**
  * Notifications: what other people did (notes, call outcomes, sales, sign-ups, publishes, website messages).
  * Everyone with full access (the owner and full-access team members) sees everything except their own actions.
- * Callers only get CALLER_KINDS (a prospect opening their preview), so they know when to call.
+ * Callers only get CALLER_KINDS (a prospect opening their preview, and tasks), so they know when to call.
  * Phone pushes carry no data: the push just wakes the app's service worker, which asks /api/notifications/latest
  * what's new while logged in. That keeps details off the push service and needs no payload encryption.
  */
 
-export type EventKind = "note" | "call" | "status" | "signup_sent" | "signed" | "paid" | "published" | "added" | "message" | "run" | "preview_open";
+export type EventKind = "note" | "call" | "status" | "signup_sent" | "signed" | "paid" | "published" | "added" | "message" | "run" | "preview_open" | "task";
 
 /** The only notifications callers get. */
-export const CALLER_KINDS: EventKind[] = ["preview_open"];
+/** The only notifications callers get: a prospect opening their preview, and tasks (the team's shared list). */
+export const CALLER_KINDS: EventKind[] = ["preview_open", "task"];
 const callerFilter = `AND kind IN (${CALLER_KINDS.map((k) => `'${k}'`).join(",")})`;
 
 export interface EventInput {
@@ -93,6 +94,7 @@ const PUSH_TITLE: Record<EventKind, string> = {
   message: "💬 New message",
   run: "🔎 Search started",
   preview_open: "👀 Preview opened",
+  task: "📝 Task",
 };
 
 /** What a phone shows when a push arrives: the newest unread item, or a count when there are several. */

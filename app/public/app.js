@@ -227,7 +227,7 @@
     meta = meta || (await api("/meta"));
     if (stale(my)) return;
     if (!document.getElementById("leads")) {
-      $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="today"></div><div id="unpaid"></div><div id="runs"></div></div><div><section>
+      $app.innerHTML = `<div class="split"><div>${isOwner() ? runCard() : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="today"></div><div id="tasks"></div><div id="unpaid"></div><div id="runs"></div></div><div><section>
         <div class="btns btns--full" style="margin-bottom:12px"><a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
@@ -368,13 +368,14 @@
     if (filters.category) q.set("category", filters.category);
     const leadsEl0 = document.getElementById("leads");
     try {
-      const [{ runs }, { leads }, { leads: due }, { leads: opened }, { leads: fresh }, { leads: sold }] = await Promise.all([
+      const [{ runs }, { leads }, { leads: due }, { leads: opened }, { leads: fresh }, { leads: sold }, { tasks: openTasks }] = await Promise.all([
         isOwner() ? api("/runs") : Promise.resolve({ runs: [] }),
         api("/leads?" + q),
         api("/leads?callbacks=due"),
         api("/leads?opened=recent"),
         filters.sales === "new" && !filters.category ? Promise.resolve({ leads: null }) : api("/leads?sales=new"),
         api("/leads?sales=sold"),
+        api("/tasks?scope=open").catch(() => ({ tasks: [] })),
       ]);
       if (stale(my)) return;
       const runsEl = document.getElementById("runs");
@@ -383,6 +384,8 @@
       runsEl.innerHTML = runsHtml(runs);
       const todayEl = document.getElementById("today");
       if (todayEl) todayEl.innerHTML = todayHtml(due, opened, fresh || leads);
+      const tasksEl = document.getElementById("tasks");
+      if (tasksEl) { tasksEl.innerHTML = tasksHomeHtml(openTasks); bindTaskChecks(tasksEl, () => refreshHome()); }
       const unpaidEl = document.getElementById("unpaid");
       if (unpaidEl) {
         unpaidEl.innerHTML = unpaidHtml(sold);
@@ -677,6 +680,7 @@
           <a class="btn${ready ? "" : " btn--primary"}" href="${telHref(phoneDigits(l))}">📞 Call ${esc(r ? r.phone.display : l.phone)}</a>
           ${r ? `<a class="btn" href="${esc(r.mapsUrl)}" target="_blank" rel="noopener">Google listing</a>` : ""}
           ${open ? `<a class="btn" href="#/playbook">💬 Plans & answers</a>` : ""}
+          <a class="btn" href="#/tasks/${l.id}">📝 Task</a>
         </div>
       </section>
       <div id="logslot-top"></div>
@@ -2357,6 +2361,7 @@
         <label class="field">Business email <span class="hint">Shown everywhere</span><input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
         <label class="field">Our Google review link <span class="hint">From your Google profile: “Ask for reviews” → copy link. Texted to happy clients.</span><input name="companyReviewUrl" type="url" value="${esc(s.companyReviewUrl || "")}" placeholder="https://g.page/r/…/review"></label>
         <label class="field">Our Facebook page <span class="hint">Linked in the website footer</span><input name="companyFacebookUrl" type="url" value="${esc(s.companyFacebookUrl || "")}" placeholder="https://www.facebook.com/…"></label>
+        <label class="field">Calendar email <span class="hint">Tasks for you with a date are sent here as calendar invites (your Google Calendar address). Blank uses your direct email.</span><input name="calendarEmail" type="email" value="${esc(s.calendarEmail || "")}" placeholder="post@undergroundassociates.com"></label>
         <label class="field">Google tag ID <span class="hint">From Google Analytics / Ads, like G-XXXXXXXXXX. Added to every page of the company website; blank turns it off.</span><input name="gaMeasurementId" value="${esc(s.gaMeasurementId || "")}" placeholder="G-XXXXXXXXXX" style="text-transform:uppercase"></label>
         <label class="field">Owner's direct email <span class="hint">Shown on your website as "Need the owner directly?"</span><input name="directEmail" type="email" value="${esc(s.directEmail || "")}" placeholder="post@undergroundassociates.com"></label>
         <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
@@ -2439,6 +2444,7 @@
             companyReviewUrl: v("companyReviewUrl") || undefined,
             companyFacebookUrl: v("companyFacebookUrl") || undefined,
             gaMeasurementId: v("gaMeasurementId").toUpperCase() || undefined,
+            calendarEmail: v("calendarEmail") || undefined,
             gbpEmail: v("gbpEmail") || undefined,
             // Only the owner's own login shows this field; others keep the owner's name as it is.
             callerName: f.elements.callerName ? v("callerName") || undefined : s.callerName,
@@ -2461,7 +2467,7 @@
   }
 
   /* ---------- notifications ---------- */
-  const NOTIF_ICON = { note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎", preview_open: "👀" };
+  const NOTIF_ICON = { note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎", preview_open: "👀", task: "📝" };
 
   async function refreshNotifCount() {
     try {
@@ -2499,6 +2505,168 @@
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const diff = Math.round((today - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
     return diff <= 0 ? "Today" : diff === 1 ? "Yesterday" : d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  }
+
+
+  /* ---------- tasks ---------- */
+  const TASK_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  /** "Today 2:30 PM", "Tomorrow", "Tue Oct 14", or "" for undated tasks. */
+  function taskWhen(t) {
+    if (!t.due) return "";
+    const today = dayFromNow(0), tomorrow = dayFromNow(1);
+    const d = new Date(t.due + "T12:00:00");
+    let day = t.due === today ? "Today" : t.due === tomorrow ? "Tomorrow" : `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]} ${TASK_MONTHS[d.getMonth()]} ${d.getDate()}`;
+    if (t.dueTime) {
+      const [h, m] = t.dueTime.split(":").map(Number);
+      day += ` ${h % 12 || 12}${m ? ":" + String(m).padStart(2, "0") : ""} ${h >= 12 ? "PM" : "AM"}`;
+    }
+    return day;
+  }
+  const taskGroup = (t) => (!t.due ? "later" : t.due < dayFromNow(0) ? "overdue" : t.due === dayFromNow(0) ? "today" : "upcoming");
+  const TASK_GROUPS = [["overdue", "Overdue"], ["today", "Today"], ["upcoming", "Coming up"], ["later", "No date"]];
+  const canDeleteTask = (t) => isOwner() || t.createdBy === meta.me.id;
+
+  function taskLi(t, full) {
+    const g = taskGroup(t);
+    const done = !!t.doneAt;
+    const who = t.assigneeName ? (t.assignee === meta.me.id ? "You" : t.assigneeName) : "Anyone";
+    const meta2 = [
+      t.due ? `<span class="chip${g === "overdue" && !done ? " chip--warn" : ""}">${esc(taskWhen(t))}</span>` : "",
+      `<span class="small muted">${esc(who)}</span>`,
+      t.leadName ? `<a class="small" href="#/lead/${t.leadId}">${esc(t.leadName)}</a>` : "",
+      full && t.createdByName && t.createdBy !== meta.me.id ? `<span class="small muted">from ${esc(t.createdByName)}</span>` : "",
+      done && t.doneByName ? `<span class="small muted">done by ${esc(t.doneByName)}</span>` : "",
+      t.onCalendar ? `<span class="small muted" title="On the calendar">📅</span>` : "",
+    ].filter(Boolean).join("");
+    return `<li class="task${done ? " task--done" : ""}" data-task="${t.id}">
+      <button type="button" class="task__check" data-done="${done ? "0" : "1"}" aria-label="${done ? "Not done" : "Mark done"}">${done ? "↩" : "✓"}</button>
+      <div class="task__body"><button type="button" class="task__title" data-edit>${esc(t.title)}</button>
+        ${t.notes && full ? `<p class="small" style="margin:2px 0 0;white-space:pre-wrap">${esc(t.notes)}</p>` : ""}
+        <div class="task__meta">${meta2}</div></div>
+      ${full && canDeleteTask(t) ? `<button type="button" class="task__del" data-del aria-label="Delete task">×</button>` : ""}
+    </li>`;
+  }
+
+  /** Home card: what's overdue or due today (yours, or unassigned), plus a link to everything. */
+  function tasksHomeHtml(tasks) {
+    const mine = tasks.filter((t) => (!t.assignee || t.assignee === meta.me.id) && t.due && t.due <= dayFromNow(0));
+    const others = tasks.length - mine.length;
+    if (!mine.length) return tasks.length ? `<p class="small muted" style="margin:-6px 0 12px"><a href="#/tasks">📝 ${tasks.length} open task${tasks.length === 1 ? "" : "s"}</a></p>` : "";
+    return `<section class="card due"><h2>📝 Tasks: ${mine.length} for today</h2>
+      <ul class="list">${mine.slice(0, 6).map((t) => taskLi(t, false)).join("")}</ul>
+      <p class="small" style="margin:8px 0 0"><a href="#/tasks">All tasks${others ? ` (${others} more)` : ""}</a> · <a href="#/tasks">Add one</a></p></section>`;
+  }
+
+  /** Wires the ✓ / ↩ buttons in any task list; `after` re-renders. */
+  function bindTaskChecks(root, after) {
+    root.querySelectorAll("[data-done]").forEach((b) => b.addEventListener("click", async () => {
+      const id = b.closest("[data-task]").dataset.task;
+      b.disabled = true;
+      try { await api(`/tasks/${id}`, { method: "PUT", json: { done: b.dataset.done === "1" } }); after(); } catch (err) { toast(err.message); b.disabled = false; }
+    }));
+  }
+
+  function taskFormHtml(t, leadName) {
+    const team = (meta.team || []).map((p) => `<option value="${esc(p.id)}"${(t.assignee || "") === p.id ? " selected" : ""}>${esc(p.id === meta.me.id ? `${p.name} (me)` : p.name)}</option>`).join("");
+    return `<form class="taskform" data-task-form="${esc(t.id || "")}">
+      <label class="field"><span class="sr-only">Task</span><input name="title" required maxlength="200" placeholder="What needs doing?" value="${esc(t.title || "")}" autocomplete="off"></label>
+      <div class="row">
+        <label class="field">When<input name="due" type="date" value="${esc(t.due || "")}"></label>
+        <label class="field">Time<input name="dueTime" type="time" value="${esc(t.dueTime || "")}"></label>
+        <label class="field">For<select name="assignee"><option value="">Anyone</option>${team}</select></label>
+      </div>
+      <label class="field"><span class="sr-only">Notes</span><textarea name="notes" rows="2" maxlength="2000" placeholder="Notes (optional)" style="min-height:48px">${esc(t.notes || "")}</textarea></label>
+      ${leadName ? `<p class="small muted">About: <strong>${esc(leadName)}</strong></p>` : ""}
+      <div class="btns"><button class="btn btn--primary" type="submit">${t.id ? "Save" : "Add task"}</button>${t.id ? `<button class="btn" type="button" data-cancel>Cancel</button>` : ""}</div>
+    </form>`;
+  }
+  const taskFormValues = (f) => ({
+    title: f.title.value.trim(),
+    due: f.due.value || null,
+    dueTime: f.due.value && f.dueTime.value ? f.dueTime.value : null,
+    assignee: f.assignee.value || null,
+    notes: f.notes.value.trim(),
+  });
+
+  async function viewTasks(leadId) {
+    setNav("tasks");
+    const my = renderSeq;
+    meta = meta || (await api("/meta"));
+    const state = { scope: "open", mine: false, leadId: leadId || null, leadName: null };
+    if (state.leadId) {
+      try { const l = await api("/leads/" + state.leadId); state.leadName = l.record ? l.record.name : l.name; } catch (e) { state.leadId = null; }
+    }
+    if (stale(my)) return;
+    $app.innerHTML = `<p><a href="${state.leadId ? `#/lead/${state.leadId}` : "#/"}" id="back">← ${state.leadId ? "Lead" : "Home"}</a></p>
+      <h1>Tasks${state.leadName ? `: ${esc(state.leadName)}` : ""}</h1>
+      <section class="card"><h2>Add a task</h2>${taskFormHtml({ assignee: state.leadId ? "" : "" }, state.leadName)}
+        <p class="small muted" style="margin:6px 0 0">${isOwner() ? "Tasks for you with a date go to your calendar as invites." : "The owner sees these on their home screen; dated tasks for the owner go to their calendar."}</p></section>
+      <div class="tabs" role="tablist">
+        <button type="button" data-scope="open" class="is-on">Open</button><button type="button" data-scope="done">Done</button>
+        <button type="button" data-mine="1">Mine</button></div>
+      <ul class="list" id="tasklist"><li class="muted">Loading…</li></ul>`;
+    const listEl = $app.querySelector("#tasklist");
+    const form = $app.querySelector("[data-task-form]");
+
+    async function load() {
+      const q = new URLSearchParams({ scope: state.scope });
+      if (state.mine) q.set("mine", "1");
+      if (state.leadId) q.set("lead", state.leadId);
+      let tasks;
+      try { ({ tasks } = await api("/tasks?" + q)); } catch (err) { listEl.innerHTML = `<li class="card offline"><p>${esc(err.message)}</p></li>`; return; }
+      if (stale(my)) return;
+      if (!tasks.length) {
+        listEl.innerHTML = `<li class="muted">${state.scope === "done" ? "Nothing finished yet." : state.mine ? "Nothing on your list. Add one above." : "No open tasks. Add one above."}</li>`;
+        return;
+      }
+      if (state.scope === "done") listEl.innerHTML = tasks.map((t) => taskLi(t, true)).join("");
+      else {
+        listEl.innerHTML = TASK_GROUPS.map(([k, label]) => {
+          const rows = tasks.filter((t) => taskGroup(t) === k);
+          return rows.length ? `<li class="tasks__group" aria-hidden="true">${label}</li>${rows.map((t) => taskLi(t, true)).join("")}` : "";
+        }).join("");
+      }
+      bindTaskChecks(listEl, load);
+      listEl.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
+        if (!confirm("Delete this task?")) return;
+        try { await api(`/tasks/${b.closest("[data-task]").dataset.task}`, { method: "DELETE" }); load(); } catch (err) { toast(err.message); }
+      }));
+      listEl.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
+        const li = b.closest("[data-task]");
+        const t = tasks.find((x) => x.id === li.dataset.task);
+        li.innerHTML = `<div class="task__body">${taskFormHtml(t, t.leadName)}</div>`;
+        const f = li.querySelector("form");
+        f.querySelector("[data-cancel]").addEventListener("click", load);
+        f.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          try { await api(`/tasks/${t.id}`, { method: "PUT", json: taskFormValues(f) }); toast("Saved"); load(); } catch (err) { toast(err.message); }
+        });
+        f.title.focus();
+      }));
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const v = taskFormValues(form);
+      if (!v.title) return toast("Give the task a name");
+      const btn = form.querySelector("button[type=submit]");
+      btn.disabled = true;
+      try {
+        await api("/tasks", { method: "POST", json: { ...v, leadId: state.leadId } });
+        form.reset();
+        toast("Task added");
+        if (state.scope !== "open") { state.scope = "open"; $app.querySelectorAll("[data-scope]").forEach((x) => x.classList.toggle("is-on", x.dataset.scope === "open")); }
+        load();
+      } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+    });
+    $app.querySelectorAll("[data-scope]").forEach((b) => b.addEventListener("click", () => {
+      state.scope = b.dataset.scope;
+      $app.querySelectorAll("[data-scope]").forEach((x) => x.classList.toggle("is-on", x === b));
+      load();
+    }));
+    const mineBtn = $app.querySelector("[data-mine]");
+    mineBtn.addEventListener("click", () => { state.mine = !state.mine; mineBtn.classList.toggle("is-on", state.mine); load(); });
+    await load();
   }
 
   async function viewNotifications() {
@@ -2588,6 +2756,7 @@
       if (h === "#/sales") return await viewSales();
       if (h === "#/inbox") return await viewInbox();
       if (h === "#/notifications") return await viewNotifications();
+      if ((m = /^#\/tasks(?:\/([a-z0-9]+))?$/.exec(h))) return await viewTasks(m[1]);
       if (h === "#/settings") return await viewSettings();
       $app.innerHTML = "";
       return await viewHome();

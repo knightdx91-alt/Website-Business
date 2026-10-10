@@ -30,6 +30,7 @@ import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, u
 import { stripeWebhook } from "./stripe.ts";
 import { extraTerms } from "./contract.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
+import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
 import { chooseLook, renderPreview, runBuild, runSearch } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
@@ -253,10 +254,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const settings = await getSettings(env);
     // Callers see prices and plan names (Show plans, Plans & answers) but not commission, private addresses,
     // payment links or the agreement text.
-    const { commission: _commission, directEmail: _direct, gbpEmail: _gbp, terms: _terms, ...shared } = settings;
+    const { commission: _commission, directEmail: _direct, gbpEmail: _gbp, terms: _terms, calendarEmail: _cal, ...shared } = settings;
+    const teamRows = await env.DB.prepare("SELECT id, name FROM users WHERE disabled = 0 ORDER BY name").all<{ id: string; name: string }>();
+    const team = [{ id: "owner", name: settings.callerName || "Owner" }, ...teamRows.results];
     const forCaller = { ...shared, plans: shared.plans.map(({ payLink: _a, payLinkFlex: _b, payLinkAnnual: _c, payLinkShort: _d, ...p }) => p), addons: shared.addons.map(({ terms: _t, ...a }) => a) };
     return json({
       me: { role: session.role, name: session.name, id: session.userId },
+      team,
       checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: mailReady(env) },
       extraTerms: isOwner ? settings.addons.map((a) => extraTerms(a)) : [],
       categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
@@ -269,6 +273,27 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   // Notifications: the owner and full-access team see what everyone else did; callers only see preview opens.
   if (path === "/notifications/count" && m === "GET") return json({ unread: await unreadCount(env, session.userId, !isOwner) });
   if (path === "/notifications" && m === "GET") return json(await listEvents(env, session.userId, 100, !isOwner));
+
+  // Tasks: the whole team can read, add, edit and finish; deleting is the owner's or the task's author's.
+  if (path === "/tasks" && m === "GET") {
+    const scope = url.searchParams.get("scope") === "done" ? "done" : "open";
+    const tasks = await listTasks(env, {
+      scope,
+      assignee: url.searchParams.get("mine") === "1" ? session.userId : undefined,
+      leadId: url.searchParams.get("lead") ?? undefined,
+      limit: scope === "done" ? 50 : 200,
+    });
+    return json({ tasks });
+  }
+  if (path === "/tasks" && m === "POST") return json({ task: await createTask(env, session, await req.json().catch(() => ({}))) });
+  {
+    const tm = /^\/tasks\/([a-z0-9]+)$/.exec(path);
+    if (tm && m === "PUT") return json({ task: await updateTask(env, session, tm[1]!, await req.json().catch(() => ({}))) });
+    if (tm && m === "DELETE") {
+      await deleteTask(env, session, tm[1]!);
+      return json({ ok: true });
+    }
+  }
   if (path === "/notifications/seen" && m === "POST") {
     await markSeen(env, session.userId);
     return json({ ok: true });
@@ -306,6 +331,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         directEmail: z.string().trim().email().max(120).optional(),
         companyReviewUrl: WEB_URL(500).optional(),
         companyFacebookUrl: WEB_URL(500).optional(),
+        calendarEmail: z.string().trim().email().max(120).optional(),
         gaMeasurementId: z.string().trim().toUpperCase().regex(/^G-[A-Z0-9]{4,16}$/, "A Google tag ID looks like G-XXXXXXXXXX").optional(),
         gbpEmail: z.string().trim().email().max(120).optional(),
         callerName: z.string().trim().max(60).optional(),

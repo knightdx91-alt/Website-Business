@@ -153,7 +153,7 @@ code { background: var(--chip); padding: 1px 6px; border-radius: 6px; word-break
 .pickrow input { width: 24px; height: 24px; margin-top: 2px; flex: none; accent-color: var(--primary); }
 .bignum { font-size: 2rem; font-weight: 800; margin: 0; }
 .btn.is-disabled { opacity: .5; pointer-events: none; }
-@media (max-width: 460px) { .top { gap: 6px; padding-left: 12px; padding-right: 12px; } .top__nav a { padding: 10px 8px; font-size: .95rem; } }
+@media (max-width: 560px) { .top { gap: 6px; padding-left: 12px; padding-right: 12px; } .top__nav { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-right: -12px; padding-right: 12px; } .top__nav::-webkit-scrollbar { display: none; } .top__nav a { padding: 10px 8px; font-size: .95rem; } }
 .more summary { cursor: pointer; font-weight: 700; min-height: 40px; display: flex; align-items: center; }
 .addon { gap: 8px; }
 .addon .field { margin-bottom: 8px; }
@@ -238,3 +238,19 @@ body.showing .top { display: none; }
 .cadence p { margin: 0 0 8px; }
 .notes li[hidden] { display: none; }
 .offline { text-align: center; }
+
+/* Tasks */
+.task { display: flex; gap: 10px; align-items: flex-start; }
+.task__check { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--line); background: var(--card); font-size: 1rem; cursor: pointer; margin-top: 2px; }
+.task__check:hover, .task__check:focus-visible { border-color: var(--good); }
+.task__body { flex: 1; min-width: 0; }
+.task__title { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: inherit; text-align: left; cursor: pointer; }
+.task__meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 2px; }
+.task--done .task__title { text-decoration: line-through; color: var(--muted); }
+.task__del { flex: none; background: none; border: 0; color: var(--muted); font-size: 1.2rem; padding: 4px 8px; cursor: pointer; min-height: 36px; }
+.tasks__group { margin: 14px 0 4px; font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.taskform .row { align-items: flex-end; }
+.taskform .row { flex-wrap: wrap; }
+.taskform .row > * { flex: 1 1 120px; }
+.taskform .row select { min-width: 120px; }
+.taskform .field { margin-bottom: 10px; }

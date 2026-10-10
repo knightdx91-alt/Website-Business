@@ -314,6 +314,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `app/public/brand/logo-{192,512,1024}.png` + `logo.svg` (transparent disc; website header + favicon), the app icons in
   `app/public/icons/`, and a marketing set (Google Ads square/4:1 logos on white and navy, Facebook profile). `scripts/examples.ts
   --og-only` re-renders just og.png (badge + phones). Company host passes `/brand/*` through to assets.
+- Tasks (`#/tasks`, `#/tasks/<leadId>` prefilled; owner and callers; migration 0013 `tasks`; `src/worker/tasks.ts`): a shared
+  to-do list with title, notes, date, time, "For" (anyone / owner / a team member) and an optional lead. `GET/POST /api/tasks`,
+  `PUT/DELETE /api/tasks/:id` (delete = owner or author). Home shows "Tasks: N for today" (yours or unassigned, due today or
+  overdue); the lead screen has a 📝 Task button. Every add/finish notifies (kind `task`, callers included; `/meta` carries
+  `team`). Calendar: tasks for the owner (or anyone) with a date are emailed to Settings → "Calendar email" (fallback direct
+  email) as iCalendar invites through Resend (`taskIcs`, METHOD:REQUEST; edits bump SEQUENCE; finishing/deleting/reassigning
+  sends CANCEL; `tasks.cal_uid/cal_seq`), so Google Calendar shows them without any Google login from the app. Times are
+  Cullman time (`chicagoToUtc`); no time = all-day. `test/worker/tasks.test.ts`.
 - Google tag: Settings → "Google tag ID" (`gaMeasurementId`, G-RPF4081813 since Oct 2026) puts gtag.js in the head of every
   undergroundassociates.com page (home, portfolio, start/thank-you/extras, change, terms, privacy) with a per-response CSP
   nonce (`nonce()`, `gaTag()`, `csp()` in company.ts); blank turns it off. Not on client sites, previews or the app. The
