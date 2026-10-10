@@ -79,6 +79,7 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
   if (r.category === "auto" && r.variant === "parts") f.push("a 'what we carry' list, a 'can't find it? we'll order it' section, counter services (battery testing and the like), and a Reserve a part form that asks for year, make, model and the part");
   f.push(...fsrpFeatures(r));
   if (hasForm) f.push("a request form that sends customer requests to an inbox (once live)");
+  f.push(...tlcFeatures(r));
   f.push("an FAQ section");
   return f;
 }
@@ -130,6 +131,34 @@ function fsrpFeatures(r: BusinessRecord): string[] {
     if (pr?.turnaround || pr?.quantityTiers?.length) f.push("a Good to know block with their turnaround and price breaks");
     if (pr?.storeUrl) f.push("a button to their online / team store");
   }
+
+  return f;
+}
+
+/** Trades, lawn and cleaning modules (Oct 2026): one line each, only for what the record really has. */
+function tlcFeatures(r: BusinessRecord): string[] {
+  const f: string[] = [];
+  const tlc = r.category === "contractor" || r.category === "landscaping" || r.category === "cleaning";
+  if (!tlc) return f;
+  const c = r.ext.contractor;
+  const k = r.ext.cleaning;
+  const l = r.ext.landscaping;
+  if (r.plans?.length) f.push(`a plans & pricing section with their ${r.plans.length} plan card${r.plans.length > 1 ? "s" : ""} (${r.plans.map((p) => p.name).join(", ")})${r.plans.some((p) => p.price) ? ", with their starting prices" : ", without prices until they give some"}`);
+  else if (r.category === "landscaping" && r.variant === "lawn_crew") f.push("a 'ways to work with us' section (weekly, every 2 weeks, one-time) built from their services, with no prices until they add some");
+  if (r.guarantee && (r.guarantee.text || r.guarantee.window || r.guarantee.remedy)) f.push("their guarantee, shown as a trust chip, a line under the services and an FAQ answer");
+  if (r.offers?.length) f.push(`a promo bar with their current offer (${r.offers[0]!.title}), which hides itself when it expires`);
+  if (r.media.gallery.some((p) => p.pairWith)) f.push("before-and-after photo pairs shown side by side");
+  if (c?.financing?.lender) f.push(`a 'Financing available' chip and section naming ${c.financing.lender} with an Apply link`);
+  if (c?.warrantyText) f.push("their warranty wording as a band under the services and an FAQ answer");
+  if (c?.emergencyService) f.push("an emergency line under the header ('Emergency? Call …') with a 'Not urgent? Request service' link, and the form asks 'Is this an emergency?' so urgent requests are flagged red in the inbox");
+  if (r.category === "contractor" && r.variant === "hvac" && r.licenses.length) f.push(`their license shown as 'AL# ${r.licenses[0]!.number}' next to the name and in the footer, as Alabama's HVAC board requires`);
+  if (c?.serves) f.push(`a line saying they work with ${c.serves === "both" ? "homes and businesses" : c.serves === "commercial" ? "businesses" : "homeowners"}, and the form asks residential or commercial`);
+  if (l?.seasonal) f.push("a 4-season 'what we do when' calendar built from their services with North Alabama timing");
+  if (l?.adaiPermit) f.push("their ADAI permit number as a trust chip (needed for fertilizing and weed control)");
+  if (l?.crew) f.push("a 'meet the crew' line in the About section");
+  if (r.category === "cleaning" && r.variant === "residential") f.push(k?.checklist?.rooms.some((x) => x.tasks.length) ? "a what's-included table comparing their cleaning tiers room by room" : "room for a what's-included table once they send their checklist");
+  if (r.category === "cleaning" && r.variant === "commercial") f.push(`a 'Request a walkthrough' button and form (building type, square feet, how often), a walkthrough → written scope → schedule section${k?.facilities?.length ? `, and the building types they clean (${k.facilities.slice(0, 4).join(", ")})` : ""}`);
+  if (r.smsEnabled) f.push("a 'text us a photo' line under the request form");
   return f;
 }
 

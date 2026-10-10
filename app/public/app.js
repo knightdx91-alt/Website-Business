@@ -928,7 +928,10 @@
   function galleryCardHtml(id, r) {
     return `<section class="card" id="card-gallery"><h2>Photo gallery</h2>
         <p class="small muted">Up to 12 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site.</p>
-        ${r.media.gallery.length ? `<ul class="thumbs">${r.media.gallery.map((p) => `<li><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy"><button class="linkbtn" type="button" data-eact="delphoto" data-photo="${esc(p.src.split("/").pop().split(".")[0])}">Remove</button></li>`).join("")}</ul>` : ""}
+        ${r.media.gallery.length ? `<ul class="thumbs" style="grid-template-columns:1fr">${r.media.gallery.map((p) => { const key = photoKey(p.src); return `<li style="text-align:left"><div class="row" style="align-items:flex-start"><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy" style="width:88px;flex:none"><div style="flex:1;min-width:0"><div class="row"><label class="field">Caption<input name="gcap_${esc(key)}" maxlength="80" value="${esc(p.caption || "")}" placeholder="Patio"></label><label class="field">Town<input name="gtown_${esc(key)}" maxlength="40" value="${esc(p.town || "")}" placeholder="Hanceville"></label></div>
+            <label class="field">Before/after<select name="gpair_${esc(key)}"><option value="">Not a “before” photo</option>${r.media.gallery.filter((o) => o !== p).map((o) => { const ok = photoKey(o.src); return `<option value="${esc(ok)}"${p.pairWith === ok ? " selected" : ""}>This is the BEFORE of: ${esc(o.caption || o.alt || ok)}</option>`; }).join("")}</select></label>
+            <button class="linkbtn" type="button" data-eact="delphoto" data-photo="${esc(key)}">Remove</button></div></div></li>`; }).join("")}</ul>
+        <p class="small muted">Captions show under the photo (“Patio, Hanceville”). Pick a photo's “after” to show the two side by side.</p>` : ""}
         <label class="field">Add photos<input type="file" id="gallery" accept="image/*" multiple></label>
         <label class="field">Describe them <span class="hint">Used for every photo in this batch</span><input id="galleryAlt" placeholder="e.g. Fresh fade at the shop"></label>
         <button class="btn btn--small" type="button" data-eact="gupload">Add to gallery</button>
@@ -1064,6 +1067,10 @@
       ${isRt ? donationsEditCard(r, ext, cb) : ""}
       ${isF ? financeEditCard(r, ext, cb) : ""}
       ${isCh ? churchEditCard(r, ext, cb) : ""}
+      ${isC ? contractorEditCard(r, ext, cb) : ""}
+      ${isL ? landscapingEditCard(r, ext, cb) : ""}
+      ${isK ? cleaningEditCard(r, ext, cb) : ""}
+      ${isC || isL || isK ? plansEditCard(r) + guaranteeEditCard(r, isK) + offersEditCard(r) : ""}
       <section class="card"><h2>Links</h2>
         ${isR ? `<label class="field">Online ordering link<input name="order" type="url" value="${esc(r.links.order || "")}" placeholder="https://"></label>
         <label class="field">Reservations link<input name="reserve" type="url" value="${esc(r.links.reserve || "")}" placeholder="https://"></label>` : ""}
@@ -1082,6 +1089,8 @@
         <label class="field">Closing heading<input name="ctaTitle" value="${esc(c.ctaTitle)}"></label>
         <label class="field">Closing line<input name="ctaLine" value="${esc(c.ctaLine)}"></label>
         <label class="field">Google search description <span class="hint">About 150 characters</span><textarea name="metaDescription" rows="3">${esc(c.meta.description)}</textarea></label>
+        ${isC || isL || isK ? `<div class="row"><label class="field">Question headline <span class="hint">Used by the “A question” headline style</span><input name="heroQuestion" maxlength="80" value="${esc(c.heroQuestion || "")}" placeholder="Is your AC blowing warm air?"></label>
+        <label class="field">Benefit headline <span class="hint">Used by the “A benefit” headline style</span><input name="heroBenefit" maxlength="80" value="${esc(c.heroBenefit || "")}" placeholder="Take your weekend back"></label></div>` : ""}
         ${hasServices ? r.services.map((s) => `<label class="field">${esc(s.name)}<textarea name="blurb_${esc(s.id)}" rows="3">${esc(c.serviceBlurbs[s.id] || "")}</textarea></label>`).join("") : ""}
       </section>
       ${isR ? `<section class="card"><h2>Menu</h2><p class="small muted">One item per line: <code>Name | $Price | Description</code>. Start a section with <code># Section name</code>.</p>
@@ -1213,6 +1222,11 @@
           ...(isParts ? { parts: partsEditValues(f) } : {}),
           ...(isF ? { finance: financeEditValues(f, r) } : {}),
           ...(isCh ? { church: churchEditValues(f) } : {}),
+          ...(isC ? { contractor: contractorEditValues(f) } : {}),
+          ...(isL ? { landscaping: landscapingEditValues(f) } : {}),
+          ...(isK ? { cleaning: cleaningEditValues(f, r) } : {}),
+          ...(isC || isL || isK ? { plans: plansEditValues(f), guarantee: guaranteeEditValues(f), offers: parseOfferLines(val("offers") || "") } : {}),
+          galleryMeta: galleryMetaValues(f, r),
           testimonials,
           towns: hasTowns ? val("towns").split(",").map((s) => s.trim()).filter(Boolean) : undefined,
           services: hasServices ? val("services").split("\n").map((s) => s.trim()).filter(Boolean) : undefined,
@@ -1228,6 +1242,8 @@
           metaDescription: val("metaDescription"),
           serviceBlurbs: hasServices ? blurbs : undefined,
           approved: on("approved"),
+          heroQuestion: val("heroQuestion"),
+          heroBenefit: val("heroBenefit"),
         },
       };
       const btn = f.querySelector("button[type=submit]");
@@ -1617,6 +1633,164 @@
     const counter = {};
     PARTS_COUNTER.forEach(([id]) => { counter[id] = !!on("pc_" + id); });
     return { counter, counterConfirmed: on("partsCounterOk"), turnaround: v("partsTurnaround"), commercial: on("partsCommercial"), commercialText: v("partsCommercialText"), program: v("partsProgram"), orderUrl: v("partsOrderUrl") };
+  }
+
+  /* ---------- trades, lawn & cleaning (Oct 2026): plans, guarantee, offers, gallery captions, category details ---------- */
+  const photoKey = (src) => src.split("/").pop().split(".")[0];
+  function galleryMetaValues(f, r) {
+    const out = {};
+    for (const p of r.media.gallery) {
+      const key = photoKey(p.src);
+      if (!f.elements["gcap_" + key]) continue;
+      out[p.src] = { caption: f.elements["gcap_" + key].value.trim(), town: (f.elements["gtown_" + key] || { value: "" }).value.trim(), pairWith: (f.elements["gpair_" + key] || { value: "" }).value };
+    }
+    return Object.keys(out).length ? out : undefined;
+  }
+  const PLAN_HINT = {
+    contractor: ["Comfort plan", "$149", "year", "Most popular", "Two tune-ups a year\n15% off repairs\nPriority scheduling"],
+    landscaping: ["Every 2 weeks", "$45", "visit", "Most popular", "Mowing & edging\nTrimming\nBlowing off drives and walks"],
+    cleaning: ["Every 2 weeks", "$120", "visit", "Most popular", "Kitchen and baths\nDusting and floors\nBeds made"],
+  };
+  function plansEditCard(r) {
+    const h = PLAN_HINT[r.category] || PLAN_HINT.cleaning;
+    const list = (r.plans || []).concat([{}, {}, {}]).slice(0, 3);
+    const lawn = r.category === "landscaping" && r.variant === "lawn_crew";
+    return `<section class="card"><h2>Plans &amp; pricing</h2>
+      <p class="small muted">Up to 3 cards: ${r.category === "contractor" ? "maintenance or service plans (HVAC, pest, garage doors)" : r.category === "landscaping" ? "ways to work with us (weekly, every 2 weeks, one-time)" : r.variant === "exterior" ? "flat-rate packages" : "recurring tiers"}. Prices are optional and always shown as starting points.${lawn ? " Lawn sites show weekly / every 2 weeks / one-time cards with no prices until you fill these in; one named plan here replaces them." : ""}</p>
+      ${list.map((p, i) => `<details class="more"${p.name ? " open" : ""}><summary>Plan ${i + 1}${p.name ? ": " + esc(p.name) : ""}</summary>
+        <div class="row"><label class="field">Name<input name="plan${i}_name" maxlength="60" value="${esc(p.name || "")}" placeholder="${esc(h[0])}"></label><label class="field">Badge<input name="plan${i}_badge" maxlength="30" value="${esc(p.badge || "")}" placeholder="${esc(h[3])}"></label></div>
+        <div class="row"><label class="field">Price (optional)<input name="plan${i}_price" maxlength="30" value="${esc(p.price || "")}" placeholder="${esc(h[1])}"></label><label class="field">Per<input name="plan${i}_unit" maxlength="30" value="${esc(p.unit || "")}" placeholder="${esc(h[2])}"></label></div>
+        <label class="field">What's included (one per line)<textarea name="plan${i}_includes" rows="4" placeholder="${esc(h[4])}">${esc((p.includes || []).join("\n"))}</textarea></label>
+        <label class="field">Note (optional)<input name="plan${i}_note" maxlength="160" value="${esc(p.note || "")}" placeholder="Cancel any time."></label>
+      </details>`).join("")}
+    </section>`;
+  }
+  function plansEditValues(f) {
+    const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : "");
+    const out = [];
+    for (let i = 0; i < 3; i++) {
+      if (!f.elements["plan" + i + "_name"]) return undefined;
+      const name = v("plan" + i + "_name");
+      if (!name) continue;
+      out.push({ name, price: v("plan" + i + "_price"), unit: v("plan" + i + "_unit"), badge: v("plan" + i + "_badge"), note: v("plan" + i + "_note"), includes: v("plan" + i + "_includes").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 8) });
+    }
+    return out;
+  }
+  function guaranteeEditCard(r, isK) {
+    const g = r.guarantee || {};
+    return `<section class="card"><h2>Guarantee</h2>
+      <p class="small muted">Only in the owner's words; the site shows nothing here until something is typed. It becomes a trust chip, a line under the services and an FAQ answer.</p>
+      <div class="row"><label class="field">Window<input name="gWindow" maxlength="40" value="${esc(g.window || "")}" placeholder="${isK ? "24 hours" : "30 days"}"></label>
+      <label class="field">What they do<input name="gRemedy" maxlength="160" value="${esc(g.remedy || "")}" placeholder="${isK ? "we'll come back and re-clean it free" : "we come back and make it right"}"></label></div>
+      <label class="field">Or the whole line, their way (optional)<input name="gText" maxlength="240" value="${esc(g.text || "")}" placeholder="${isK ? "Not happy with a room? Tell us within 24 hours and we'll re-clean it free." : ""}"></label>
+    </section>`;
+  }
+  function guaranteeEditValues(f) {
+    if (!f.elements.gWindow) return undefined;
+    const v = (n) => f.elements[n].value.trim();
+    return { window: v("gWindow"), remedy: v("gRemedy"), text: v("gText") };
+  }
+  function offersEditCard(r) {
+    return `<section class="card"><h2>Offers &amp; coupons</h2>
+      <p class="small muted">One per line as <b>offer | code | expires | details</b>. Code and details are optional; expires is YYYY-MM-DD and the offer hides itself after that day. The first one shows as a bar under the opening, the rest as cards.</p>
+      <label class="field">Offers<textarea name="offers" rows="3" placeholder="$25 off your first clean | WEB25 | 2026-12-31 | New customers, mention this website.&#10;Free second opinion on any repair quote | | |">${esc(offerLines(r.offers))}</textarea></label>
+    </section>`;
+  }
+  function offerLines(offers) {
+    return (offers || []).map((o) => [o.title, o.code || "", o.expiresOn || "", o.detail || ""].join(" | ").replace(/( \|\s*)+$/, "")).join("\n");
+  }
+  function parseOfferLines(text) {
+    const out = [];
+    for (const line of text.split("\n")) {
+      const parts = line.split("|").map((x) => x.trim());
+      if (!parts[0]) continue;
+      const o = { title: parts[0].slice(0, 80) };
+      if (parts[1]) o.code = parts[1].slice(0, 30);
+      if (parts[2]) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(parts[2])) { toast(`Offer "${o.title}" needs an expiry like 2026-12-31 (or leave it blank).`); continue; }
+        o.expiresOn = parts[2];
+      }
+      if (parts[3]) o.detail = parts[3].slice(0, 160);
+      out.push(o);
+    }
+    return out.slice(0, 6);
+  }
+  function contractorEditCard(r, x, cb) {
+    const fin = x.financing || {};
+    const ah = x.afterHours || {};
+    const hvac = r.variant === "hvac";
+    const remodel = r.variant === "remodeling";
+    return `<section class="card"><h2>Contractor details</h2>
+      <label class="field">Who they work with<select name="cServes"><option value="">Not set</option>${[["residential", "Homeowners"], ["commercial", "Businesses"], ["both", "Both homes and businesses"]].map(([v, t]) => `<option value="${v}"${x.serves === v ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+      <h3>Financing</h3>
+      <p class="small muted">Name the lender and paste their application link. The site says “Financing available” and “Apply with &lt;lender&gt;”; it never states rates, 0% or approval odds.</p>
+      <div class="row"><label class="field">Lender<input name="cFinLender" maxlength="60" value="${esc(fin.lender || "")}" placeholder="Wisetack, GreenSky, Synchrony…"></label>
+      <label class="field">Application link<input name="cFinUrl" type="url" value="${esc(fin.url || "")}" placeholder="https://"></label></div>
+      <label class="field">Warranty, in their words<textarea name="cWarranty" rows="2" maxlength="300" placeholder="Our workmanship is covered for one year. If something we did fails, we come back and fix it at no charge.">${esc(x.warrantyText || "")}</textarea></label>
+      <h3>Emergency calls</h3>
+      <p class="small muted">${x.emergencyService ? "“Offers emergency service” is on, so the site shows an “Emergency? Call…” line under the header. Required before publishing: confirm the terms." : "Tick “Offers emergency service” under Facts to show an emergency line."}</p>
+      <div class="row"><label class="field">After-hours number (if different)<input name="cAhPhone" type="tel" maxlength="30" value="${esc(ah.phone || "")}" placeholder="(256) 555-0199"></label>
+      <label class="field">Terms, their words<input name="cAhNote" maxlength="160" value="${esc(ah.note || "")}" placeholder="Nights and weekends; after-hours rates apply"></label></div>
+      ${cb("cAhOk", "Owner confirmed the emergency terms (hours, extra charges)" + (x.emergencyService ? " (required)" : ""), !!ah.confirmed)}
+      ${hvac ? `<p class="small muted"><b>Alabama HVAC rule:</b> the AL# certification number must be on the home page. Type it under License # in Facts; the site shows “AL# …” next to the name.</p>` : ""}
+      ${remodel ? cb("cOver10k", "They take jobs over $10,000 (Alabama then requires the HBLB license number on the site)", !!x.jobsOver10k) : ""}
+    </section>`;
+  }
+  function contractorEditValues(f) {
+    const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
+    const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
+    const out = { serves: v("cServes"), financingLender: v("cFinLender"), financingUrl: v("cFinUrl"), warrantyText: v("cWarranty"), afterHoursPhone: v("cAhPhone"), afterHoursNote: v("cAhNote"), afterHoursConfirmed: on("cAhOk"), jobsOver10k: on("cOver10k") };
+    return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
+  }
+  function landscapingEditCard(r, x, cb) {
+    return `<section class="card"><h2>Lawn &amp; landscape details</h2>
+      ${cb("lSeasonal", "Show a 4-season “what we do when” calendar (built from the services list, North Alabama timing)", !!x.seasonal)}
+      <label class="field">ADAI permit # <span class="hint">Required before publishing if the services include fertilizing, weed control or pest treatments</span><input name="lAdai" maxlength="40" value="${esc(x.adaiPermit || "")}"></label>
+      <label class="field">Meet the crew (one line, their words)<input name="lCrew" maxlength="160" value="${esc(x.crew || "")}" placeholder="Owner-operated: Jake runs every job."></label>
+    </section>`;
+  }
+  function landscapingEditValues(f) {
+    const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
+    const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
+    const out = { seasonal: on("lSeasonal"), adaiPermit: v("lAdai"), crew: v("lCrew") };
+    return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
+  }
+  const CHECKLIST_ROOMS = ["Every room", "Kitchen", "Bathrooms", "Bedrooms", "Living areas"];
+  const CLEANING_FACILITIES = ["Offices", "Medical & dental", "Churches", "Schools & daycares", "Retail stores", "Restaurants", "Banks", "Gyms", "Industrial & warehouses", "Apartment common areas", "Vacation rentals", "Post-construction"];
+  function cleaningEditCard(r, x, cb) {
+    if (r.variant === "commercial") {
+      const fac = new Set(x.facilities || []);
+      return `<section class="card"><h2>Commercial cleaning details</h2>
+        <p class="small muted">The site asks for a walkthrough, then a written scope and a schedule. Tick only the building types they really clean.</p>
+        <h3>Buildings they clean</h3>
+        ${CLEANING_FACILITIES.map((n, i) => cb("kFac_" + i, n, fac.has(n))).join("")}
+        <label class="field">How often, their words<input name="kFreq" maxlength="120" value="${esc(x.frequency || "")}" placeholder="Nightly, weekly or on your schedule"></label>
+        ${cb("kAfterHours", "They clean after hours", !!x.afterHours)}
+      </section>`;
+    }
+    if (r.variant !== "residential") return "";
+    const c = x.checklist || { rooms: [], tiers: [], extras: [] };
+    const rooms = CHECKLIST_ROOMS.concat((c.rooms || []).map((rm) => rm.room).filter((n) => !CHECKLIST_ROOMS.includes(n)));
+    const tasksOf = (name) => { const rm = (c.rooms || []).find((q) => q.room === name); return rm ? rm.tasks.join("\n") : ""; };
+    return `<section class="card"><h2>What's included</h2>
+      <p class="small muted">Their checklist, one task per line. Name the tiers (e.g. <b>Standard, Deep, Move-out</b>), then tag a task that's only in some tiers with <b>@deep</b> or <b>@move</b>; untagged tasks are in every tier. It renders as a tick-box comparison table.</p>
+      <label class="field">Tiers (comma separated)<input name="kTiers" maxlength="120" value="${esc((c.tiers || []).join(", "))}" placeholder="Standard, Deep, Move-out"></label>
+      ${rooms.map((name, i) => `<label class="field">${esc(name)}<textarea name="kRoom_${i}" data-room="${esc(name)}" rows="3" placeholder="${i === 1 ? "Counters and sink\nOutside of appliances\nInside the oven @deep @move" : i === 0 ? "Dust surfaces\nVacuum and mop floors\nBaseboards @deep @move" : ""}">${esc(tasksOf(name))}</textarea></label>`).join("")}
+      <label class="field">May cost extra (one per line)<textarea name="kExtras" rows="3" placeholder="Inside the fridge&#10;Interior windows&#10;Laundry">${esc((c.extras || []).join("\n"))}</textarea></label>
+    </section>`;
+  }
+  function cleaningEditValues(f, r) {
+    const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : undefined);
+    const on = (n) => (f.elements[n] ? f.elements[n].checked : undefined);
+    const lines = (n) => f.elements[n].value.split("\n").map((x) => x.trim()).filter(Boolean);
+    if (r.variant === "commercial") {
+      if (!f.elements.kFreq) return undefined;
+      return { facilities: CLEANING_FACILITIES.filter((n, i) => on("kFac_" + i)), frequency: v("kFreq"), afterHours: !!on("kAfterHours") };
+    }
+    if (!f.elements.kTiers) return undefined;
+    const rooms = [];
+    for (const ta of f.querySelectorAll("textarea[data-room]")) { const tasks = ta.value.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 30); if (tasks.length) rooms.push({ room: ta.dataset.room, tasks }); }
+    return { checklist: { rooms, tiers: v("kTiers").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 4), extras: lines("kExtras").slice(0, 20) } };
   }
 
   /* ---------- shops: donations (on by default for thrift stores) ---------- */

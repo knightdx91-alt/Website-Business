@@ -16,7 +16,7 @@ export interface PageSpec {
 export interface CopyBrief {
   voice: string;
   /** Free-text guidance per Copy field; fields left out are not requested. */
-  fields: Partial<Record<"heroTagline" | "heroSub" | "about" | "serviceBlurbs" | "steps" | "faq" | "serviceAreaIntro" | "cta" | "cuisineLabel" | "metaDescription", string>>;
+  fields: Partial<Record<"heroTagline" | "heroSub" | "about" | "serviceBlurbs" | "steps" | "faq" | "serviceAreaIntro" | "cta" | "cuisineLabel" | "metaDescription" | "heroQuestion" | "heroBenefit", string>>;
 }
 
 export interface CategoryPack {

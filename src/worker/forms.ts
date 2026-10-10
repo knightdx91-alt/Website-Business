@@ -7,7 +7,14 @@ const FIELDS = [
   "topic", "name", "phone", "email", "service", "vehicle", "frequency", "home_size", "property", "quantity", "year", "make", "model", "part", "items", "address", "best_day", "town", "message",
   // Oct 2026: catering / truck booking / florist inquiry / booth inquiry / print quote fields.
   "event_date", "guests", "needs", "location", "occasion", "budget_range", "needed_by", "placements", "artwork_status", "rush", "booth",
+  // Oct 2026: trades / lawn / cleaning forms.
+  "reach", "urgent", "facility", "sq_ft",
 ] as const;
+
+/** True when the form's "Is this an emergency?" answer was yes. */
+export function isUrgent(data: Record<string, string>): boolean {
+  return /^y/i.test(data.urgent ?? "");
+}
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 /** "2026-11-03" → "Nov 3"; anything else comes back as typed. */
@@ -37,6 +44,11 @@ export function requestSummary(data: Record<string, string>): string {
     data.part,
     vehicle,
     data.items,
+    data.facility,
+    data.sq_ft ? `${data.sq_ft} sq ft` : "",
+    data.home_size,
+    data.frequency,
+    data.property,
     data.booth,
     data.occasion,
     data.event_date ? shortDate(data.event_date) : "",
@@ -52,8 +64,10 @@ export function requestSummary(data: Record<string, string>): string {
     data.best_day ? `best day ${data.best_day}` : "",
     data.town,
   ].filter(Boolean);
-  const line = bits.join(" · ");
-  return data.topic ? `${data.topic}${line ? `: ${line}` : ""}` : line;
+  if (data.reach) bits.push(`prefers ${data.reach.toLowerCase() === "text" ? "a text" : "a call"}`);
+  const joined = bits.join(" · ");
+  const line = data.topic ? `${data.topic}${joined ? `: ${joined}` : ""}` : joined;
+  return isUrgent(data) ? `🔴 Emergency${line ? ` · ${line}` : ""}` : line;
 }
 
 /** Lead form posts from published client sites. Works without JavaScript (plain POST + redirect). */
@@ -87,6 +101,6 @@ export async function handleFormPost(env: Env, req: Request, leadId: string): Pr
     .bind(newId(), leadId, now(), JSON.stringify(data), ip)
     .run();
   const what = requestSummary(data);
-  await notify(env, { kind: "message", actorName: data.name, leadId, text: `💬 New request from ${lead.name}'s website: ${data.name}${what ? `, ${what}` : ""}` });
+  await notify(env, { kind: "message", actorName: data.name, leadId, text: `${isUrgent(data) ? "🔴" : "💬"} New request from ${lead.name}'s website: ${data.name}${what ? `, ${what}` : ""}` });
   return back("/thanks/");
 }

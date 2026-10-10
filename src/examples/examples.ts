@@ -116,7 +116,7 @@ Turnip greens | $3`),
     record.services = svc(["Leak repair", "Drain cleaning", "Water heaters", "Toilet repair", "Repiping", "Emergency service"]);
     record.insured = true;
     record.licenses = [{ label: "AL Plumbing License", number: "EX-00000" }];
-    record.ext.contractor = { residential: true, commercial: true, emergencyService: true, freeEstimates: true };
+    record.ext.contractor = { residential: true, commercial: true, emergencyService: true, freeEstimates: true, serves: "both", afterHours: { note: "Nights and weekends too; after-hours rates apply", confirmed: true }, warrantyText: "Our work is covered for one year. If a repair we made fails, we come back and fix it at no charge." };
     record.testimonials = [said("Came out the same afternoon and had our water heater running by supper.", "Mark T."), said("Honest price, clean work, and he explained everything.", "Debbie S."), said("They fixed a leak two other plumbers couldn't find.", "Carl H.")];
     return {
       slug: "ridgeline-plumbing",
@@ -221,7 +221,7 @@ Turnip greens | $3`),
     const record = base({ slug: "green-acre-lawn", name: "Green Acre Lawn & Landscape", category: "landscaping", variant: "lawn_crew", phone: "0105", storefront: false });
     record.services = svc(["Lawn mowing", "Edging & trimming", "Leaf cleanup", "Mulch & flower beds", "Shrub trimming", "Sod installation"]);
     record.insured = true;
-    record.ext.landscaping = { freeEstimates: true };
+    record.ext.landscaping = { freeEstimates: true, seasonal: true, crew: "Owner-operated: Dale is on every job with the same two-man crew." };
     record.testimonials = [said("Our yard has never looked this good. They show up every week like clockwork.", "Brenda C."), said("Great job on our fall cleanup, and they hauled everything off.", "Paul A."), said("Friendly crew and fair prices.", "Kim J.")];
     return {
       slug: "green-acre-lawn",
@@ -257,7 +257,22 @@ Turnip greens | $3`),
     record.services = svc(["Standard cleaning", "Deep cleaning", "Move-in / move-out", "Recurring cleaning", "Rental turnovers", "Office cleaning"]);
     record.insured = true;
     record.bonded = true;
-    record.ext.cleaning = { freeEstimates: true, backgroundChecked: true, suppliesIncluded: true, petSafe: true };
+    record.ext.cleaning = {
+      freeEstimates: true,
+      backgroundChecked: true,
+      suppliesIncluded: true,
+      petSafe: true,
+      checklist: {
+        tiers: ["Standard", "Deep", "Move-out"],
+        rooms: [
+          { room: "Every room", tasks: ["Dust surfaces and sills", "Vacuum and mop floors", "Empty trash", "Baseboards and door frames @deep @move", "Inside closets @move"] },
+          { room: "Kitchen", tasks: ["Counters and sink", "Outside of appliances", "Microwave inside and out", "Inside the oven @deep @move", "Inside the fridge @move", "Cabinet fronts @deep @move"] },
+          { room: "Bathrooms", tasks: ["Toilets, tubs and showers", "Mirrors and fixtures", "Tile grout scrub @deep @move"] },
+        ],
+        extras: ["Interior windows", "Laundry", "Inside the fridge (standard visits)"],
+      },
+    };
+    record.guarantee = { window: "24 hours", remedy: "we'll come back and re-clean it free" };
     record.testimonials = [said("I come home every other Friday to a spotless house. Worth every penny.", "Jennifer H."), said("They got our rental ready in one day.", "Mike R."), said("Careful with our things and great with our dogs.", "Sarah L.")];
     return {
       slug: "spotless-cottage",

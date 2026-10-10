@@ -24,6 +24,8 @@ const CopySchema = z.object({
   ctaTitle: z.string(),
   ctaLine: z.string(),
   metaDescription: z.string(),
+  heroQuestion: z.string().describe("Only when the brief asks: a headline question, at most 60 characters; empty string otherwise"),
+  heroBenefit: z.string().describe("Only when the brief asks: a headline benefit line, at most 60 characters; empty string otherwise"),
 });
 type CopyOut = z.infer<typeof CopySchema>;
 
@@ -102,6 +104,7 @@ function facts(r: BusinessRecord, pack: CategoryPack, primaryTypeLabel?: string)
     brings_supplies: r.ext.cleaning?.suppliesIncluded,
     pet_safe_products: r.ext.cleaning?.petSafe,
     ...fsrpFacts(r),
+    ...tlcFacts(r),
     owner_story: "unknown",
   };
 }
@@ -160,6 +163,39 @@ function fsrpFacts(r: BusinessRecord): Record<string, unknown> {
   return out;
 }
 
+/** Trades, lawn and cleaning owner facts (Oct 2026 modules): the copy may mention them; nothing here is ever invented. */
+function tlcFacts(r: BusinessRecord): Record<string, unknown> {
+  if (r.category !== "contractor" && r.category !== "landscaping" && r.category !== "cleaning") return {};
+  const c = r.ext.contractor;
+  const l = r.ext.landscaping;
+  const k = r.ext.cleaning;
+  const out: Record<string, unknown> = {
+    plans: r.plans?.length ? r.plans.map((p) => ({ name: p.name, price: p.price ? `${p.price}${p.unit ? ` per ${p.unit}` : ""}` : "not given", includes: p.includes })) : undefined,
+    guarantee: r.guarantee?.text || r.guarantee?.remedy || r.guarantee?.window ? { window: r.guarantee.window, remedy: r.guarantee.remedy, text: r.guarantee.text } : undefined,
+    current_offers: r.offers?.length ? r.offers.map((o) => o.title) : undefined,
+  };
+  if (r.category === "contractor") {
+    out.financing_lender = c?.financing?.lender;
+    out.financing_terms = c?.financing?.lender ? "unknown: never state rates, 0%, approval or credit terms" : undefined;
+    out.warranty_text = c?.warrantyText || undefined;
+    out.emergency_service = c?.emergencyService || undefined;
+    out.emergency_terms = c?.emergencyService ? c.afterHours?.note || "unknown" : undefined;
+    out.serves = c?.serves;
+  }
+  if (r.category === "landscaping") {
+    out.seasonal_calendar_shown = l?.seasonal || undefined;
+    out.adai_permit = l?.adaiPermit ? "yes (number on file)" : undefined;
+    out.crew_line = l?.crew || undefined;
+  }
+  if (r.category === "cleaning") {
+    out.cleaning_tiers = k?.checklist?.tiers?.length ? k.checklist.tiers : undefined;
+    out.facility_types = k?.facilities?.length ? k.facilities : undefined;
+    out.cleaning_frequency = k?.frequency || undefined;
+    out.after_hours_cleaning = k?.afterHours || undefined;
+  }
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined));
+}
+
 function brief(pack: CategoryPack, r: BusinessRecord): string {
   const b = pack.copyBrief(r);
   const lines = Object.entries(b.fields).map(([k, v]) => `- ${k}: ${v}`);
@@ -168,9 +204,11 @@ function brief(pack: CategoryPack, r: BusinessRecord): string {
 
 function check(out: CopyOut, factsText: string, reviews: string[], banned: RegExp[] = []): string[] {
   const issues: string[] = [];
-  const all = [out.cuisineLabel, out.heroTagline, out.heroSub, ...out.about, ...out.serviceBlurbs.map((s) => s.text), ...out.steps.flatMap((s) => [s.title, s.body]), ...out.faq.flatMap((f) => [f.q, f.a]), out.serviceAreaIntro, out.ctaTitle, out.ctaLine, out.metaDescription].join(" \n ");
+  const all = [out.cuisineLabel, out.heroTagline, out.heroSub, ...out.about, ...out.serviceBlurbs.map((s) => s.text), ...out.steps.flatMap((s) => [s.title, s.body]), ...out.faq.flatMap((f) => [f.q, f.a]), out.serviceAreaIntro, out.ctaTitle, out.ctaLine, out.metaDescription, out.heroQuestion, out.heroBenefit].join(" \n ");
   const hype = bannedPhraseIn(all);
   if (hype) issues.push(`uses banned phrase "${hype}"`);
+  if (out.heroQuestion.length > 60) issues.push("heroQuestion is longer than 60 characters");
+  if (out.heroBenefit.length > 60) issues.push("heroBenefit is longer than 60 characters");
   if (SUPERLATIVE.test(all)) issues.push("uses a superlative");
   for (const re of banned) {
     const m = re.exec(all);
@@ -196,6 +234,8 @@ function toCopy(out: CopyOut, issues: string[] = []): Copy {
     meta: { title: "", description: out.metaDescription },
     approved: false,
     issues: issues.length ? issues : undefined,
+    heroQuestion: out.heroQuestion?.trim() || undefined,
+    heroBenefit: out.heroBenefit?.trim() || undefined,
   };
 }
 

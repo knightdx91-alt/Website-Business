@@ -282,6 +282,61 @@ ${divider}
 .about{display:grid;gap:28px}
 @media (min-width:900px){.about--photo{grid-template-columns:1fr 1fr;align-items:center}}
 .about img{border-radius:var(--radius)}
+/* plans & pricing */
+.plans{display:grid;gap:18px;list-style:none;margin:30px 0 0;padding:0}
+@media (min-width:700px){.plans--2,.plans--3{grid-template-columns:repeat(2,1fr)}}
+@media (min-width:1000px){.plans--3{grid-template-columns:repeat(3,1fr)}}
+.plan{position:relative;background:var(--surface);color:var(--text);border-radius:var(--radius);padding:26px 22px 22px;border:${cardBorder || `1px solid ${withAlpha(c.text, 0.14)}`};box-shadow:${cardShadow};${cardRuled}}
+.plan--badged{border:2px solid var(--primary)}
+.plan__badge{position:absolute;top:-13px;left:18px;background:var(--primary);color:var(--on-primary);font-weight:700;font-size:.82rem;line-height:1.2;padding:4px 11px;border-radius:999px}
+.plan h3{margin:0 0 .3em}
+.plan__price{margin:0 0 .9em;font-size:1.05rem}.plan__price strong{font:${t.headingWeight} 1.7rem/1 var(--hf);color:var(--heading)}.plan__price span{color:var(--muted);margin-left:2px}
+.plan__list{list-style:none;margin:0;padding:0}.plan__list li{display:flex;gap:.5em;align-items:flex-start;padding:7px 0;border-top:1px solid ${withAlpha(c.text, 0.12)}}.plan__list li:first-child{border-top:0;padding-top:0}.plan__list .i{color:var(--primary);margin-top:.2em}
+.plan__note{margin:.9em 0 0;color:var(--muted);font-size:.95rem}
+.plans__note{color:var(--muted);margin:14px 0 18px}
+.plans+.btns{margin-top:18px}
+/* guarantee band */
+.guarantee{display:flex;gap:12px;align-items:flex-start;margin:26px 0 0;padding:16px 18px;border-radius:var(--radius);background:var(--band);color:var(--text);border-left:5px solid var(--accent)}
+.guarantee .i{color:var(--primary);flex:none;margin-top:.15em}.guarantee strong{color:var(--heading)}.guarantee span{margin:0}
+/* promo bar + offers */
+.promo{background:var(--primary);color:var(--on-primary)}
+.promo__in{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:10px 20px;font-size:.98rem}
+.promo .i{flex:none}.promo a{color:inherit;font-weight:700;margin-left:auto}
+.offer__meta{display:inline-flex;flex-wrap:wrap;gap:4px 10px;font-size:.9rem}
+.offers{list-style:none;margin:28px 0 16px;padding:0;display:grid;gap:14px}
+@media (min-width:760px){.offers{grid-template-columns:repeat(2,1fr)}}
+.offer{background:var(--surface);color:var(--text);border-radius:var(--radius);padding:18px 20px;border:2px dashed ${withAlpha(c.text, 0.35)}}
+.offer h3{margin:0 0 .3em;font-size:1.15rem}.offer p{margin:0 0 .4em}.offer .offer__meta{color:var(--muted)}
+/* before/after pairs + captions */
+.pairs{list-style:none;margin:24px 0 0;padding:0;display:grid;gap:22px}
+@media (min-width:900px){.pairs{grid-template-columns:repeat(2,1fr)}}
+.pair__pics{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pair figure{margin:0;position:relative}.pair img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:var(--radius)}
+.pair figcaption{position:absolute;left:8px;top:8px;background:var(--surface);color:var(--text);font-weight:700;font-size:.82rem;line-height:1.2;padding:4px 10px;border-radius:999px}
+.pair__cap{margin:8px 0 0;font-weight:600}
+.gallery figure{margin:0}.gallery figcaption{font-size:.92rem;color:var(--muted);margin-top:6px}
+.gallery--more{margin-top:28px}
+/* emergency line (contractors) */
+.emerg{background:var(--secondary);color:var(--on-secondary)}
+.emerg__in{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;justify-content:space-between;padding:10px 20px}
+.emerg p{margin:0;font-weight:700}.emerg a{color:inherit}.emerg__alt{font-weight:600;font-size:.95rem}
+/* seasonal calendar (lawn care) */
+.seasons{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:16px}
+@media (min-width:700px){.seasons{grid-template-columns:repeat(2,1fr)}}
+@media (min-width:1000px){.seasons{grid-template-columns:repeat(4,1fr)}}
+.season{background:var(--surface);color:var(--text);border-radius:var(--radius);padding:20px;border:${cardBorder || `1px solid ${withAlpha(c.text, 0.14)}`};box-shadow:${cardShadow}}
+.season h3{margin:0 0 .1em}.season__when{color:var(--muted);font-size:.92rem;margin:0 0 .6em;font-weight:600}
+.season ul{list-style:none;margin:0;padding:0}.season li{padding:8px 0;border-top:1px solid ${withAlpha(c.text, 0.12)};font-size:.98rem}.season li:first-child{border-top:0}.season li strong{display:block;color:var(--heading)}
+/* what's included (cleaning tiers) */
+.tiers-wrap{overflow-x:auto;margin:24px 0 0;-webkit-overflow-scrolling:touch}
+.tiers{width:100%;border-collapse:collapse;background:var(--surface);color:var(--text);min-width:360px}
+.tiers th,.tiers td{padding:10px 12px;border-bottom:1px solid ${withAlpha(c.text, 0.12)};text-align:left;vertical-align:top}
+.tiers thead th{background:var(--band);font-weight:700}
+.tiers .tiers__mark{text-align:center;width:5.5em}
+.tiers .tiers__room th{background:var(--band);font-weight:700;color:var(--heading)}
+.tiers__yes{color:var(--primary)}.tiers__no{color:var(--muted)}
+.tiers .i{vertical-align:middle}
+.crew{display:flex;gap:10px;align-items:flex-start;font-weight:600;margin:1.2em 0 0;padding:14px 16px;border-radius:var(--radius);background:var(--band);color:var(--text)}.crew .i{color:var(--primary);flex:none;margin-top:.15em}
 ${dnaCss(t)}
 ${scopeLayoutCss(layoutCss(t), t.dna)}`;
 }
