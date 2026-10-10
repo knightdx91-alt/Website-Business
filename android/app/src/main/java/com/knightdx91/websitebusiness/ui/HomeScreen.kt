@@ -164,7 +164,7 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp),
                 )
             }
-            items(shown, key = { it.id }) { l -> LeadCard(l, onOpen = { nav.navigate("lead/${l.id}") }, onCall = { if (l.ready) nav.navigate("pitch/${l.id}") else context.dial(l.phone) }, onPreview = { nav.navigate(webRoute("/#/preview/${l.id}")) }) }
+            items(shown, key = { it.id }) { l -> LeadCard(l, onOpen = { nav.navigate("lead/${l.id}") }, onCall = { if (l.ready) nav.navigate("pitch/${l.id}") else context.dial(l.phone) }, onPreview = { nav.navigate("preview/${l.id}") }) }
         }
     }
 }

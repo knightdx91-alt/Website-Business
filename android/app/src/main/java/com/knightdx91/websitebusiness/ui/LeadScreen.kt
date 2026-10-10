@@ -168,10 +168,10 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             OutlinedButton(onClick = { context.sms(l.phone, greeting()) }) { Text("💬 Text") }
                             OutlinedButton(onClick = { context.directions(l.address, l.lat, l.lng) }) { Text("🗺️ Directions") }
                             if (l.ready) OutlinedButton(onClick = { nav.navigate("pitch/${l.id}") }) { Text("📋 Call guide") }
-                            if (l.ready) OutlinedButton(onClick = { nav.navigate(webRoute("/#/preview/${l.id}")) }) { Text("👁️ Preview") }
+                            if (l.ready) OutlinedButton(onClick = { nav.navigate("preview/${l.id}") }) { Text("👁️ Preview") }
                             if (l.ready) OutlinedButton(onClick = { nav.navigate(webRoute("/#/walkin/${l.id}")) }) { Text("🚶 In person") }
                             OutlinedButton(onClick = { nav.navigate("tasks/${l.id}") }) { Text("📝 Task") }
-                            if (isOwner && l.ready) OutlinedButton(onClick = { nav.navigate(webRoute("/#/edit/${l.id}")) }) { Text("✏️ Edit site") }
+                            if (isOwner && l.ready) OutlinedButton(onClick = { nav.navigate("edit/${l.id}") }) { Text("✏️ Edit site") }
                             if (isOwner && l.ready) OutlinedButton(onClick = { nav.navigate(webRoute("/#/lead/${l.id}")) }) { Text("⋯ More") }
                         }
                         if (l.ready) {

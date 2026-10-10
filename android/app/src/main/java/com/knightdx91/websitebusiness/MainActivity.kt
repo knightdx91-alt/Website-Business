@@ -35,9 +35,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.knightdx91.websitebusiness.net.Api
 import com.knightdx91.websitebusiness.net.Meta
+import com.knightdx91.websitebusiness.ui.EditScreen
 import com.knightdx91.websitebusiness.ui.HomeScreen
+import com.knightdx91.websitebusiness.ui.PreviewScreen
 import com.knightdx91.websitebusiness.ui.LeadScreen
 import com.knightdx91.websitebusiness.ui.LoginScreen
 import com.knightdx91.websitebusiness.ui.NotificationsScreen
@@ -124,6 +128,8 @@ fun AppRoot(startLead: String?) {
             composable("home") { HomeScreen(state, nav) }
             composable("lead/{id}") { e -> LeadScreen(state, nav, e.arguments?.getString("id") ?: "") }
             composable("pitch/{id}") { e -> PitchScreen(state, nav, e.arguments?.getString("id") ?: "") }
+            composable("edit/{id}") { e -> EditScreen(state, nav, e.arguments?.getString("id") ?: "") }
+            composable("preview/{id}?path={path}", arguments = listOf(navArgument("path") { type = NavType.StringType; nullable = true; defaultValue = null })) { e -> PreviewScreen(state, nav, e.arguments?.getString("id") ?: "", e.arguments?.getString("path")) }
             composable("notifications") { NotificationsScreen(state, nav) }
             composable("tasks") { TasksScreen(state, nav, null) }
             composable("tasks/{lead}") { e -> TasksScreen(state, nav, e.arguments?.getString("lead")) }
