@@ -50,7 +50,9 @@ import com.knightdx91.websitebusiness.ui.PreviewScreen
 import com.knightdx91.websitebusiness.ui.LeadScreen
 import com.knightdx91.websitebusiness.ui.LoginScreen
 import com.knightdx91.websitebusiness.ui.NotificationsScreen
+import com.knightdx91.websitebusiness.ui.PdfScreen
 import com.knightdx91.websitebusiness.ui.PitchScreen
+import com.knightdx91.websitebusiness.ui.SignupScreen
 import com.knightdx91.websitebusiness.ui.PlaybookScreen
 import com.knightdx91.websitebusiness.ui.ShowPlansScreen
 import com.knightdx91.websitebusiness.ui.WalkinScreen
@@ -145,6 +147,8 @@ fun AppRoot(startLead: String?) {
             composable("walkin/{lead}") { e -> WalkinScreen(state, nav, e.arguments?.getString("lead")) }
             composable("plans") { ShowPlansScreen(state, nav, null) }
             composable("plans/{lead}") { e -> ShowPlansScreen(state, nav, e.arguments?.getString("lead")) }
+            composable("pdf?path={path}&title={title}", arguments = listOf(navArgument("path") { type = NavType.StringType; nullable = true; defaultValue = null }, navArgument("title") { type = NavType.StringType; nullable = true; defaultValue = null })) { e -> PdfScreen(state, nav, e.arguments?.getString("path") ?: "", e.arguments?.getString("title")) }
+            composable("signup/{lead}?plan={plan}", arguments = listOf(navArgument("plan") { type = NavType.StringType; nullable = true; defaultValue = null })) { e -> SignupScreen(state, nav, e.arguments?.getString("lead") ?: "", e.arguments?.getString("plan")) }
             composable("inbox") { InboxScreen(state, nav) }
             composable("sales") { SalesScreen(state, nav) }
             composable("add") { AddBusinessScreen(state, nav) }
