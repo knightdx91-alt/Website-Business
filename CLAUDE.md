@@ -317,7 +317,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Google tag: Settings → "Google tag ID" (`gaMeasurementId`, G-RPF4081813 since Oct 2026) puts gtag.js in the head of every
   undergroundassociates.com page (home, portfolio, start/thank-you/extras, change, terms, privacy) with a per-response CSP
   nonce (`nonce()`, `gaTag()`, `csp()` in company.ts); blank turns it off. Not on client sites, previews or the app. The
-  privacy policy's wording switches with it.
+  privacy policy's wording switches with it. Events for Google Ads conversions: every page reports `call_click` / `text_click`
+  (tel:/sms: taps); home `?sent=1` fires `generate_lead` (contact form), the extras "Request sent" page `generate_lead`
+  (extras_request), `/start/thanks` fires `sign_up`, or `purchase` with the signup's due_cents when Stripe returns with
+  `?paid=1&a=s<id>.<hmac>`. Mark them as key events in GA4 and import into Ads (owner's step).
 - Facebook page: Settings → "Our Facebook page" (`companyFacebookUrl`, default facebook.com/undergroundassociates) is linked
   in the company site footer and as `sameAs` in its structured data. Client sites don't link it (their footer credit points
   at undergroundassociates.com, which carries it).

@@ -202,7 +202,7 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
         source: "website",
         business: d.business,
         phone: d.phone,
-        successUrl: `${ORIGIN}/start/thanks`,
+        successUrl: `${ORIGIN}/start/thanks?paid=1`,
         cancelUrl: `${ORIGIN}/start?plan=${encodeURIComponent(order.plan!.id)}&canceled=1`,
       });
       const summary = orderSummary(order);
@@ -248,12 +248,19 @@ async function startThanks(env: Env, url: URL): Promise<Response> {
   const a = url.searchParams.get("a") ?? "";
   const copy = /^[sp][a-z0-9]+\.[A-Za-z0-9_-]+$/.test(a) ? `<p><a href="/agreement/${e(a)}" target="_blank" rel="noopener">📄 View or print your signed agreement</a></p>` : "";
   const name = s.companyName || "Underground Associates";
+  // Conversion for Google Ads: a paid order is a purchase (with what was due today), an unpaid signed order a sign_up.
+  const paid = url.searchParams.get("paid") === "1";
+  const signupId = a.startsWith("s") ? a.slice(1).split(".")[0]! : "";
+  const due = paid && signupId ? await env.DB.prepare("SELECT due_cents FROM signups WHERE id = ?").bind(signupId).first<{ due_cents: number | null }>() : null;
+  const gaEvents: GaEvent[] = paid
+    ? [["purchase", { transaction_id: signupId || `web-${Date.now()}`, currency: "USD", ...(due?.due_cents != null ? { value: Math.round(due.due_cents) / 100 } : {}) }]]
+    : [["sign_up", { method: "website" }]];
   const body = `<h1>Thank you! 🎉</h1><p class="lead">We got your order. ${s.companyPhone ? `We'll call you within one business day from ${e(s.companyPhone)}` : "We'll be in touch within one business day"} to get your photos, hours and details.</p>
 <p>If you paid online, a receipt is on its way from our payment provider. Nothing goes live until you've approved your site.</p>
 <p><strong>${GO_LIVE_TEXT}</strong></p>${copy}
 ${manageBillingHtml(s)}
 <p><a class="btn" href="/">Back to the home page</a></p>`;
-  return policyShell(name, s.legalName || name, "Thank you", body, { phone: s.companyPhone, ga: s.gaMeasurementId });
+  return policyShell(name, s.legalName || name, "Thank you", body, { phone: s.companyPhone, ga: s.gaMeasurementId, gaEvents });
 }
 
 const digits = (t: string) => t.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
@@ -278,7 +285,7 @@ async function extrasRequest(env: Env, req: Request, url: URL): Promise<Response
     const lead = to
       ? `<p class="lead">We just emailed your personal link to the email we have on file for your business (<strong>${e(to)}</strong>). Open it to review the agreement for your extras, sign it and pay. It can take a minute to arrive; check your spam folder if you don't see it.</p>`
       : `<p class="lead">We'll send you a link within one business day where you can review the agreement for your extras, sign it and pay.</p>`;
-    return policyShell(name, s.legalName || name, "Request sent", `<h1>Got it, thank you!</h1>${lead}<p>${s.companyPhone ? `Questions? Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>.` : ""}</p><p><a class="btn" href="/">Back to the home page</a></p>`, { phone: s.companyPhone, ga: s.gaMeasurementId });
+    return policyShell(name, s.legalName || name, "Request sent", `<h1>Got it, thank you!</h1>${lead}<p>${s.companyPhone ? `Questions? Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>.` : ""}</p><p><a class="btn" href="/">Back to the home page</a></p>`, { phone: s.companyPhone, ga: s.gaMeasurementId, gaEvents: [["generate_lead", { method: "extras_request" }]] });
   }
   let note = "";
   if (req.method === "POST") {
@@ -371,13 +378,13 @@ ${s.addons.map((a, i) => `<label class="xopt"><input type="checkbox" name="x_${i
 }
 
 /** Simple light page in the company style (header, narrow column, footer). */
-function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean; wide?: boolean; phone?: string; description?: string; status?: number; from?: number | null; ga?: string }): Response {
+function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean; wide?: boolean; phone?: string; description?: string; status?: number; from?: number | null; ga?: string; gaEvents?: GaEvent[] }): Response {
   const n = nonce();
   const meta = o.description
     ? `<meta name="description" content="${e(o.description)}"><link rel="canonical" href="${ORIGIN}/portfolio"><meta property="og:image" content="${ORIGIN}/og.png">`
     : `<meta name="robots" content="noindex">`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${e(title)} | ${e(name)}</title>${meta}<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(o.ga, n)}<style>${CSS}</style></head><body>
+<title>${e(title)} | ${e(name)}</title>${meta}<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(o.ga, n, o.gaEvents)}<style>${CSS}</style></head><body>
 ${header(name, o.phone, o.from)}
 <main id="main" class="sec"><div class="wrap${o.wide ? "" : " narrow"}">${body}</div></main>
 ${footer(legal)}</body></html>`;
@@ -450,7 +457,7 @@ async function home(env: Env, url: URL): Promise<Response> {
 <title>${e(title)}</title><meta name="description" content="${e(description)}"><link rel="canonical" href="${ORIGIN}/">
 <meta property="og:type" content="website"><meta property="og:title" content="${e(title)}"><meta property="og:description" content="${e(description)}"><meta property="og:url" content="${ORIGIN}/">
 <meta property="og:image" content="${ORIGIN}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(s.gaMeasurementId, n)}
+<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(s.gaMeasurementId, n, sent ? [["generate_lead", { method: "contact_form" }]] : [])}
 <link rel="preload" href="/fonts/bricolage-grotesque-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>${CSS}</style><script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script></head><body>
 <a class="skip" href="#main">Skip to content</a>
@@ -608,10 +615,17 @@ function nonce(): string {
 const GA_SCRIPT = "https://www.googletagmanager.com";
 // Where gtag.js sends hits: Analytics (regional hosts), Ads signals (google.com, doubleclick), plus 'self' for Cloudflare's own beacons.
 const GA_CONNECT = "'self' https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.googletagmanager.com https://www.google.com https://stats.g.doubleclick.net";
-/** Google tag (gtag.js) for the head of every company page; nothing when Settings has no ID. */
-function gaTag(id: string | undefined, n: string): string {
+type GaEvent = [name: string, params: Record<string, string | number>];
+/**
+ * Google tag (gtag.js) for the head of every company page; nothing when Settings has no ID.
+ * `events` fire on load (sign_up, purchase, generate_lead on the pages that mean it); every page also reports
+ * call_click / text_click when a tel: or sms: link is tapped, so Google Ads can count calls from the site.
+ */
+function gaTag(id: string | undefined, n: string, events: GaEvent[] = []): string {
   if (!id) return "";
-  return `<script async nonce="${n}" src="${GA_SCRIPT}/gtag/js?id=${e(id)}"></script><script nonce="${n}">window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","${e(id)}");</script>`;
+  const fire = events.map(([name, params]) => `gtag("event",${JSON.stringify(name)},${JSON.stringify(params)});`).join("");
+  const clicks = `document.addEventListener("click",function(ev){var a=ev.target&&ev.target.closest?ev.target.closest("a"):null;if(!a)return;var h=a.getAttribute("href")||"";if(h.indexOf("tel:")===0)gtag("event","call_click",{link_url:h});else if(h.indexOf("sms:")===0)gtag("event","text_click",{link_url:h});});`;
+  return `<script async nonce="${n}" src="${GA_SCRIPT}/gtag/js?id=${e(id)}"></script><script nonce="${n}">window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","${e(id)}");${fire}${clicks}</script>`;
 }
 /** The company site's CSP: no scripts at all unless a page has its own (inline) or the Google tag is on. */
 function csp(n: string, o: { ga?: boolean; inlineScript?: boolean; stripe?: boolean } = {}): string {
