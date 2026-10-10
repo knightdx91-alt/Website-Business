@@ -342,8 +342,8 @@ async function activatePlan(
     renewsOn = longDate(anchor);
     await stripe(env, `customers/${o.customer}`, { invoice_settings: { default_payment_method: o.paymentMethod } }).catch(() => undefined);
   }
-  await env.DB.prepare("UPDATE signups SET paid = 1, stripe_customer = COALESCE(?, stripe_customer), stripe_subscription = COALESCE(?, stripe_subscription), paid_via = ?, tap_nonce = NULL WHERE id = ?")
-    .bind(o.customer, subscription, o.via ?? "tap", row.id)
+  await env.DB.prepare("UPDATE signups SET paid = 1, stripe_customer = COALESCE(?, stripe_customer), stripe_subscription = COALESCE(?, stripe_subscription), stripe_payment_intent = COALESCE(?, stripe_payment_intent), paid_via = ?, tap_nonce = NULL WHERE id = ?")
+    .bind(o.customer, subscription, o.paidRef.startsWith("pi_") ? o.paidRef : null, o.via ?? "tap", row.id)
     .run();
   const renewText = subscription && recurring.length ? ` Renews ${recurring[0]!.interval === "year" ? "yearly" : "monthly"}${renewsOn ? ` from ${renewsOn}` : ""} on the same card.` : "";
   const cardText = o.paymentMethod ? "" : recurring.length ? " The card couldn't be saved for renewals (some phone wallets can't be): open their Stripe billing portal to add a card before the next payment." : "";
@@ -459,4 +459,94 @@ export async function reconcileTaps(env: Env): Promise<{ completed: number; canc
     }
   }
   return { completed, cancelled };
+}
+
+
+// ---- refunds from the app (owner only) ----
+
+interface ChargeObj {
+  id: string;
+  amount: number;
+  amount_refunded: number;
+  refunded: boolean;
+  status: string;
+  created: number;
+  description: string | null;
+  payment_intent: string | null;
+  payment_method_details?: { card?: { brand?: string; last4?: string }; card_present?: { brand?: string; last4?: string } };
+}
+
+export interface Refundable {
+  charges: Array<{ id: string; amountCents: number; refundedCents: number; refundableCents: number; when: number; description: string; card: string | null }>;
+  subscription: { id: string; status: string; cancelAt: number | null } | null;
+  customer: string | null;
+  paid: boolean;
+}
+
+/** What a sign-up has been charged so far (the first payment and any renewals) and whether its plan still runs. */
+export async function refundable(env: Env, signupId: string): Promise<Refundable> {
+  const row = await signupRow(env, signupId);
+  const customer = row.stripe_customer;
+  const out: Refundable = { charges: [], subscription: null, customer, paid: !!row.paid };
+  if (!customer || !env.STRIPE_SECRET_KEY) return out;
+  const list = await stripeGet<{ data: ChargeObj[] }>(env, "charges", { customer, limit: 20 });
+  out.charges = list.data
+    .filter((c) => c.status === "succeeded" && c.amount > 0)
+    .map((c) => {
+      const pm = c.payment_method_details?.card_present ?? c.payment_method_details?.card;
+      return {
+        id: c.id,
+        amountCents: c.amount,
+        refundedCents: c.amount_refunded,
+        refundableCents: Math.max(0, c.amount - c.amount_refunded),
+        when: c.created * 1000,
+        description: c.description ?? "",
+        card: pm?.brand ? `${pm.brand.replace(/^\w/, (ch) => ch.toUpperCase())} ••${pm.last4 ?? ""}` : null,
+      };
+    });
+  if (row.stripe_subscription) {
+    const sub = await stripeGet<{ id: string; status: string; cancel_at: number | null }>(env, `subscriptions/${row.stripe_subscription}`).catch(() => null);
+    if (sub) out.subscription = { id: sub.id, status: sub.status, cancelAt: sub.cancel_at ? sub.cancel_at * 1000 : null };
+  }
+  return out;
+}
+
+/**
+ * Refunds part or all of one charge and, if asked, ends the plan now. A full refund of the sign-up payment with the plan
+ * cancelled marks the sign-up unpaid; the lead keeps its status (the team decides what it is now). Noted and announced.
+ */
+export async function refundSignup(
+  env: Env,
+  o: { signupId: string; chargeId: string; amountCents: number; cancelPlan: boolean; reason?: string; actorName: string },
+): Promise<{ ok: true; refundedCents: number; chargeId: string; planCancelled: boolean; message: string }> {
+  const row = await signupRow(env, o.signupId);
+  const lead = await getLead(env, row.lead_id);
+  if (!row.stripe_customer) throw new HttpError(409, "No Stripe payment on file for this sign-up");
+  const charge = await stripeGet<ChargeObj & { customer: string | null }>(env, `charges/${o.chargeId}`);
+  if (charge.customer !== row.stripe_customer) throw new HttpError(409, "That payment doesn't belong to this client");
+  const left = charge.amount - charge.amount_refunded;
+  if (o.amountCents < 1 || o.amountCents > left) throw new HttpError(400, `Refund between $0.01 and ${money(left)}`);
+  const refund = await stripe<{ id: string; amount: number; status: string }>(env, "refunds", {
+    charge: charge.id,
+    amount: o.amountCents,
+    reason: "requested_by_customer",
+    metadata: { signupId: row.id, leadId: row.lead_id, by: o.actorName, note: (o.reason ?? "").slice(0, 200) },
+  }, `refund:${charge.id}:${o.amountCents}:${Date.now()}`);
+  let planCancelled = false;
+  if (o.cancelPlan && row.stripe_subscription) {
+    await stripe(env, `subscriptions/${row.stripe_subscription}`, { cancel_at_period_end: false }, undefined).catch(() => undefined);
+    const res = await fetch(`https://api.stripe.com/v1/subscriptions/${row.stripe_subscription}`, { method: "DELETE", headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } });
+    planCancelled = res.ok;
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+      if (!/No such subscription|already been canceled|canceled subscription/i.test(err.error?.message ?? "")) throw new HttpError(502, `Refunded, but the plan couldn't be cancelled: ${err.error?.message ?? res.status}`);
+      planCancelled = true;
+    }
+  }
+  const full = o.amountCents >= left;
+  if (full && (planCancelled || !row.stripe_subscription)) await env.DB.prepare("UPDATE signups SET paid = 0 WHERE id = ?").bind(row.id).run();
+  const message = `Refunded ${money(o.amountCents)}${full ? "" : ` of ${money(charge.amount)}`}${charge.description ? ` (${charge.description})` : ""}${planCancelled ? "; plan cancelled" : ""}${o.reason ? `. Reason: ${o.reason.trim()}` : ""}. Back on their card in 5 to 10 business days.`;
+  if (lead) await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)").bind(newId(), row.lead_id, o.actorName, message, now()).run();
+  await notify(env, { kind: "paid", actorName: o.actorName, leadId: lead ? row.lead_id : null, text: `↩️ ${o.actorName} refunded ${lead?.name ?? "a client"} ${money(o.amountCents)}${planCancelled ? " and cancelled their plan" : ""}` });
+  return { ok: true, refundedCents: refund.amount, chargeId: charge.id, planCancelled, message };
 }

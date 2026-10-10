@@ -166,3 +166,23 @@ suspend fun Api.deleteNote(id: String, noteId: String) { deleteJson("/leads/$id/
 
 /** Settings → "Our Google review link", read from `/meta` (the [Meta] model doesn't carry it). */
 suspend fun Api.companyReviewUrl(): String? = getJson("/meta").optJSONObject("settings")?.str("companyReviewUrl")
+
+
+// ---- refunds ----
+
+data class RefundCharge(val id: String, val amountCents: Long, val refundedCents: Long, val refundableCents: Long, val whenMs: Long, val description: String, val card: String?)
+data class RefundInfo(val charges: List<RefundCharge>, val subscriptionId: String?, val subscriptionStatus: String?, val paid: Boolean)
+
+suspend fun Api.refundable(signupId: String): RefundInfo {
+    val j = getJson("/signups/$signupId/refund")
+    val sub = j.optJSONObject("subscription")
+    return RefundInfo(
+        charges = j.optJSONArray("charges").objects().map { RefundCharge(it.optString("id"), it.optLong("amountCents"), it.optLong("refundedCents"), it.optLong("refundableCents"), it.optLong("when"), it.optString("description"), it.str("card")) },
+        subscriptionId = sub?.str("id"),
+        subscriptionStatus = sub?.str("status"),
+        paid = j.optBoolean("paid"),
+    )
+}
+
+suspend fun Api.refund(signupId: String, chargeId: String, amountCents: Long, cancelPlan: Boolean, reason: String): String =
+    postJson("/signups/$signupId/refund", JSONObject().put("chargeId", chargeId).put("amountCents", amountCents).put("cancelPlan", cancelPlan).put("reason", reason)).optString("message")

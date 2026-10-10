@@ -86,6 +86,9 @@ import com.knightdx91.websitebusiness.net.retryBuild
 import com.knightdx91.websitebusiness.net.rewrite
 import com.knightdx91.websitebusiness.net.setLook
 import com.knightdx91.websitebusiness.net.setPaid
+import com.knightdx91.websitebusiness.net.refund
+import com.knightdx91.websitebusiness.net.refundable
+import com.knightdx91.websitebusiness.net.RefundInfo
 import com.knightdx91.websitebusiness.net.siteStats
 import com.knightdx91.websitebusiness.tap.TapToPayActivity
 import kotlinx.coroutines.Dispatchers
@@ -226,6 +229,9 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             load()
         }
     }
+
+    var refundFor by remember { mutableStateOf<String?>(null) }
+    refundFor?.let { sid -> RefundDialog(state, sid, onDone = { refundFor = null; scope.launch { load() } }, onClose = { refundFor = null }) }
 
     fun tap(signupId: String) {
         act("tap") {
@@ -494,6 +500,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 if (!s.paid && !s.invoice && isOwner && meta?.tapReady == true && s.dueCents >= 50) Button(onClick = { tap(s.id) }, enabled = busy == null) { Text("💳 Take payment by tap · ${money(s.dueCents)}") }
                                 OutlinedButton(onClick = { nav.navigate(pdfNav("/api/agreements/s/${s.id}.pdf", "Signed agreement")) }) { Text("📄 Signed agreement") }
+                                if (s.paid && isOwner) OutlinedButton(onClick = { refundFor = s.id }, enabled = busy == null) { Text("↩ Refund") }
                             }
                             if (!s.paid && !s.invoice && isOwner && meta?.tapReady != true && meta?.tapWhy != null && meta.checkoutOnline) Text("💳 Tap to Pay isn't set up yet: Settings → Tap to Pay.", style = MaterialTheme.typography.bodySmall, color = muted)
                             if (isOwner) {
@@ -763,4 +770,90 @@ private suspend fun saveToDownloads(context: Context, name: String, bytes: ByteA
         f.writeBytes(bytes)
         f.absolutePath
     }
+}
+
+
+/** Refund part or all of a client's payment and, if they're backing out, end the plan. Owner only. */
+@Composable
+private fun RefundDialog(state: AppState, signupId: String, onDone: () -> Unit, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var info by remember { mutableStateOf<RefundInfo?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var chargeId by remember { mutableStateOf<String?>(null) }
+    var amount by remember { mutableStateOf("") }
+    var cancelPlan by remember { mutableStateOf(true) }
+    var reason by remember { mutableStateOf("") }
+    var working by remember { mutableStateOf(false) }
+
+    LaunchedEffect(signupId) {
+        try {
+            val r = state.api.refundable(signupId)
+            info = r
+            val first = r.charges.firstOrNull { it.refundableCents > 0 }
+            chargeId = first?.id
+            amount = first?.let { String.format(java.util.Locale.US, "%.2f", it.refundableCents / 100.0) } ?: ""
+            cancelPlan = r.subscriptionId != null
+        } catch (e: Exception) { error = e.message ?: "Couldn't load the payments" }
+    }
+
+    val cents = ((amount.toDoubleOrNull() ?: 0.0) * 100).toLong()
+    val charge = info?.charges?.firstOrNull { it.id == chargeId }
+    val full = charge != null && cents >= charge.refundableCents
+
+    AlertDialog(
+        onDismissRequest = { if (!working) onClose() },
+        title = { Text("Refund") },
+        text = {
+            Column {
+                val i = info
+                when {
+                    error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                    i == null -> Text("Loading their payments…")
+                    i.charges.none { it.refundableCents > 0 } -> Text(if (i.charges.isEmpty()) "No Stripe payment on file for this sign-up (paid by invoice or marked by hand)." else "Everything they paid has already been refunded.")
+                    else -> {
+                        if (i.charges.size > 1) {
+                            Text("Which payment:", style = MaterialTheme.typography.labelLarge)
+                            i.charges.filter { it.refundableCents > 0 }.forEach { c ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    androidx.compose.material3.RadioButton(selected = chargeId == c.id, onClick = { chargeId = c.id; amount = String.format(java.util.Locale.US, "%.2f", c.refundableCents / 100.0) })
+                                    Text("${money(c.refundableCents)} · ${dateTime(c.whenMs)}${c.card?.let { " · $it" } ?: ""}", style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        } else {
+                            val c = i.charges.first { it.refundableCents > 0 }
+                            Text("Paid ${money(c.amountCents)} on ${dateTime(c.whenMs)}${c.card?.let { " with $it" } ?: ""}${if (c.refundedCents > 0) " · ${money(c.refundedCents)} already refunded" else ""}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        OutlinedTextField(amount, { amount = it.filter { ch -> ch.isDigit() || ch == '.' } }, label = { Text("Amount to refund ($)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), supportingText = { Text(if (full) "Full refund" else "Partial refund") })
+                        if (i.subscriptionId != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = cancelPlan, onCheckedChange = { cancelPlan = it })
+                            Text("Also cancel their plan now (no more renewals)")
+                        }
+                        OutlinedTextField(reason, { reason = it.take(200) }, label = { Text("Reason (goes in the call log)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                        Text(
+                            "What they were promised: a full refund if they cancel before the site goes live; monthly charges aren't refunded for part of a month; yearly plans within 30 days get back what they paid minus the months started; one-time extras aren't refunded once delivered unless we made the mistake. Billing mistakes are always refunded in full. Stripe keeps its fee (about 3%). The money shows on their card in 5 to 10 business days.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val c = charge ?: return@Button
+                    working = true
+                    scope.launch {
+                        try {
+                            val msg = state.api.refund(signupId, c.id, cents, cancelPlan, reason.trim())
+                            context.toast(msg.ifBlank { "Refunded" })
+                            onDone()
+                        } catch (e: Exception) { context.toast(e.message ?: "Refund failed") } finally { working = false }
+                    }
+                },
+                enabled = !working && charge != null && cents in 1..(charge?.refundableCents ?: 0),
+            ) { Text(if (working) "Refunding…" else if (cents > 0) "Refund ${money(cents)}" else "Refund") }
+        },
+        dismissButton = { TextButton(onClick = onClose, enabled = !working) { Text("Cancel") } },
+    )
 }

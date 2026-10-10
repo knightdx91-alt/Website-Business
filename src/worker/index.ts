@@ -30,7 +30,7 @@ import { handleFormPost } from "./forms.ts";
 import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
 import { stripeWebhook } from "./stripe.ts";
 import { pdfResponse } from "./pdf.ts";
-import { cardReady, completeCardSetup, completeTap, connectionToken, reconcileTaps, setupTap, startCardSetup, startTap, tapAuth, tapSession, tapStatus } from "./tap.ts";
+import { cardReady, completeCardSetup, completeTap, connectionToken, reconcileTaps, refundable, refundSignup, setupTap, startCardSetup, startTap, tapAuth, tapSession, tapStatus } from "./tap.ts";
 import { DEFAULT_DOMAIN, googleSession, verifyGoogleIdToken } from "./google.ts";
 import { editForm, editsFromForm } from "./editform.ts";
 import { extraTerms } from "./contract.ts";
@@ -301,6 +301,16 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/ach.pdf" && m === "GET") return achFormPdf(env, { leadId: url.searchParams.get("lead") ?? undefined });
   if (path === "/contract.json" && m === "GET") {
     return contractJson(env, { leadId: url.searchParams.get("lead") ?? undefined, plan: url.searchParams.get("plan") ?? undefined, billing: url.searchParams.get("billing") ?? undefined, picks: url.searchParams.get("picks") ?? undefined });
+  }
+  // Refunds from the app: what was charged, then refund part or all and optionally end the plan (owner only).
+  const refundMatch = /^\/signups\/([a-z0-9]+)\/refund$/.exec(path);
+  if (refundMatch) {
+    ownerOnly();
+    if (m === "GET") return json(await refundable(env, refundMatch[1]!));
+    if (m === "POST") {
+      const input = await body(req, z.object({ chargeId: z.string().regex(/^(ch|py)_[A-Za-z0-9]+$/), amountCents: z.number().int().min(1).max(10_000_000), cancelPlan: z.boolean().default(false), reason: z.string().trim().max(200).optional() }));
+      return json(await refundSignup(env, { signupId: refundMatch[1]!, ...input, actorName: session.name }));
+    }
   }
   // The Android app's native card entry (Stripe payment sheet) for a signed sign-up: owner and callers.
   const payMatch = /^\/signups\/([a-z0-9]+)\/pay\/(start|complete)$/.exec(path);

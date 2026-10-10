@@ -179,6 +179,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Call log: `lead_notes` (outcome + note + author) and `leads.follow_up` (YYYY-MM-DD, Cullman time) via
   `POST /api/leads/:id/log`. "No answer" defaults the callback to tomorrow; Sold/Not interested clear it.
   Home shows "Call back today" (due + overdue). A future callback keeps a lead from expiring, capped at 90 days.
+- Refunds from the app (2.3, Oct 2026): the lead screen's paid sign-up has "↩ Refund" (owner): `GET /api/signups/:id/refund`
+  (`refundable` in tap.ts: the customer's succeeded charges with what's left to refund, the plan subscription) and `POST
+  /api/signups/:id/refund {chargeId, amountCents, cancelPlan, reason}` (`refundSignup`: Stripe refund, optional subscription
+  delete, sign-up unpaid on a full refund with the plan ended, call-log note, alert). The dialog restates the agreement's refund
+  rules. Card-sheet payments now also store `stripe_payment_intent`.
 - Android app 2.2 (Oct 2026): fully native, no web views. `SignupScreen` (in-person sign-up: plan / way to pay / extras picker,
   agreement sections from `/api/contract.json`, Canvas signature pad → PNG data URL, `POST /api/leads/:id/signups`; then Tap to
   Pay, Stripe's payment sheet (`com.stripe:stripe-android` 22.8.1, SetupIntent via `/api/signups/:id/pay/start|complete`), or
