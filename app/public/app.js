@@ -1021,6 +1021,10 @@
         <label class="field">Jobs open (one per line)<textarea name="hiringRoles" rows="3" placeholder="Line cook&#10;Server">${esc(((r.hiring || {}).roles || []).join("\n"))}</textarea></label>
         <label class="field">How to apply<input name="hiringHow" maxlength="240" value="${esc((r.hiring || {}).how || "")}" placeholder="Stop by between 2 and 4, or give us a call."></label>
       </section>
+      <section class="card"><h2>Events &amp; specials</h2>
+        <p class="small muted">Optional. Dated things in the owner's words: an event, a sale, a coupon, a deadline, a distribution day. One per line as <b>date | title | time | details | link</b>. Dates are YYYY-MM-DD; write <b>2026-11-01..2026-11-30</b> for something that runs for a while. Past items drop off the site on their own.</p>
+        <label class="field">Coming up<textarea name="events" rows="4" placeholder="2026-10-25 | Trunk or Treat | 5–7 PM | Candy, games and hot dogs in the parking lot.&#10;2026-11-01..2026-11-30 | $20 off any brake job | | Mention this website.">${esc(eventLines(r.events))}</textarea></label>
+      </section>
       <section class="card"><h2>Design</h2><label class="field">Colors &amp; fonts<select name="lookBase">${l.looks
         .map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}>${esc(x.name)}</option>`)
         .join("")}</select></label>
@@ -1189,6 +1193,7 @@
           petSafe: on("petSafe"),
           links: { order: val("order"), reserve: val("reserve"), booking: val("booking"), facebook: val("facebook"), instagram: val("instagram"), ...(isRt ? { shop: val("shop") } : {}) },
           hiring: (() => { const roles = (val("hiringRoles") || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 8); return roles.length ? { roles, how: val("hiringHow") || "" } : null; })(),
+          events: parseEventLines(val("events") || ""),
           ...(isP ? { email: val("email"), designHelp: on("designHelp"), proofBeforePrint: on("proofBeforePrint"), ...(r.variant === "signs" ? { install: on("install") } : {}) } : {}),
           ...(isRt ? { giftCards: on("giftCards"), delivery: on("delivery"), donations: donationsEditValues(f) } : {}),
           ...(isParts ? { parts: partsEditValues(f) } : {}),
@@ -2859,6 +2864,26 @@
     }
   }
 
+  /** Events as "date | title | time | details | link" lines (date may be start..end), and back. */
+  function eventLines(events) {
+    return (events || []).map((e) => [e.endDate ? `${e.date}..${e.endDate}` : e.date, e.title, e.time || "", e.detail || "", e.url || ""].join(" | ").replace(/( \|\s*)+$/, "")).join("\n");
+  }
+  function parseEventLines(text) {
+    const out = [];
+    for (const line of text.split("\n")) {
+      const parts = line.split("|").map((x) => x.trim());
+      if (parts.length < 2 || !parts[1]) continue;
+      const m = /^(\d{4}-\d{2}-\d{2})(?:\s*\.\.\s*(\d{4}-\d{2}-\d{2}))?$/.exec(parts[0] || "");
+      if (!m) { toast(`Event "${parts[1]}" needs a date like 2026-10-25.`); continue; }
+      const e = { title: parts[1].slice(0, 80), date: m[1] };
+      if (m[2]) e.endDate = m[2];
+      if (parts[2]) e.time = parts[2].slice(0, 40);
+      if (parts[3]) e.detail = parts[3].slice(0, 240);
+      if (parts[4] && /^https?:\/\//.test(parts[4])) e.url = parts[4];
+      out.push(e);
+    }
+    return out.slice(0, 20);
+  }
   /** "~h1n0b2…" from the Edit form's structure pickers, or "" when every pick is the classic one. */
   function dnaCode(f, order) {
     if (!order || !order.length) return "";

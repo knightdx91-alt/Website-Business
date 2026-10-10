@@ -142,6 +142,19 @@ export const EditsSchema = z.object({
       services: z.array(z.string().trim().min(1).max(60)).max(12).optional(),
       menuText: z.string().max(20_000).optional(),
       hiring: z.object({ roles: z.array(z.string().trim().min(1).max(60)).max(8), how: z.string().trim().max(240) }).nullable().optional(),
+      events: z
+        .array(
+          z.object({
+            title: z.string().trim().min(1).max(80),
+            date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+            time: z.string().trim().max(40).optional(),
+            detail: z.string().trim().max(240).optional(),
+            url: url.optional(),
+          }),
+        )
+        .max(20)
+        .optional(),
       galleryAlts: z.record(z.string(), z.string().trim().max(150)).optional(),
       confirmed: z.array(z.enum(["name", "phone", "address", "hours", "services", "service_area", "variant", "menu"])).optional(),
     })
@@ -276,6 +289,10 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
   }
   if (e.testimonials) r.testimonials = e.testimonials;
   if (e.hiring !== undefined) r.hiring = e.hiring && e.hiring.roles.length ? { roles: e.hiring.roles, how: e.hiring.how || undefined } : undefined;
+  if (e.events !== undefined)
+    r.events = e.events.length
+      ? e.events.map((x) => ({ title: x.title, date: x.date, endDate: x.endDate && x.endDate > x.date ? x.endDate : undefined, time: x.time || undefined, detail: x.detail || undefined, url: x.url || undefined }))
+      : undefined;
   if (e.galleryAlts) for (const p of r.media.gallery) if (e.galleryAlts[p.src]) p.alt = e.galleryAlts[p.src]!;
   if (e.towns) r.serviceArea = { towns: e.towns, counties: r.serviceArea?.counties ?? [] };
   if (e.services) {

@@ -68,6 +68,7 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
   if (r.category === "restaurant") f.push("a menu section and a separate menu page, ready for their menu to be typed in");
   else f.push(`a ${r.category === "church" ? "ministries / programs" : "services"} list (${r.services.map((s) => s.name).join(", ")})`);
   if (r.serviceArea?.towns.length) f.push(`a service-area list of nearby towns (${r.serviceArea.towns.slice(0, 5).join(", ")}…)`);
+  if (r.events?.length) f.push(`a "Coming up" section with their dated events and specials (${r.events.slice(0, 2).map((e) => e.title).join(", ")}), which drop off on their own once they've passed`);
   if (r.smsEnabled) f.push("a Text us button (their number takes texts), in the hero, the call bar and the closing section");
   if (r.category === "print") f.push("a 'send us your design' section with buttons to email or text their artwork");
   if (r.category === "church") f.push(r.variant === "church" ? "a service-times section right under the welcome, plus a 'Plan a visit' section for first-time visitors" : "a section for their meetings, help hours or hall rental, filled in with their own details");

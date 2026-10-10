@@ -5,7 +5,7 @@ import { html, join, raw, type Html, type Raw } from "./html.ts";
 import { icon, type IconName } from "./icons.ts";
 import type { Dna } from "./dna.ts";
 import type { Theme } from "./themes.ts";
-import type { BuildMode, BusinessRecord, Copy, Faq, Image, Site } from "./types.ts";
+import type { BuildMode, BusinessRecord, Copy, EventItem, Faq, Image, Site } from "./types.ts";
 
 export interface Ctx {
   r: BusinessRecord;
@@ -28,6 +28,8 @@ export interface Ctx {
   reviewsAllowed?: boolean;
   /** Set by hero() when it shows the open/closed pill, so the info strip shows today's hours instead of repeating it. */
   statusShown?: boolean;
+  /** Set once announcements() rendered, so render.ts doesn't add the section twice. */
+  eventsShown?: boolean;
 }
 
 export interface NavItem {
@@ -250,6 +252,46 @@ export function serviceList(ctx: Ctx, items: CardItem[], cols: 2 | 3 = 3): Raw {
     default:
       return cardGrid(items, cols);
   }
+}
+
+/** Today in the business's time zone as YYYY-MM-DD (Cullman: America/Chicago). */
+export function todayIso(tz = "America/Chicago", now = new Date()): string {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const g = (t: string) => p.find((x) => x.type === t)?.value ?? "";
+  return `${g("year")}-${g("month")}-${g("day")}`;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function eventDate(iso: string): { mon: string; day: string; wd: string } {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  return { mon: MONTHS[m! - 1] ?? "", day: String(d), wd: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getUTCDay()]! };
+}
+
+/** Events that haven't ended yet, soonest first. */
+export function upcomingEvents(r: BusinessRecord, today = todayIso()): EventItem[] {
+  return (r.events ?? []).filter((e) => (e.endDate ?? e.date) >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 8);
+}
+
+/**
+ * "What's happening": dated events, specials, deadlines. Shows only what hasn't ended (the page also hides
+ * items whose end date passes while it's live). Packs call it where it fits; render.ts adds it near the top
+ * otherwise. Nothing renders without events.
+ */
+export function announcements(ctx: Ctx, o: { label?: string; title?: string; intro?: string } = {}): Raw {
+  const items = upcomingEvents(ctx.r);
+  if (!items.length) return raw("");
+  ctx.eventsShown = true;
+  return html`<section class="section section--band" id="events" aria-labelledby="events-title"><div class="wrap">
+${sectionHead(o.label ?? "What's happening", o.title ?? "Coming up", o.intro, "events-title")}
+<ul class="events">${items.map((e) => {
+    const d = eventDate(e.date);
+    const end = e.endDate && e.endDate !== e.date ? eventDate(e.endDate) : undefined;
+    return html`<li class="event" data-event-end="${e.endDate ?? e.date}"><time class="event__date" datetime="${e.date}"><span class="event__mon">${d.mon}</span><span class="event__day">${d.day}</span><span class="event__wd">${end ? `to ${end.mon} ${end.day}` : d.wd}</span></time><div class="event__body"><h3>${e.url ? html`<a href="${e.url}" target="_blank" rel="noopener">${e.title}<span class="sr"> (opens in new tab)</span></a>` : e.title}</h3>${
+      e.time ? html`<p class="event__time">${e.time}</p>` : ""
+    }${e.detail ? html`<p>${e.detail}</p>` : ""}</div></li>`;
+  })}</ul>
+</div></section>`;
 }
 
 export function steps(items: Array<{ title: string; body: string }>): Raw {

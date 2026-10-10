@@ -266,6 +266,19 @@ export interface CleaningExt {
   commercial?: boolean;
 }
 
+/** One dated item for the "What's happening" section: an event, a special, a coupon, a deadline. */
+export interface EventItem {
+  title: string;
+  /** YYYY-MM-DD; the day it happens or a special starts. */
+  date: string;
+  /** YYYY-MM-DD; shown until this day is over (defaults to `date`). */
+  endDate?: string;
+  /** Free text, e.g. "5–7 PM" or "All month". */
+  time?: string;
+  detail?: string;
+  url?: string;
+}
+
 export interface BusinessRecord {
   placeId: string;
   name: string;
@@ -300,6 +313,8 @@ export interface BusinessRecord {
   media: { logo?: Image; hero?: Image; gallery: Image[] };
   /** Optional "We're hiring" section: the jobs open and how to apply, in the owner's words. */
   hiring?: { roles: string[]; how?: string };
+  /** Dated events, specials and announcements in the owner's words; past ones drop off on their own. */
+  events?: EventItem[];
   reputation: { rating?: number; count?: number; displayMode: "link_only" | "owner_stated"; ownerStatedText?: string };
   ext: {
     restaurant?: RestaurantExt;

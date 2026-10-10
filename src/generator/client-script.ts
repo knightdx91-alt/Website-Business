@@ -132,6 +132,16 @@ if (sm && navigator.sendBeacon) {
     else if (h.indexOf("google.com/maps") > -1 || h.indexOf("maps.apple.com") > -1) hit("directions");
   });
 }
+var evs = d.querySelectorAll("[data-event-end]");
+if (evs.length) {
+  try {
+    var tp = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    var tg = function (t) { for (var i = 0; i < tp.length; i++) if (tp[i].type === t) return tp[i].value; return ""; };
+    var todayIso = tg("year") + "-" + tg("month") + "-" + tg("day"), left = 0;
+    for (var ei = 0; ei < evs.length; ei++) { if (evs[ei].getAttribute("data-event-end") < todayIso) evs[ei].hidden = true; else left++; }
+    if (!left) { var es = d.getElementById("events"); if (es) es.hidden = true; }
+  } catch (err) {}
+}
 var fy = d.querySelectorAll("[data-year]");
 for (var y = 0; y < fy.length; y++) fy[y].textContent = String(new Date().getFullYear());
 })();

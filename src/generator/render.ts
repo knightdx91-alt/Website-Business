@@ -1,5 +1,5 @@
 import { CLIENT_SCRIPT } from "./client-script.ts";
-import { actionBar, footer, gallery, header, hiring, sectionHead, type Ctx } from "./components.ts";
+import { actionBar, announcements, footer, gallery, header, hiring, sectionHead, type Ctx } from "./components.ts";
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
 import { html, jsonForScript, raw, type Raw } from "./html.ts";
@@ -94,6 +94,11 @@ function withExtras(ctx: Ctx, body: Raw): Raw {
   if (!ctx.galleryShown) {
     const photos = gallery(ctx).value;
     if (photos) out = out.includes('id="reviews"') ? out.replace(/<section class="section[^"]*" id="reviews"/, (m) => photos + m) : out.replace("</main>", `${photos}</main>`);
+  }
+  if (!ctx.eventsShown) {
+    // Dated events/specials go right after the opening (before the first section) when the pack didn't place them.
+    const ev = announcements(ctx).value;
+    if (ev) out = /<section class="section[ "]/.test(out) ? out.replace(/<section class="section[ "]/, (m) => ev + m) : out.replace("</main>", `${ev}</main>`);
   }
   const jobs = hiring(ctx).value;
   if (jobs) out = /<section class="cta[ "]/.test(out) ? out.replace(/<section class="cta[ "]/, (m) => jobs + m) : out.replace("</main>", `${jobs}</main>`);
