@@ -533,13 +533,12 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
             item {
                 SectionCard("More") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedButton(onClick = { nav.navigate(webRoute("/#/playbook")) }) { Text("💬 Plans & answers") }
-                        OutlinedButton(onClick = { nav.navigate(webRoute("/#/plans")) }) { Text("📋 Show plans") }
-                        OutlinedButton(onClick = { nav.navigate(webRoute("/#/walkin")) }) { Text("🚶 In-person guide") }
+                        OutlinedButton(onClick = { nav.navigate("playbook") }) { Text("💬 Plans & answers") }
+                        OutlinedButton(onClick = { nav.navigate("plans") }) { Text("📋 Show plans") }
+                        OutlinedButton(onClick = { nav.navigate("walkin") }) { Text("🚶 In-person guide") }
                         if (isOwner) {
-                            OutlinedButton(onClick = { nav.navigate(webRoute("/#/inbox")) }) { Text("📥 Inbox") }
-                            OutlinedButton(onClick = { nav.navigate(webRoute("/#/sales")) }) { Text("📈 Sales") }
-                            OutlinedButton(onClick = { nav.navigate(webRoute("/#/settings")) }) { Text("⚙️ Settings on the web") }
+                            OutlinedButton(onClick = { nav.navigate("inbox") }) { Text("📥 Inbox") }
+                            OutlinedButton(onClick = { nav.navigate("sales") }) { Text("📈 Sales") }
                         }
                     }
                 }

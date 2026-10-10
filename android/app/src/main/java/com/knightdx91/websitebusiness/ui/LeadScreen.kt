@@ -169,9 +169,10 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             OutlinedButton(onClick = { context.directions(l.address, l.lat, l.lng) }) { Text("🗺️ Directions") }
                             if (l.ready) OutlinedButton(onClick = { nav.navigate("pitch/${l.id}") }) { Text("📋 Call guide") }
                             if (l.ready) OutlinedButton(onClick = { nav.navigate("preview/${l.id}") }) { Text("👁️ Preview") }
-                            if (l.ready) OutlinedButton(onClick = { nav.navigate(webRoute("/#/walkin/${l.id}")) }) { Text("🚶 In person") }
+                            if (l.ready) OutlinedButton(onClick = { nav.navigate("walkin/${l.id}") }) { Text("🚶 In person") }
                             OutlinedButton(onClick = { nav.navigate("tasks/${l.id}") }) { Text("📝 Task") }
                             if (isOwner && l.ready) OutlinedButton(onClick = { nav.navigate("edit/${l.id}") }) { Text("✏️ Edit site") }
+                            if (isOwner && (l.salesStatus == "sold" || l.salesStatus == "live")) OutlinedButton(onClick = { nav.navigate("gbp/${l.id}") }) { Text("🔎 Google profile") }
                             if (isOwner && l.ready) OutlinedButton(onClick = { nav.navigate(webRoute("/#/lead/${l.id}")) }) { Text("⋯ More") }
                         }
                         if (l.ready) {
@@ -224,7 +225,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                         if (meta != null && meta.plans.isNotEmpty()) {
                             Text(if (detail.signups.isNotEmpty()) "Send a new link to change plans." else "Pick a plan: they choose how to pay, read the agreement, sign and pay, on your phone or theirs.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
-                                OutlinedButton(onClick = { nav.navigate(webRoute("/#/plans/${l.id}")) }) { Text("📋 Show them the plans") }
+                                OutlinedButton(onClick = { nav.navigate("plans/${l.id}") }) { Text("📋 Show them the plans") }
                                 OutlinedButton(onClick = { nav.navigate(webRoute("/api/contract?lead=${l.id}")) }) { Text("📄 Agreement") }
                             }
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {

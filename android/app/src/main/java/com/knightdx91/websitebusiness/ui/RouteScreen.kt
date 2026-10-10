@@ -249,8 +249,8 @@ fun RouteScreen(state: AppState, nav: NavHostController) {
                             }
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(start = 40.dp)) {
-                            Button(onClick = { nav.navigate(webRoute("/#/walkin/${l.id}")) }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) { Text("🚶 Guide") }
-                            TextButton(onClick = { nav.navigate(webRoute("/#/preview/${l.id}")) }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Preview") }
+                            Button(onClick = { nav.navigate("walkin/${l.id}") }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) { Text("🚶 Guide") }
+                            TextButton(onClick = { nav.navigate("preview/${l.id}") }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Preview") }
                             TextButton(onClick = { flyer(l.id) }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Flyer") }
                         }
                     }

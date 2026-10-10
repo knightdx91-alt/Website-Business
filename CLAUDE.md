@@ -179,6 +179,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Call log: `lead_notes` (outcome + note + author) and `leads.follow_up` (YYYY-MM-DD, Cullman time) via
   `POST /api/leads/:id/log`. "No answer" defaults the callback to tomorrow; Sold/Not interested clear it.
   Home shows "Call back today" (due + overdue). A future callback keeps a lead from expiring, capped at 90 days.
+- Android app 2.1 (Oct 2026): every web screen is native now. Added: `EditScreen` (from `/editform`), `PreviewScreen`
+  (WebView of `/p/<id>/` in a native frame: phone/desktop toggle, text/copy link, Edit, Open in Chrome), `PlaybookScreen`,
+  `ShowPlansScreen`, `WalkinScreen` (copy served by `GET /api/content` from `src/worker/content.ts`, which mirrors the app.js
+  constants; `test/worker/content.test.ts` keeps them in step; ways to pay from `GET /api/plans/options?lead=` in
+  `src/worker/plan-options.ts`), `InboxScreen`, `SalesScreen`, `AddBusinessScreen`, `RouteScreen`, `GbpScreen`, and the full
+  `SettingsScreen` (every setting, team, extras, agreement, backup). API extension functions live in `net/Api<Feature>.kt`.
+  The in-app WebView (`WebScreen`) remains only for pages a client reads or signs (sign-up `/a/…`, agreement and contract
+  pages, printable flyer / review cards) and the web lead page's long tail ("⋯ More": publish, custom domain, delete).
 - Android app (`android/`, 2.0, Oct 2026): a real native app (Kotlin + Jetpack Compose, Material 3), not a web wrapper any more.
   Package `com.knightdx91.websitebusiness`, `MainActivity` = one Compose activity with bottom tabs Leads / Tasks / Alerts / Settings
   (`ui/*Screen.kt`): home (Today card, status tabs, search, type filter, lead cards), lead detail (call/text/directions, call guide,

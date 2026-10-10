@@ -39,13 +39,21 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.knightdx91.websitebusiness.net.Api
 import com.knightdx91.websitebusiness.net.Meta
+import com.knightdx91.websitebusiness.ui.AddBusinessScreen
 import com.knightdx91.websitebusiness.ui.EditScreen
+import com.knightdx91.websitebusiness.ui.GbpScreen
+import com.knightdx91.websitebusiness.ui.InboxScreen
+import com.knightdx91.websitebusiness.ui.RouteScreen
+import com.knightdx91.websitebusiness.ui.SalesScreen
 import com.knightdx91.websitebusiness.ui.HomeScreen
 import com.knightdx91.websitebusiness.ui.PreviewScreen
 import com.knightdx91.websitebusiness.ui.LeadScreen
 import com.knightdx91.websitebusiness.ui.LoginScreen
 import com.knightdx91.websitebusiness.ui.NotificationsScreen
 import com.knightdx91.websitebusiness.ui.PitchScreen
+import com.knightdx91.websitebusiness.ui.PlaybookScreen
+import com.knightdx91.websitebusiness.ui.ShowPlansScreen
+import com.knightdx91.websitebusiness.ui.WalkinScreen
 import com.knightdx91.websitebusiness.ui.RunScreen
 import com.knightdx91.websitebusiness.ui.SettingsScreen
 import com.knightdx91.websitebusiness.ui.TasksScreen
@@ -129,6 +137,16 @@ fun AppRoot(startLead: String?) {
             composable("lead/{id}") { e -> LeadScreen(state, nav, e.arguments?.getString("id") ?: "") }
             composable("pitch/{id}") { e -> PitchScreen(state, nav, e.arguments?.getString("id") ?: "") }
             composable("edit/{id}") { e -> EditScreen(state, nav, e.arguments?.getString("id") ?: "") }
+            composable("playbook") { PlaybookScreen(state, nav) }
+            composable("walkin") { WalkinScreen(state, nav, null) }
+            composable("walkin/{lead}") { e -> WalkinScreen(state, nav, e.arguments?.getString("lead")) }
+            composable("plans") { ShowPlansScreen(state, nav, null) }
+            composable("plans/{lead}") { e -> ShowPlansScreen(state, nav, e.arguments?.getString("lead")) }
+            composable("inbox") { InboxScreen(state, nav) }
+            composable("sales") { SalesScreen(state, nav) }
+            composable("add") { AddBusinessScreen(state, nav) }
+            composable("route") { RouteScreen(state, nav) }
+            composable("gbp/{lead}") { e -> GbpScreen(state, nav, e.arguments?.getString("lead") ?: "") }
             composable("preview/{id}?path={path}", arguments = listOf(navArgument("path") { type = NavType.StringType; nullable = true; defaultValue = null })) { e -> PreviewScreen(state, nav, e.arguments?.getString("id") ?: "", e.arguments?.getString("path")) }
             composable("notifications") { NotificationsScreen(state, nav) }
             composable("tasks") { TasksScreen(state, nav, null) }

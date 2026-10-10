@@ -115,8 +115,8 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
         LazyColumn(modifier = Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp, 8.dp, 12.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { nav.navigate(webRoute("/#/add")) }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Add a business") }
-                    OutlinedButton(onClick = { nav.navigate(webRoute("/#/route")) }) { Text("🗺️ Walk-in route") }
+                    OutlinedButton(onClick = { nav.navigate("add") }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Add a business") }
+                    OutlinedButton(onClick = { nav.navigate("route") }) { Text("🗺️ Walk-in route") }
                 }
             }
             if (today.isNotEmpty()) item {

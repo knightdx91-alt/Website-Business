@@ -182,14 +182,14 @@ fun WalkinScreen(state: AppState, nav: NavHostController, leadId: String?) {
                     l.lead.address?.let { Text(it, modifier = Modifier.padding(top = 4.dp)) }
                     if (l.today.isNotBlank()) Text(l.today, fontWeight = FontWeight.Bold)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                        Button(onClick = { nav.navigate(webRoute("/#/preview/${l.lead.id}")) }) { Text("📱 Open their preview") }
+                        Button(onClick = { nav.navigate("preview/${l.lead.id}") }) { Text("📱 Open their preview") }
                         OutlinedButton(onClick = { if (l.mapsUrl != null) context.openUrl(l.mapsUrl) else context.directions(l.lead.address, l.lead.lat, l.lead.lng) }) { Text("🗺️ Directions") }
                         OutlinedButton(onClick = { flyer(l) }) { Text("🖨️ Flyer to leave") }
                     }
                     if (l.lead.contact != null || l.lead.bestTime != null) Text("👤 ${listOfNotNull(l.lead.contact?.let { "Ask for: $it" }, l.lead.bestTime).joinToString(" · ")}", modifier = Modifier.padding(top = 6.dp))
                 } else {
                     Text("What to say and do when you walk into a business, start to finish. Open it from a lead (or a stop on your walk-in route) and it fills in their name, what to show them and the best time to go.", color = muted)
-                    Button(onClick = { nav.navigate(webRoute("/#/route")) }, modifier = Modifier.padding(top = 8.dp)) { Text("🗺️ Plan a walk-in route") }
+                    Button(onClick = { nav.navigate("route") }, modifier = Modifier.padding(top = 8.dp)) { Text("🗺️ Plan a walk-in route") }
                 }
             }
 
