@@ -268,7 +268,7 @@ ${canceled ? `<div class="card"><p><strong>Your payment wasn't finished.</strong
 ${preview ? `<a class="btn btn--ghost" href="${escHtml(preview)}" target="_blank" rel="noopener">See your website preview</a>` : ""}</div>
 ${already && !paidNow ? `<div class="card"><p class="ok">Signed by ${escHtml(already.signer_name)} on ${signedOn}${already.paid ? ", and paid. Thank you!" : "."}</p></div>` : ""}
 ${paidNow ? "" : `<form class="card" method="post"><h2>${already ? "Sign again" : "Sign up"}</h2>
-${pickerHtml(settings, { planId, esc: escHtml, showPlans: false, category: lead.category, invoice: allowInvoice })}
+${pickerHtml(settings, { planId, esc: escHtml, showPlans: false, category: lead.category, invoice: allowInvoice, billing: /^(short|standard|flex|annual|invoice)$/.test(new URL(req.url).searchParams.get("billing") ?? "") ? new URL(req.url).searchParams.get("billing")! : undefined })}
 <label>Your title <span class="muted small" style="font-weight:400">(optional)</span><input type="text" name="title" placeholder="Owner" maxlength="60"></label>
 <label>Email for receipts<input type="email" name="email" autocomplete="email" required maxlength="120"></label>
 <div style="position:absolute;left:-9999px" aria-hidden="true"><label>Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
@@ -459,7 +459,17 @@ export async function contractPreviewPage(env: Env, q: PreviewQuery): Promise<Re
 <p class="small muted" style="margin:0 0 4px">Plan</p><p class="noprint">${plans.map((p) => pill(link(p.id, option.id), p.name, p.id === plan.id)).join("")}</p>
 <p class="small muted" style="margin:0 0 4px">Way to pay</p><p class="noprint">${options.map((o) => pill(link(plan.id, o.id), o.label, o.id === option.id)).join("")}</p>
 <div class="terms" style="max-height:none;white-space:pre-line">${escHtml(terms)}</div>
-<p class="noprint" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap"><a class="btn" style="width:auto" href="/api/contract.pdf?${qs(plan.id, option.id)}">Download PDF</a><button class="btn btn--ghost" style="width:auto" type="button" onclick="window.print()">Print</button></p>
+<p class="noprint" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">${
+    q.leadId
+      ? `<button class="btn" style="width:auto" type="button" id="signbtn">✍️ Sign this agreement</button>`
+      : ""
+  }<a class="btn btn--ghost" style="width:auto" href="/api/contract.pdf?${qs(plan.id, option.id)}">Download PDF</a><button class="btn btn--ghost" style="width:auto" type="button" onclick="window.print()">Print</button></p>
+${
+    q.leadId
+      ? `<p class="small muted noprint">Sign opens ${escHtml(business)}'s own sign-up page: they confirm the plan and way to pay, read this agreement, sign with a finger and pay. The link is logged in their call log.</p>
+<script>(function(){var b=document.getElementById("signbtn");if(!b)return;b.addEventListener("click",function(){b.disabled=true;b.textContent="Opening the sign-up page…";fetch("/api/leads/"+${JSON.stringify(q.leadId)}+"/signup",{method:"POST",headers:{"x-wb":"1","content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({plan:${JSON.stringify(plan.id)}})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Could not open the sign-up page");return j;});}).then(function(j){location.href=j.url+"?billing="+encodeURIComponent(${JSON.stringify(option.id)});}).catch(function(e){alert(e.message);b.disabled=false;b.textContent="✍️ Sign this agreement";});});})();</script>`
+      : `<p class="small muted noprint">To sign: open the business's lead page in the app, tap <strong>Show them the plans</strong> and choose a plan. That opens their sign-up page with this agreement, a signature pad and payment.</p>`
+  }
 </div></div>`;
   return page(`Agreement preview: ${plan.name}`, body, { brand, css: "@media print{.top{display:none}.card{border:0}}" });
 }

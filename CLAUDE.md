@@ -565,6 +565,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Authorization" form (same words + bank/card/billing blanks + signature) for invoice clients or a paper file; details go on the
   paper and into Stripe, never the app. Settings → "📄 Preview the agreement" (plan + way-to-pay pickers incl. invoice → Show /
   PDF, uses saved settings) and the blank form link; the lead page's sign-up card has "🏦 Payment authorization form".
+  Signing: the preview opened from a lead has "✍️ Sign this agreement" (POSTs `/api/leads/:id/signup` for the shown plan, then
+  opens the sign-up page `/a/<token>?billing=<id>`, which pre-picks that way to pay); the sign-up page is the only place a client
+  signs (name + drawn signature + consent, then payment). Without a lead the preview explains the Show them the plans → Choose path.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.
