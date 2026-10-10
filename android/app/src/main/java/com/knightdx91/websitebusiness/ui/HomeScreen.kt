@@ -11,9 +11,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
@@ -112,14 +115,15 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
             if (meta?.isOwner == true) ExtendedFloatingActionButton(onClick = { nav.navigate("run") }, icon = { Icon(Icons.Default.Search, null) }, text = { Text("Find new leads") })
         },
     ) { pad ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp, 8.dp, 12.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            item {
+        // Lead cards flow into two or three columns on the open Fold or a tablet; the header rows always span the width.
+        LazyVerticalGrid(columns = GridCells.Adaptive(360.dp), modifier = Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp, 8.dp, 12.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { nav.navigate("add") }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Add a business") }
                     OutlinedButton(onClick = { nav.navigate("route") }) { Text("🗺️ Walk-in route") }
                 }
             }
-            if (today.isNotEmpty()) item {
+            if (today.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("📋 Today: ${today.size} call${if (today.size == 1) "" else "s"}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -137,24 +141,24 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
                     }
                 }
             }
-            item {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(TABS) { (id, label) -> FilterChip(selected = tab == id, onClick = { tab = id }, label = { Text(label) }) }
                 }
             }
-            item {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 OutlinedTextField(search, { search = it }, placeholder = { Text("Search name, street or phone") }, singleLine = true, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Icons.Default.Search, null) })
             }
-            if (meta != null) item {
+            if (meta != null) item(span = { GridItemSpan(maxLineSpan) }) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     item { FilterChip(selected = category.isEmpty(), onClick = { category = "" }, label = { Text("All types") }) }
                     val groups = meta.categories.map { it.category }.distinct()
                     items(groups) { c -> FilterChip(selected = category == c, onClick = { category = if (category == c) "" else c }, label = { Text(categoryLabel(c)) }) }
                 }
             }
-            if (loading && leads.isEmpty()) item { Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
-            error?.let { e -> item { Card { Column(Modifier.padding(14.dp)) { Text(e, color = MaterialTheme.colorScheme.error); Button(onClick = { scope.launch { load() } }, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") } } } } }
-            if (!loading && shown.isEmpty() && error == null) item {
+            if (loading && leads.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) { Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
+            error?.let { e -> item(span = { GridItemSpan(maxLineSpan) }) { Card { Column(Modifier.padding(14.dp)) { Text(e, color = MaterialTheme.colorScheme.error); Button(onClick = { scope.launch { load() } }, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") } } } } }
+            if (!loading && shown.isEmpty() && error == null) item(span = { GridItemSpan(maxLineSpan) }) {
                 Text(
                     when (tab) {
                         "new" -> if (meta?.isOwner == true) "No new leads. Tap Find new leads to run a search." else "No new leads right now. Check back after the next run."

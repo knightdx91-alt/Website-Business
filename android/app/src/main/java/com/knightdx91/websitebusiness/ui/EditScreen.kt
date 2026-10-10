@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -246,8 +248,9 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String) {
     ) { pad ->
         if (loading) { Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return@Scaffold }
         error?.let { e -> Column(Modifier.padding(pad).padding(24.dp)) { Text(e, color = MaterialTheme.colorScheme.error); Button(onClick = { scope.launch { loading = true; load(false) } }, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") } }; return@Scaffold }
-        LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp, 8.dp, 12.dp, 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            busy?.let { b -> item { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(b) } } }
+        // One column on a phone, two side by side on the open Fold or a tablet (cards are at least 420 dp wide).
+        LazyVerticalGrid(columns = GridCells.Adaptive(420.dp), modifier = Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp, 8.dp, 12.dp, 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            busy?.let { b -> item(span = { GridItemSpan(maxLineSpan) }) { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(b) } } }
             cards.forEach { card ->
                 item(key = card.id) {
                     Card(Modifier.fillMaxWidth()) {
@@ -300,7 +303,7 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String) {
                     }
                 }
             }
-            item {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 Button(onClick = { save() }, enabled = !saving, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text(if (saving) "Saving…" else "Save & update preview") }
                 OutlinedButton(onClick = { nav.navigate("preview/$id") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Preview") }
             }

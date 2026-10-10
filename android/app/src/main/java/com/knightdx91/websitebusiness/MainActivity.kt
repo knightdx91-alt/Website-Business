@@ -58,6 +58,9 @@ import com.knightdx91.websitebusiness.ui.RunScreen
 import com.knightdx91.websitebusiness.ui.SettingsScreen
 import com.knightdx91.websitebusiness.ui.TasksScreen
 import com.knightdx91.websitebusiness.ui.WbTheme
+import com.knightdx91.websitebusiness.ui.LocalWindowInfo
+import com.knightdx91.websitebusiness.ui.rememberWindowInfo
+import androidx.compose.runtime.CompositionLocalProvider
 import com.knightdx91.websitebusiness.ui.WebScreen
 import com.knightdx91.websitebusiness.update.Updater
 import java.net.URLDecoder
@@ -70,7 +73,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val startLead = intent?.getStringExtra("lead")
-        setContent { WbTheme { AppRoot(startLead) } }
+        setContent { WbTheme { CompositionLocalProvider(LocalWindowInfo provides rememberWindowInfo()) { AppRoot(startLead) } } }
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
