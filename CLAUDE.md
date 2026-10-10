@@ -186,7 +186,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   The app only needs rebuilding for shell changes (name, icon, package); features ship with `npm run deploy`.
   The signing key is deliberately NOT kept anywhere (owner's choice). If it's gone, `android/build.sh`
   makes a new one: add its fingerprint to `ASSET_LINKS` (keep the old ones so existing installs stay full-screen),
-  redeploy, and phones uninstall + reinstall once to move to the new build. 1.2 (Oct 2026) was signed with a new key.
+  redeploy, and phones uninstall + reinstall once to move to the new build. 1.2 (Oct 2026) was signed with a new key. 2.0 (Oct 2026)
+  adds the Kotlin Tap to Pay screen (see "Tap to Pay" below); the Android SDK lives outside the repo (`ANDROID_HOME`).
   Maven Central rate-limits builds here, so `settings.gradle.kts` lists Google's mirror first.
 - Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS). Several groups share one
   template, and the variant comes from the Google type + business name: food trucks/bakeries/coffee →
@@ -568,6 +569,27 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Signing: the preview opened from a lead has "✍️ Sign this agreement" (POSTs `/api/leads/:id/signup` for the shown plan, then
   opens the sign-up page `/a/<token>?billing=<id>`, which pre-picks that way to pay); the sign-up page is the only place a client
   signs (name + drawn signature + consent, then payment). Without a lead the preview explains the Show them the plans → Choose path.
+- Tap to Pay (Oct 2026, research/android-tap-to-pay-2026.md; `src/worker/tap.ts`, migration 0014 `signups.stripe_payment_intent /
+  paid_via / tap_nonce`): in-person card payments on the owner's phone with Stripe Terminal. Android app 2.0 keeps the TWA and adds one
+  native Kotlin screen, `tap/TapToPayActivity` (Stripe Terminal SDK 6.0.0, `stripeterminal-taptopay` + `-core`, arm64 only, APK ≈40 MB;
+  `App.kt` guards the `:stripetaptopay` process). The web app opens it with `intent://tap?t=<token>&o=<origin>#Intent;scheme=wbpay;
+  package=com.knightdx91.websitebusiness;…;end` (`tapIntentUrl`). Flow: client signs on the sign-up page (`?tap=1`, added by `tapHref()` in
+  app.js and the preview's Sign button on Android; honored only when `tapStatus` is ready) → "Tap card now" / the lead page's "💳 Take payment
+  by tap" → `POST /api/leads/:id/tap {signupId}` (owner) = `startTap`: Stripe Customer (reused per lead) + `card_present` PaymentIntent with
+  `setup_future_usage=off_session` for `due_cents` (reuses an open one; never two authorizations), a 10-minute single-use token
+  (`tapToken`/`verifyTap` in auth.ts, nonce in `tap_nonce`). The native screen calls `GET /api/tap/session`, `POST /api/tap/connection_token`
+  and `POST /api/tap/complete` with `Authorization: Bearer <token>` (no cookie; routes sit before the session check in index.ts).
+  `completeTap` re-reads the PaymentIntent, takes `latest_charge.payment_method_details.card_present.generated_card`, creates the plan
+  subscription (`priceSignup` recurring lines, `billing_cycle_anchor` = `nextPeriodStart()` one month/year ahead, `proration_behavior=none`,
+  idempotency key `sub:<signup>:<pi>`), sets the customer's default card, marks the sign-up paid (`paid_via='tap'`), notes "Paid $X in person by
+  tap (Visa ••1234)" and notifies; the webhook (`payment_intent.succeeded`, metadata kind `signup_tap`) and the daily cron (`reconcileTaps`:
+  finish succeeded intents, cancel open ones after a day) do the same if the phone never reported. No `generated_card` (some wallets) = paid
+  for this period, card not saved, warning in the note. One-time setup: Settings → business street/city/state/ZIP (`companyStreet…`), then
+  Settings → "Set up Tap to Pay" (`POST /api/tap/setup` → Stripe Terminal Location, id in settings key `terminal_location`); `/meta.tap`
+  carries ready/why. Phone rules the screen checks or explains: Android 13+, NFC on, Location on + permission, Developer options OFF, Play
+  Store present, not rooted, release build only (debug builds use Stripe's simulated reader). Fees 2.7% + 5¢ + 10¢ per tap; renewals are
+  online charges. The agreement's PAYMENT AUTHORIZATION says a tapped card is the card on file. `page()` now allows `connect-src 'self'`.
+  Build as before: `npm run android` (versionCode 5, "2.0"). First live test: a $1 tap with the owner's own card, refunded in Stripe.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.

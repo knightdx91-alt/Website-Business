@@ -544,6 +544,19 @@
   }
 
   /* ---------- sign-up ---------- */
+  const isAndroid = () => /Android/i.test(navigator.userAgent);
+  const tapReady = () => !!(meta && meta.tap && meta.tap.ready);
+  /** A sign-up link opened on this phone: on the owner's Android with Tap to Pay set up, the page offers the tap instead of Stripe's card form. */
+  function tapHref(url) {
+    return tapReady() && isAndroid() ? url + (url.includes("?") ? "&" : "?") + "tap=1" : url;
+  }
+  function tapButtonHtml(x) {
+    if (!isOwner() || x.paid || (x.extras && x.extras.invoice)) return "";
+    if (!tapReady()) return meta.tap && meta.tap.why && meta.checkout && meta.checkout.online ? `<p class="small muted">💳 Tap to Pay isn't set up yet: <a href="#/settings">Settings → Tap to Pay</a>.</p>` : "";
+    return isAndroid()
+      ? `<p><button class="btn btn--small btn--primary" type="button" data-tap="${esc(x.id)}">💳 Take payment by tap</button> <span class="small muted">${x.dueCents ? `${money(x.dueCents / 100)} now, renewals on the same card` : ""}</span></p>`
+      : `<p class="small muted">💳 Open this in the Android app to take their card by tap.</p>`;
+  }
   function signupCardHtml(l) {
     const plans = meta.settings.plans || [];
     const signed = (l.signups || [])[0];
@@ -554,6 +567,7 @@
         ${x.dueCents ? `<p class="small">Due at sign-up: <strong>${money(x.dueCents / 100)}</strong></p>` : ""}
         <p class="small"><a href="/api/agreements/s/${x.id}" target="_blank" rel="noopener">📄 Signed agreement</a> · <a href="/api/agreements/s/${x.id}.pdf">⬇ PDF</a></p>
         <p class="small muted">${esc(x.signerName)}${x.signerTitle ? ", " + esc(x.signerTitle) : ""} · ${esc(x.signerEmail || "")} · ${ago(x.createdAt)}${x.sentBy ? ` · sent by ${esc(x.sentBy)}` : ""}</p>
+        ${tapButtonHtml(x)}
         ${isOwner() ? `<label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label>` : x.paid ? `<p class="chip chip--good">Paid</p>` : ""}</div>`).join("")}
       ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)} · <a href="/api/agreements/p/${p.id}" target="_blank" rel="noopener">📄 agreement</a> · <a href="/api/agreements/p/${p.id}.pdf">⬇ PDF</a></li>`).join("")}</ul>` : ""}
       ${plans.length
@@ -565,11 +579,38 @@
       </section>`;
   }
 
+  /** After handing off to the Tap to Pay screen, re-check the lead until the sign-up shows paid (10 minutes at most). */
+  let tapWatch = null;
+  function watchTap(leadId, signupId, after) {
+    clearInterval(tapWatch);
+    const until = Date.now() + 10 * 60 * 1000;
+    const check = async () => {
+      if (Date.now() > until || !location.hash.includes(leadId)) { clearInterval(tapWatch); return; }
+      try {
+        const l = await api("/leads/" + leadId);
+        const s = (l.signups || []).find((x) => x.id === signupId);
+        if (s && s.paid) { clearInterval(tapWatch); toast("Paid ✅"); after(); }
+      } catch (e) { /* offline for a moment */ }
+    };
+    tapWatch = setInterval(check, 3000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); }, { once: true });
+  }
+
   function bindSignup(l, after) {
     const card = document.getElementById("signupcard");
     if (!card) return;
     card.querySelectorAll("[data-paid]").forEach((c) => c.addEventListener("change", async () => {
       try { await api(`/leads/${l.id}/paid`, { method: "POST", json: { signupId: c.dataset.paid, paid: c.checked } }); toast(c.checked ? "Marked as paid" : "Marked as not paid"); } catch (err) { toast(err.message); }
+    }));
+    card.querySelectorAll("[data-tap]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        const res = await api(`/leads/${l.id}/tap`, { method: "POST", json: { signupId: b.dataset.tap } });
+        if (res.alreadyPaid) { toast("Already paid ✅"); after(); return; }
+        toast(`Hand the phone over: ${money(res.amountCents / 100)} by tap`);
+        watchTap(l.id, b.dataset.tap, after);
+        location.href = res.intentUrl;
+      } catch (err) { toast(err.message); } finally { b.disabled = false; }
     }));
     card.querySelectorAll("[data-plan]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
@@ -578,7 +619,7 @@
         const phone = phoneDigits(l);
         const sms = `${greeting()} Here's the sign-up page for your new website (${res.plan} plan) for ${l.record ? l.record.name : l.name}: ${res.url}`;
         card.querySelector("#signuplink").innerHTML = `<div class="linkbox"><p class="small"><strong>${esc(res.plan)}</strong> sign-up link ready (works ${res.expiresInDays} days).</p>
-          <div class="btns btns--full"><a class="btn btn--primary" href="${esc(res.url)}" target="_blank" rel="noopener">Open here</a>
+          <div class="btns btns--full"><a class="btn btn--primary" href="${esc(tapHref(res.url))}" target="_blank" rel="noopener">Open here</a>
           <a class="btn" href="sms:+1${phone}?body=${encodeURIComponent(sms)}">Text it</a><button class="btn" type="button" data-copy>Copy</button></div>
           <p class="small muted">“Open here” lets them sign on your phone right now.</p></div>`;
         card.querySelector("[data-copy]").addEventListener("click", async () => { try { await navigator.clipboard.writeText(res.url); toast("Link copied"); } catch (e) { toast("Couldn't copy"); } });
@@ -1505,7 +1546,7 @@
       b.textContent = "Opening sign-up…";
       try {
         const res = await api(`/leads/${leadId}/signup`, { method: "POST", json: { plan: b.dataset.choose } });
-        location.href = res.url;
+        location.href = tapHref(res.url);
       } catch (err) { toast(err.message); b.disabled = false; b.textContent = "Try again"; }
     }));
   }
@@ -2851,10 +2892,37 @@
         <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
       <section class="card"><h2>Android app</h2>
         <p class="small muted">Install the app on an Android phone. After downloading, open the file and allow installing from this source if asked. Log in once in the app with the same password.</p>
-        <a class="btn" href="/api/android.apk" download>Download Android app</a></section>`;
+        <a class="btn" href="/api/android.apk" download>Download Android app</a></section>
+      ${isOwner() ? tapCard() : ""}`;
+  }
+
+  function tapCard() {
+    const t = meta.tap || {};
+    return `<section class="card" id="tapcard"><h2>💳 Tap to Pay</h2>
+      <p class="small muted">Take a client's card on your phone, in person: they sign on the sign-up page, then tap their card on the back of the phone. The card is saved in Stripe for the monthly or yearly renewals. Needs the Android app (version 2.0 or newer).</p>
+      ${t.ready
+        ? `<p class="chip chip--good">Ready · location ${esc(t.locationId || "")}</p><p class="small muted">${esc(t.address || "")}</p>`
+        : `<p class="small"><strong>Not ready:</strong> ${esc(t.why || "Stripe isn't connected.")}</p>${meta.checkout && meta.checkout.online ? `<button class="btn btn--primary" type="button" id="tapsetup">Set up Tap to Pay</button>` : ""}`}
+      <details class="small" style="margin-top:10px"><summary>Phone requirements (Stripe's rules)</summary><ul>
+        <li>Android 13 or newer with NFC and a security update from the last 12 months (the Fold is fine).</li>
+        <li>NFC and Location turned on; Location allowed for the app the first time.</li>
+        <li><strong>Developer options off</strong>, no screen recorder or screen-overlay app running while taking a payment.</li>
+        <li>Google Play Store installed and the phone not rooted.</li>
+        <li>Fees: 2.7% + 5¢ + 10¢ per tap; renewals on the saved card are normal online charges (2.9% + 30¢).</li></ul></details></section>`;
   }
 
   function bindDevice() {
+    const setup = $app.querySelector("#tapsetup");
+    if (setup) setup.addEventListener("click", async () => {
+      setup.disabled = true;
+      try {
+        const r = await api("/tap/setup", { method: "POST", json: {} });
+        toast(`Tap to Pay is set up (${r.locationId})`);
+        meta = await api("/meta");
+        const card = document.getElementById("tapcard");
+        if (card) card.outerHTML = tapCard();
+      } catch (err) { toast(err.message); setup.disabled = false; }
+    });
     $app.querySelector("#logout").addEventListener("click", async () => { await api("/auth/logout", { method: "POST" }); meta = null; go("#/login"); });
     const inst = $app.querySelector("#install");
     inst.addEventListener("click", async () => { if (!installPrompt) return; installPrompt.prompt(); installPrompt = null; inst.hidden = true; });
@@ -2981,6 +3049,10 @@
         <label class="field">Legal name <span class="hint">Who signs client agreements</span><input name="legalName" value="${esc(s.legalName || "")}" placeholder="e.g. Underground Associates LLC"></label>
         <div class="row"><label class="field">Business phone<input name="companyPhone" type="tel" value="${esc(s.companyPhone || "")}"></label>
         <label class="field">Business email <span class="hint">Shown everywhere</span><input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
+        <label class="field">Business street address <span class="hint">Needed once for Tap to Pay (Stripe registers where in-person payments happen). Not shown to clients.</span><input name="companyStreet" value="${esc(s.companyStreet || "")}" placeholder="123 2nd Ave SW" autocomplete="street-address"></label>
+        <div class="row"><label class="field">City<input name="companyCity" value="${esc(s.companyCity || "")}" placeholder="Cullman"></label>
+        <label class="field">State<input name="companyState" value="${esc(s.companyState || "AL")}" maxlength="2" style="text-transform:uppercase"></label>
+        <label class="field">ZIP<input name="companyZip" value="${esc(s.companyZip || "")}" inputmode="numeric" placeholder="35055"></label></div>
         <label class="field">Our Google review link <span class="hint">From your Google profile: “Ask for reviews” → copy link. Texted to happy clients.</span><input name="companyReviewUrl" type="url" value="${esc(s.companyReviewUrl || "")}" placeholder="https://g.page/r/…/review"></label>
         <label class="field">Our Facebook page <span class="hint">Linked in the website footer</span><input name="companyFacebookUrl" type="url" value="${esc(s.companyFacebookUrl || "")}" placeholder="https://www.facebook.com/…"></label>
         <label class="field">Calendar email <span class="hint">Tasks for you with a date are sent here as calendar invites (your Google Calendar address). Blank uses your direct email.</span><input name="calendarEmail" type="email" value="${esc(s.calendarEmail || "")}" placeholder="post@undergroundassociates.com"></label>
@@ -3079,6 +3151,10 @@
             legalName: v("legalName") || undefined,
             companyPhone: v("companyPhone") || undefined,
             companyEmail: v("companyEmail") || undefined,
+            companyStreet: v("companyStreet") || undefined,
+            companyCity: v("companyCity") || undefined,
+            companyState: v("companyState").toUpperCase() || undefined,
+            companyZip: v("companyZip") || undefined,
             directEmail: v("directEmail") || undefined,
             companyReviewUrl: v("companyReviewUrl") || undefined,
             companyFacebookUrl: v("companyFacebookUrl") || undefined,

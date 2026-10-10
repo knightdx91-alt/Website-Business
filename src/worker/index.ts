@@ -29,6 +29,7 @@ import { HttpError, json, localDate, newId, now, type Env, type Job } from "./en
 import { handleFormPost } from "./forms.ts";
 import { allowedEndpoint, latestForPush, listEvents, markSeen, notify, pushTo, unreadCount, vapidPublicKey } from "./notify.ts";
 import { stripeWebhook } from "./stripe.ts";
+import { completeTap, connectionToken, reconcileTaps, setupTap, startTap, tapAuth, tapSession, tapStatus } from "./tap.ts";
 import { extraTerms } from "./contract.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
 import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
@@ -248,6 +249,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   }
   if (path === "/auth/logout" && m === "POST") return json({ ok: true }, 200, { "set-cookie": clearCookie() });
 
+  // The Android Tap to Pay screen: no cookie (it isn't Chrome), a short-lived token from /leads/:id/tap instead.
+  if (path.startsWith("/tap/") && req.headers.has("authorization")) {
+    const row = await tapAuth(env, req.headers.get("authorization"));
+    if (path === "/tap/session" && m === "GET") return json(await tapSession(env, row));
+    if (path === "/tap/connection_token" && m === "POST") return json(await connectionToken(env));
+    if (path === "/tap/complete" && m === "POST") {
+      const { paymentIntentId } = await body(req, z.object({ paymentIntentId: z.string().regex(/^pi_[A-Za-z0-9]+$/) }));
+      return json(await completeTap(env, { signupId: row.id, paymentIntentId, actorName: "Tap to Pay" }));
+    }
+    throw new HttpError(404, "Not found");
+  }
+
   const session = await getSession(env, req);
   if (!session) throw new HttpError(401, "Please log in");
   const isOwner = session.role === "owner";
@@ -262,6 +275,14 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const q = { leadId: url.searchParams.get("lead") ?? undefined, plan: url.searchParams.get("plan") ?? undefined, billing: url.searchParams.get("billing") ?? undefined };
     return path.endsWith(".pdf") ? contractPreviewPdf(env, q) : contractPreviewPage(env, q);
   }
+  if (path === "/tap/status" && m === "GET") {
+    ownerOnly();
+    return json(await tapStatus(env));
+  }
+  if (path === "/tap/setup" && m === "POST") {
+    ownerOnly();
+    return json(await setupTap(env));
+  }
   if (path === "/meta" && m === "GET") {
     const settings = await getSettings(env);
     // Callers see prices and plan names (Show plans, Plans & answers) but not commission, private addresses,
@@ -274,6 +295,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       me: { role: session.role, name: session.name, id: session.userId },
       team,
       checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: mailReady(env) },
+      tap: isOwner ? await tapStatus(env, settings) : { ready: false },
       extraTerms: isOwner ? settings.addons.map((a) => extraTerms(a)) : [],
       categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
       defaultTerms: isOwner ? defaultTerms(settings) : "",
@@ -340,6 +362,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         legalName: z.string().trim().max(120).optional(),
         companyPhone: z.string().trim().max(30).optional(),
         companyEmail: z.string().trim().email().max(120).optional(),
+        companyStreet: z.string().trim().max(120).optional(),
+        companyCity: z.string().trim().max(60).optional(),
+        companyState: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Two-letter state").optional(),
+        companyZip: z.string().trim().regex(/^\d{5}(-\d{4})?$/, "ZIP code").optional(),
         directEmail: z.string().trim().email().max(120).optional(),
         companyReviewUrl: WEB_URL(500).optional(),
         companyFacebookUrl: WEB_URL(500).optional(),
@@ -687,6 +713,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         .run();
       await notify(env, { kind: "signup_sent", actor: session, leadId: id, text: `${session.name} sent ${lead.name} a ${p.name} sign-up link` });
       return json({ url: `${url.origin}/a/${token}`, plan: p.name, expiresInDays: 30 });
+    }
+    // In-person card payment for a signed sign-up (owner, Android app): returns the intent:// link that opens the Tap to Pay screen.
+    if (action === "/tap" && m === "POST") {
+      const { signupId } = await body(req, z.object({ signupId: z.string().regex(/^[a-z0-9]+$/) }));
+      return json(await startTap(env, { signupId, leadId: id, origin: url.origin, session }));
     }
     if (action === "/paid" && m === "POST") {
       const { signupId, paid } = await body(req, z.object({ signupId: z.string().regex(/^[a-z0-9]+$/), paid: z.boolean() }));
@@ -1283,5 +1314,6 @@ export default {
     }
     await expireStaleLeads(env);
     await pruneOldRows(env);
+    await reconcileTaps(env);
   },
 } satisfies ExportedHandler<Env, Job>;

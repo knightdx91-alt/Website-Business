@@ -60,6 +60,7 @@ export function paymentAuthText(s: PenaltySettings & { legalName?: string; compa
   return [
     `If you pay by card or bank account on file, you authorize ${legal} to charge that card (credit or debit) or to debit that bank account by ACH, through our payment processor (Stripe), for: your plan on its billing day each month or year; extras you approve; and amounts you owe under this agreement, including late fees, the reinstatement fee, the early cancellation fee and dispute or returned-payment fees.`,
     `Amounts change only when your plan or extras change or a fee under this agreement applies; we'll tell you at least 10 days before a charge that differs from your regular amount. This authorization stays in effect until you cancel it by texting or emailing us at least 3 business days before the next charge. Cancelling it doesn't end what you owe, and without a working payment method on file your plan may be suspended.`,
+    `A card you tap or insert on our phone in person counts as the card on file: Stripe keeps it and charges it for this plan on each renewal under this authorization.`,
     `A bank debit that comes back unpaid may be retried once${ret ? ` and carries a ${money2(ret)} returned-payment fee` : ""}. You confirm you're authorized to use this payment method and that it belongs to your business or to you. We never see or store your full card or account numbers. You can ask us for a copy of this authorization at any time.`,
   ].join("\n");
 }

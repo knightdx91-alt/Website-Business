@@ -33,7 +33,7 @@ export function page(title: string, body: string, opts: { brand?: string; css?: 
       "cache-control": "no-store",
       "x-robots-tag": "noindex",
       "referrer-policy": "no-referrer",
-      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; script-src 'unsafe-inline'; form-action 'self' https://checkout.stripe.com; frame-ancestors 'self'; base-uri 'none'",
+      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://checkout.stripe.com; frame-ancestors 'self'; base-uri 'none'",
     },
   });
 }

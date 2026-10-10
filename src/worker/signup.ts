@@ -8,6 +8,7 @@ import { agreementToken, verifyAgreement } from "./auth.ts";
 import { contractSectionsHtml, contractText, paymentAuthText } from "./contract.ts";
 import { dataUrlBytes, pdfBytes, pdfResponse, pngToPdfImage } from "./pdf.ts";
 import { esignHtml, readSignature } from "./esign.ts";
+import { tapStatus } from "./tap.ts";
 
 interface SignupRow {
   id: string;
@@ -226,6 +227,28 @@ export async function serveSignup(env: Env, req: Request, leadId: string, planId
       .run();
     await notify(env, { kind: "signed", actorName: name, leadId, text: `✍️ ${name} signed ${lead.name} up: ${orderSummary(order)}${order.invoice ? " (wants an invoice)" : ""}${sent?.author ? `, from ${sent.author}'s link` : ""}` });
     await updateLead(env, leadId, { sales_status: lead.sales_status === "live" ? "live" : "sold", follow_up: localDate(1), last_contact: now() });
+    // Signed on the owner's Android phone with Tap to Pay set up (?tap=1 from the app): take the card right here instead
+    // of sending them to Stripe's card form. The buttons call the owner's API with the owner's own login cookie.
+    if (saved.checkoutUrl && !order.invoice && url.searchParams.get("tap") === "1" && (await tapStatus(env, settings)).ready) {
+      return page(
+        "Thank you",
+        `<div class="wrap"><div class="card"><h1>Thank you, ${escHtml(name.split(" ")[0]!)}!</h1>
+<p class="ok">You're signed up for ${escHtml(business)}.</p>${orderLinesHtml(order)}
+<p>Last step: hand the phone back to <strong>${escHtml(settings.companyName || "us")}</strong> and tap your card on it. Due today: <strong>${escHtml(dollars(order.dueToday))}</strong>${order.renews ? `, then ${escHtml(dollars(order.renews.amount))} a ${order.renews.interval} on the same card` : ""}.</p>
+<p id="tapdone" class="ok" hidden>✅ Paid. Your receipt goes to ${escHtml(email)}.</p>
+<button class="btn" type="button" id="tapbtn">💳 Tap card now</button>
+<p id="tapmsg" class="small muted" style="min-height:1.4em"></p>
+<a class="btn btn--ghost" id="online" href="${escHtml(saved.checkoutUrl)}" rel="noopener">Pay online instead</a>
+<p><a href="${escHtml(saved.agreementUrl)}" target="_blank" rel="noopener">📄 View or print your signed agreement</a></p>
+<p><strong>${GO_LIVE_TEXT}</strong></p>
+<script>(function(){var lead=${JSON.stringify(leadId)},signup=${JSON.stringify(saved.signupId)},b=document.getElementById("tapbtn"),msg=document.getElementById("tapmsg"),done=document.getElementById("tapdone"),timer=null,until=0;
+function paid(){done.hidden=false;b.hidden=true;document.getElementById("online").hidden=true;msg.textContent="";clearInterval(timer);}
+function check(){if(Date.now()>until){clearInterval(timer);return;}fetch("/api/leads/"+lead,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).then(function(j){if(!j)return;var s=(j.signups||[]).filter(function(x){return x.id===signup;})[0];if(s&&s.paid)paid();}).catch(function(){});}
+b.addEventListener("click",function(){b.disabled=true;msg.textContent="Opening Tap to Pay…";fetch("/api/leads/"+lead+"/tap",{method:"POST",headers:{"x-wb":"1","content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({signupId:signup})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Couldn't start the payment");return j;});}).then(function(j){if(j.alreadyPaid){paid();return;}until=Date.now()+10*60*1000;clearInterval(timer);timer=setInterval(check,3000);msg.textContent="Tap the card on the back of the phone. This page updates when it's paid.";b.disabled=false;b.textContent="💳 Tap again";location.href=j.intentUrl;}).catch(function(e){msg.textContent=e.message+(/log in/i.test(e.message)?" (this button only works on the owner's phone)":"");b.disabled=false;});});
+document.addEventListener("visibilitychange",function(){if(!document.hidden&&until)check();});})();</script></div></div>`,
+        { brand },
+      );
+    }
     if (saved.checkoutUrl) return Response.redirect(saved.checkoutUrl, 303);
     const option = order.option!;
     return page(
@@ -467,7 +490,7 @@ export async function contractPreviewPage(env: Env, q: PreviewQuery): Promise<Re
 ${
     q.leadId
       ? `<p class="small muted noprint">Sign opens ${escHtml(business)}'s own sign-up page: they confirm the plan and way to pay, read this agreement, sign with a finger and pay. The link is logged in their call log.</p>
-<script>(function(){var b=document.getElementById("signbtn");if(!b)return;b.addEventListener("click",function(){b.disabled=true;b.textContent="Opening the sign-up page…";fetch("/api/leads/"+${JSON.stringify(q.leadId)}+"/signup",{method:"POST",headers:{"x-wb":"1","content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({plan:${JSON.stringify(plan.id)}})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Could not open the sign-up page");return j;});}).then(function(j){location.href=j.url+"?billing="+encodeURIComponent(${JSON.stringify(option.id)});}).catch(function(e){alert(e.message);b.disabled=false;b.textContent="✍️ Sign this agreement";});});})();</script>`
+<script>(function(){var b=document.getElementById("signbtn");if(!b)return;b.addEventListener("click",function(){b.disabled=true;b.textContent="Opening the sign-up page…";fetch("/api/leads/"+${JSON.stringify(q.leadId)}+"/signup",{method:"POST",headers:{"x-wb":"1","content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({plan:${JSON.stringify(plan.id)}})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Could not open the sign-up page");return j;});}).then(function(j){location.href=j.url+"?billing="+encodeURIComponent(${JSON.stringify(option.id)})+(/Android/i.test(navigator.userAgent)?"&tap=1":"");}).catch(function(e){alert(e.message);b.disabled=false;b.textContent="✍️ Sign this agreement";});});})();</script>`
       : `<p class="small muted noprint">To sign: open the business's lead page in the app, tap <strong>Show them the plans</strong> and choose a plan. That opens their sign-up page with this agreement, a signature pad and payment.</p>`
   }
 </div></div>`;

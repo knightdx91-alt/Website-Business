@@ -245,6 +245,11 @@ export interface AppSettings {
   legalName?: string;
   companyPhone?: string;
   companyEmail?: string;
+  /** Business street address: Stripe's Terminal location for Tap to Pay (a US address is required). */
+  companyStreet?: string;
+  companyCity?: string;
+  companyState?: string;
+  companyZip?: string;
   /** The owner's own address, shown next to the business email for people who want them directly. */
   directEmail?: string;
   /** Our own Google "write a review" link, texted to happy clients. */

@@ -1,6 +1,7 @@
 import { notify } from "./notify.ts";
 import { getLead, updateLead } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
+import { completeTap } from "./tap.ts";
 
 /**
  * Stripe webhook (Stripe → Developers → Webhooks → https://<app>/stripe/webhook). The signing secret lives in the
@@ -72,7 +73,10 @@ function extrasNames(itemsJson: string | null | undefined): string[] {
 export async function handleStripeEvent(env: Env, event: StripeEvent): Promise<void> {
   const o = event.data.object;
   const meta = (o.metadata ?? {}) as Record<string, string>;
-  if (event.type === "checkout.session.completed" && meta.kind === "signup" && meta.signupId) {
+  if (event.type === "payment_intent.succeeded" && meta.kind === "signup_tap" && meta.signupId) {
+    // An in-person tap the phone may not have reported (same bookkeeping as the app's /tap/complete; idempotent).
+    await completeTap(env, { signupId: meta.signupId, paymentIntentId: String(o.id), actorName: "Stripe" });
+  } else if (event.type === "checkout.session.completed" && meta.kind === "signup" && meta.signupId) {
     // Checkout made by the app for a sign-up (from a sign-up link, or a Buy now order on the website).
     await env.DB.prepare("UPDATE signups SET paid = 1, stripe_customer = ?, stripe_subscription = ? WHERE id = ?").bind(o.customer ?? null, o.subscription ?? null, meta.signupId).run();
     const row = await env.DB.prepare("SELECT s.lead_id, s.business, s.signer_name, l.name FROM signups s LEFT JOIN leads l ON l.id = s.lead_id WHERE s.id = ?")

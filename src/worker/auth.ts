@@ -235,6 +235,20 @@ export async function verifyExtras(env: Env, leadId: string, exp: string, sig: s
   return safeEqual(sig, await hmac(env.APP_SECRET, `extras.${leadId}.${exp}`));
 }
 
+/** Short-lived token the web app hands the Android Tap to Pay screen for one sign-up; the nonce makes it single-use. */
+export async function tapToken(env: Env, signupId: string, nonce: string, minutes = 10): Promise<string> {
+  const exp = Date.now() + minutes * 60_000;
+  return `${signupId}.${nonce}.${exp}.${await hmac(env.APP_SECRET, `tap.${signupId}.${nonce}.${exp}`)}`;
+}
+
+export async function verifyTap(env: Env, token: string): Promise<{ signupId: string; nonce: string } | null> {
+  const m = /^([a-z0-9]+)\.([a-f0-9]+)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(token);
+  if (!m) return null;
+  const [, signupId, nonce, exp, sig] = m as unknown as [string, string, string, string, string];
+  if (Number(exp) < Date.now()) return null;
+  return safeEqual(sig, await hmac(env.APP_SECRET, `tap.${signupId}.${nonce}.${exp}`)) ? { signupId, nonce } : null;
+}
+
 /** Permanent link to one signed agreement: "s" = sign-up, "p" = extras purchase. */
 export async function agreementToken(env: Env, kind: "s" | "p", id: string): Promise<string> {
   return `${kind}${id}.${await hmac(env.APP_SECRET, `agreement.${kind}.${id}`)}`;
