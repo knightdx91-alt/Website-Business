@@ -1,5 +1,5 @@
 import type { PricedOrder } from "./checkout.ts";
-import { addonPrice, defaultTerms, missingCoreTerms, type AddOn, type AppSettings } from "./db.ts";
+import { addonPrice, defaultTerms, lateFeeOf, missingCoreTerms, type AddOn, type AppSettings, type PenaltySettings } from "./db.ts";
 
 /**
  * Agreements built from exactly what's being bought: the main service agreement, the plan and way to pay, and the
@@ -31,7 +31,11 @@ const GENERIC_EXTRA_TERMS = "We provide this extra as described. One-time items 
 export const TIMING_TEXT = "We put your site live within 3 business days after you approve the details. A same-day build, if bought, goes live the same business day you approve it, within 24 hours at the latest.";
 
 /** Added to HOW YOU PAY when they pay against an invoice instead of online. */
-export const INVOICE_TEXT = "Paying by invoice: we email an invoice to your billing contact; nothing is charged online. Monthly invoices are due within 15 days, yearly invoices within 30 days. If an invoice is 15 days overdue we add a $15 late fee; at 45 days we may take the site offline until it's paid; at 75 days we may end this agreement and the balance is due. You can switch to a card or bank account on file at any time. The person signing confirms they're authorized by the church or organization to make this purchase.";
+/** How paying by invoice works (churches and anyone who asks), with the late fee from Settings. */
+export function invoiceText(s: PenaltySettings): string {
+  const fee = lateFeeOf(s);
+  return `Paying by invoice: we email an invoice to your billing contact; nothing is charged online. Monthly invoices are due within 15 days, yearly invoices within 30 days.${fee ? ` If an invoice is 15 days overdue we add a $${fee % 1 ? fee.toFixed(2) : fee} late fee;` : " If an invoice is overdue,"} at 45 days we may take the site offline until it's paid; at 75 days we may end this agreement and the balance is due. You can switch to a card or bank account on file at any time. The person signing confirms they're authorized by the church or organization to make this purchase.`;
+}
 
 /** Heading for the core lines added when the owner's own service agreement doesn't say them. */
 const ALSO_HEADING = "ALSO PART OF THIS AGREEMENT";
@@ -70,7 +74,7 @@ function orderLines(order: PricedOrder): string[] {
 function serviceTerms(s: AppSettings): { text: string; also: string[] } {
   const custom = s.terms?.trim();
   const text = custom || defaultTerms(s);
-  return { text, also: missingCoreTerms(text) };
+  return { text, also: missingCoreTerms(text, s) };
 }
 
 /** The exact agreement text stored with a signature. */
@@ -85,7 +89,7 @@ export function contractText(s: AppSettings, order: PricedOrder, o: ContractInpu
       const inc = order.plan.includes.split("\n").map((x) => x.trim()).filter(Boolean);
       out.push("", `YOUR PLAN: ${order.plan.name.toUpperCase()}`, `$${order.plan.monthly} a month. Includes:`, ...inc.map((x) => `- ${x}`));
     }
-    if (order.option) out.push("", "HOW YOU PAY", `${order.option.label}: ${order.option.detail}${order.invoice ? `\n${INVOICE_TEXT}` : ""}`);
+    if (order.option) out.push("", "HOW YOU PAY", `${order.option.label}: ${order.option.detail}${order.invoice ? `\n${invoiceText(s)}` : ""}`);
     out.push("", "TIMING", TIMING_TEXT);
     const terms = serviceTerms(s);
     out.push("", "SERVICE AGREEMENT", terms.text);
@@ -119,7 +123,7 @@ export function contractSectionsHtml(s: AppSettings, o: ContractInput & { esc: (
       const inc = p.includes.split("\n").map((x) => x.trim()).filter(Boolean);
       parts.push(sec(`Your plan: ${p.name}`, `<p>$${p.monthly} a month. Includes:</p><ul>${inc.map((x) => `<li>${e(x)}</li>`).join("")}</ul>`, ` data-plan="${p.id}"`));
     }
-    parts.push(sec("How you pay", `<p data-billing-text></p><p data-invoice-text hidden>${e(INVOICE_TEXT)}</p>`));
+    parts.push(sec("How you pay", `<p data-billing-text></p><p data-invoice-text hidden>${e(invoiceText(s))}</p>`));
     parts.push(sec("Timing", para(TIMING_TEXT)));
     const terms = serviceTerms(s);
     parts.push(sec("Service agreement", para(terms.text)));

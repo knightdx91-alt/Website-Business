@@ -2956,6 +2956,8 @@
         <label class="field" style="flex:1 1 120px">Standard plan (months) <span class="hint">No setup fee</span><input name="minMonths" type="number" min="0" max="36" inputmode="numeric" value="${s.minMonths ?? 12}"></label>
         <label class="field" style="flex:1 1 120px">Month-to-month setup ($) <span class="hint">0 = don't offer</span><input name="flexSetup" type="number" min="0" inputmode="decimal" value="${s.flexSetup ?? 299}"></label>
         <label class="field" style="flex:1 1 120px">Yearly: months free <span class="hint">0 = don't offer</span><input name="annualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.annualMonthsFree ?? 2}"></label>
+        <label class="field" style="flex:1 1 120px">Late fee ($) <span class="hint">Added once per missed payment, 10 days after it fails · 0 = none</span><input name="lateFee" type="number" min="0" max="500" step="0.01" inputmode="decimal" value="${s.lateFee ?? 15}"></label>
+        <label class="field" style="flex:1 1 120px">Early payoff discount (%) <span class="hint">Off the remaining months when they pay the early cancellation fee up front · 0 = none</span><input name="payoffDiscount" type="number" min="0" max="100" inputmode="numeric" value="${s.payoffDiscount ?? 15}"></label>
         <label class="field" style="flex:1 1 120px">Churches &amp; nonprofits: yearly months free <span class="hint">4 = 12 months for the price of 8</span><input name="churchAnnualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.churchAnnualMonthsFree ?? 4}"></label></div>
         <h2 style="margin-top:18px">Extras</h2>
         <p class="small muted">Shown on the sign-up page and in call guides. Leave a name blank to remove it.</p>
@@ -3029,6 +3031,8 @@
             minMonths: n(v("minMonths")),
             shortMonths: n(v("shortMonths")),
             flexSetup: n(v("flexSetup")),
+            lateFee: n(v("lateFee")),
+            payoffDiscount: n(v("payoffDiscount")),
             annualMonthsFree: n(v("annualMonthsFree")),
             churchAnnualMonthsFree: n(v("churchAnnualMonthsFree")),
             dailyCalls: n(v("dailyCalls")),

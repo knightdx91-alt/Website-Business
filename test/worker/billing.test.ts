@@ -50,3 +50,16 @@ test("the default agreement carries the five core lines; a custom one that lacks
   assert.match(terms, /at least 30 days before a yearly renewal/);
   assert.equal(missingCoreTerms("Our own short agreement. Our total liability is capped.").length, 10);
 });
+
+test("the late fee and early-payoff discount come from Settings, and 0 turns each off", () => {
+  const base = { minMonths: 12, shortMonths: 6 };
+  assert.match(defaultTerms({ ...base, lateFee: 25, payoffDiscount: 10 }), /we add a \$25 late fee, once per missed payment/);
+  assert.match(defaultTerms({ ...base, lateFee: 25, payoffDiscount: 10 }), /or pay it now, less 10%, and we close your account at once/);
+  assert.match(defaultTerms({ ...base, lateFee: 12.5 }), /\$12\.50 late fee/);
+  const none = defaultTerms({ ...base, lateFee: 0, payoffDiscount: 0 });
+  assert.doesNotMatch(none, /late fee/);
+  assert.match(none, /or pay it now, and we close your account at once/);
+  assert.deepEqual(missingCoreTerms(none, { lateFee: 0, payoffDiscount: 0 }), [], "no late-fee core line is demanded when the fee is off");
+  assert.ok(missingCoreTerms("short custom text", { lateFee: 20 }).some((t) => t.includes("$20 late fee")));
+  assert.ok(!missingCoreTerms("short custom text", { lateFee: 0 }).some((t) => t.includes("late fee")));
+});

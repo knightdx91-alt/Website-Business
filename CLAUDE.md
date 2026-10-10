@@ -552,7 +552,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   line. `STANDARD_EXTRA_TERMS` gained the research's fixes (photo no-show = the visit, new visit $99; GBP refund half if
   Google won't verify; ad accounts in the client's name; logo has no trademark search; NFC dead-card swap 90 days; quotes
   good 30 days). `/terms` refunds list, Limits (12 months) and a "How we settle disagreements" section match. The numbers
-  are business decisions (ranges in the research §7 table); the owner should have a lawyer review once.
+  are business decisions (ranges in the research §7 table); the owner should have a lawyer review once. Settings → Sales
+  has "Late fee ($)" (`settings.lateFee`, default 15, 0 = none) and "Early payoff discount (%)" (`payoffDiscount`, default 15,
+  0 = none): `lateFeeOf()` / `payoffDiscountOf()` in db.ts feed `defaultTerms`, `coreTerms(s)` / `missingCoreTerms(text, s)`,
+  `invoiceText(s)` (contract.ts) and the `/terms` refunds list; changing them clears cached call guides like other sales settings.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.

@@ -200,24 +200,37 @@ export const GO_LIVE_TEXT = "Your site goes live within 3 business days of your 
  * Plain-language lines every agreement carries. They're woven into defaultTerms; when the owner has written their own
  * service agreement in Settings, contract.ts adds the ones that text doesn't already cover.
  */
-export const CORE_TERMS: Array<{ key: RegExp; text: string }> = [
-  { key: /early cancellation fee|remaining months of the minimum/i, text: "If you cancel before the end of your plan's minimum term, you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term: keep paying monthly until the term ends, or pay it now less 15%. We may charge the card on file for it." },
-  { key: /isn't fixed within 30 days|not fixed within 30 days/i, text: "If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up; after 60 days we may end the agreement and the whole balance is due." },
-  { key: /late fee/i, text: "A payment still unpaid 10 days after it fails carries a $15 late fee, once per missed payment." },
-  { key: /dispute/i, text: "Disputing a charge with your bank that was due under this agreement counts as a missed payment." },
-  { key: /total liability/i, text: "Our total liability to you is limited to what you paid us in the 12 months before the problem, and we aren't liable for indirect losses such as lost profits. Alabama law applies." },
-  { key: /undergroundassociates\.com\/terms/i, text: "Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign." },
-  { key: /30 days before a yearly renewal/i, text: "Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews." },
-  { key: /templates, designs and code/i, text: "Your name, logo, photos, text and domain are yours; the templates, designs and code we build with are ours. If you leave, you may ask for a copy of your site's pages within 30 days." },
-  { key: /right to use any photos/i, text: "You confirm you have the right to use any photos, logo or text you send us and that what you tell us about your business is true; claims arising from them are yours to cover." },
-  { key: /guarantee search rankings/i, text: "No one can guarantee search rankings, visitors, calls or sales, or that a site is never down." },
-  { key: /Cullman County/i, text: "Alabama law applies and any case is filed in the state courts in Cullman County, Alabama, after we've first tried for 30 days to work it out." },
-];
+/** The late fee and early-payoff discount as the agreement states them. */
+export type PenaltySettings = Pick<AppSettings, "lateFee" | "payoffDiscount">;
+export const lateFeeOf = (s: PenaltySettings) => Math.max(0, Math.round((s.lateFee ?? 15) * 100) / 100);
+export const payoffDiscountOf = (s: PenaltySettings) => Math.max(0, Math.min(100, Math.round(s.payoffDiscount ?? 15)));
+const fee = (s: PenaltySettings) => `$${lateFeeOf(s) % 1 ? lateFeeOf(s).toFixed(2) : lateFeeOf(s)}`;
+/** "pay it now less 15%" or, with no discount, "pay it now". */
+const payoffWords = (s: PenaltySettings) => (payoffDiscountOf(s) ? `pay it now, less ${payoffDiscountOf(s)}%,` : "pay it now,");
+
+export function coreTerms(s: PenaltySettings = {}): Array<{ key: RegExp; text: string }> {
+  return [
+    { key: /early cancellation fee|remaining months of the minimum/i, text: `If you cancel before the end of your plan's minimum term, you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term: keep paying monthly until the term ends, or ${payoffWords(s)} and we close your account. We may charge the card on file for it.` },
+    { key: /isn't fixed within 30 days|not fixed within 30 days/i, text: "If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up; after 60 days we may end the agreement and the whole balance is due." },
+    ...(lateFeeOf(s) ? [{ key: /late fee/i, text: `A payment still unpaid 10 days after it fails carries a ${fee(s)} late fee, once per missed payment.` }] : []),
+    { key: /dispute/i, text: "Disputing a charge with your bank that was due under this agreement counts as a missed payment." },
+    { key: /total liability/i, text: "Our total liability to you is limited to what you paid us in the 12 months before the problem, and we aren't liable for indirect losses such as lost profits. Alabama law applies." },
+    { key: /undergroundassociates\.com\/terms/i, text: "Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign." },
+    { key: /30 days before a yearly renewal/i, text: "Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews." },
+    { key: /templates, designs and code/i, text: "Your name, logo, photos, text and domain are yours; the templates, designs and code we build with are ours. If you leave, you may ask for a copy of your site's pages within 30 days." },
+    { key: /right to use any photos/i, text: "You confirm you have the right to use any photos, logo or text you send us and that what you tell us about your business is true; claims arising from them are yours to cover." },
+    { key: /guarantee search rankings/i, text: "No one can guarantee search rankings, visitors, calls or sales, or that a site is never down." },
+    { key: /Cullman County/i, text: "Alabama law applies and any case is filed in the state courts in Cullman County, Alabama, after we've first tried for 30 days to work it out." },
+  ];
+}
+/** Kept for callers that only need the default numbers. */
+export const CORE_TERMS = coreTerms();
 
 /** The core lines a (custom) service agreement doesn't already say. */
-export function missingCoreTerms(text: string): string[] {
-  return CORE_TERMS.filter((c) => !c.key.test(text)).map((c) => c.text);
+export function missingCoreTerms(text: string, s: PenaltySettings = {}): string[] {
+  return coreTerms(s).filter((c) => !c.key.test(text)).map((c) => c.text);
 }
+
 
 export interface AppSettings {
   defaultCap: number;
@@ -250,6 +263,10 @@ export interface AppSettings {
   annualMonthsFree?: number;
   /** Months free on the yearly option for churches and nonprofits (12 months for the price of 8 by default). */
   churchAnnualMonthsFree: number;
+  /** Late fee in dollars, added once per missed payment 10 days after it fails (0 = no late fee). */
+  lateFee?: number;
+  /** Percent off when a client pays the rest of their minimum term up front instead of month by month (0 = no discount). */
+  payoffDiscount?: number;
   /** Daily call goal per person, shown in the app only. 0 = no goal. */
   dailyCalls?: number;
   addons: AddOn[];
@@ -268,8 +285,16 @@ export interface AppSettings {
  * overdue, offline at 30 days, agreement may end at 60, $49 to reinstate, 15% off an early payoff, 12-month liability
  * cap, a free month for >24 h of our-fault downtime, 3-business-day updates, 7-day deemed approval. Not legal advice.
  */
-export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | "minMonths" | "shortMonths">): string {
+
+/**
+ * The standard client agreement (Oct 2026 rewrite after research/contract-review-2026.md). Plain English, numbered,
+ * phone-readable. The bracket-free defaults are business decisions: $15 late fee after 10 days, 8%/yr after 30 days
+ * overdue, offline at 30 days, agreement may end at 60, $49 to reinstate, 15% off an early payoff, 12-month liability
+ * cap, a free month for >24 h of our-fault downtime, 3-business-day updates, 7-day deemed approval. Not legal advice.
+ */
+export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | "minMonths" | "shortMonths"> & PenaltySettings): string {
   const us = s.legalName || s.companyName || "We";
+  const late = lateFeeOf(s);
   const min = s.minMonths ?? 12;
   const short = s.shortMonths ?? 6;
   const terms = short && short < min ? `${short}-month or ${min}-month plan` : `${min}-month plan`;
@@ -278,10 +303,10 @@ export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | 
     "2. Approving your site. You saw a preview before signing. We make the changes you ask for, you give us a yes, and the site goes live within 3 business days of that yes. If we don't hear from you within 7 days of sending you a change, we treat it as approved so your site isn't held up.",
     "3. Payment. Your plan is charged automatically each month (or each year on a yearly plan), starting today. Month to month has a one-time setup fee due today; the other plans have none unless your plan says otherwise. You authorize us to charge the card or bank account on file for your plan, extras you approve and other amounts you owe under this agreement. Prices don't include sales or use tax; if one applies, we add it. Your price is fixed for your minimum or prepaid term; after that we give 30 days' notice of any change and you may cancel instead. Extras are described in the section for each extra: one-time extras are billed when you sign up for them and aren't refundable once delivered unless we made the mistake; monthly extras can be canceled with 30 days' notice; quoted work starts after you approve the quote.",
     min > 0
-      ? `4. Your term and early cancellation fee. With the ${terms}, those first months are a minimum. You get them with no setup fee because you're committing to them, and we build your site up front in return. After the minimum, cancel any time with 30 days' notice. If you cancel before the minimum term ends, you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term. You agree that's a fair estimate of our loss, not a penalty, since we built your site at no charge in return for the term. You can pay it two ways: keep paying monthly until the term ends (your site stays live unless you ask us to take it down), or pay it now, less 15%, and we close your account at once. If you stop paying instead, the whole fee is due at once; we may charge the card or bank account on file for it, and the late-payment section applies, including collection costs. Month to month has no minimum: cancel any time with 30 days' notice; the setup fee isn't refundable once your site is live. Yearly plans are paid up front for 12 months and aren't refunded after the first 30 days.`
+      ? `4. Your term and early cancellation fee. With the ${terms}, those first months are a minimum. You get them with no setup fee because you're committing to them, and we build your site up front in return. After the minimum, cancel any time with 30 days' notice. If you cancel before the minimum term ends, you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term. You agree that's a fair estimate of our loss, not a penalty, since we built your site at no charge in return for the term. You can pay it two ways: keep paying monthly until the term ends (your site stays live unless you ask us to take it down), or ${payoffWords(s)} and we close your account at once. If you stop paying instead, the whole fee is due at once; we may charge the card or bank account on file for it, and the late-payment section applies, including collection costs. Month to month has no minimum: cancel any time with 30 days' notice; the setup fee isn't refundable once your site is live. Yearly plans are paid up front for 12 months and aren't refunded after the first 30 days.`
       : "4. Your term. Cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months.",
     "5. Renewal and how to cancel. Monthly plans continue after any minimum term until you cancel. Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews. To cancel, text or email us or use your billing link; it takes effect at the end of your paid period. Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign.",
-    "6. Late payments. If a payment fails we'll tell you and retry the card. If it's still unpaid after 10 days, we add a $15 late fee, once per missed payment. Balances more than 30 days overdue earn interest at 8% a year. Your plan keeps billing while a payment is late. If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up. 60 days after a missed payment we may end this agreement, and the whole balance, including the rest of any minimum term, is due. Putting a site back online costs $49. If we send a balance to collections or court, you also owe our reasonable collection costs and attorney's fees as far as Alabama law allows.",
+    `6. Late payments. If a payment fails we'll tell you and retry the card.${late ? ` If it's still unpaid after 10 days, we add a ${fee(s)} late fee, once per missed payment.` : ""} Balances more than 30 days overdue earn interest at 8% a year. Your plan keeps billing while a payment is late. If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up. 60 days after a missed payment we may end this agreement, and the whole balance, including the rest of any minimum term, is due. Putting a site back online costs $49. If we send a balance to collections or court, you also owe our reasonable collection costs and attorney's fees as far as Alabama law allows.`,
     "7. Payment disputes. Contact us before disputing a charge with your bank; we refund billing mistakes in full. A dispute of a charge that was due under this agreement counts as a missed payment: we may take the site offline right away, and you owe the amount, the bank's dispute fee ($15 today) and the reinstatement fee once it's resolved.",
     "8. Your content stays yours. Your business name, logo, photos, the text about your business and your domain belong to you. You confirm you have the right to use any photos, logo or text you send us, and that what you tell us about your business, prices and licenses is true. The templates, designs and code we build with are ours, and we use them for other businesses too. While your plan is active you may use the site as we host it. We may show your site in our portfolio and keep a small \"Website by\" line in the footer unless you ask us not to.",
     "9. Website text. We draft your site's text with software from your public listing and what you tell us, then you review it. Check prices, hours, licenses and promises before you approve; once approved, the text is yours and you're responsible for it.",
@@ -321,6 +346,8 @@ export async function getSettings(env: Env): Promise<AppSettings> {
     addons: s.addons ?? DEFAULT_ADDONS,
     shortMonths: s.shortMonths ?? 6,
     flexSetup: s.flexSetup ?? 299,
+    lateFee: s.lateFee ?? 15,
+    payoffDiscount: s.payoffDiscount ?? 15,
     annualMonthsFree: s.annualMonthsFree ?? 2,
     churchAnnualMonthsFree: s.churchAnnualMonthsFree ?? 4,
     dailyCalls: s.dailyCalls ?? 0,

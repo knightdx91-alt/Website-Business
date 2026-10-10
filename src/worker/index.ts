@@ -362,6 +362,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         minMonths: z.number().int().min(0).max(36).optional(),
         shortMonths: z.number().int().min(0).max(36).optional(),
         flexSetup: z.number().min(0).max(10_000).optional(),
+        lateFee: z.number().min(0).max(500).optional(),
+        payoffDiscount: z.number().int().min(0).max(100).optional(),
         annualMonthsFree: z.number().int().min(0).max(6).optional(),
         addons: z
           .array(z.object({ name: z.string().trim().min(1).max(60), price: z.number().min(0).max(10_000), unit: z.enum(["month", "each", "one-time", "quote"]), about: z.string().trim().max(200).optional(), terms: z.string().trim().max(1500).optional() }))
@@ -378,7 +380,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const before = await getSettings(env);
     await setSetting(env, "app_settings", JSON.stringify(s));
     // Call guides quote these, so saved guides are rewritten on next open.
-    const sales = (x: Partial<typeof s>) => JSON.stringify([x.companyName, x.legalName, x.callerName, x.minMonths, x.shortMonths, x.flexSetup, x.annualMonthsFree, x.addons, (x.plans ?? []).map((p) => [p.name, p.setup, p.monthly, p.includes])]);
+    const sales = (x: Partial<typeof s>) => JSON.stringify([x.companyName, x.legalName, x.callerName, x.minMonths, x.shortMonths, x.flexSetup, x.lateFee, x.payoffDiscount, x.annualMonthsFree, x.addons, (x.plans ?? []).map((p) => [p.name, p.setup, p.monthly, p.includes])]);
     if (sales(before) !== sales(s)) await env.DB.prepare("UPDATE leads SET pitch_json = NULL WHERE pitch_json IS NOT NULL").run();
     return json({ ok: true });
   }
