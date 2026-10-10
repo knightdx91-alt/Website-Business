@@ -179,6 +179,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Call log: `lead_notes` (outcome + note + author) and `leads.follow_up` (YYYY-MM-DD, Cullman time) via
   `POST /api/leads/:id/log`. "No answer" defaults the callback to tomorrow; Sold/Not interested clear it.
   Home shows "Call back today" (due + overdue). A future callback keeps a lead from expiring, capped at 90 days.
+- Android app 2.2 (Oct 2026): fully native, no web views. `SignupScreen` (in-person sign-up: plan / way to pay / extras picker,
+  agreement sections from `/api/contract.json`, Canvas signature pad → PNG data URL, `POST /api/leads/:id/signups`; then Tap to
+  Pay, Stripe's payment sheet (`com.stripe:stripe-android` 22.8.1, SetupIntent via `/api/signups/:id/pay/start|complete`), or
+  "Text them the payment link"), `PdfScreen` (any API PDF with PdfRenderer: agreements, contract preview, ACH form, review cards,
+  tents, window sign, flyer; print via PrintManager, share via FileProvider), `LeadScreen` with every lead-page card (stats, domain,
+  design, publish + zip to Downloads, extras / review texts, billing portal, rewrite, delete). `WebScreen` and `webRoute` are gone.
+  The only web engine left is `PreviewScreen`, which renders the client's actual website. Layouts follow the window size
+  (`ui/Adaptive.kt`: `LocalWindowInfo`, `LazyVerticalGrid(GridCells.Adaptive(…))` on Home and Edit; Fold closed = one column,
+  open / tablet = two). Settings → "Stripe publishable key" enables the payment sheet.
 - Android app 2.1 (Oct 2026): every web screen is native now. Added: `EditScreen` (from `/editform`), `PreviewScreen`
   (WebView of `/p/<id>/` in a native frame: phone/desktop toggle, text/copy link, Edit, Open in Chrome), `PlaybookScreen`,
   `ShowPlansScreen`, `WalkinScreen` (copy served by `GET /api/content` from `src/worker/content.ts`, which mirrors the app.js

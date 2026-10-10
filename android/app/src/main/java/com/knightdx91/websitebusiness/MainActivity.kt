@@ -63,10 +63,7 @@ import com.knightdx91.websitebusiness.ui.WbTheme
 import com.knightdx91.websitebusiness.ui.LocalWindowInfo
 import com.knightdx91.websitebusiness.ui.rememberWindowInfo
 import androidx.compose.runtime.CompositionLocalProvider
-import com.knightdx91.websitebusiness.ui.WebScreen
 import com.knightdx91.websitebusiness.update.Updater
-import java.net.URLDecoder
-import java.net.URLEncoder
 
 /** Everything the app shows lives in one Compose activity; the Tap to Pay screen is the only other activity. */
 class MainActivity : ComponentActivity() {
@@ -107,7 +104,6 @@ class AppState(val api: Api) {
     }
 }
 
-fun webRoute(path: String): String = "web/" + URLEncoder.encode(path, "UTF-8")
 
 @Composable
 fun AppRoot(startLead: String?) {
@@ -160,7 +156,6 @@ fun AppRoot(startLead: String?) {
             composable("tasks/{lead}") { e -> TasksScreen(state, nav, e.arguments?.getString("lead")) }
             composable("run") { RunScreen(state, nav) }
             composable("settings") { SettingsScreen(state, nav) }
-            composable("web/{path}") { e -> WebScreen(state, nav, URLDecoder.decode(e.arguments?.getString("path") ?: "/", "UTF-8")) }
         }
     }
 }
