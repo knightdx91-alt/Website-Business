@@ -63,3 +63,15 @@ test("the late fee and early-payoff discount come from Settings, and 0 turns eac
   assert.ok(missingCoreTerms("short custom text", { lateFee: 20 }).some((t) => t.includes("$20 late fee")));
   assert.ok(!missingCoreTerms("short custom text", { lateFee: 0 }).some((t) => t.includes("late fee")));
 });
+
+test("interest, reinstatement and dispute fees come from Settings; interest never exceeds Alabama's 8%", () => {
+  const base = { minMonths: 12, shortMonths: 6 };
+  const t = defaultTerms({ ...base, interestRate: 6, reinstatementFee: 75, returnedPaymentFee: 20 });
+  assert.match(t, /earn interest at 6% a year/);
+  assert.match(t, /Putting a site back online costs \$75\./);
+  assert.match(t, /a \$20 dispute fee and the reinstatement fee/);
+  assert.match(defaultTerms({ ...base, interestRate: 12 }), /interest at 8% a year/);
+  const off = defaultTerms({ ...base, interestRate: 0, reinstatementFee: 0, returnedPaymentFee: 0 });
+  assert.doesNotMatch(off, /interest at|back online costs|dispute fee/);
+  assert.match(off, /you owe the amount once it's resolved/);
+});

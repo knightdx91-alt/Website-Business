@@ -1,5 +1,5 @@
 import { notify } from "./notify.ts";
-import { addonPrice, billingOptions, defaultTerms, getSettings, GO_LIVE_TEXT, lateFeeOf, payoffDiscountOf, type AppSettings } from "./db.ts";
+import { addonPrice, billingOptions, defaultTerms, getSettings, GO_LIVE_TEXT, interestRateOf, lateFeeOf, money2, payoffDiscountOf, reinstatementFeeOf, returnedFeeOf, type AppSettings } from "./db.ts";
 import { dollars, pickerHtml, picksFromForm, priceSignup, type PricedOrder } from "./checkout.ts";
 import { agreementPage, agreementPdf, manageBillingHtml, orderSummary, saveOrder } from "./signup.ts";
 import { contractSectionsHtml, contractText } from "./contract.ts";
@@ -691,8 +691,8 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
         s.annualMonthsFree ? "Yearly plans: cancel within 30 days of paying and we refund what you paid, minus the regular monthly price for each month started. After 30 days, yearly payments aren't refunded; your site stays up through the year you paid for and the plan won't renew." : "",
         s.annualMonthsFree ? "Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews." : "",
         "Extras: one-time extras aren't refundable once delivered unless we made the mistake (printed and programmed items once printed or programmed). Monthly extras can be canceled with 30 days' notice. A same-day build is refunded if we miss the window through our own fault; Google Business Profile setup is refunded half if Google refuses to verify.",
-        `Late payments: ${lateFeeOf(s) ? `a ${money(lateFeeOf(s))} late fee 10 days after a failed payment, ` : ""}8% a year on balances over 30 days overdue, the site may go offline after 30 days, the agreement may end after 60 days with the balance due, and $49 to put a site back online.`,
-        "Payment disputes: please contact us first; we refund billing mistakes in full. Disputing a charge that was due counts as a missed payment and adds the bank's $15 fee.",
+        `Late payments: ${lateFeeOf(s) ? `a ${money(lateFeeOf(s))} late fee 10 days after a failed payment, ` : ""}${interestRateOf(s) ? `${interestRateOf(s)}% a year on balances over 30 days overdue, ` : ""}the site may go offline after 30 days, the agreement may end after 60 days with the balance due${reinstatementFeeOf(s) ? `, and ${money2(reinstatementFeeOf(s))} to put a site back online` : ""}.`,
+        `Payment disputes: please contact us first; we refund billing mistakes in full. Disputing a charge that was due counts as a missed payment${returnedFeeOf(s) ? ` and adds a ${money2(returnedFeeOf(s))} fee` : ""}.`,
         "If we fail you: a month free for more than 24 hours of downtime in a month that's our fault. Three such months in a year, or a problem not fixed within 14 days of your written notice, lets you cancel without the rest of your term and get unused prepaid months back.",
         "If we ever charge you by mistake, we refund it in full. Refunds go back to your original card or account, usually within 5 to 10 business days.",
         `To cancel or ask for a refund, ${reach} or use your billing link. Cancellation takes effect at the end of your paid period (after any minimum term).`,

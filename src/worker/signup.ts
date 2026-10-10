@@ -5,7 +5,7 @@ import { addonPrice, billingOptions, defaultTerms, getLead, getSettings, GO_LIVE
 import { HttpError, localDate, newId, now, type Env } from "./env.ts";
 import { escHtml, page } from "./page.ts";
 import { agreementToken, verifyAgreement } from "./auth.ts";
-import { contractSectionsHtml, contractText } from "./contract.ts";
+import { contractSectionsHtml, contractText, paymentAuthText } from "./contract.ts";
 import { dataUrlBytes, pdfBytes, pdfResponse, pngToPdfImage } from "./pdf.ts";
 import { esignHtml, readSignature } from "./esign.ts";
 
@@ -432,9 +432,10 @@ async function previewData(env: Env, q: PreviewQuery) {
   const plans = settings.plans.filter((p) => p.monthly);
   const plan = plans.find((p) => p.id === q.plan) ?? plans.find((p) => p.id === "plus") ?? plans[0];
   if (!plan) return { settings, business, plans, plan: undefined, options: [], option: undefined, terms: "" };
-  const options = billingOptions(plan, settings, { category: lead?.category ?? undefined });
+  const category = lead?.category ?? undefined;
+  const options: Array<{ id: string; label: string }> = [...billingOptions(plan, settings, { category }), { id: INVOICE_BILLING, label: "Pay by invoice" }];
   const option = options.find((o) => o.id === q.billing) ?? options.find((o) => o.id === "standard") ?? options[0]!;
-  const order = priceSignup(settings, plan.id, option.id, [], { category: lead?.category ?? undefined });
+  const order = option.id === INVOICE_BILLING ? priceSignup(settings, plan.id, INVOICE_BILLING, [], { category, invoice: true }) : priceSignup(settings, plan.id, option.id, [], { category });
   const terms = contractText(settings, order, { business, kind: "signup" });
   return { settings, business, plans, plan, options, option, terms };
 }
@@ -475,4 +476,54 @@ export async function contractPreviewPdf(env: Env, q: PreviewQuery): Promise<Res
     footer: `${settings.companyName || ""} · Preview, not signed`,
   };
   return pdfResponse(pdfBytes(doc), `agreement-preview-${plan.id}.pdf`);
+}
+
+/**
+ * A blank recurring-payment authorization form (ACH debit or card) as a PDF, for clients who pay by invoice today or
+ * want a paper authorization on file: the same words as the agreement's PAYMENT AUTHORIZATION section, then blanks to fill
+ * by hand and sign. The bank or card details go on the paper (kept locked up) and into Stripe, never into the app.
+ */
+export async function achFormPdf(env: Env, q: { leadId?: string }): Promise<Response> {
+  const settings = await getSettings(env);
+  const lead = q.leadId ? await getLead(env, q.leadId) : null;
+  const record = lead?.record_json ? (JSON.parse(lead.record_json) as { name?: string }) : null;
+  const business = record?.name || lead?.name || "";
+  const legal = settings.legalName || settings.companyName || "Underground Associates LLC";
+  const line = (label: string, width = 48) => `${label}: ${"_".repeat(Math.max(8, width - label.length))}`;
+  const text = [
+    `Between ${legal} ("we") and ${business || "_".repeat(40)} ("you").`,
+    "",
+    "WHAT YOU AUTHORIZE",
+    paymentAuthText(settings),
+    "",
+    "PAYMENT METHOD (tick one)",
+    "[  ] Bank account (ACH debit)        [  ] Debit or credit card",
+    "",
+    "BANK ACCOUNT",
+    line("Bank name"),
+    line("Routing number (9 digits)"),
+    line("Account number"),
+    "Account type:  [  ] Checking   [  ] Savings   [  ] Business checking",
+    line("Name on the account"),
+    "",
+    "CARD",
+    line("Name on the card"),
+    line("Card number"),
+    line("Expires (MM/YY)", 30) + "    " + line("Billing ZIP", 24),
+    "",
+    "WHAT WE CHARGE",
+    line("Plan and monthly or yearly amount"),
+    line("Billing day (e.g. the 1st, or the day you sign)"),
+    "Plus extras you approve and amounts owed under your agreement (late, reinstatement, early cancellation, returned-payment fees).",
+    "",
+    "SIGNATURE",
+    line("Signed (your signature)"),
+    line("Printed name and title"),
+    line("Phone and email for notices"),
+    line("Date", 30),
+    "",
+    "Keep the signed paper copy in a locked place; enter card or bank details only into Stripe. Clients may revoke by text or email at least 3 business days before the next charge.",
+  ].join("\n");
+  const doc = { title: "Recurring Payment Authorization", notice: "ACH bank debit or debit/credit card. Not legal advice: have a lawyer review once.", text, footer: settings.companyName || legal };
+  return pdfResponse(pdfBytes(doc), `payment-authorization${business ? `-${business.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : ""}.pdf`);
 }

@@ -20,7 +20,7 @@ import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
 import { cadenceFor, nextCadenceStep, salesDashboard } from "./sales.ts";
 import { portalSession } from "./checkout.ts";
-import { agreementPage, agreementPdf, contractPreviewPage, contractPreviewPdf, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
+import { achFormPdf, agreementPage, agreementPdf, contractPreviewPage, contractPreviewPdf, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { EXPIRE_SQL } from "./expire.ts";
 import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
@@ -255,6 +255,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   };
 
   // The agreement a business would sign, before signing: owner and callers show it on the phone.
+  if (path === "/ach.pdf" && m === "GET") return achFormPdf(env, { leadId: url.searchParams.get("lead") ?? undefined });
   if ((path === "/contract" || path === "/contract.pdf") && m === "GET") {
     const q = { leadId: url.searchParams.get("lead") ?? undefined, plan: url.searchParams.get("plan") ?? undefined, billing: url.searchParams.get("billing") ?? undefined };
     return path.endsWith(".pdf") ? contractPreviewPdf(env, q) : contractPreviewPage(env, q);
@@ -364,6 +365,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         flexSetup: z.number().min(0).max(10_000).optional(),
         lateFee: z.number().min(0).max(500).optional(),
         payoffDiscount: z.number().int().min(0).max(100).optional(),
+        interestRate: z.number().min(0).max(8).optional(),
+        reinstatementFee: z.number().min(0).max(500).optional(),
+        returnedPaymentFee: z.number().min(0).max(100).optional(),
         annualMonthsFree: z.number().int().min(0).max(6).optional(),
         addons: z
           .array(z.object({ name: z.string().trim().min(1).max(60), price: z.number().min(0).max(10_000), unit: z.enum(["month", "each", "one-time", "quote"]), about: z.string().trim().max(200).optional(), terms: z.string().trim().max(1500).optional() }))
@@ -380,7 +384,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const before = await getSettings(env);
     await setSetting(env, "app_settings", JSON.stringify(s));
     // Call guides quote these, so saved guides are rewritten on next open.
-    const sales = (x: Partial<typeof s>) => JSON.stringify([x.companyName, x.legalName, x.callerName, x.minMonths, x.shortMonths, x.flexSetup, x.lateFee, x.payoffDiscount, x.annualMonthsFree, x.addons, (x.plans ?? []).map((p) => [p.name, p.setup, p.monthly, p.includes])]);
+    const sales = (x: Partial<typeof s>) => JSON.stringify([x.companyName, x.legalName, x.callerName, x.minMonths, x.shortMonths, x.flexSetup, x.lateFee, x.payoffDiscount, x.interestRate, x.reinstatementFee, x.returnedPaymentFee, x.annualMonthsFree, x.addons, (x.plans ?? []).map((p) => [p.name, p.setup, p.monthly, p.includes])]);
     if (sales(before) !== sales(s)) await env.DB.prepare("UPDATE leads SET pitch_json = NULL WHERE pitch_json IS NOT NULL").run();
     return json({ ok: true });
   }

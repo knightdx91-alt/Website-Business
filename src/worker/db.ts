@@ -201,10 +201,15 @@ export const GO_LIVE_TEXT = "Your site goes live within 3 business days of your 
  * service agreement in Settings, contract.ts adds the ones that text doesn't already cover.
  */
 /** The late fee and early-payoff discount as the agreement states them. */
-export type PenaltySettings = Pick<AppSettings, "lateFee" | "payoffDiscount">;
+export type PenaltySettings = Pick<AppSettings, "lateFee" | "payoffDiscount" | "interestRate" | "reinstatementFee" | "returnedPaymentFee">;
 export const lateFeeOf = (s: PenaltySettings) => Math.max(0, Math.round((s.lateFee ?? 15) * 100) / 100);
 export const payoffDiscountOf = (s: PenaltySettings) => Math.max(0, Math.min(100, Math.round(s.payoffDiscount ?? 15)));
-const fee = (s: PenaltySettings) => `$${lateFeeOf(s) % 1 ? lateFeeOf(s).toFixed(2) : lateFeeOf(s)}`;
+/** Capped at 8: Alabama's legal maximum for a rate written into a contract (Ala. Code § 8-8-1). */
+export const interestRateOf = (s: PenaltySettings) => Math.max(0, Math.min(8, Math.round((s.interestRate ?? 8) * 100) / 100));
+export const reinstatementFeeOf = (s: PenaltySettings) => Math.max(0, Math.round((s.reinstatementFee ?? 49) * 100) / 100);
+export const returnedFeeOf = (s: PenaltySettings) => Math.max(0, Math.round((s.returnedPaymentFee ?? 15) * 100) / 100);
+export const money2 = (n: number) => `$${n % 1 ? n.toFixed(2) : n}`;
+const fee = (s: PenaltySettings) => money2(lateFeeOf(s));
 /** "pay it now less 15%" or, with no discount, "pay it now". */
 const payoffWords = (s: PenaltySettings) => (payoffDiscountOf(s) ? `pay it now, less ${payoffDiscountOf(s)}%,` : "pay it now,");
 
@@ -267,6 +272,12 @@ export interface AppSettings {
   lateFee?: number;
   /** Percent off when a client pays the rest of their minimum term up front instead of month by month (0 = no discount). */
   payoffDiscount?: number;
+  /** Yearly interest on balances more than 30 days overdue, percent (Alabama caps written contracts at 8; 0 = none). */
+  interestRate?: number;
+  /** Fee to put a site back online after it was taken down for non-payment (0 = none). */
+  reinstatementFee?: number;
+  /** Fee for a bank debit that comes back unpaid or a card charge the bank disputes (0 = none). */
+  returnedPaymentFee?: number;
   /** Daily call goal per person, shown in the app only. 0 = no goal. */
   dailyCalls?: number;
   addons: AddOn[];
@@ -306,8 +317,8 @@ export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | 
       ? `4. Your term and early cancellation fee. With the ${terms}, those first months are a minimum. You get them with no setup fee because you're committing to them, and we build your site up front in return. After the minimum, cancel any time with 30 days' notice. If you cancel before the minimum term ends, you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term. You agree that's a fair estimate of our loss, not a penalty, since we built your site at no charge in return for the term. You can pay it two ways: keep paying monthly until the term ends (your site stays live unless you ask us to take it down), or ${payoffWords(s)} and we close your account at once. If you stop paying instead, the whole fee is due at once; we may charge the card or bank account on file for it, and the late-payment section applies, including collection costs. Month to month has no minimum: cancel any time with 30 days' notice; the setup fee isn't refundable once your site is live. Yearly plans are paid up front for 12 months and aren't refunded after the first 30 days.`
       : "4. Your term. Cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months.",
     "5. Renewal and how to cancel. Monthly plans continue after any minimum term until you cancel. Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews. To cancel, text or email us or use your billing link; it takes effect at the end of your paid period. Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign.",
-    `6. Late payments. If a payment fails we'll tell you and retry the card.${late ? ` If it's still unpaid after 10 days, we add a ${fee(s)} late fee, once per missed payment.` : ""} Balances more than 30 days overdue earn interest at 8% a year. Your plan keeps billing while a payment is late. If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up. 60 days after a missed payment we may end this agreement, and the whole balance, including the rest of any minimum term, is due. Putting a site back online costs $49. If we send a balance to collections or court, you also owe our reasonable collection costs and attorney's fees as far as Alabama law allows.`,
-    "7. Payment disputes. Contact us before disputing a charge with your bank; we refund billing mistakes in full. A dispute of a charge that was due under this agreement counts as a missed payment: we may take the site offline right away, and you owe the amount, the bank's dispute fee ($15 today) and the reinstatement fee once it's resolved.",
+    `6. Late payments. If a payment fails we'll tell you and retry the card.${late ? ` If it's still unpaid after 10 days, we add a ${fee(s)} late fee, once per missed payment.` : ""}${interestRateOf(s) ? ` Balances more than 30 days overdue earn interest at ${interestRateOf(s)}% a year.` : ""} Your plan keeps billing while a payment is late. If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up. 60 days after a missed payment we may end this agreement, and the whole balance, including the rest of any minimum term, is due.${reinstatementFeeOf(s) ? ` Putting a site back online costs ${money2(reinstatementFeeOf(s))}.` : ""} If we send a balance to collections or court, you also owe our reasonable collection costs and attorney's fees as far as Alabama law allows.`,
+    `7. Payment disputes. Contact us before disputing a charge with your bank; we refund billing mistakes in full. A dispute of a charge that was due under this agreement counts as a missed payment: we may take the site offline right away, and you owe the amount${returnedFeeOf(s) ? `, a ${money2(returnedFeeOf(s))} dispute fee` : ""}${reinstatementFeeOf(s) ? " and the reinstatement fee" : ""} once it's resolved.`,
     "8. Your content stays yours. Your business name, logo, photos, the text about your business and your domain belong to you. You confirm you have the right to use any photos, logo or text you send us, and that what you tell us about your business, prices and licenses is true. The templates, designs and code we build with are ours, and we use them for other businesses too. While your plan is active you may use the site as we host it. We may show your site in our portfolio and keep a small \"Website by\" line in the footer unless you ask us not to.",
     "9. Website text. We draft your site's text with software from your public listing and what you tell us, then you review it. Check prices, hours, licenses and promises before you approve; once approved, the text is yours and you're responsible for it.",
     "10. Your domain and email. If you already own your domain it stays yours; we only need DNS changes. If we register one for you, we put it in your name where the registrar allows, pay renewals while your plan is active, and transfer it to you within 10 business days after your final balance is paid (registrars lock a domain against moving for 60 days after an ownership change). Email forwarding to your own inbox is free with plans that include it. A Google mailbox is billed to you by Google under Google's terms; we set it up but don't control Google's prices or service.",
@@ -348,6 +359,9 @@ export async function getSettings(env: Env): Promise<AppSettings> {
     flexSetup: s.flexSetup ?? 299,
     lateFee: s.lateFee ?? 15,
     payoffDiscount: s.payoffDiscount ?? 15,
+    interestRate: s.interestRate ?? 8,
+    reinstatementFee: s.reinstatementFee ?? 49,
+    returnedPaymentFee: s.returnedPaymentFee ?? 15,
     annualMonthsFree: s.annualMonthsFree ?? 2,
     churchAnnualMonthsFree: s.churchAnnualMonthsFree ?? 4,
     dailyCalls: s.dailyCalls ?? 0,

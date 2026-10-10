@@ -37,7 +37,7 @@ test("the agreement holds the order, plan, way to pay, main terms and only the e
 test("the agreement says when the site goes live and carries the five core lines", () => {
   const order = priceSignup(s, "plus", "standard", []);
   const text = contractText(s, order, { business: "Joe's Pizza", kind: "signup" });
-  assert.match(text, /HOW YOU PAY\n12-month plan[^\n]*\n\nTIMING\nWe put your site live within 3 business days after you approve the details\. A same-day build, if bought, goes live the same business day/);
+  assert.match(text, /HOW YOU PAY\n12-month plan[^\n]*\n\nPAYMENT AUTHORIZATION\n[\s\S]*?\n\nTIMING\nWe put your site live within 3 business days after you approve the details\. A same-day build, if bought, goes live the same business day/);
   assert.match(text, /you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term/);
   assert.match(text, /If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up\./);
   assert.match(text, /Our total liability to you is limited to what you paid us in the 12 months before the problem\./);
@@ -91,4 +91,17 @@ test("a signature needs agreement, a full name and a real drawing", () => {
   assert.equal(readSignature(form({ agree: "yes", signer_name: "Pat", signature: png })), null);
   assert.equal(readSignature(form({ agree: "yes", signer_name: "Pat Smith", signature: "data:image/png;base64,AAAA" })), null);
   assert.equal(readSignature(form({ agree: "yes", signer_name: "Pat Smith", signature: "javascript:alert(1)" })), null);
+});
+
+test("every signed agreement carries the payment authorization, with the fees from Settings", () => {
+  const order = priceSignup(s, "plus", "standard", []);
+  const text = contractText(s, order, { business: "Joe's Pizza", kind: "signup" });
+  assert.match(text, /HOW YOU PAY\n[^\n]*\n\nPAYMENT AUTHORIZATION\nIf you pay by card or bank account on file, you authorize Underground Associates LLC to charge that card \(credit or debit\) or to debit that bank account by ACH/);
+  assert.match(text, /cancel it by texting or emailing us at least 3 business days before the next charge/);
+  assert.match(text, /carries a \$15 returned-payment fee/);
+  const extras = contractText(s, priceExtras(s, [{ index: 2, qty: 1 }]), { business: "Joe's", kind: "extras" });
+  assert.match(extras, /PAYMENT AUTHORIZATION/);
+  const noFee = contractText({ ...s, returnedPaymentFee: 0 }, order, { business: "Joe's", kind: "signup" });
+  assert.match(noFee, /may be retried once\. You confirm/);
+  assert.match(contractSectionsHtml(s, { business: "Joe's", kind: "signup", esc: (t) => t }), /<h3>Payment authorization<\/h3>/);
 });

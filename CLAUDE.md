@@ -556,6 +556,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   has "Late fee ($)" (`settings.lateFee`, default 15, 0 = none) and "Early payoff discount (%)" (`payoffDiscount`, default 15,
   0 = none): `lateFeeOf()` / `payoffDiscountOf()` in db.ts feed `defaultTerms`, `coreTerms(s)` / `missingCoreTerms(text, s)`,
   `invoiceText(s)` (contract.ts) and the `/terms` refunds list; changing them clears cached call guides like other sales settings.
+  Also "Interest on overdue balances (% a year)" (`interestRate`, default 8, `interestRateOf()` caps at 8 = Ala. Code § 8-8-1),
+  "Reinstatement fee ($)" (`reinstatementFee`, default 49) and "Returned payment / dispute fee ($)" (`returnedPaymentFee`, default
+  15); 0 drops each sentence. Every sign-up and extras agreement carries a PAYMENT AUTHORIZATION section (`paymentAuthText(s)` in
+  contract.ts: charge the card or ACH-debit the bank account on file through Stripe for the plan, approved extras and amounts owed;
+  10 days' notice of a different amount; revoke by text/email 3 business days before the next charge; returned-payment fee; no
+  card/bank numbers stored by us). `GET /api/ach.pdf?lead=` (`achFormPdf`, owner + callers) is a blank paper "Recurring Payment
+  Authorization" form (same words + bank/card/billing blanks + signature) for invoice clients or a paper file; details go on the
+  paper and into Stripe, never the app. Settings → "📄 Preview the agreement" (plan + way-to-pay pickers incl. invoice → Show /
+  PDF, uses saved settings) and the blank form link; the lead page's sign-up card has "🏦 Payment authorization form".
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.

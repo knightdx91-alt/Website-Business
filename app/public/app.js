@@ -514,7 +514,7 @@
       ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)} · <a href="/api/agreements/p/${p.id}" target="_blank" rel="noopener">📄 agreement</a> · <a href="/api/agreements/p/${p.id}.pdf">⬇ PDF</a></li>`).join("")}</ul>` : ""}
       ${plans.length
         ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
-          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> <a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="/api/contract.pdf?lead=${l.id}">⬇ Agreement PDF</a></p>
+          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> <a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="/api/contract.pdf?lead=${l.id}">⬇ Agreement PDF</a> <a class="btn btn--small" href="/api/ach.pdf?lead=${l.id}">🏦 Payment authorization form</a></p>
           <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div>
           <div id="signuplink"></div>`
         : isOwner() ? `<p class="small muted">Add your plans and prices in <a href="#/settings">Settings</a> first.</p>` : `<p class="small muted">The owner hasn't set up plans yet.</p>`}
@@ -2958,6 +2958,20 @@
         <label class="field" style="flex:1 1 120px">Yearly: months free <span class="hint">0 = don't offer</span><input name="annualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.annualMonthsFree ?? 2}"></label>
         <label class="field" style="flex:1 1 120px">Late fee ($) <span class="hint">Added once per missed payment, 10 days after it fails · 0 = none</span><input name="lateFee" type="number" min="0" max="500" step="0.01" inputmode="decimal" value="${s.lateFee ?? 15}"></label>
         <label class="field" style="flex:1 1 120px">Early payoff discount (%) <span class="hint">Off the remaining months when they pay the early cancellation fee up front · 0 = none</span><input name="payoffDiscount" type="number" min="0" max="100" inputmode="numeric" value="${s.payoffDiscount ?? 15}"></label>
+        <label class="field" style="flex:1 1 120px">Interest on overdue balances (% a year) <span class="hint">After 30 days overdue · Alabama allows up to 8 in a written contract · 0 = none</span><input name="interestRate" type="number" min="0" max="8" step="0.5" inputmode="decimal" value="${s.interestRate ?? 8}"></label>
+        <label class="field" style="flex:1 1 120px">Reinstatement fee ($) <span class="hint">To put a site back online after non-payment · 0 = none</span><input name="reinstatementFee" type="number" min="0" max="500" step="0.01" inputmode="decimal" value="${s.reinstatementFee ?? 49}"></label>
+        <label class="field" style="flex:1 1 120px">Returned payment / dispute fee ($) <span class="hint">A bank debit that bounces or a charge they dispute · 0 = none</span><input name="returnedPaymentFee" type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${s.returnedPaymentFee ?? 15}"></label>
+      </div>
+      <section class="card" style="margin-top:14px"><h2>📄 Preview the agreement</h2>
+        <p class="small muted">See the exact agreement a client would sign with the numbers above. Uses what's saved, so tap Save first after changing anything.</p>
+        <div class="row" style="flex-wrap:wrap">
+          <label class="field" style="flex:1 1 140px">Plan<select data-prev-plan>${(s.plans || []).filter((p) => p.monthly).map((p) => `<option value="${esc(p.id)}"${p.id === "plus" ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label>
+          <label class="field" style="flex:1 1 160px">Way to pay<select data-prev-billing>${[["standard", `${s.minMonths ?? 12}-month plan`], ["short", `${s.shortMonths ?? 6}-month plan`], ["flex", "Month to month"], ["annual", "Pay yearly"], ["invoice", "Pay by invoice (churches)"]].filter(([id]) => (id !== "short" || s.shortMonths) && (id !== "flex" || s.flexSetup) && (id !== "annual" || s.annualMonthsFree)).map(([id, label]) => `<option value="${id}">${esc(label)}</option>`).join("")}</select></label>
+        </div>
+        <div class="btns btns--full"><a class="btn btn--primary" data-prev-show href="/api/contract?plan=plus" target="_blank" rel="noopener">Show the example agreement</a><a class="btn" data-prev-pdf href="/api/contract.pdf?plan=plus">⬇ Download as PDF</a></div>
+        <p class="small muted" style="margin-top:10px">Also: <a href="/api/ach.pdf">⬇ Blank payment authorization form (ACH debit or card, PDF)</a> for clients who pay by invoice or want a paper authorization on file. Bank and card numbers go on the paper and into Stripe, never into this app.</p>
+      </section>
+      <div class="row" style="flex-wrap:wrap">
         <label class="field" style="flex:1 1 120px">Churches &amp; nonprofits: yearly months free <span class="hint">4 = 12 months for the price of 8</span><input name="churchAnnualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.churchAnnualMonthsFree ?? 4}"></label></div>
         <h2 style="margin-top:18px">Extras</h2>
         <p class="small muted">Shown on the sign-up page and in call guides. Leave a name blank to remove it.</p>
@@ -3033,6 +3047,9 @@
             flexSetup: n(v("flexSetup")),
             lateFee: n(v("lateFee")),
             payoffDiscount: n(v("payoffDiscount")),
+            interestRate: n(v("interestRate")),
+            reinstatementFee: n(v("reinstatementFee")),
+            returnedPaymentFee: n(v("returnedPaymentFee")),
             annualMonthsFree: n(v("annualMonthsFree")),
             churchAnnualMonthsFree: n(v("churchAnnualMonthsFree")),
             dailyCalls: n(v("dailyCalls")),
@@ -3381,6 +3398,15 @@
     }
     return any ? "~" + code : "";
   }
+  // Settings → Preview the agreement: the Show / PDF links follow the plan and way-to-pay picks.
+  document.addEventListener("change", (e) => {
+    if (!e.target.matches || !e.target.matches("[data-prev-plan],[data-prev-billing]")) return;
+    const card = e.target.closest("section");
+    const plan = card.querySelector("[data-prev-plan]").value, billing = card.querySelector("[data-prev-billing]").value;
+    const qs = `plan=${encodeURIComponent(plan)}&billing=${encodeURIComponent(billing)}`;
+    card.querySelector("[data-prev-show]").href = `/api/contract?${qs}`;
+    card.querySelector("[data-prev-pdf]").href = `/api/contract.pdf?${qs}`;
+  });
   // Edit → Design: picking a style sets the structure pickers it cares about; the others stay as they were.
   document.addEventListener("change", (e) => {
     const sel = e.target.closest && e.target.closest("[data-recipe-fill]");

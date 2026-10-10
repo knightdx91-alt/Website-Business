@@ -1,5 +1,5 @@
 import type { PricedOrder } from "./checkout.ts";
-import { addonPrice, defaultTerms, lateFeeOf, missingCoreTerms, type AddOn, type AppSettings, type PenaltySettings } from "./db.ts";
+import { addonPrice, defaultTerms, lateFeeOf, missingCoreTerms, money2, returnedFeeOf, type AddOn, type AppSettings, type PenaltySettings } from "./db.ts";
 
 /**
  * Agreements built from exactly what's being bought: the main service agreement, the plan and way to pay, and the
@@ -49,6 +49,21 @@ export function esignClause(legal: string): string {
   return `By signing, you agree to do business with ${legal} electronically: your typed name and drawn signature are your legal signature, this agreement and our notices may be sent to you electronically, and you're authorized to sign for the business. You confirm you can open and keep a copy on your device, and you can ask us for a paper copy at any time.`;
 }
 
+/**
+ * Recurring payment authorization: the words that let us charge the card or debit the bank account on file for the
+ * plan, extras and anything owed (NACHA-style: identifies who may debit, what, when, how to revoke; card networks:
+ * amount, frequency, how to cancel). Card and bank details themselves live only with Stripe. Not legal advice.
+ */
+export function paymentAuthText(s: PenaltySettings & { legalName?: string; companyName?: string }): string {
+  const legal = s.legalName || s.companyName || "Underground Associates LLC";
+  const ret = returnedFeeOf(s);
+  return [
+    `If you pay by card or bank account on file, you authorize ${legal} to charge that card (credit or debit) or to debit that bank account by ACH, through our payment processor (Stripe), for: your plan on its billing day each month or year; extras you approve; and amounts you owe under this agreement, including late fees, the reinstatement fee, the early cancellation fee and dispute or returned-payment fees.`,
+    `Amounts change only when your plan or extras change or a fee under this agreement applies; we'll tell you at least 10 days before a charge that differs from your regular amount. This authorization stays in effect until you cancel it by texting or emailing us at least 3 business days before the next charge. Cancelling it doesn't end what you owe, and without a working payment method on file your plan may be suspended.`,
+    `A bank debit that comes back unpaid may be retried once${ret ? ` and carries a ${money2(ret)} returned-payment fee` : ""}. You confirm you're authorized to use this payment method and that it belongs to your business or to you. We never see or store your full card or account numbers. You can ask us for a copy of this authorization at any time.`,
+  ].join("\n");
+}
+
 export interface ContractInput {
   business: string;
   /** "signup" = plan + extras; "extras" = extras added to an existing client's agreement. */
@@ -90,12 +105,14 @@ export function contractText(s: AppSettings, order: PricedOrder, o: ContractInpu
       out.push("", `YOUR PLAN: ${order.plan.name.toUpperCase()}`, `$${order.plan.monthly} a month. Includes:`, ...inc.map((x) => `- ${x}`));
     }
     if (order.option) out.push("", "HOW YOU PAY", `${order.option.label}: ${order.option.detail}${order.invoice ? `\n${invoiceText(s)}` : ""}`);
+    out.push("", "PAYMENT AUTHORIZATION", paymentAuthText(s));
     out.push("", "TIMING", TIMING_TEXT);
     const terms = serviceTerms(s);
     out.push("", "SERVICE AGREEMENT", terms.text);
     if (terms.also.length) out.push("", ALSO_HEADING, ...terms.also);
   } else {
     out.push("", `These extras are added to your existing website service agreement with ${legal}, and its terms still apply.`);
+    out.push("", "PAYMENT AUTHORIZATION", paymentAuthText(s));
   }
   const picked = order.extras.map((x) => x.name).concat(order.quotes);
   for (const name of picked) {
@@ -124,12 +141,14 @@ export function contractSectionsHtml(s: AppSettings, o: ContractInput & { esc: (
       parts.push(sec(`Your plan: ${p.name}`, `<p>$${p.monthly} a month. Includes:</p><ul>${inc.map((x) => `<li>${e(x)}</li>`).join("")}</ul>`, ` data-plan="${p.id}"`));
     }
     parts.push(sec("How you pay", `<p data-billing-text></p><p data-invoice-text hidden>${e(invoiceText(s))}</p>`));
+    parts.push(sec("Payment authorization", para(paymentAuthText(s))));
     parts.push(sec("Timing", para(TIMING_TEXT)));
     const terms = serviceTerms(s);
     parts.push(sec("Service agreement", para(terms.text)));
     if (terms.also.length) parts.push(sec("Also part of this agreement", para(terms.also.join("\n"))));
   } else {
     parts.push(`<p>These extras are added to your existing website service agreement with ${e(legal)}, and its terms still apply.</p>`);
+    parts.push(sec("Payment authorization", para(paymentAuthText(s))));
   }
   s.addons.forEach((a, i) => parts.push(sec(`Extra: ${a.name} (${addonPrice(a)})`, para(extraTerms(a)), ` data-extra="${i}"`)));
   parts.push(sec("Electronic signature", para(esignClause(legal))));
