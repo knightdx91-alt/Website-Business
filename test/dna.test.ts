@@ -39,7 +39,9 @@ test("picked dna is deterministic, category-aware and self-consistent", () => {
     assert.notEqual(d.strip === "none" && d.hero !== "split", true, "the address never disappears");
   }
   const avoid = [pickDna("lead-1", "auto")];
-  assert.notEqual(encodeDna(pickDna("lead-1", "auto", { avoid })), encodeDna(avoid[0]!));
+  const next = pickDna("lead-1", "auto", { avoid });
+  assert.notEqual(encodeDna(next), encodeDna(avoid[0]!));
+  assert.ok(next.hero !== avoid[0]!.hero || next.services !== avoid[0]!.services || next.strip !== avoid[0]!.strip, "a reroll changes something people notice");
 });
 
 test("legacy dna reproduces the old page byte for byte", async () => {

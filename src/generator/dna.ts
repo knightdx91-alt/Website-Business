@@ -397,11 +397,16 @@ export function pickDna(seed: string, category: CategoryId, o: { avoid?: Dna[] }
     if (recipes.length && roll(`recipe|${salt}`) < 0.55) Object.assign(d, recipes[Math.floor(roll(`which|${salt}`) * recipes.length)]!.dna);
     return settleDna(d);
   };
-  for (let i = 0; i < 8; i++) {
+  // "Used" means the parts people notice first match (opening, services, address bar, headline), not every knob.
+  const sig = (d: Dna) => `${d.hero}|${d.services}|${d.strip}|${d.headline}`;
+  const used = new Set((o.avoid ?? []).map(sig));
+  let first: Dna | undefined;
+  for (let i = 0; i < 12; i++) {
     const d = build(i ? String(i) : "");
-    if (!o.avoid?.some((a) => encodeDna(a) === encodeDna(d))) return d;
+    first ??= d;
+    if (!used.has(sig(d))) return d;
   }
-  return build("8");
+  return first!;
 }
 
 /** data-* attributes for <html>, which every piece of DNA CSS keys off. */
