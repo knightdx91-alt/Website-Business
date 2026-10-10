@@ -4,4 +4,45 @@
     <string name="launcherName">Sites</string>
     <string name="launchUrl">https://website-business.knightdx91.workers.dev/</string>
     <string name="assetStatements" translatable="false">[{ \"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": { \"namespace\": \"web\", \"site\": \"https://website-business.knightdx91.workers.dev\" } }]</string>
+    <!-- Tap to Pay screen -->
+    <string name="tapTitle">Tap to Pay</string>
+    <string name="tapOpenFromApp">Open this from a client\'s sign-up in the app: Lead → Signed up → Take payment by tap.</string>
+    <string name="tapNoNfc">This phone has no NFC, so it can\'t take tap payments. Send them the sign-up link instead.</string>
+    <string name="tapNfcOff">NFC is turned off. Turn it on, then come back.</string>
+    <string name="tapTurnOnNfc">Turn on NFC</string>
+    <string name="tapLocationOff">Location is turned off. Stripe needs it on while taking a payment.</string>
+    <string name="tapTurnOnLocation">Turn on Location</string>
+    <string name="tapDevOptions">Developer options are on. Stripe won\'t take payments until they\'re off.</string>
+    <string name="tapOpenDevOptions">Open Developer options</string>
+    <string name="tapNeedLocation">Allow Location so Stripe can take the payment…</string>
+    <string name="tapLocationDenied">Location permission was denied. Allow it for this app in Settings, then try again.</string>
+    <string name="tapOpenAppSettings">Open app settings</string>
+    <string name="tapLoading">Getting the order…</string>
+    <string name="tapAlreadyPaid">Already paid ✓</string>
+    <string name="tapServerError">Couldn\'t reach the app server. Check the connection and try again.</string>
+    <string name="tapStartingReader">Starting the card reader…</string>
+    <string name="tapConnecting">Connecting (the first time takes a few seconds)…</string>
+    <string name="tapReconnecting">Reconnecting…</string>
+    <string name="tapReady">Ready</string>
+    <string name="tapGettingReady">Getting ready…</string>
+    <string name="tapNow">Tap the card now</string>
+    <string name="tapHoldCard">Hold the card or phone flat against the back of this phone until it beeps.</string>
+    <string name="tapSaving">Saving the card for renewals…</string>
+    <string name="tapPaid">Paid %1$s ✓</string>
+    <string name="tapRenews">Renews on the same card from %1$s</string>
+    <string name="tapCardNotSaved">The card couldn\'t be saved for renewals. Add one from their Stripe billing portal before the next payment.</string>
+    <string name="tapReportFailed">The card was charged, but the app couldn\'t be updated yet (%1$s). It will catch up on its own; check the lead in a minute.</string>
+    <string name="tapCanceled">Cancelled before the card was read.</string>
+    <string name="tapDeclined">Declined. Ask for another card and try again.</string>
+    <string name="tapTimedOut">No card was read in time. Try again.</string>
+    <string name="tapSessionExpired">The connection to Stripe expired. Try again.</string>
+    <string name="tapOffline">No internet connection. Tap to Pay can\'t work offline.</string>
+    <string name="tapUnsupported">This phone can\'t take tap payments (Stripe needs Android 13+, NFC and an up-to-date security patch). Send them the sign-up link instead.</string>
+    <string name="tapTampered">Stripe won\'t take payments on this phone (rooted, unlocked or missing Google services).</string>
+    <string name="tapInsecure">Stripe stopped: turn off Developer options, screen recording and any app drawing over other apps, then try again.</string>
+    <string name="tapDebugBuild">Tap to Pay only works in the release build of the app.</string>
+    <string name="tapDisconnected">The reader disconnected. Try again.</string>
+    <string name="tapRetry">Try again</string>
+    <string name="tapCancel">Cancel</string>
+    <string name="tapDone">Done</string>
 </resources>

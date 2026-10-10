@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Trusted Web Activity: opens the live app full-screen in the phone's Chrome engine,
-     so logins, tap-to-call, texting, photo upload and downloads work exactly like the website. -->
+     so logins, tap-to-call, texting, photo upload and downloads work exactly like the website.
+     Plus one native screen, TapToPayActivity, that takes a card by tap with Stripe Terminal;
+     the web app opens it with an intent://tap?… link (scheme wbpay). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Lets the app show the web app's notifications (new notes, calls, sales, sign-ups). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Tap to Pay: Stripe requires the phone's location while taking a payment, and talks to Stripe itself. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <application
+        android:name=".App"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
@@ -38,6 +48,22 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Opened by the web app (intent://tap?t=…#Intent;scheme=wbpay;package=…;end) on top of the Chrome tab. -->
+        <activity
+            android:name=".tap.TapToPayActivity"
+            android:exported="true"
+            android:label="@string/tapTitle"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="wbpay" android:host="tap" />
             </intent-filter>
         </activity>
 
