@@ -47,7 +47,6 @@ import com.knightdx91.websitebusiness.net.SalesData
 import com.knightdx91.websitebusiness.net.SalesRow
 import com.knightdx91.websitebusiness.net.portalUrl
 import com.knightdx91.websitebusiness.net.sales
-import com.knightdx91.websitebusiness.webRoute
 import kotlinx.coroutines.launch
 
 /** The reasons offered when logging "Not interested" (same keys as the web app's LOST_REASONS). */
@@ -192,8 +191,7 @@ fun SalesScreen(state: AppState, nav: NavHostController) {
                         Text(listOfNotNull(o.name, o.phone, o.email, ago(o.createdAt).ifBlank { null }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             if (!o.phone.isNullOrBlank()) TextButton(onClick = { context.dial(o.phone) }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("📞 Call") }
-                            TextButton(onClick = { nav.navigate(webRoute("/api/agreements/s/${o.id}")) }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("📄 Agreement") }
-                            TextButton(onClick = { nav.navigate(webRoute("/api/agreements/s/${o.id}.pdf")) }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("⬇ PDF") }
+                            TextButton(onClick = { nav.navigate(pdfNav("/api/agreements/s/${o.id}.pdf", "Agreement")) }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("📄 Agreement") }
                         }
                     }
                     if (data.websiteOrders.isNotEmpty()) {

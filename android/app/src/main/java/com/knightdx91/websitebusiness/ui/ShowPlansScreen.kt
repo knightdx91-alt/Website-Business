@@ -47,7 +47,6 @@ import com.knightdx91.websitebusiness.net.Content
 import com.knightdx91.websitebusiness.net.PlanOffer
 import com.knightdx91.websitebusiness.net.PlanOptions
 import com.knightdx91.websitebusiness.net.planOptions
-import com.knightdx91.websitebusiness.webRoute
 import kotlinx.coroutines.launch
 
 /** Show plans is the one screen the customer reads, so it is always light, whatever the phone's theme. */
@@ -92,16 +91,10 @@ fun ShowPlansScreen(state: AppState, nav: NavHostController, leadId: String?) {
         } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { error = e.message ?: "Couldn't load the plans" }
     }
 
+    // "Choose <plan>" opens the native sign-up screen, which makes the lead's sign-up link and lets them sign and pay here.
     fun choose(planId: String) {
-        if (leadId == null || choosing != null) return
-        choosing = planId
-        scope.launch {
-            try {
-                val r = state.api.signupLink(leadId, planId)
-                val url = r.getString("url")
-                nav.navigate(webRoute(url.removePrefix(state.api.origin) + (if (state.meta?.tapReady == true) "?tap=1" else "")))
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't open the sign-up page") } finally { choosing = null }
-        }
+        if (leadId == null) return
+        nav.navigate("signup/$leadId?plan=$planId")
     }
 
     MaterialTheme(colorScheme = ShowPlansLight) {
@@ -129,7 +122,7 @@ fun ShowPlansScreen(state: AppState, nav: NavHostController, leadId: String?) {
                     val lead = if (t.commits.isNotEmpty()) "No setup fee on ${t.commitWords} plans." + (if (t.flex > 0) " Month to month has a one-time ${moneyDollars(t.flex)} setup fee." else "") else "One simple monthly price."
                     Text("$lead We build your site, host it and keep it running.", modifier = Modifier.padding(top = 4.dp))
                 }
-                items(o.plans, key = { it.id }) { p -> PlanCard(p, c, o, leadId, choosing, onChoose = { choose(p.id) }, onAgreement = { nav.navigate(webRoute("/api/contract?" + (if (leadId != null) "lead=$leadId&" else "") + "plan=${p.id}")) }) }
+                items(o.plans, key = { it.id }) { p -> PlanCard(p, c, o, leadId, choosing, onChoose = { choose(p.id) }, onAgreement = { nav.navigate(pdfNav("/api/contract.pdf?" + (if (leadId != null) "lead=$leadId&" else "") + "plan=${p.id}", "Agreement")) }) }
                 item { SectionCard("Every plan includes") { Bullets(c.everyPlan) } }
                 item {
                     SectionCard("Ways to pay") {
