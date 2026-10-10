@@ -11,3 +11,4 @@ android/local.properties
 *.jks
 *.keystore
 .dev.vars
+.claude/worktrees/
