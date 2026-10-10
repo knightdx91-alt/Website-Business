@@ -105,7 +105,7 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
     return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url><url><loc>${ORIGIN}/portfolio</loc></url><url><loc>${ORIGIN}/terms</loc></url><url><loc>${ORIGIN}/privacy</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
   }
   // Fonts and icons come from the app's static assets.
-  if (path.startsWith("/fonts/") || path.startsWith("/icons/") || path === "/og.png") return null;
+  if (path.startsWith("/fonts/") || path.startsWith("/icons/") || path.startsWith("/brand/") || path === "/og.png") return null;
   if (path === "/owner.jpg" && req.method === "GET") {
     // The owner's photo, when app/public/owner.jpg exists; the assets fallback page is not it.
     const res = await env.ASSETS.fetch(req);
@@ -158,7 +158,7 @@ async function changeRequest(env: Env, req: Request, url: URL): Promise<Response
 ${s.companyPhone ? `<p class="direct">Or text or call <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>. Photos are easiest to text.</p>` : ""}`
     : `<h1>Request a change</h1><p>This link doesn't match one of our client websites. ${s.companyPhone ? `Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : `<a href="/#contact">Contact us</a>`} and we'll help.</p>`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Request a change | ${e(name)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
+<title>Request a change | ${e(name)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png"><style>${CSS}</style></head><body>
 ${header(name, s.companyPhone)}
 <main id="main" class="sec sec--dark"><div class="wrap narrow">${body}</div></main>
 ${footer(s.legalName || name)}</body></html>`;
@@ -375,7 +375,7 @@ function policyShell(name: string, legal: string, title: string, body: string, o
     ? `<meta name="description" content="${e(o.description)}"><link rel="canonical" href="${ORIGIN}/portfolio"><meta property="og:image" content="${ORIGIN}/og.png">`
     : `<meta name="robots" content="noindex">`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${e(title)} | ${e(name)}</title>${meta}<meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
+<title>${e(title)} | ${e(name)}</title>${meta}<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png"><style>${CSS}</style></head><body>
 ${header(name, o.phone, o.from)}
 <main id="main" class="sec"><div class="wrap${o.wide ? "" : " narrow"}">${body}</div></main>
 ${footer(legal)}</body></html>`;
@@ -448,7 +448,7 @@ async function home(env: Env, url: URL): Promise<Response> {
 <title>${e(title)}</title><meta name="description" content="${e(description)}"><link rel="canonical" href="${ORIGIN}/">
 <meta property="og:type" content="website"><meta property="og:title" content="${e(title)}"><meta property="og:description" content="${e(description)}"><meta property="og:url" content="${ORIGIN}/">
 <meta property="og:image" content="${ORIGIN}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png">
+<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">
 <link rel="preload" href="/fonts/bricolage-grotesque-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>${CSS}</style><script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script></head><body>
 <a class="skip" href="#main">Skip to content</a>
@@ -563,7 +563,7 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
 
 /** Site header: name, Our work, Plans (with the lowest monthly price), and a Call (or Contact) button. */
 function header(name: string, phone?: string, from?: number | null): string {
-  return `<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/">${e(name)}</a><nav class="hdr__nav" aria-label="Main"><a href="/portfolio">Our work</a><a class="hdr__plans" href="/#plans">Plans${from ? ` <small>from ${money(from)}/mo</small>` : ""}</a>${
+  return `<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/"><img src="/brand/logo-192.png" alt="" width="40" height="40">${e(name)}</a><nav class="hdr__nav" aria-label="Main"><a href="/portfolio">Our work</a><a class="hdr__plans" href="/#plans">Plans${from ? ` <small>from ${money(from)}/mo</small>` : ""}</a>${
     phone ? `<a class="hdr__call" href="${telHref(phone)}">Call</a>` : `<a class="hdr__call" href="/#contact">Contact</a>`
   }</nav></div></header>`;
 }
@@ -686,7 +686,7 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
   }
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${e(title)} | ${e(name)}</title><meta name="description" content="${e(`${title} for ${legal}, Cullman, Alabama.`)}"><link rel="canonical" href="${ORIGIN}/${kind}">
-<meta name="theme-color" content="#14213d"><link rel="icon" href="/icons/icon-192.png" type="image/png"><style>${CSS}</style></head><body>
+<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png"><style>${CSS}</style></head><body>
 <a class="skip" href="#main">Skip to content</a>
 ${header(name, phone)}
 <main id="main" class="sec"><div class="wrap narrow legal"><h1>${e(title)}</h1><p class="small muted">Last updated ${POLICIES_UPDATED}</p>${body}</div></main>
@@ -710,7 +710,7 @@ h1{font-size:clamp(2.2rem,7vw,3.8rem)}h2{font-size:clamp(1.6rem,4.5vw,2.4rem)}h3
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .hdr{position:sticky;top:0;z-index:5;background:var(--navy)}
 .hdr__in{display:flex;align-items:center;justify-content:space-between;min-height:60px}
-.brand{color:#fff;text-decoration:none;font-family:"Bricolage",system-ui,sans-serif;font-weight:800;font-size:1.15rem}
+.brand{color:#fff;text-decoration:none;font-family:"Bricolage",system-ui,sans-serif;font-weight:800;font-size:1.15rem;display:inline-flex;align-items:center;gap:10px}.brand img{width:40px;height:40px;display:block}
 .hdr__call{color:var(--navy)!important;background:var(--gold);text-decoration:none;font-weight:700;padding:10px 18px;border-radius:999px}
 .hdr__nav{display:flex;align-items:center;gap:16px}.hdr__nav a{color:#fff;text-decoration:none;font-weight:700}.hdr__nav a:not(.hdr__call):hover{text-decoration:underline}
 .hdr__nav a{white-space:nowrap}.hdr__plans small{font-weight:400;color:#dfe4ee;font-size:.82rem}

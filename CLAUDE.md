@@ -309,6 +309,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   link opens undergroundassociates.com/change?b=<lead> (sold/live leads only), which posts to the app Inbox and notifies.
 - Review asks: Settings → "Our Google review link" (`companyReviewUrl`) adds "Ask for a review" (text) on sold/live
   leads and a "Review us on Google" link in the company site footer.
+- Brand (Oct 2026): the owner's logo is the round "UA" badge (`app/public/brand/logo-original-512.png` is their file; `src/brand/logo.ts`
+  rebuilds it as a vector, Montserrat 800/700, navy #14213d + orange #fca311). `npx tsx scripts/brand.ts [outDir]` renders
+  `app/public/brand/logo-{192,512,1024}.png` + `logo.svg` (transparent disc; website header + favicon), the app icons in
+  `app/public/icons/`, and a marketing set (Google Ads square/4:1 logos on white and navy, Facebook profile). `scripts/examples.ts
+  --og-only` re-renders just og.png (badge + phones). Company host passes `/brand/*` through to assets.
 - Facebook page: Settings → "Our Facebook page" (`companyFacebookUrl`, default facebook.com/undergroundassociates) is linked
   in the company site footer and as `sameAs` in its structured data. Client sites don't link it (their footer credit points
   at undergroundassociates.com, which carries it).

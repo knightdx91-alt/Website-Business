@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Underground Associates">
+
+<g transform="translate(0 0)" font-family="Montserrat, system-ui, sans-serif">
+<circle cx="256" cy="256" r="256" fill="#14213d"/>
+<circle cx="256" cy="256" r="160" fill="none" stroke="#fca311" stroke-width="8"/>
+<defs><path id="ua-top" d="M 256 256 m -219 0 a 219 219 0 1 1 438 0"/><path id="ua-bottom" d="M 256 256 m -219 0 a 219 219 0 0 0 438 0"/></defs>
+<text fill="#fff" font-weight="700" font-size="39" letter-spacing="3"><textPath href="#ua-top" startOffset="50%" text-anchor="middle" dominant-baseline="central">UNDERGROUND ASSOCIATES</textPath></text>
+<text fill="#fff" font-weight="700" font-size="39" letter-spacing="3"><textPath href="#ua-bottom" startOffset="50%" text-anchor="middle" dominant-baseline="central">CULLMAN, ALABAMA</textPath></text>
+<circle cx="38.5" cy="281.6" r="7" fill="#fca311"/><circle cx="473.5" cy="281.6" r="7" fill="#fca311"/>
+<text x="256" y="286" fill="#fff" font-weight="800" font-size="136" text-anchor="middle" letter-spacing="-2">UA</text>
+<rect x="184" y="308" width="144" height="11" rx="5.5" fill="#fca311"/>
+<text x="256" y="361" fill="#fff" font-weight="700" font-size="22" text-anchor="middle" letter-spacing="6">EST. 2021</text>
+</g></svg>

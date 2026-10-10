@@ -16,8 +16,10 @@ const SKIP = new Set(["robots.txt", "sitemap.xml", "_headers"]);
 
 const banner = `<div class="wb-example" style="position:relative;z-index:60;background:#14213d;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 16px;text-align:center">Example website by Underground Associates. Not a real business. <a href="https://undergroundassociates.com/#contact" style="color:#fca311">Get a free preview of yours</a></div>`;
 
-await rm(OUT, { recursive: true, force: true });
-for (const ex of EXAMPLES) {
+// --og-only re-renders just the link preview image (the example sites and their screenshots stay as they are).
+const ogOnly = process.argv.includes("--og-only");
+if (!ogOnly) await rm(OUT, { recursive: true, force: true });
+for (const ex of ogOnly ? [] : EXAMPLES) {
   const base = `/examples/${ex.slug}`;
   const out = await buildSite({
     record: ex.record,
@@ -54,7 +56,7 @@ await new Promise<void>((r) => server.listen(0, r));
 const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium" }).catch(() => chromium.launch());
-for (const ex of EXAMPLES) {
+for (const ex of ogOnly ? [] : EXAMPLES) {
   const page = await browser.newPage({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 });
   // A Tuesday at 10:30 AM in Cullman, so every example shows "Open now".
   await page.clock.setFixedTime(new Date("2026-10-06T15:30:00Z"));
@@ -72,11 +74,11 @@ const shots = EXAMPLES.slice(0, 3).map((e) => `/examples/${e.slug}.jpg`);
 await og.setContent(`<html><head><style>
 @font-face{font-family:B;src:url(${origin}/fonts/bricolage-grotesque-latin-800-normal.woff2)}
 body{margin:0;width:1200px;height:630px;background:#14213d;color:#fff;font-family:system-ui,sans-serif;display:flex;align-items:center;overflow:hidden}
-.t{padding:0 0 0 70px;width:560px}.t p{color:#fca311;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:0 0 18px}
+.t{padding:0 0 0 70px;width:560px}.t img{width:92px;height:92px;display:block;margin-bottom:16px}.t p{color:#fca311;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:0 0 18px}
 .t h1{font:800 64px/1.02 B,system-ui;margin:0 0 22px}.t h1 span{color:#fca311}.t div{font-size:26px;color:#dfe4ee}
 .s{display:flex;gap:18px;transform:rotate(-6deg);margin-left:10px}.s img{width:200px;border-radius:18px;border:6px solid #fff;box-shadow:0 20px 40px rgba(0,0,0,.4)}
 .s img:nth-child(2){margin-top:60px}</style></head><body>
-<div class="t"><p>Underground Associates</p><h1>See your new website <span>before you pay.</span></h1><div>Websites for Cullman-area businesses</div></div>
+<div class="t"><img src="${origin}/brand/logo-512.png" alt=""><p>Underground Associates</p><h1>See your new website <span>before you pay.</span></h1><div>Websites for small businesses, live in days</div></div>
 <div class="s">${shots.map((s) => `<img src="${origin}${s}">`).join("")}</div></body></html>`);
 await og.waitForLoadState("networkidle");
 await og.evaluate(() => document.fonts.ready);
