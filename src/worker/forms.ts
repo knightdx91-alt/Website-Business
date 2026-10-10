@@ -2,7 +2,16 @@ import { notify } from "./notify.ts";
 import { getLead } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 
-const FIELDS = ["name", "phone", "email", "service", "vehicle", "frequency", "home_size", "property", "quantity", "town", "message"] as const;
+// Every FormField name the generator can render (src/generator/components.ts), plus the hidden topic a special form sets.
+const FIELDS = ["topic", "name", "phone", "email", "service", "vehicle", "frequency", "home_size", "property", "quantity", "year", "make", "model", "part", "items", "address", "best_day", "town", "message"] as const;
+
+/** One line for the notification: what they asked for (service, the part and vehicle, or the pickup items). */
+export function requestSummary(data: Record<string, string>): string {
+  const vehicle = [data.year, data.make, data.model].filter(Boolean).join(" ") || data.vehicle;
+  const bits = [data.service, data.part, vehicle, data.items, data.address, data.best_day ? `best day ${data.best_day}` : "", data.town].filter(Boolean);
+  const what = bits.join(" · ");
+  return data.topic ? `${data.topic}${what ? `: ${what}` : ""}` : what;
+}
 
 /** Lead form posts from published client sites. Works without JavaScript (plain POST + redirect). */
 export async function handleFormPost(env: Env, req: Request, leadId: string): Promise<Response> {
@@ -34,6 +43,7 @@ export async function handleFormPost(env: Env, req: Request, leadId: string): Pr
   await env.DB.prepare("INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)")
     .bind(newId(), leadId, now(), JSON.stringify(data), ip)
     .run();
-  await notify(env, { kind: "message", actorName: data.name, leadId, text: `💬 New request from ${lead.name}'s website: ${data.name}${data.service ? `, ${data.service}` : ""}` });
+  const what = requestSummary(data);
+  await notify(env, { kind: "message", actorName: data.name, leadId, text: `💬 New request from ${lead.name}'s website: ${data.name}${what ? `, ${what}` : ""}` });
   return back("/thanks/");
 }

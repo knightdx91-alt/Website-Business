@@ -39,6 +39,7 @@ export const SEARCH_GROUPS: SearchGroup[] = [
   { id: "auto_more", label: "Body shops, detailing & towing", category: "auto", terms: ["auto body shop", "auto detailing", "towing service"] },
   { id: "small_engine", label: "Small engine & mower repair", category: "auto", terms: ["small engine repair", "lawn mower repair"] },
   { id: "glass_muffler", label: "Auto glass & mufflers", category: "auto", terms: ["auto glass repair", "windshield replacement", "muffler shop"] },
+  { id: "auto_parts", label: "Auto parts stores", category: "auto", terms: ["auto parts store", "auto parts"] },
   { id: "landscaping", label: "Landscaping & lawn", category: "landscaping", terms: ["landscaping", "lawn care service", "lawn mowing service"] },
   { id: "cleaning", label: "Cleaning services", category: "cleaning", terms: ["house cleaning service", "cleaning service", "janitorial service"] },
   { id: "pressure_washing", label: "Pressure & window washing", category: "cleaning", terms: ["pressure washing", "window cleaning"] },

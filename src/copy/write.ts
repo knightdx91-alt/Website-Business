@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { hasAnyHours, hoursSummary } from "../generator/hours.ts";
+import { donationsOn } from "../generator/actions.ts";
+import { partsCounter } from "../generator/packs/auto.ts";
 import { BANNED_PHRASES, bannedPhraseIn, quotesReview, SUPERLATIVE, unsupportedNumbers } from "../generator/lint.ts";
 import type { CategoryPack } from "../generator/packs/types.ts";
 import type { BusinessRecord, Copy } from "../generator/types.ts";
@@ -76,6 +78,26 @@ function facts(r: BusinessRecord, pack: CategoryPack, primaryTypeLabel?: string)
     walk_ins: r.ext.salon?.walkIns,
     ase_certified: r.ext.auto?.ase,
     warranty: r.ext.auto?.warranty,
+    ...(r.category === "auto" && r.variant === "parts"
+      ? {
+          counter_services: partsCounter(r).map((c) => c.label),
+          special_order_turnaround: r.ext.auto?.parts?.turnaround ?? "unknown",
+          commercial_accounts: r.ext.auto?.parts?.commercial || undefined,
+          parts_program: r.ext.auto?.parts?.program,
+          online_ordering_for_pickup: r.ext.auto?.parts?.orderUrl ? true : undefined,
+        }
+      : {}),
+    ...(donationsOn(r)
+      ? {
+          donations: {
+            accepts: r.ext.retail?.donations?.accepts ?? "unknown",
+            does_not_accept: r.ext.retail?.donations?.doesNotAccept ?? "unknown",
+            drop_off_hours: r.ext.retail?.donations?.dropOffHours ?? "unknown",
+            furniture_pickup: r.ext.retail?.donations?.pickup ?? "unknown",
+            nonprofit_receipts: r.ext.retail?.donations?.receipts ?? "unknown",
+          },
+        }
+      : {}),
     background_checked: r.ext.cleaning?.backgroundChecked,
     brings_supplies: r.ext.cleaning?.suppliesIncluded,
     pet_safe_products: r.ext.cleaning?.petSafe,

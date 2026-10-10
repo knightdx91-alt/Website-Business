@@ -223,6 +223,22 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   proof when ≥4.3 with ≥10 reviews and the pack allows reviews (`ctx.reviewsAllowed`). App: Edit → Design → "Page
   structure" pickers + 🎲 Surprise me (`dnaCode()` encodes; `/api/leads/:id` carries `dna` + `dnaOrder`); "Try another
   design" rerolls everything. Design sheets accept the full id. Research behind it: `research/design-upgrade-2026.md`.
+- Auto parts stores (auto pack, variant `parts`, Oct 2026): `autoVariant` picks it from the name ("auto parts", "parts & supply"…, not
+  "parts & repair"/salvage) or Google's `auto_parts_store`; search group "Auto parts stores"; chains (O'Reilly, AutoZone, NAPA,
+  Carquest…) are in the auto chain list. Label "Auto Parts Store", schema `AutoPartsStore`, no service area. The site sells the
+  counter: hero "Call to check stock" + "Reserve a part" (#reserve), What we carry (= `services`, seeded brakes/batteries/filters…),
+  "Can't find it? We'll order it" (`ext.auto.parts.turnaround`, suggested to-do), Services at the counter (`PARTS_COUNTER` toggles in
+  `ext.auto.parts.counter`, battery/wiper-bulb/loaner tools on by default; `counterConfirmed` is a REQUIRED to-do), Commercial accounts &
+  delivery (only with `commercial`), reviews, and a Reserve a part form (`contactForm` opts: id/topic/title; extra fields year, make,
+  model, part). `program` shows as a trust chip; `orderUrl` adds "Order online for pickup" and lets the copy mention it. `partsBannedPhrases`
+  blocks shipping/price/stock claims and common brands the owner didn't type. Edit → "Auto parts details" (`partsEditCard` in app.js).
+- Thrift donations (retail pack, `ext.retail.donations`, Oct 2026): on by default for `thrift` (`donationsOn` in actions.ts), any shop can
+  turn it on in Edit → "Donations" (`donationsEditCard`). Section #donations after What's new: intro `note`, "We gladly take" /
+  "We can't take" chips (`accepts` / `doesNotAccept`), `dropOffHours`, nonprofit `receipts` line, and with `pickup` a "Request a furniture
+  pickup" form (#pickup, fields items/address/best_day, `hasForm` becomes true). REQUIRED to-do until `accepts` and `dropOffHours` are
+  filled (`donationsMissing`). Nav "Donations", hero "Donate items". The thrift brief says the site's jobs are "open / where" and
+  donations and never states what's accepted unless given. Form posts: `FIELDS` in `src/worker/forms.ts` lists every generator form
+  field (+ hidden `topic`); `requestSummary` puts the part + vehicle or pickup items in the notification, `requestLine` in the Inbox.
 - Tax & finance (`packs/finance.ts`, research/tax-finance.md): variants tax_prep / accounting / insurance / financial_advisor
   from `financeVariant` (names decide; banks, lenders, pawn, payday, captive agents and franchise tax offices return null and are
   skipped in runs). Search groups "Tax preparers & bookkeepers", "Accountants & CPAs", "Insurance agencies"; advisors only by hand

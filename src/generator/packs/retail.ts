@@ -1,8 +1,9 @@
-import { actions, type ActionId } from "../actions.ts";
-import { about, cardGrid, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, todo, visit, type Ctx, serviceList } from "../components.ts";
+import { action, actions, donationsOn, type ActionId } from "../actions.ts";
+import { about, button, cardGrid, contactForm, ctaBand, faq, gallery, hero, infoStrip, reviews, sectionHead, serviceList, todo, visit, type Ctx } from "../components.ts";
 import { hasAnyHours } from "../hours.ts";
-import { html } from "../html.ts";
-import type { BusinessRecord, Faq, Service } from "../types.ts";
+import { html, raw, type Raw } from "../html.ts";
+import { icon } from "../icons.ts";
+import type { BusinessRecord, Faq, RetailDonations, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 /** research/retail-shops.md §10, checked in order; Google has no antique or feed-store type, so names decide those. */
@@ -67,18 +68,59 @@ function dataFaq(r: BusinessRecord): Faq[] {
   out.push({ q: "Where are you?", a: `${r.showStreetAddress && r.address.street ? `${r.address.street}, ` : ""}${r.address.city}, ${r.address.state}. Tap Get directions for turn-by-turn directions.` });
   if (r.ext.retail?.shopUrl) out.push({ q: "Can I shop online?", a: r.variant === "florist" ? "Yes. Tap Order flowers to order online, or call us." : "Yes. Tap Shop online to see what we have, or stop by the store." });
   if (r.ext.retail?.giftCards) out.push({ q: "Do you sell gift cards?", a: "Yes. Ask at the counter or give us a call." });
+  if (donationsOn(r)) {
+    const d = donations(r);
+    out.push({ q: "How do I donate?", a: `${d.dropOffHours ? `Drop-off hours are ${d.dropOffHours}. ` : "See the Donations section for what we take. "}${d.pickup ? "For furniture or a big load, ask us about a pickup. " : ""}Not sure about something? Call ${r.phone.display} first.` });
+  }
   out.push({ q: "How do I see what's new?", a: Object.values(r.links.social).some(Boolean) ? "Follow us on social media. New things go up there first." : `Give us a call at ${r.phone.display} or stop by. Things change all the time.` });
   return out;
 }
 
 const SOCIAL_LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube", nextdoor: "Nextdoor" };
 
+export function donations(r: BusinessRecord): RetailDonations {
+  return r.ext.retail?.donations ?? {};
+}
+
+/** True while the owner hasn't told us what they take and when: the required to-do that blocks publishing. */
+export function donationsMissing(r: BusinessRecord): boolean {
+  const d = donations(r);
+  return donationsOn(r) && (!d.accepts?.length || !d.dropOffHours);
+}
+
+/** Donations: what they take, what they can't, drop-off hours, and (if they offer it) a pickup request form. Only the owner's own lists. */
+function donationsSection(ctx: Ctx): Raw {
+  const r = ctx.r;
+  if (!donationsOn(r)) return raw("");
+  const d = donations(r);
+  const call = action(r, "call")!;
+  const list = (items: string[], ok: boolean) => html`<ul class="towns">${items.map((t) => html`<li class="chip">${icon(ok ? "check" : "close", 16)}${t}</li>`)}</ul>`;
+  const filled = !!(d.accepts?.length || d.doesNotAccept?.length);
+  return html`<section class="section" id="donations" aria-labelledby="donations-title"><div class="wrap">
+${sectionHead("Donations", "Donate to the store", d.note || "Your donations keep our shelves full. Thank you for thinking of us.", "donations-title")}
+${filled ? html`<div class="cols">
+<div><h3>We gladly take</h3>${d.accepts?.length ? list(d.accepts, true) : html`<p>Call us and ask.</p>`}</div>
+<div><h3>We can't take</h3>${d.doesNotAccept?.length ? list(d.doesNotAccept, false) : html`<p>Not sure about something? Call ${r.phone.display} before you load it up.</p>`}</div>
+</div>` : ""}
+${d.dropOffHours ? html`<p><strong>Drop-off hours:</strong> ${d.dropOffHours}</p>` : ""}
+${d.receipts ? html`<p>We're a nonprofit. Ask at the counter and we'll give you a receipt for your donation.</p>` : ""}
+${d.pickup ? html`<p>${d.pickupNote || "Furniture or a big load? We may be able to pick it up."} <a href="#pickup">Request a pickup</a>.</p>` : ""}
+<div class="btns">${button(call, "secondary")}${button(action(r, "directions")!, "ghost")}</div>
+${donationsMissing(r) ? todo(ctx, "Tell us what you accept for donations and your drop-off hours", "List what you take, what you can't (mattresses, TVs, car seats…), when people can drop things off, and whether you pick up furniture. We only ever show your own list.", true) : ""}
+</div></section>
+${d.pickup ? contactForm(ctx, [], [], [
+  { name: "items", label: "What you'd like picked up", required: true, autocomplete: "off" },
+  { name: "address", label: "Address or town", autocomplete: "street-address" },
+  { name: "best_day", label: "Best day", autocomplete: "off" },
+], d.pickupNote || "Tell us what you have and where it is. We'll call to set up a time.", { id: "pickup", label: "Donations", title: "Request a furniture pickup", topic: "Furniture pickup", button: "Send request", details: "Anything else" }) : ""}`;
+}
+
 export const retailPack: CategoryPack = {
   id: "retail",
   label: "Shops & boutiques",
   titleMode: "name",
   locationModel: "storefront",
-  hasForm: () => false,
+  hasForm: (r) => donationsOn(r) && !!donations(r).pickup,
   looks: ["retail.shop_window", "retail.mercantile", "retail.bloom", "retail.salvage_yard"],
   defaultLook: (r) =>
     ({ boutique: "retail.shop_window", gift: "retail.mercantile", antique: "retail.salvage_yard", thrift: "retail.salvage_yard", florist: "retail.bloom", farm_feed: "retail.mercantile", furniture: "retail.salvage_yard" } as Record<string, string>)[r.variant] ?? "retail.mercantile",
@@ -89,9 +131,10 @@ export const retailPack: CategoryPack = {
     const l = LABEL[r.variant] ?? "Shop";
     return fitTitle([`${r.name} | ${l} in ${r.address.city}, ${r.address.state}`, `${r.name} | ${l} in ${r.address.city}`, `${r.name} | ${r.address.city}, ${r.address.state}`, r.name]);
   },
-  nav: () => [
+  nav: (ctx) => [
     { label: "What we carry", href: "/#carry" },
     { label: "What's new", href: "/#new" },
+    ...(donationsOn(ctx.r) ? [{ label: "Donations", href: "/#donations" }] : []),
     { label: "About", href: "/#about" },
     { label: "Hours & location", href: "/#visit" },
   ],
@@ -101,7 +144,7 @@ export const retailPack: CategoryPack = {
     const r = ctx.r;
     const label = LABEL[r.variant] ?? "Shop";
     const social = Object.entries(r.links.social).filter(([, u]) => u) as Array<[string, string]>;
-    const heroActs = actions(r, r.ext.retail?.shopUrl && r.variant !== "florist" ? [...first(r), "shop"] : first(r));
+    const heroActs = actions(r, r.ext.retail?.shopUrl && r.variant !== "florist" ? [...first(r), "shop"] : donationsOn(r) ? [...first(r), "donate"] : first(r));
     return html`${hero(ctx, {
       eyebrow: `${label} · ${r.address.city}, ${r.address.state}`,
       h1: r.name,
@@ -125,6 +168,7 @@ ${sectionHead("What's new", r.variant === "florist" ? "See our latest arrangemen
 ${social.length ? "" : todo(ctx, "Add your Facebook or Instagram", "Shops like yours sell new arrivals on social media. Send us your page links and we'll add Follow us buttons.")}
 ${r.ext.retail?.shopUrl ? "" : todo(ctx, "Do you sell online?", r.variant === "florist" ? "If you take flower orders online, send us the link and we'll add an Order flowers button." : "If you have a Shopify, Etsy or Facebook shop, send us the link and we'll add a Shop online button.")}
 </div></section>
+${donationsSection(ctx)}
 ${gallery(ctx, "Send photos of your shop", "Three to six photos of your store, displays and front door. People want to see what it's like inside before they drive over.")}
 ${reviews(ctx)}
 ${about(ctx, `About ${r.name}`, "Our story")}

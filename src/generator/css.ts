@@ -175,6 +175,7 @@ ${divider}
 .hours tr.is-today th::after{content:" (today)";font-weight:400;color:var(--muted)}
 .addr{font-style:normal;font-size:1.15rem;margin-bottom:1rem}
 .towns{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:16px 0}
+.cols{display:grid;gap:20px;margin:20px 0}@media (min-width:700px){.cols{grid-template-columns:1fr 1fr}}.cols h3{margin-bottom:.2em}
 /* faq */
 .faq{margin-top:24px}
 .faq details{background:var(--surface);border-radius:var(--radius);margin-bottom:10px;border:${cardBorder};box-shadow:${cardShadow}}

@@ -66,6 +66,7 @@ const CHAIN_LISTS: Array<{ categories: CategoryId[]; names: string[] }> = [
       "jiffy lube", "express oil change", "take 5", "valvoline", "firestone", "goodyear", "pep boys", "o'reilly", "autozone", "advance auto parts",
       "napa auto", "meineke", "midas", "christian brothers automotive", "discount tire", "tire discounters", "mavis", "big o tires", "tires plus", "ntb",
       "safelite", "safelite autoglass", "maaco", "caliber collision", "gerber collision", "crash champions", "walmart auto", "sam's club", "aamco", "grease monkey",
+      "carquest", "bumper to bumper", "fisher auto parts", "parts city", "auto value", "harbor freight", "lkq",
     ],
   },
   {
@@ -209,7 +210,7 @@ const TYPE_CATEGORY: Array<[RegExp, CategoryId]> = [
 /** Best-guess template for a Places result (the owner can change it before adding). */
 export function guessCategory(p: Place): CategoryId | null {
   const n = (p.displayName?.text ?? "").toLowerCase();
-  if (/\b(collision|body shop|paint (&|and) body|detail|wrecker|towing|small engine|mower repair|auto glass|autoglass|windshield|muffler|exhaust)/.test(n)) return "auto";
+  if (/\b(collision|body shop|paint (&|and) body|detail|wrecker|towing|small engine|mower repair|auto glass|autoglass|windshield|muffler|exhaust|auto ?parts|parts store|parts (&|and) supply)/.test(n)) return "auto";
   if (/\b(lawn|landscap|mowing|sod|irrigation)/.test(n)) return "landscaping";
   if (/\b(clean|maid|janitor|(pressure|power|soft) ?wash)/.test(n)) return "cleaning";
   if (/\b(massage|day spa|bodywork)/.test(n)) return "salon";

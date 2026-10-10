@@ -129,10 +129,29 @@ export interface SalonExt {
   walkIns?: "welcome" | "appointment_only" | "both";
 }
 
+/** Counter services an auto parts store may offer; the owner confirms the set before publish. */
+export type PartsCounterService = "battery" | "hose" | "machine" | "keys" | "paint" | "install" | "loaner";
+
+/** Auto parts stores (auto pack, variant `parts`). What they carry is `record.services`; everything here is owner-entered. */
+export interface AutoPartsExt {
+  counter?: Partial<Record<PartsCounterService, boolean>>;
+  /** Owner confirmed the counter-service list (required to publish). */
+  counterConfirmed?: boolean;
+  /** Typical special-order turnaround in the owner's words, e.g. "Most parts by the next morning". */
+  turnaround?: string;
+  commercial?: boolean;
+  commercialText?: string;
+  /** Buying group or program name (NAPA, Carquest, Parts Plus, Bumper to Bumper), shown only with the owner's say-so. */
+  program?: string;
+  /** The program's online ordering page for in-store pickup; adds an "Order online for pickup" button. */
+  orderUrl?: string;
+}
+
 export interface AutoExt {
   warranty?: { months?: number; miles?: number; nationwide?: boolean };
   ase?: boolean;
   freeEstimates?: boolean;
+  parts?: AutoPartsExt;
 }
 
 export interface LandscapingExt {
@@ -148,11 +167,26 @@ export interface PrintExt {
   install?: boolean;
 }
 
+/** Thrift-store donations (on by default for the thrift variant; any shop can turn it on). All owner-entered. */
+export interface RetailDonations {
+  enabled?: boolean;
+  accepts?: string[];
+  doesNotAccept?: string[];
+  dropOffHours?: string;
+  /** Adds a "Request a furniture pickup" form. */
+  pickup?: boolean;
+  pickupNote?: string;
+  /** Shows the "we're a nonprofit and can give you a receipt" line. */
+  receipts?: boolean;
+  note?: string;
+}
+
 export interface RetailExt {
   /** Link to an online store (Shopify, Etsy, Facebook shop) or a florist's own order page. */
   shopUrl?: string;
   giftCards?: boolean;
   delivery?: boolean;
+  donations?: RetailDonations;
 }
 
 /** Tax & finance (research/tax-finance.md §9). Every claim field is owner-entered and owner-confirmed. */
