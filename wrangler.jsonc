@@ -38,7 +38,7 @@
     ]
   },
   // Daily: expire stale leads and prune old rows. Weekly (Sunday 09:00 UTC): write a backup to R2 _backup/.
-  "triggers": { "crons": ["17 8 * * *", "0 9 * * 0"] },
+  "triggers": { "crons": ["17 8 * * *", "0 9 * * SUN"] },
   "vars": { "CF_ACCOUNT_ID": "04d2dbe746314a8494bd7977db7392da" },
   "observability": { "enabled": true }
 }

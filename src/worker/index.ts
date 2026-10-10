@@ -58,7 +58,7 @@ const BACKUP_KEEP = 8;
 /** A build still "queued"/"building" after this long is stuck (the queue gave up) and may be retried. */
 const STUCK_BUILD_MS = 20 * 60_000;
 /** Which scheduled trigger fired (wrangler.jsonc): the daily housekeeping run and the weekly backup. */
-const CRON_WEEKLY_BACKUP = "0 9 * * 0";
+const CRON_WEEKLY_BACKUP = "0 9 * * SUN";
 
 
 /** Only web addresses: zod's url() alone would let a javascript: link through. */
