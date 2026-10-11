@@ -3626,6 +3626,33 @@
   setInterval(() => { if (!document.hidden && meta) refreshNotifCount(); }, 60000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && meta) refreshNotifCount(); });
 
+  // A new deploy while the app is open: an installed web app can stay loaded for days, so it watches /app.js's ETag
+  // (a HEAD request every 5 minutes and whenever it comes back to the front). When it changes, a bar offers a reload
+  // and the next screen change reloads by itself (never in the middle of an unsaved edit).
+  let appEtag = null;
+  let updateReady = false;
+  async function checkForUpdate() {
+    try {
+      const res = await fetch("/app.js", { method: "HEAD", cache: "no-store" });
+      const tag = res.headers.get("etag");
+      if (!tag) return;
+      if (appEtag === null) { appEtag = tag; return; }
+      if (tag !== appEtag && !updateReady) {
+        updateReady = true;
+        const bar = document.createElement("div");
+        bar.id = "update-bar";
+        bar.setAttribute("role", "status");
+        bar.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:60;background:#14213d;color:#fff;padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:center;font-size:.95rem";
+        bar.innerHTML = `<span>A new version of the app is ready.</span><button class="btn btn--small" type="button" style="background:#fca311;color:#14213d;border:0">Reload now</button>`;
+        bar.querySelector("button").onclick = () => location.reload();
+        document.body.appendChild(bar);
+      }
+    } catch (e) { /* offline */ }
+  }
+  checkForUpdate();
+  setInterval(() => { if (!document.hidden) checkForUpdate(); }, 300000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
+
   const b64ToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
 
   async function pushState() {
@@ -3869,6 +3896,8 @@
       location.hash = lastHash;
       return;
     }
+    // A newer app.js is on the server (see checkForUpdate): take it now, at a screen change, when nothing is unsaved.
+    if (updateReady && lastHash !== null && h !== lastHash && !leaveGuard) { location.reload(); return; }
     if (lastHash !== null) scrollMemo[isHomeHash(lastHash) ? "#/" : lastHash] = window.scrollY;
     lastHash = h;
     window.scrollTo(0, 0);

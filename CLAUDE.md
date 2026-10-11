@@ -960,6 +960,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   cards, Plans & answers cards (web + Android 2.35 `ShowPlansScreen` / `PlaybookScreen`), the "too expensive" objection answer
   (`playbookObjections` in app.js + content.ts) and the training pitch line ({fromMonthly}) all say "$49 a month" / "billed
   monthly". `/api/plans/options` still returns `perDay` for older app builds; nothing displays it. Don't reintroduce per-day math.
+- The web app updates itself (Oct 2026): the owner saw an old screen because an installed web app stays loaded for days
+  (the service worker is network-first, so a *reload* always got the new files, but nothing reloaded). Now `checkForUpdate()`
+  in app.js HEADs `/app.js` with `cache: no-store` on start, every 5 minutes while visible and on every return to the
+  foreground; a changed ETag shows a bottom bar "A new version of the app is ready · Reload now" and the next `go()` (screen
+  change) reloads by itself unless an Edit has unsaved changes (`leaveGuard`). `npm run prepare:app` (part of deploy) also
+  stamps `sw.js`'s `VERSION` with a hash of index.html + app.js + app.css, so the offline shell cache turns over on every
+  deploy that changes the shell; never hand-edit that line. (Before this, the Settings guide buttons and Costs & usage were
+  live on the server for hours while the phone showed the old app.)
 - Show plans (`#/plans` or `#/plans/<leadId>`, owner and callers): customer-facing, always light, app bar hidden.
   Plan cards from Settings (tagline per tier in `PLAN_TAGLINE`), every-plan list, ways to pay, add-ons, fine print.
   From a lead, "Choose <plan>" creates that lead's sign-up link and opens it on the same phone.
