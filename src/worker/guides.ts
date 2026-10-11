@@ -26,7 +26,7 @@ export interface Guide {
   sections: GuideSection[];
 }
 
-export const GUIDE_IDS = ["tankboard", "pricetags", "display"] as const;
+export const GUIDE_IDS = ["tankboard", "pricetags", "display", "costs"] as const;
 
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
@@ -357,7 +357,76 @@ export function guideById(id: string, s: AppSettings): Guide | null {
   if (id === "tankboard") return tankBoardGuide(s);
   if (id === "pricetags") return priceTagsGuide(s);
   if (id === "display") return displayGuide(s);
+  if (id === "costs") return costsGuide(s);
   return null;
+}
+
+/** 💵 What keeps the app running, what each piece costs, and the monthly check (for whoever minds the bills). */
+export function costsGuide(s: AppSettings): Guide {
+  const company = s.companyName || "Underground Associates";
+  return {
+    id: "costs",
+    title: "💵 Costs & usage: what keeps the app running",
+    intro:
+      `${company} runs on a handful of outside services. Most are a few dollars a month or free; two are billed by how much we use them. Settings → Costs & usage lists every one with what it does for us, what it costs, how much we've used this month, when it renews and what stops if it lapses. This guide is the walkthrough for whoever keeps an eye on it.`,
+    sections: [
+      {
+        title: "What we pay for, in one minute",
+        steps: [
+          "Cloudflare, $5 a month: the app itself, its database and photos, the build queue, every client website and our own site. If this card fails, everything goes dark until it's fixed, so it's the one to watch.",
+          "Our domain, undergroundassociates.com, about $10 a year: the company site, every link we text, our email. Auto-renew stays on.",
+          "Google Places API, billed by use: finding businesses (searches, details, photos). Google gives a free monthly allowance per kind of request; the run cap in Find new leads is what controls this bill.",
+          "Anthropic (Claude), billed by use: writes every site's words, call guides, Spanish pages, info cards. Roughly 10 to 20 cents a site. Prepaid credit; it must be topped up.",
+          "Stripe: no monthly fee; it keeps about 2.9% + 30¢ of each payment (2.7% + 15¢ for a tap) and pays the rest to our bank.",
+          "Resend (email) and Brave Search are free at our volume; Firebase alerts, the Google Cloud project and the barcode lookup are free. Google Workspace is the company mailbox, about $8.40 a user a month.",
+          "Development (the owner's Claude Code subscription) builds and fixes the app but is not needed for it to run.",
+        ],
+      },
+      {
+        title: "The monthly check (first week of the month)",
+        numbered: true,
+        steps: [
+          "Open Settings → 💵 Costs & usage. The top card says what this month costs so far (fixed + usage + card fees) next to what's coming in from paid plans.",
+          "Read the warnings line. A yellow line means a free allowance is 80% used, a renewal is within 30 days, a price is blank, or the month is over budget.",
+          "Check each usage service's \"This month\" against \"Last month\". A jump in Places searches means a big run; a jump in Anthropic means a lot of rewrites. Neither is wrong, just know why.",
+          "Open the three billing pages (Cloudflare, Google Cloud, Anthropic console) once and compare: the screen's numbers are estimates from our own counter and the prices typed in here, not the invoice.",
+          "Anthropic: check the prepaid balance; add credit (or turn on auto-reload) before it runs out. Running out stops every build.",
+          "Cards and renewals: a card expiring soon on any of these accounts gets fixed now, not when something breaks. The renewal dates in the screen are typed in by us; keep them current.",
+          "Tap Edit on any service to update its price, the free allowance, the renewal date, which login it's under, or a note. Prices change; the code doesn't need to.",
+        ],
+      },
+      {
+        title: "If a card fails or a service stops",
+        steps: [
+          "Everything offline (app, client sites, company site): Cloudflare. Log in, Billing, fix the card; it comes back within minutes.",
+          "Find new leads or Add a business fails with a Google error: the Google Cloud billing account. Fix the card there; the key itself rarely needs touching.",
+          "Previews build with no words, call guide or Spanish page fails: Anthropic credit has run out. Add credit in the console; queued builds finish on their own.",
+          "Payments fail or renewals stop: Stripe is asking for something (identity, bank details). The Stripe dashboard says exactly what.",
+          "Emails to clients stop: Resend. Rare; text the link by hand meanwhile.",
+          "Phone alerts arrive late (every 15 minutes instead of instantly): Firebase. Nothing is lost.",
+          "Company email stops or Google sign-in fails: Google Workspace. The owner's password login to the app still works.",
+        ],
+      },
+      {
+        title: "Where to log in",
+        steps: [
+          "Each service card has an Open button to its billing or dashboard page and an \"Account\" line for which login it's under. Fill the account lines in once; the next person shouldn't have to guess.",
+          "Passwords and API keys never go in the app. They live in the password manager the owner uses and, for the keys the app needs, in Cloudflare's secrets (set by the developer).",
+          "Client domains and client Google Workspace mailboxes are bought by the clients in their own names: not our bill, not in this list.",
+        ],
+      },
+      {
+        title: "How the usage numbers are counted",
+        steps: [
+          "The app counts its own calls to Google, Anthropic, Brave, Resend and Firebase as they happen and adds them up per day. The Costs screen sums the current and previous month.",
+          "Anthropic is counted in tokens (about three quarters of a word each) per model; the estimate multiplies by the prices typed in the screen.",
+          "Google's free allowances and prices are set per kind of request; the defaults are from October 2026. If the Google bill differs from the estimate, update the prices here rather than trusting the estimate.",
+          "The count is a cost estimate, not an invoice: a crash mid-request can lose a few counts, and nothing is counted before the day the counter was added.",
+          "Budget: the screen compares the month against a budget (default $150). Over it, or 80% into a free allowance, the owner and full-access team get one alert for that month.",
+        ],
+      },
+    ],
+  };
 }
 
 

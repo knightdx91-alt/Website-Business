@@ -1772,6 +1772,80 @@
         ${s.note ? `<p class="small muted"><strong>Good to know:</strong> ${esc(s.note)}</p>` : ""}</details>`).join("")}`;
   }
 
+  /** 💵 Costs & usage (owner and full access): every paid service, this month's usage and estimate, renewals, warnings; edits save to /api/costs. */
+  async function viewCosts() {
+    setNav("home");
+    const my = renderSeq;
+    $app.innerHTML = `<section class="card"><h2>💵 Costs & usage</h2><p class="muted">Loading…</p></section>`;
+    let r;
+    try { r = await api("/costs"); } catch (err) { if (stale(my)) return; $app.innerHTML = `<section class="card"><p class="bad">${esc(err.message || NO_CONNECTION)}</p></section>`; return; }
+    if (stale(my)) return;
+    const cents = (c) => money(Math.round(c) / 100);
+    const monthName = (ym) => new Date(`${ym}-15T12:00:00Z`).toLocaleDateString([], { month: "long", year: "numeric", timeZone: "UTC" });
+    const qty = (n) => Number(n || 0).toLocaleString("en-US");
+    const kindLabel = { fixed: "Fixed price", usage: "Billed by use", fees: "Fees per payment", free: "Free" };
+    const rateText = (l) => l.unit === "per_million" ? `${cents(l.unitCents)} per million tokens` : l.unitCents ? `${l.unitCents >= 100 ? cents(l.unitCents) : `${Number(l.unitCents.toFixed(2))}¢`} each` : "free";
+    const render = () => {
+      const t = r.totals;
+      const net = t.revenueCents - t.outCents;
+      $app.innerHTML = `<section class="card"><h2>💵 Costs & usage</h2>
+        <p class="muted small">${monthName(r.month)} so far. Estimates from the app's own counter and the prices below; the invoices are on each service's billing page. <a href="#/guide/costs">How to read this</a> · <a href="#/settings">Settings</a></p>
+        <div class="split">
+          <div><p><strong>Going out:</strong> ${cents(t.outCents)} this month<br><span class="small muted">${cents(t.fixedCents)} fixed · ${cents(t.usageCents)} usage · ${cents(t.feesCents)} card fees</span></p></div>
+          <div><p><strong>Coming in:</strong> ${cents(t.revenueCents)} a month from paid plans${t.signedRevenueCents > t.revenueCents ? `<br><span class="small muted">${cents(t.signedRevenueCents)} once everyone signed has paid</span>` : ""}</p></div>
+        </div>
+        <p><strong>${net >= 0 ? "Ahead" : "Behind"} by ${cents(Math.abs(net))} a month</strong> · budget ${cents(r.budgetCents)} <button class="btn btn--small" id="budgetEdit" type="button">Change budget</button></p>
+        ${r.warnings.length ? `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(252,163,17,.15)">${r.warnings.map((w) => `<p style="margin:4px 0">⚠️ ${esc(w)}</p>`).join("")}</div>` : `<p class="small muted">No warnings this month.</p>`}
+      </section>
+      ${r.services.map((s) => `<section class="card" data-svc="${esc(s.id)}">
+        <h2>${s.emoji} ${esc(s.name)}</h2>
+        <p class="small muted">${kindLabel[s.kind]}${s.kind === "fixed" ? ` · ${s.monthlyCents === null ? "price not set" : `${cents(s.monthlyCents)} a ${s.renewEvery === "year" ? "year" : "month"}`}${s.renews ? ` · renews ${esc(s.renews)}` : ""}` : ""}${s.perMonthCents && s.kind !== "fixed" ? ` · about ${cents(s.perMonthCents)} this month` : ""}</p>
+        <p>${esc(s.what)}</p>
+        ${s.usage.length ? `<table class="stats"><thead><tr><th>What</th><th>This month</th><th>Last month</th><th>Rate</th><th>Est.</th></tr></thead><tbody>${s.usage.map((l) => `<tr><td style="text-align:left">${esc(l.label)}${l.freeQty > 0 && l.freeQty < 1000000 ? `<br><span class="muted">${qty(l.freeQty)} free a month${l.freeUsed !== null ? ` · ${Math.round(l.freeUsed * 100)}% used` : ""}</span>` : ""}${l.note ? `<br><span class="muted">${esc(l.note)}</span>` : ""}</td><td>${qty(l.month)}</td><td>${qty(l.lastMonth)}</td><td>${esc(rateText(l))}</td><td>${l.estCents ? cents(l.estCents) : "—"}</td></tr>`).join("")}</tbody></table>` : ""}
+        ${s.warnings.map((w) => `<p class="small" style="margin:4px 0">⚠️ ${esc(w)}</p>`).join("")}
+        <p class="small"><strong>If it stops:</strong> ${esc(s.ifItStops)}</p>
+        ${s.tip ? `<p class="small muted">${esc(s.tip)}</p>` : ""}
+        ${s.account ? `<p class="small"><strong>Account:</strong> ${esc(s.account)}</p>` : ""}
+        ${s.notes ? `<p class="small"><strong>Notes:</strong> ${esc(s.notes).replace(/\n/g, "<br>")}</p>` : ""}
+        <div class="btns">${s.url ? `<a class="btn btn--small" href="${esc(s.url)}" target="_blank" rel="noopener">Open ${s.kind === "free" ? "dashboard" : "billing"}</a>` : ""}<button class="btn btn--small" type="button" data-edit="${esc(s.id)}">Edit</button></div>
+        <form class="costedit" data-form="${esc(s.id)}" hidden style="margin-top:10px">
+          ${s.kind === "fixed" ? `<label class="field">Price (dollars per ${s.renewEvery === "year" ? "year" : "month"})<input name="monthly" type="number" step="0.01" min="0" value="${s.monthlyCents === null ? "" : (s.monthlyCents / 100).toFixed(2)}"></label>
+          <label class="field">Next renewal date<input name="renews" type="date" value="${esc(s.renews || "")}"></label>` : ""}
+          <label class="field">Account it's under (login email, who owns it)<input name="account" value="${esc(s.account || "")}" placeholder="e.g. the owner's Google address"></label>
+          <label class="field">Notes<textarea name="notes" rows="2" placeholder="Card on file, extra mailboxes, who to call…">${esc(s.notes || "")}</textarea></label>
+          ${s.usage.length ? `<p class="small muted" style="margin:8px 0 4px">Rates (the estimate uses these; check them against the bill once)</p>${s.usage.map((l) => `<div class="row"><label class="field" style="flex:2">${esc(l.label)}: ${l.unit === "per_million" ? "dollars per million tokens" : "cents each"}<input name="rate:${esc(l.metric)}" type="number" step="0.001" min="0" value="${l.unit === "per_million" ? (l.unitCents / 100).toFixed(2) : Number(l.unitCents.toFixed(3))}"></label><label class="field" style="flex:1">Free a month<input name="free:${esc(l.metric)}" type="number" step="1" min="0" value="${l.freeQty}"></label></div>`).join("")}` : ""}
+          <div class="btns" style="margin-top:8px"><button class="btn btn--primary btn--small" type="submit">Save</button><button class="btn btn--small" type="button" data-cancel="${esc(s.id)}">Cancel</button></div>
+        </form>
+      </section>`).join("")}`;
+      $app.querySelectorAll("[data-edit]").forEach((b) => (b.onclick = () => { const f = $app.querySelector(`[data-form="${b.dataset.edit}"]`); f.hidden = !f.hidden; if (!f.hidden) f.querySelector("input,textarea").focus(); }));
+      $app.querySelectorAll("[data-cancel]").forEach((b) => (b.onclick = () => ($app.querySelector(`[data-form="${b.dataset.cancel}"]`).hidden = true)));
+      $app.querySelectorAll("form.costedit").forEach((f) => (f.onsubmit = async (e) => {
+        e.preventDefault();
+        const id = f.dataset.form;
+        const svc = r.services.find((x) => x.id === id);
+        const fd = new FormData(f);
+        const body = { services: { [id]: { account: String(fd.get("account") || "").trim() || null, notes: String(fd.get("notes") || "").trim() || null } }, rates: {} };
+        if (svc.kind === "fixed") {
+          const m = String(fd.get("monthly") || "").trim();
+          body.services[id].monthlyCents = m === "" ? null : Math.round(Number(m) * 100);
+          body.services[id].renews = String(fd.get("renews") || "") || null;
+        }
+        for (const l of svc.usage) {
+          const rate = Number(fd.get(`rate:${l.metric}`));
+          const free = Number(fd.get(`free:${l.metric}`));
+          body.rates[l.metric] = { unitCents: l.unit === "per_million" ? Math.round(rate * 100 * 1000) / 1000 : rate, freeQty: Math.max(0, Math.round(free)) };
+        }
+        try { r = await api("/costs", { method: "PUT", json: body }); toast("Saved"); render(); } catch (err) { toast(err.message || NO_CONNECTION); }
+      }));
+      $app.querySelector("#budgetEdit").onclick = async () => {
+        const v = prompt("Monthly budget in dollars (the screen warns above it; 0 turns the warning off)", (r.budgetCents / 100).toFixed(0));
+        if (v === null || v.trim() === "" || Number.isNaN(Number(v))) return;
+        try { r = await api("/costs", { method: "PUT", json: { budgetCents: Math.max(0, Math.round(Number(v) * 100)) } }); toast("Saved"); render(); } catch (err) { toast(err.message || NO_CONNECTION); }
+      };
+    };
+    render();
+  }
+
   /** 🎓 Training: the course from /api/training (one source with the Android app), progress saved per person. */
   async function viewTraining() {
     setNav("home");
@@ -3164,7 +3238,10 @@
         <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
       <section class="card"><h2>📖 Guides</h2>
         <p class="small muted">How to set up and sell what we offer, with the exact buttons to tap. Prices in the guides come from Settings.</p>
-        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">🐠 Tank board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/training">🎓 Training course</a></div></section>
+        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">🐠 Tank board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/training">🎓 Training course</a></div></section>
+      <section class="card"><h2>💵 Costs & usage</h2>
+        <p class="small muted">Every outside service the app depends on: what it costs, what we've used this month, when it renews and what stops if it lapses. For whoever minds the bills.</p>
+        <div class="btns btns--full"><a class="btn btn--primary" href="#/costs">💵 Open Costs & usage</a><a class="btn" href="#/guide/costs">📖 The guide</a></div></section>
       <section class="card"><h2>Android app</h2>
         <p class="small muted">Install the app on an Android phone. After downloading, open the file and allow installing from this source if asked. Log in once in the app with the same password.</p>
         <a class="btn" href="/api/android.apk" download>Download Android app</a></section>
@@ -3535,7 +3612,7 @@
   }
 
   /* ---------- notifications ---------- */
-  const NOTIF_ICON = { note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎", preview_open: "👀", task: "📝" };
+  const NOTIF_ICON = { costs: "💵", note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎", preview_open: "👀", task: "📝" };
 
   async function refreshNotifCount() {
     try {
@@ -3809,7 +3886,7 @@
     try {
       if (h === "#/login") return await viewLogin();
       meta = meta || (await api("/meta"));
-      if (!isOwner() && (/^#\/(edit|gbp)\//.test(h) || h === "#/inbox" || h === "#/sales")) return go("#/");
+      if (!isOwner() && (/^#\/(edit|gbp)\//.test(h) || h === "#/inbox" || h === "#/sales" || h === "#/costs")) return go("#/");
       if ((m = /^#\/lead\/([a-z0-9]+)$/.exec(h))) return await viewLead(m[1]);
       if ((m = /^#\/edit\/([a-z0-9]+)$/.exec(h))) return await viewEdit(m[1]);
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
@@ -3817,6 +3894,7 @@
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/playbook") return await viewPlaybook();
       if (h === "#/training") return await viewTraining();
+      if (h === "#/costs") return await viewCosts();
       if ((m = /^#\/guide\/([a-z0-9-]+)$/.exec(h))) return await viewGuide(m[1]);
       if ((m = /^#\/walkin(?:\/([a-z0-9]+))?$/.exec(h))) return await viewWalkin(m[1]);
       if ((m = /^#\/plans(?:\/([a-z0-9]+))?$/.exec(h))) return await viewShowPlans(m[1]);

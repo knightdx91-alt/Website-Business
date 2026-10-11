@@ -349,6 +349,26 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `POST /api/leads/:id/boardlink` (owner + callers) → `/b/<leadId>.<exp>.<hmac>` (`boardPitchToken` / `verifyBoardPitch` in
   auth.ts, 30 days, 410 after) = `customerPitchPage()`: the same words as a public, noindex page with "Open your Tank board"
   (their `clientLink`, made on first use), the tablet view, undergroundassociates.com/pricing#price-list and "Text us a question".
+- 💵 Costs & usage (Oct 2026, `src/worker/costs.ts` + `meter.ts`, migration 0019 `usage_daily`; web `#/costs` `viewCosts`
+  (owner + full access, route-gated like Sales), Android `ui/CostsScreen.kt` 2.36 (route `costs`, Settings → More), buttons in
+  Settings; guide `costs` "What keeps the app running"): for whoever minds the bills (Brenda). `SERVICES` lists every outside
+  service with what it does for us, kind (fixed / usage / fees / free), default price (Oct 2026: Cloudflare Workers Paid $5/mo,
+  domain $10.44/yr, Workspace $8.40/user/mo, dev tools blank), billing URL, "if it stops", a tip, and usage `rates`
+  (metric, cents each or per million tokens, free units a month: Places search 3.5¢ / details 2¢ / photo 0.7¢ with 1,000 free
+  each; Opus 5.5 $4/$20 per M in/out, cache read $0.20, write $5; Sonnet 5.5 $2/$10/$0.20/$2.50; Haiku 5.5 $0.10/$0.50; Brave
+  0.3¢ after 2,000 free; Resend free to 3,000; FCM / OFF free). The meter: `installMeter()` (index.ts module load) wraps global
+  `fetch` once per isolate and classifies hosts (`classify`: places search/details/photo, brave, email, push, openfoodfacts,
+  anthropic → the response is cloned and `usage` read per model: `.calls/.in/.out/.cache_read/.cache_write`); counts buffer in
+  memory and `flushUsage(env)` upserts `usage_daily (day, metric, qty)` at the end of every request (`ctx.waitUntil`), queue
+  batch and cron (the three handlers now delegate to `handle` / `handleQueue` / `handleScheduled`). Stripe fees are estimated
+  from this month's paid sign-ups + purchases (2.9% + 30¢), revenue from `salesDashboard`. `costsReport()` → totals (fixed,
+  usage, fees, out, revenue, signed), per-service `usage` lines (this month / last month / est after free tier / % of free
+  used), `perMonthCents` (yearly ÷ 12), warnings (≥80% of a free tier, renewal within 30 days or past, blank price, over
+  budget; default budget $150), unknown Anthropic models priced at the Opus rate with a note. Edits (`PUT /api/costs`
+  {services:{id:{monthlyCents, renews YYYY-MM-DD, account, notes}}, rates:{metric:{unitCents, freeQty}}, budgetCents}) merge into
+  settings key `costs_json`, so price changes never need code. Daily cron `costAlerts()`: one 💵 alert (kind `costs`, owner /
+  full access only) per new warning per month (settings key `costs_alerted.<YYYY-MM>`). `test/worker/meter.test.ts`,
+  `test/worker/costs.test.ts`. Not measured: Cloudflare's own usage (far inside the plan) and the dev subscription.
 - 🎓 Training (Oct 2026, `src/worker/training.ts`, migration 0017 `training_done`; web `#/training` `viewTraining`, Android
   `ui/TrainingScreen.kt`, 2.10): an in-app course for owner and callers, Home → "🎓 Training" (also Settings). 12 lessons (what
   we sell, where leads come from, before you call, showing the preview, logging calls, signing up, taking payment, finish &

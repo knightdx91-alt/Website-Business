@@ -12,7 +12,7 @@ import { fcmSend } from "./fcm.ts";
  * what's new while logged in. That keeps details off the push service and needs no payload encryption.
  */
 
-export type EventKind = "note" | "call" | "status" | "signup_sent" | "signed" | "paid" | "published" | "added" | "message" | "run" | "preview_open" | "task";
+export type EventKind = "note" | "call" | "status" | "signup_sent" | "signed" | "paid" | "published" | "added" | "message" | "run" | "preview_open" | "task" | "costs";
 
 /** The notifications callers get: anything added or changed on a lead, plus tasks. Not website messages or search runs. */
 export const CALLER_KINDS: EventKind[] = ["note", "call", "status", "signup_sent", "signed", "paid", "published", "added", "preview_open", "task"];
@@ -98,6 +98,7 @@ const PUSH_TITLE: Record<EventKind, string> = {
   run: "🔎 Search started",
   preview_open: "👀 Preview opened",
   task: "📝 Task",
+  costs: "💵 Costs & usage",
 };
 
 /** What a phone shows when a push arrives: the newest unread item, or a count when there are several. */
