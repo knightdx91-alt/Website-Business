@@ -16,7 +16,7 @@ import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/cl
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
-import { announceUpdate, fcmClientConfig, serviceAccount } from "./fcm.ts";
+import { LAST_ANNOUNCE_KEY, TICK_KEY, announceUpdate, fcmClientConfig, serviceAccount, serviceAccountProblem } from "./fcm.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
@@ -26,7 +26,7 @@ import { portalSession } from "./checkout.ts";
 import { achFormPdf, agreementPage, agreementPdf, appSignup, contractJson, contractPreviewPage, contractPreviewPdf, purchasesFor, serveExtras, serveSignup, signupsFor, websiteOrders } from "./signup.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { EXPIRE_SQL } from "./expire.ts";
-import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
+import { addonPrice, addUsage, billingOptions, defaultTerms, getLead, getSetting, getSettings, MODEL_PRICES, setSetting, updateLead, type LeadRow, type RunRow } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
 import { HttpError, json, localDate, newId, now, type Env, type Job } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
@@ -101,7 +101,15 @@ interface ActivityCols {
   last_activity?: number | null;
 }
 
-function summary(l: LeadRow & { latest_signup_paid?: number | null } & ActivityCols) {
+/**
+ * The columns a lead card needs. The list query selects these instead of `leads.*`: the JSON blobs (Google place data, the
+ * site record, copy, call guide) run to megabytes across a hundred leads and Home loads several lists at once, which made the
+ * leads tab spin for seconds (Oct 2026). `has_pitch` stands in for pitch_json.
+ */
+const LIST_COLS =
+  "id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, found_url, score, status, sales_status, look, lint_json, (pitch_json IS NOT NULL) AS has_pitch, follow_up, last_contact, contact, best_time, shown_at, lat, lng, custom_domain, preview_opens, preview_opened_at, error, rewrite, pages_project, live_url, published_at, fetched_at, created_at, updated_at";
+
+function summary(l: LeadRow & { latest_signup_paid?: number | null; has_pitch?: number | null } & ActivityCols) {
   const lint = l.lint_json ? (JSON.parse(l.lint_json) as { publishBlockers?: string[]; errors?: string[]; todos?: string[] }) : null;
   const activity =
     l.last_note_json !== undefined
@@ -132,7 +140,7 @@ function summary(l: LeadRow & { latest_signup_paid?: number | null } & ActivityC
     look: l.look,
     error: l.error,
     liveUrl: l.live_url,
-    hasPitch: !!l.pitch_json,
+    hasPitch: l.has_pitch !== undefined ? !!l.has_pitch : !!l.pitch_json,
     followUp: l.follow_up,
     lastContact: l.last_contact,
     placeId: l.place_id,
@@ -303,6 +311,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/auth/config" && m === "GET") {
     const s = await getSettings(env);
     return json({ googleClientId: s.googleClientId ?? null, domain: s.googleDomain || DEFAULT_DOMAIN, requireGoogle: !!(s.requireGoogle && s.googleClientId), hasOwner: await hasOwner(env) });
+  }
+  // Instant-push health (public, read-only, no secrets): does the Firebase secret parse, when did the minute cron last tick,
+  // and how did the last update announcement go. Settings shows it; it also answers "did the push go out?" without logs.
+  if (path === "/push/status" && m === "GET") {
+    const [tick, last, announced] = await Promise.all([getSetting(env, TICK_KEY), getSetting(env, LAST_ANNOUNCE_KEY), getSetting(env, "android_announced_code")]);
+    return json({ server: !!serviceAccount(env), problem: serviceAccountProblem(env), tick: tick ? Number(tick) : null, last: last ? JSON.parse(last) : null, announced: announced ? Number(announced) : null });
   }
   // Google sign-in (web button or the Android app): a verified company Workspace account becomes the same signed session.
   if (path === "/auth/google" && m === "POST") {
@@ -837,10 +851,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       binds.push(category);
     }
     const rows = await env.DB.prepare(
-      `SELECT leads.*, (SELECT s.paid FROM signups s WHERE s.lead_id = leads.id ORDER BY s.created_at DESC LIMIT 1) AS latest_signup_paid${cols} FROM leads WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT 500`,
+      `SELECT ${LIST_COLS}, (SELECT s.paid FROM signups s WHERE s.lead_id = leads.id ORDER BY s.created_at DESC LIMIT 1) AS latest_signup_paid${cols} FROM leads WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT 500`,
     )
       .bind(...binds)
-      .all<LeadRow & { latest_signup_paid: number | null } & ActivityCols>();
+      .all<LeadRow & { latest_signup_paid: number | null; has_pitch: number | null } & ActivityCols>();
     return json({ leads: rows.results.map(summary) });
   }
 

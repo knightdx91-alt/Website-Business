@@ -194,10 +194,19 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (FirebaseMessagingService, manifest) runs `Updater.notifyIfNewer` / `Alerts.deliver` (the AlertWorker body, now shared) and emits
   `Push.events` so an open app shows the update pop-up / refreshes the badge at once. Without the secret or the four values the
   15-minute AlertWorker polling still covers everything. Deps: firebase-bom 33.7.0 + firebase-messaging. `test/worker/fcm.test.ts`.
+  Health: `GET /api/push/status` (public, read-only, no secrets): `server` (secret parses), `problem` (`serviceAccountProblem()`:
+  not set / not JSON + length / missing fields, never content), `tick` (last minute-cron run, settings key `android_announce_tick`),
+  `last` ({at, code, ok, error} of the last announcement, `android_announce_last`), `announced`. Oct 2026: the secret once came
+  back as exactly 1,024 characters (pasted at an interactive `wrangler secret put` prompt, which keeps one line of ≤1,024); fix by
+  pasting the whole file in the dashboard or `wrangler secret put FCM_SERVICE_ACCOUNT < file.json`. `wrangler tail` and the
+  observability API are not reachable from the Claude Code container (proxy / token scope), hence the D1 breadcrumbs.
   Owner setup: console.firebase.google.com → Add project (Analytics off) → Add app → Android, package
   `com.knightdx91.websitebusiness` (skip google-services.json) → Project settings → General: App ID, Web API key, Project ID;
   Cloud Messaging: Sender ID → paste the four into Settings; Project settings → Service accounts → Generate new private key →
   the JSON file's content as Cloudflare Worker secret FCM_SERVICE_ACCOUNT.
+- Leads list speed (Oct 2026): `GET /api/leads` selects `LIST_COLS` (the card fields + `has_pitch`) instead of `leads.*`; the JSON
+  blobs (place_json alone was 1.6 MB across 114 leads) were being read for every list, and Home loads 3–5 lists at once, which
+  made the leads tab spin for seconds. `summary()` takes `has_pitch` when present. Keep new card fields in `LIST_COLS`.
 - Android 2.14 (Oct 2026): updates announce themselves. `AlertWorker` (every 15 min in the background) calls
   `Updater.notifyIfNewer()`: one "Update available: X" notification per new versionCode (`Prefs.updateNotifiedCode`,
   id `UPDATE_NOTIFICATION_ID`), whose tap opens MainActivity with extra `update=true` (onCreate or `onNewIntent`, launchMode
