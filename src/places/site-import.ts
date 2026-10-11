@@ -158,6 +158,49 @@ export interface SitePhoto {
   ext: "jpg" | "png" | "webp";
   alt?: string;
   src: string;
+  width?: number;
+  height?: number;
+}
+
+/** Pixel size from the file header (JPEG SOF, PNG IHDR, WebP VP8/VP8L/VP8X), no decoding. Null when unreadable. */
+export function imageSize(buf: ArrayBuffer): { width: number; height: number } | null {
+  const b = new Uint8Array(buf);
+  const dv = new DataView(buf);
+  if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { width: dv.getUint32(16), height: dv.getUint32(20) };
+  if (b.length > 4 && b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const marker = b[i + 1]!;
+      if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) { i += 2; continue; }
+      const len = dv.getUint16(i + 2);
+      if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) {
+        return { height: dv.getUint16(i + 5), width: dv.getUint16(i + 7) };
+      }
+      i += 2 + len;
+    }
+    return null;
+  }
+  if (b.length > 30 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) {
+    const tag = String.fromCharCode(b[12]!, b[13]!, b[14]!, b[15]!);
+    if (tag === "VP8X") return { width: 1 + (b[24]! | (b[25]! << 8) | (b[26]! << 16)), height: 1 + (b[27]! | (b[28]! << 8) | (b[29]! << 16)) };
+    if (tag === "VP8L") { const n = b[21]! | (b[22]! << 8) | (b[23]! << 16) | (b[24]! << 24); return { width: 1 + (n & 0x3fff), height: 1 + ((n >> 14) & 0x3fff) }; }
+    if (tag === "VP8 ") return { width: dv.getUint16(26, true) & 0x3fff, height: dv.getUint16(28, true) & 0x3fff };
+  }
+  return null;
+}
+
+/** Alt text worth keeping: not a file name, path or address, not empty. */
+export function cleanAlt(alt: string | undefined): string | undefined {
+  const a = (alt ?? "").trim();
+  if (!a || /[\/\\]|\.(jpe?g|png|webp|gif)\b|^https?:|^img[_-]?\d|^dsc[_-]?\d|^\d+$/i.test(a)) return undefined;
+  return a.slice(0, 150);
+}
+
+/** A real photo, not a banner, badge or thumbnail: at least 500 px wide and 360 tall, no wider than 2.4:1 or taller than 1:2.4. */
+export function looksLikePhoto(w: number | undefined, h: number | undefined): boolean {
+  if (!w || !h) return true; // unknown size: let it through, the owner reviews
+  return w >= 500 && h >= 360 && w / h <= 2.4 && h / w <= 2.4;
 }
 
 /** Downloads up to `max` of their photos: real image types only, 25 KB to 8 MB, one at a time so a slow host can't hang the build. */
@@ -172,7 +215,9 @@ export async function fetchSitePhotos(images: ExistingSite["images"], max = 6, f
       if (!res.ok || !ext) continue;
       const bytes = await res.arrayBuffer();
       if (bytes.byteLength < 25_000 || bytes.byteLength > 8_000_000) continue;
-      out.push({ bytes, type: type as SitePhoto["type"], ext, alt: img.alt, src: img.src });
+      const size = imageSize(bytes);
+      if (!looksLikePhoto(size?.width, size?.height)) continue;
+      out.push({ bytes, type: type as SitePhoto["type"], ext, alt: cleanAlt(img.alt), src: img.src, width: size?.width, height: size?.height });
     } catch {
       /* skip this one */
     }

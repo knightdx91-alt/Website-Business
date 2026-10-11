@@ -135,12 +135,16 @@ export async function importSitePhotos(env: Env, leadId: string, record: Busines
   const old = await env.BUCKET.list({ prefix: `owner/${leadId}/s` });
   await Promise.all(old.objects.map((o) => env.BUCKET.delete(o.key)));
   record.media.gallery = record.media.gallery.filter(keep);
+  // Hero = the largest proper landscape photo (not the first thing on their page, which is often a banner); the rest in page order.
+  const wantHero = !record.media.hero || record.media.hero.source === "google";
+  const area = (p: { width?: number; height?: number }) => (p.width ?? 0) * (p.height ?? 0);
+  const heroPick = wantHero ? [...photos].filter((p) => p.width && p.height && p.width >= 800 && p.width / p.height >= 1 && p.width / p.height <= 2.2).sort((a, b) => area(b) - area(a))[0] ?? photos[0] : undefined;
   let n = 0;
   for (const ph of photos) {
     const key = `s${n + 1}`;
     await env.BUCKET.put(`owner/${leadId}/${key}.${ph.ext}`, ph.bytes, { httpMetadata: { contentType: ph.type } });
-    const img = { src: `/assets/owner/${key}.${ph.ext}`, alt: ph.alt?.slice(0, 150) || `Photo from ${record.name}`, source: "site" as const };
-    if (n === 0 && (!record.media.hero || record.media.hero.source === "google")) record.media.hero = img;
+    const img = { src: `/assets/owner/${key}.${ph.ext}`, alt: ph.alt || `Photo from ${record.name}`, source: "site" as const, width: ph.width, height: ph.height };
+    if (ph === heroPick) record.media.hero = img;
     else if (record.media.gallery.length < 24) record.media.gallery.push(img);
     n++;
   }

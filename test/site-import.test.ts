@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applySiteFacts, extractImages, extractSiteFacts } from "../src/places/site-import.ts";
+import { applySiteFacts, cleanAlt, extractImages, extractSiteFacts, imageSize, looksLikePhoto } from "../src/places/site-import.ts";
 
 const HTML = `<!doctype html><html><head><title>King Fish Aquatics</title><meta name="description" content="Cullman's locally owned aquatics store"></head>
 <body><script>var x = "Cullman's locally owned Aquatics store";</script><style>.a{}</style>
@@ -62,4 +62,18 @@ test("carousel and gallery slides hidden in data attributes or JSON are found by
 <div style="background-image:url(https://kingfishaquatics.co/u/reef-tank.webp)"></div><img src="https://kingfishaquatics.co/u/logo.png">`;
   const imgs = extractImages(html, "https://kingfishaquatics.co/").map((i) => i.src);
   assert.deepEqual(imgs, ["https://img1.wsimg.com/isteam/ip/abc/discus.jpg", "https://img1.wsimg.com/isteam/ip/abc/clownfish.JPG", "https://kingfishaquatics.co/u/reef-tank.webp"]);
+});
+
+test("image sizes come from the file header, banners and thumbnails are not photos, file-name alt text is dropped", () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0x0a, 0x00, 0, 0, 0x07, 0x80, 8, 2, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(imageSize(png.buffer), { width: 2560, height: 1920 });
+  const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 17, 8, 0x01, 0x3b, 0x03, 0x53, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1, 0xff, 0xd9]);
+  assert.deepEqual(imageSize(jpg.buffer), { width: 851, height: 315 });
+  assert.equal(looksLikePhoto(851, 315), false, "a 2.7:1 banner 315 px tall is not a photo");
+  assert.equal(looksLikePhoto(1600, 800), true, "a 2:1 wide shot still is");
+  assert.equal(looksLikePhoto(2560, 1920), true);
+  assert.equal(looksLikePhoto(undefined, undefined), true);
+  assert.equal(cleanAlt("//img1.wsimg.com/isteam/ip/abc/IMG_0246.jpeg/:/rs=w:1300"), undefined);
+  assert.equal(cleanAlt("IMG_0246"), undefined);
+  assert.equal(cleanAlt("Boyd and Regina Posey: Owners of King Fish Aquatics"), "Boyd and Regina Posey: Owners of King Fish Aquatics");
 });
