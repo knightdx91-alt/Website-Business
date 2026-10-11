@@ -259,6 +259,9 @@ export function editForm(l: EditDetail): EditForm {
       ...x.paragraphs.slice(0, 4).map((p: string) => note(p.length > 240 ? `${p.slice(0, 240)}…` : p)),
     ], { collapsed: true });
   }
+  if (!r.existingSite && r.siteImport) {
+    card("existing", "Their current website", [note(`We tried to read ${r.siteImport.url} on ${r.siteImport.triedAt} UTC and couldn't: ${r.siteImport.error}. Rewrite tries again; if it keeps failing, add their photos and details by hand.`)], { collapsed: true });
+  }
   card("facts", "Facts (only if the owner says so)", facts);
 
   const pr = r.proof || {};

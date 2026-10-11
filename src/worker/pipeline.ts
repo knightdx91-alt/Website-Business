@@ -11,7 +11,7 @@ import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { groupById, MARKET } from "../places/queries.ts";
 import { qualify, scorePlace } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
-import { applySiteFacts, fetchSitePhotos, importSite } from "../places/site-import.ts";
+import { applySiteFacts, fetchSitePhotos, importSiteDetailed } from "../places/site-import.ts";
 import { autoMatchPhotos } from "../generator/packs/retail.ts";
 import { websiteProblem } from "../places/site-check.ts";
 import { placeToRecord, reviewTexts } from "../places/to-record.ts";
@@ -207,11 +207,14 @@ export async function runBuild(env: Env, job: Extract<Job, { type: "build" }>): 
     const siteUrl = lead.found_url || (place.websiteUri && !/facebook\.|instagram\.|linktr\.ee|tiktok\./i.test(place.websiteUri) ? place.websiteUri : null);
     const stale = !record.existingSite || record.existingSite.url !== siteUrl || Date.now() - Date.parse(record.existingSite.fetchedAt) > 7 * 86_400_000 || !!lead.rewrite;
     if (siteUrl && stale) {
-      const found = await importSite(siteUrl);
-      if (found) {
-        record.existingSite = found;
-        applySiteFacts(record, found);
-        if ((await importSitePhotos(env, lead.id, record, found.images)) && record.ext.retail?.priceList) autoMatchPhotos(record.ext.retail.priceList.sections, record.media.gallery);
+      const got = await importSiteDetailed(siteUrl);
+      if (got.facts) {
+        record.existingSite = got.facts;
+        record.siteImport = undefined;
+        applySiteFacts(record, got.facts);
+        if ((await importSitePhotos(env, lead.id, record, got.facts.images)) && record.ext.retail?.priceList) autoMatchPhotos(record.ext.retail.priceList.sections, record.media.gallery);
+      } else {
+        record.siteImport = { url: siteUrl, triedAt: new Date().toISOString().slice(0, 16).replace("T", " "), error: got.error ?? "unknown" };
       }
     }
 

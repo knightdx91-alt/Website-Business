@@ -1210,6 +1210,7 @@
       ${isL ? landscapingEditCard(r, ext, cb) : ""}
       ${isK ? cleaningEditCard(r, ext, cb) : ""}
       ${isC || isL || isK ? plansEditCard(r) + guaranteeEditCard(r, isK) + offersEditCard(r) : ""}
+      ${!r.existingSite && r.siteImport ? `<section class="card"><h2>Their current website</h2><p class="small muted">We tried to read <a href="${esc(r.siteImport.url)}" target="_blank" rel="noopener">${esc(r.siteImport.url.replace(/^https?:\/\//, ""))}</a> on ${esc(r.siteImport.triedAt)} UTC and couldn't: ${esc(r.siteImport.error)}. Rewrite tries again; if it keeps failing, add their photos and details by hand.</p></section>` : ""}
       ${r.existingSite ? `<section class="card"><h2>Their current website</h2>
         <p class="small muted">Read from <a href="${esc(r.existingSite.url)}" target="_blank" rel="noopener">${esc(r.existingSite.url.replace(/^https?:\/\//, ""))}</a> on ${esc(r.existingSite.fetchedAt)}. Used as background for the text (rewritten, never copied). Check it's really theirs.</p>
         ${r.existingSite.notices.length ? `<p class="small"><strong>Notice on their site:</strong> ${esc(r.existingSite.notices.join(" / "))}</p>` : ""}

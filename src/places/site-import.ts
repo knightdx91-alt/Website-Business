@@ -145,23 +145,59 @@ export async function fetchSitePhotos(images: ExistingSite["images"], max = 6, f
   return out;
 }
 
-/** Fetches and extracts; null when the site is down, not HTML, or looks like a social page. Never throws. */
-export async function importSite(url: string, fetchFn: typeof fetch = fetch): Promise<ExistingSite | null> {
+export interface SiteImportResult {
+  facts: ExistingSite | null;
+  /** Why nothing came back, in plain words ("timed out after 15 s", "HTTP 403", "not an HTML page"). */
+  error?: string;
+}
+
+const UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128 Mobile Safari/537.36";
+
+async function fetchPage(url: string, fetchFn: typeof fetch, ms: number): Promise<{ html?: string; finalUrl?: string; error?: string }> {
   try {
-    const u = new URL(url);
-    if (/(^|\.)(facebook|instagram|linktr|tiktok|yelp|google|nextdoor)\./i.test(u.hostname)) return null;
-    const res = await fetchFn(u.toString(), {
-      headers: { "user-agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128 Mobile Safari/537.36", accept: "text/html,application/xhtml+xml" },
+    const res = await fetchFn(url, {
+      headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5", "accept-language": "en-US,en;q=0.8" },
       redirect: "follow",
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(ms),
     });
-    if (!res.ok || !/text\/html|xhtml/i.test(res.headers.get("content-type") ?? "")) return null;
-    const html = (await res.text()).slice(0, MAX_BYTES);
-    const facts = extractSiteFacts(res.url || u.toString(), html);
-    return facts.paragraphs.length || facts.headings.length ? facts : null;
-  } catch {
-    return null;
+    if (!res.ok) return { error: `HTTP ${res.status}` };
+    const type = res.headers.get("content-type") ?? "";
+    if (!/text\/html|xhtml/i.test(type)) return { error: `not an HTML page (${type.split(";")[0] || "no content type"})` };
+    return { html: (await res.text()).slice(0, MAX_BYTES), finalUrl: res.url || url };
+  } catch (err) {
+    const name = err instanceof Error ? err.name : "";
+    return { error: name === "TimeoutError" || name === "AbortError" ? `timed out after ${Math.round(ms / 1000)} s` : `couldn't connect (${err instanceof Error ? err.message : String(err)})`.slice(0, 160) };
   }
+}
+
+/**
+ * Fetches and extracts, with the reason when it can't. Tries https first (Google often stores the http address), then the
+ * address as given, each with a generous limit: small-business hosts are slow. Never throws.
+ */
+export async function importSiteDetailed(url: string, fetchFn: typeof fetch = fetch): Promise<SiteImportResult> {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return { facts: null, error: "not a web address" };
+  }
+  if (/(^|\.)(facebook|instagram|linktr|tiktok|yelp|google|nextdoor)\./i.test(u.hostname)) return { facts: null, error: "a social page, not their own site" };
+  const tries = u.protocol === "http:" ? [u.toString().replace(/^http:/, "https:"), u.toString()] : [u.toString()];
+  let lastError = "unknown";
+  for (const t of tries) {
+    const r = await fetchPage(t, fetchFn, 15_000);
+    if (r.html) {
+      const facts = extractSiteFacts(r.finalUrl ?? t, r.html);
+      return facts.paragraphs.length || facts.headings.length || facts.images.length ? { facts } : { facts: null, error: "the page had no readable text (probably built by scripts)" };
+    }
+    lastError = r.error ?? lastError;
+  }
+  return { facts: null, error: lastError };
+}
+
+/** Facts or null; see importSiteDetailed for the reason. */
+export async function importSite(url: string, fetchFn: typeof fetch = fetch): Promise<ExistingSite | null> {
+  return (await importSiteDetailed(url, fetchFn)).facts;
 }
 
 /** Fills record gaps the site answers plainly (email, social links, founded year). Never overwrites what's there. */

@@ -503,6 +503,8 @@ export interface BusinessRecord {
   typeLabel?: string;
   /** Facts read from their current website at build time, when they have one. */
   existingSite?: ExistingSite;
+  /** When the last read of their site failed: the address tried, when, and why (shown in Edit so nobody wonders). */
+  siteImport?: { url: string; triedAt: string; error: string };
   businessStatus: string;
   phone: { e164: string; display: string };
   smsEnabled: boolean;
