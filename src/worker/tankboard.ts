@@ -4,11 +4,31 @@ import { getLead, updateLead, type LeadRow } from "./db.ts";
 import { HttpError, newId, type Env } from "./env.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
 import { kindWords, listKind } from "../generator/pricelist.ts";
-import type { BusinessRecord, Copy, Image, ItemInfo, MenuSection } from "../generator/types.ts";
+import type {
+  BusinessRecord,
+  Copy,
+  Image,
+  ItemInfo,
+  MenuSection,
+} from "../generator/types.ts";
 import { escHtml } from "./page.ts";
 import { renderPreview } from "./pipeline.ts";
 import { publishLead } from "./publish.ts";
-import { approveUnlock, nfcSecret, normalizeCode, setStaffPin } from "./tablet.ts";
+import {
+  approveUnlock,
+  nfcSecret,
+  normalizeCode,
+  setStaffPin,
+} from "./tablet.ts";
+import {
+  detectColumns,
+  exportCsv,
+  fieldChoices,
+  importRows,
+  parseTable,
+  rowsFrom,
+  type Field,
+} from "./stock-import.ts";
 
 /**
  * Tank board: the client's own live editor for their price list (built for King Fish Aquatics, whose tanks change several
@@ -28,7 +48,11 @@ async function sign(env: Env, leadId: string, key: string): Promise<string> {
 }
 
 /** The client's link, making their key on first use. */
-export async function clientLink(env: Env, lead: LeadRow, origin: string): Promise<string> {
+export async function clientLink(
+  env: Env,
+  lead: LeadRow,
+  origin: string,
+): Promise<string> {
   let key = lead.client_key ?? null;
   if (!key) {
     key = newId();
@@ -37,27 +61,67 @@ export async function clientLink(env: Env, lead: LeadRow, origin: string): Promi
   return `${origin}/c/${lead.id}.${await sign(env, lead.id, key)}`;
 }
 
-async function leadFor(env: Env, leadId: string, sig: string): Promise<LeadRow> {
+async function leadFor(
+  env: Env,
+  leadId: string,
+  sig: string,
+): Promise<LeadRow> {
   const lead = await getLead(env, leadId);
-  if (!lead || lead.status === "expired" || !lead.client_key || !safeEqual(sig, await sign(env, leadId, lead.client_key))) throw new HttpError(404, "This link isn't valid any more. Ask us for a new one.");
+  if (
+    !lead ||
+    lead.status === "expired" ||
+    !lead.client_key ||
+    !safeEqual(sig, await sign(env, leadId, lead.client_key))
+  )
+    throw new HttpError(
+      404,
+      "This link isn't valid any more. Ask us for a new one.",
+    );
   return lead;
 }
 
-export const recordOf = (lead: LeadRow): BusinessRecord | null => (lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null);
+export const recordOf = (lead: LeadRow): BusinessRecord | null =>
+  lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null;
 
 export function priceList(r: BusinessRecord) {
-  return (r.ext.retail ??= {}).priceList ?? { sections: [] as MenuSection[], lastUpdated: "", public: true };
+  return (
+    (r.ext.retail ??= {}).priceList ?? {
+      sections: [] as MenuSection[],
+      lastUpdated: "",
+      public: true,
+    }
+  );
 }
 
-export const stamp = () => new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
+export const stamp = () =>
+  new Date().toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Chicago",
+  });
 
 /** What the site and the board read: in-stock items only for the site; the board asks with `all=1`. */
 /** An owner photo's public address through `/l/<id>/photo/`; Google photos never. */
-export function photoUrl(lead: LeadRow, origin: string, img?: Image): string | null {
-  return img && img.source !== "google" ? (img.src.startsWith("/assets/owner/") ? `${origin}/l/${lead.id}/photo/${img.src.slice("/assets/owner/".length)}` : img.src) : null;
+export function photoUrl(
+  lead: LeadRow,
+  origin: string,
+  img?: Image,
+): string | null {
+  return img && img.source !== "google"
+    ? img.src.startsWith("/assets/owner/")
+      ? `${origin}/l/${lead.id}/photo/${img.src.slice("/assets/owner/".length)}`
+      : img.src
+    : null;
 }
 
-export function pricesFeed(lead: LeadRow, record: BusinessRecord, origin: string, all = false) {
+export function pricesFeed(
+  lead: LeadRow,
+  record: BusinessRecord,
+  origin: string,
+  all = false,
+) {
   const pl = priceList(record);
   const photo = (img?: Image) => photoUrl(lead, origin, img) ?? undefined;
   const words = kindWords(record);
@@ -65,10 +129,21 @@ export function pricesFeed(lead: LeadRow, record: BusinessRecord, origin: string
     name: record.name,
     title: pl.title?.trim() || words.title,
     kind: listKind(record),
-    words: { section: words.section, item: words.item, emoji: words.emoji, board: words.board, empty: words.empty, fields: words.fields },
+    words: {
+      section: words.section,
+      item: words.item,
+      emoji: words.emoji,
+      board: words.board,
+      empty: words.empty,
+      fields: words.fields,
+    },
     public: pl.public !== false,
     updatedAt: pl.lastUpdated,
-    siteUrl: lead.custom_domain ? `https://${lead.custom_domain}/prices/` : lead.live_url ? `${lead.live_url.replace(/\/$/, "")}/prices/` : null,
+    siteUrl: lead.custom_domain
+      ? `https://${lead.custom_domain}/prices/`
+      : lead.live_url
+        ? `${lead.live_url.replace(/\/$/, "")}/prices/`
+        : null,
     sections: pl.sections
       .map((s) => ({
         name: s.name,
@@ -76,7 +151,17 @@ export function pricesFeed(lead: LeadRow, record: BusinessRecord, origin: string
         note: s.note ?? "",
         items: s.items
           .filter((it) => all || (!it.soldOut && it.qty !== 0))
-          .map((it) => ({ name: it.name, price: it.price ?? "", note: it.description ?? "", qty: it.qty ?? null, soldOut: !!it.soldOut, image: photo(it.image) ?? null, imageSrc: it.image?.src ?? null, info: it.info ?? null, barcode: it.barcode ?? "" })),
+          .map((it) => ({
+            name: it.name,
+            price: it.price ?? "",
+            note: it.description ?? "",
+            qty: it.qty ?? null,
+            soldOut: !!it.soldOut,
+            image: photo(it.image) ?? null,
+            imageSrc: it.image?.src ?? null,
+            info: it.info ?? null,
+            barcode: it.barcode ?? "",
+          })),
       }))
       .filter((s) => all || s.items.length),
   };
@@ -101,18 +186,79 @@ const ItemsBody = z.object({
               imageSrc: z.string().max(200).nullable().optional(),
             }),
           )
-          .max(200),
+          .max(2000),
       }),
     )
-    .max(60),
+    .max(100),
 });
 
+const ImportBody = z.object({
+  text: z.string().max(2_000_000),
+  mode: z.enum(["merge", "replace"]).default("merge"),
+  /** Where rows without a section go. */
+  section: z.string().trim().max(60).optional(),
+  /** The page's corrected columns; absent = our guess. */
+  columns: z.array(z.string().max(40)).max(60).optional(),
+  hasHeader: z.boolean().optional(),
+  /** Only report what would happen. */
+  dryRun: z.boolean().optional(),
+});
+
+/** Shared by the board and the app: a pasted sheet or CSV in, a preview or the applied result out. */
+export function runImport(
+  record: BusinessRecord,
+  body: z.infer<typeof ImportBody>,
+) {
+  const kind = listKind(record);
+  const W = kindWords(record);
+  const { rows, delimiter } = parseTable(body.text);
+  if (!rows.length)
+    throw new HttpError(
+      422,
+      "Nothing to import: paste the cells or pick a file first",
+    );
+  const guess = detectColumns(rows, kind);
+  const allowed = new Set(fieldChoices(kind).map(([f]) => f));
+  const columns: Field[] = body.columns?.length
+    ? body.columns.map((c) => (allowed.has(c as Field) ? (c as Field) : "skip"))
+    : guess.columns.map((c) => c.field);
+  const hasHeader = body.hasHeader ?? guess.hasHeader;
+  if (!columns.includes("name"))
+    throw new HttpError(422, "Pick which column is the name");
+  const fallback =
+    body.section?.trim() ||
+    priceList(record).sections[0]?.name ||
+    `${W.section} 1`;
+  const parsed = rowsFrom(rows, columns, hasHeader, fallback);
+  const preview = {
+    delimiter: delimiter === "\t" ? "tab" : delimiter,
+    hasHeader,
+    columns: guess.columns.map((c, i) => ({
+      header: c.header,
+      field: columns[i] ?? "skip",
+      sample: c.sample,
+    })),
+    choices: fieldChoices(kind),
+    rows: parsed.length,
+    sections: [...new Set(parsed.map((r) => r.section))].length,
+    sample: parsed.slice(0, 5),
+    fallback,
+  };
+  if (body.dryRun) return { preview };
+  const result = importRows(record, parsed, body.mode);
+  return { preview, result };
+}
+
 /** Replaces the price list with what the board sent, keeping photos by file and matching new ones by caption. */
-export function applyClientItems(record: BusinessRecord, body: z.infer<typeof ItemsBody>): void {
+export function applyClientItems(
+  record: BusinessRecord,
+  body: z.infer<typeof ItemsBody>,
+): void {
   const pl = priceList(record);
   const byFile = new Map<string, Image>();
   for (const g of record.media.gallery) byFile.set(g.src, g);
-  for (const s of pl.sections) for (const it of s.items) if (it.image) byFile.set(it.image.src, it.image);
+  for (const s of pl.sections)
+    for (const it of s.items) if (it.image) byFile.set(it.image.src, it.image);
   // Care cards ride along by name (the board doesn't edit them; the tablet and the catalog do).
   const infoByName = new Map<string, ItemInfo | undefined>();
   const codeByName = new Map<string, string>();
@@ -120,10 +266,11 @@ export function applyClientItems(record: BusinessRecord, body: z.infer<typeof It
     if (c.info) infoByName.set(c.name.toLowerCase(), c.info);
     if (c.barcode) codeByName.set(c.name.toLowerCase(), c.barcode);
   }
-  for (const s of pl.sections) for (const it of s.items) {
-    if (it.info) infoByName.set(it.name.toLowerCase(), it.info);
-    if (it.barcode) codeByName.set(it.name.toLowerCase(), it.barcode);
-  }
+  for (const s of pl.sections)
+    for (const it of s.items) {
+      if (it.info) infoByName.set(it.name.toLowerCase(), it.info);
+      if (it.barcode) codeByName.set(it.name.toLowerCase(), it.barcode);
+    }
   const sections: MenuSection[] = body.sections.map((s) => ({
     name: s.name,
     note: s.note || undefined,
@@ -135,23 +282,38 @@ export function applyClientItems(record: BusinessRecord, body: z.infer<typeof It
       soldOut: it.soldOut || undefined,
       image: it.imageSrc ? byFile.get(it.imageSrc) : undefined,
       info: infoByName.get(it.name.toLowerCase()),
-      barcode: it.barcode === undefined ? codeByName.get(it.name.toLowerCase()) : normalizeCode(it.barcode) || undefined,
+      barcode:
+        it.barcode === undefined
+          ? codeByName.get(it.name.toLowerCase())
+          : normalizeCode(it.barcode) || undefined,
     })),
   }));
   autoMatchPhotos(sections, record.media.gallery);
   record.ext.retail!.priceList = { ...pl, sections, lastUpdated: stamp() };
 }
 
-export async function saveAndRefresh(env: Env, lead: LeadRow, record: BusinessRecord, o: { quick?: boolean } = {}): Promise<void> {
+export async function saveAndRefresh(
+  env: Env,
+  lead: LeadRow,
+  record: BusinessRecord,
+  o: { quick?: boolean } = {},
+): Promise<void> {
   const copy = lead.copy_json ? (JSON.parse(lead.copy_json) as Copy) : null;
-  await updateLead(env, lead.id, { record_json: JSON.stringify(record), prices_dirty: lead.live_url ? 1 : 0, pitch_json: null });
+  await updateLead(env, lead.id, {
+    record_json: JSON.stringify(record),
+    prices_dirty: lead.live_url ? 1 : 0,
+    pitch_json: null,
+  });
   // Tablet taps (+1, −1) skip the preview rebuild: the preview and the live site both read the live feed anyway.
-  if (copy && !o.quick) await renderPreview(env, lead, record, copy, lead.look ?? "");
+  if (copy && !o.quick)
+    await renderPreview(env, lead, record, copy, lead.look ?? "");
 }
 
 /** Minute cron: republish live sites whose price list changed, two a minute, so the static copy follows the board. */
 export async function republishDirty(env: Env): Promise<number> {
-  const rows = await env.DB.prepare("SELECT * FROM leads WHERE prices_dirty = 1 AND live_url IS NOT NULL AND status = 'ready' ORDER BY updated_at ASC LIMIT 2").all<LeadRow>();
+  const rows = await env.DB.prepare(
+    "SELECT * FROM leads WHERE prices_dirty = 1 AND live_url IS NOT NULL AND status = 'ready' ORDER BY updated_at ASC LIMIT 2",
+  ).all<LeadRow>();
   let n = 0;
   for (const lead of rows.results) {
     try {
@@ -167,40 +329,103 @@ export async function republishDirty(env: Env): Promise<number> {
 }
 
 /** `/l/<leadId>/prices.json`: the live feed any copy of the site (preview, share, live) reads. Public, cached half a minute. */
-export async function servePricesFeed(env: Env, leadId: string, origin: string): Promise<Response> {
+export async function servePricesFeed(
+  env: Env,
+  leadId: string,
+  origin: string,
+): Promise<Response> {
   const lead = await getLead(env, leadId);
   const record = lead && recordOf(lead);
-  if (!lead || !record || lead.status === "expired") return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
+  if (!lead || !record || lead.status === "expired")
+    return new Response("{}", {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    });
   return new Response(JSON.stringify(pricesFeed(lead, record, origin)), {
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=30", "access-control-allow-origin": "*" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=30",
+      "access-control-allow-origin": "*",
+    },
   });
 }
 
 /** `/l/<leadId>/photo/<file>`: an owner photo straight from storage, so a photo taken at the tank shows before the next publish. */
-export async function servePhoto(env: Env, leadId: string, file: string): Promise<Response> {
-  if (!/^[A-Za-z0-9_.-]{1,80}$/.test(file)) return new Response("Not found", { status: 404 });
+export async function servePhoto(
+  env: Env,
+  leadId: string,
+  file: string,
+): Promise<Response> {
+  if (!/^[A-Za-z0-9_.-]{1,80}$/.test(file))
+    return new Response("Not found", { status: 404 });
   const obj = await env.BUCKET.get(`owner/${leadId}/${file}`);
   if (!obj) return new Response("Not found", { status: 404 });
-  return new Response(obj.body, { headers: { "content-type": obj.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=86400", "access-control-allow-origin": "*" } });
+  return new Response(obj.body, {
+    headers: {
+      "content-type": obj.httpMetadata?.contentType ?? "image/jpeg",
+      "cache-control": "public, max-age=86400",
+      "access-control-allow-origin": "*",
+    },
+  });
 }
 
 /** `/c/<leadId>.<sig>` and its little API. */
-export async function serveTankBoard(env: Env, req: Request, leadId: string, sig: string, rest: string, origin: string): Promise<Response> {
+export async function serveTankBoard(
+  env: Env,
+  req: Request,
+  leadId: string,
+  sig: string,
+  rest: string,
+  origin: string,
+): Promise<Response> {
   const lead = await leadFor(env, leadId, sig);
   const record = recordOf(lead);
-  if (!record) throw new HttpError(409, "Your site isn't built yet. Try again in a few minutes.");
+  if (!record)
+    throw new HttpError(
+      409,
+      "Your site isn't built yet. Try again in a few minutes.",
+    );
   const base = `/c/${leadId}.${sig}`;
-  if (rest === "/data" && req.method === "GET") return Response.json({ ...pricesFeed(lead, record, origin, true), staffPinSet: !!priceList(record).staffPin, nfcText: `ua-staff:${await nfcSecret(env, lead)}` }, { headers: { "cache-control": "no-store" } });
+  if (rest === "/data" && req.method === "GET")
+    return Response.json(
+      {
+        ...pricesFeed(lead, record, origin, true),
+        staffPinSet: !!priceList(record).staffPin,
+        nfcText: `ua-staff:${await nfcSecret(env, lead)}`,
+      },
+      { headers: { "cache-control": "no-store" } },
+    );
   if (rest === "/items" && req.method === "PUT") {
     const body = ItemsBody.parse(await req.json());
     applyClientItems(record, body);
     await saveAndRefresh(env, lead, record);
-    return Response.json(pricesFeed(lead, record, origin, true), { headers: { "cache-control": "no-store" } });
+    return Response.json(pricesFeed(lead, record, origin, true), {
+      headers: { "cache-control": "no-store" },
+    });
+  }
+  if (rest === "/import" && req.method === "POST") {
+    const body = ImportBody.parse(await req.json());
+    const out = runImport(record, body);
+    if (out.result) await saveAndRefresh(env, lead, record);
+    return Response.json(out, { headers: { "cache-control": "no-store" } });
+  }
+  if (rest === "/export.csv" && req.method === "GET") {
+    return new Response(exportCsv(record), {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="${record.name.replace(/[^\w ]+/g, "").trim() || "stock"} - ${kindWords(record).board}.csv"`,
+        "cache-control": "no-store",
+      },
+    });
   }
   if (rest === "/unlock" && req.method === "POST") {
     // The shop approves a tablet's 6-digit code from their phone.
     const { code } = (await req.json()) as { code?: string };
-    if (!(await approveUnlock(env, leadId, String(code ?? "")))) throw new HttpError(404, "No tablet is waiting with that code (codes last 10 minutes)");
+    if (!(await approveUnlock(env, leadId, String(code ?? ""))))
+      throw new HttpError(
+        404,
+        "No tablet is waiting with that code (codes last 10 minutes)",
+      );
     return Response.json({ ok: true });
   }
   if (rest === "/staffpin" && req.method === "PUT") {
@@ -211,29 +436,64 @@ export async function serveTankBoard(env: Env, req: Request, leadId: string, sig
   if (rest === "/photo" && req.method === "POST") {
     const url = new URL(req.url);
     const type = req.headers.get("content-type") ?? "";
-    const ext = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as Record<string, string>)[type];
+    const ext = (
+      {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+      } as Record<string, string>
+    )[type];
     if (!ext) throw new HttpError(415, "Send a JPEG, PNG or WebP photo");
     const bytes = await req.arrayBuffer();
-    if (bytes.byteLength > 8_000_000) throw new HttpError(413, "That photo is over 8 MB");
+    if (bytes.byteLength > 8_000_000)
+      throw new HttpError(413, "That photo is over 8 MB");
     const section = url.searchParams.get("section") ?? "";
     const item = url.searchParams.get("item") ?? "";
     const key = `c${newId().slice(0, 10)}`;
-    await env.BUCKET.put(`owner/${leadId}/${key}.${ext}`, bytes, { httpMetadata: { contentType: type } });
-    const img: Image = { src: `/assets/owner/${key}.${ext}`, alt: item || `Photo from ${record.name}`, source: "owner", width: Number(url.searchParams.get("w")) || undefined, height: Number(url.searchParams.get("h")) || undefined };
+    await env.BUCKET.put(`owner/${leadId}/${key}.${ext}`, bytes, {
+      httpMetadata: { contentType: type },
+    });
+    const img: Image = {
+      src: `/assets/owner/${key}.${ext}`,
+      alt: item || `Photo from ${record.name}`,
+      source: "owner",
+      width: Number(url.searchParams.get("w")) || undefined,
+      height: Number(url.searchParams.get("h")) || undefined,
+    };
     if (record.media.gallery.length < 24) record.media.gallery.push(img);
     const pl = priceList(record);
-    const target = pl.sections.find((s) => s.name === section)?.items.find((it) => it.name === item);
+    const target = pl.sections
+      .find((s) => s.name === section)
+      ?.items.find((it) => it.name === item);
     if (target) target.image = img;
     record.ext.retail!.priceList = { ...pl, lastUpdated: stamp() };
     await saveAndRefresh(env, lead, record);
-    return Response.json({ ok: true, imageSrc: img.src, image: `${origin}/l/${leadId}/photo/${key}.${ext}` });
+    return Response.json({
+      ok: true,
+      imageSrc: img.src,
+      image: `${origin}/l/${leadId}/photo/${key}.${ext}`,
+    });
   }
   if (rest && rest !== "/") return Response.redirect(`${origin}${base}/`, 302);
   if (!rest) return Response.redirect(`${origin}${base}/`, 301);
   return boardPage(record, base, leadId);
 }
 
-export function boardPage(record: BusinessRecord, base: string, leadId = ""): Response {
+const NOTE_HINT: Record<string, string> = {
+  fish: "size, pairs only, feeding",
+  plants: "size, sun, pot",
+  pets: "age, sex, handled",
+  food: "serves, allergens",
+  parts: "fits, condition, where it is",
+  vehicles: "miles, title, color",
+  goods: "size, condition, brand",
+};
+
+export function boardPage(
+  record: BusinessRecord,
+  base: string,
+  leadId = "",
+): Response {
   const name = escHtml(record.name);
   const W = kindWords(record);
   const sec = W.section.toLowerCase();
@@ -269,7 +529,14 @@ main{max-width:720px;margin:0 auto;padding:12px}
 footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 </style></head><body>
 <header><div><h1>${name} · ${escHtml(W.board)}</h1><div class="st" id="st">Loading…</div></div><a id="open" class="small" style="color:#fff" hidden target="_blank" rel="noopener">Open price page ↗</a></header>
-<main id="m"><p class="empty">Loading your tanks…</p></main>
+<div id="findbar" style="max-width:720px;margin:0 auto;padding:12px 12px 0" hidden><input id="find" type="search" placeholder="Find by name, barcode or ${escHtml(sec)}…" aria-label="Find" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit"><p class="small muted" id="findMsg" style="margin:4px 0 0"></p></div>
+<main id="m"><p class="empty">Loading your ${escHtml(sec)}s…</p></main>
+<section class="tank" id="importbox" style="max-width:720px;margin:0 auto 12px"><div class="tank__h"><span>⬆️</span><b>Put a whole list on at once</b></div><div style="padding:10px 12px" class="small">
+<p style="margin:0 0 8px">Have your stock in a spreadsheet or your register's export? Paste the cells here (open it in Excel or Google Sheets, select all, copy, paste) or pick the .csv file. A column for the name is all it needs; price, how many, barcode or SKU and ${escHtml(sec)} / category are used when you have them.</p>
+<textarea id="impText" rows="5" placeholder="Name	Price	How many	Barcode	${escHtml(W.section)}&#10;Oil filter PH3614	$6.99	24	0025338041...	Aisle 3" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit"></textarea>
+<div class="row" style="margin:8px 0"><label class="chip" style="cursor:pointer">📄 Pick a .csv file<input id="impFile" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" style="display:none"></label><button class="btn btn--line" id="impPreview" type="button" style="padding:10px 12px">Check it first</button><a class="chip" id="expCsv" href="${escHtml(base)}/export.csv" download>⬇️ Download what's on the board (.csv)</a></div>
+<div id="impPrev" hidden></div>
+<p class="muted" id="impMsg" style="margin:4px 0 0"></p></div></section>
 <div class="bar"><button class="btn btn--line" id="addTank" type="button">+ Add a ${escHtml(sec)}</button><span class="small muted">Changes save by themselves.</span></div>
 <section class="tank" id="staffbox"><div class="tank__h"><span>📺</span><b>Tablet &amp; staff</b></div><div style="padding:10px 12px" class="small">
 <p style="margin:0 0 8px">A tablet beside a ${escHtml(sec)} shows it live (the 📺 on each one). On the tablet, <b>Staff</b> unlocks adding ${escHtml(W.item)}s, counts and photos. Three ways in:</p>
@@ -289,7 +556,7 @@ function render(){
   m.innerHTML=data.sections.map(function(s,si){return '<section class="tank" data-s="'+si+'"><div class="tank__h"><span>${W.emoji}</span><input value="'+esc(s.name)+'" data-f="sname" aria-label="Section name"><button class="ic" data-a="up" title="Move up">▲</button><button class="ic" data-a="down" title="Move down">▼</button><button class="ic" data-a="deltank" title="Remove this ${escHtml(sec)}">🗑</button><a class="ic" href="/d/'+LEAD+'/'+esc(s.slug||'')+'" target="_blank" rel="noopener" title="Show this ${escHtml(sec)} on a tablet or TV">📺</a></div>'+
     s.items.map(function(it,ii){return '<div class="item'+(it.soldOut?' out':'')+'" data-i="'+ii+'"><label class="ph" title="Take or pick a photo">'+(it.image?'<img src="'+esc(it.image)+'" alt="">':'📷')+'<input type="file" accept="image/*" capture="environment" data-a="photo"></label><div>'+
       '<div class="row"><input class="nm" value="'+esc(it.name)+'" data-f="name" placeholder="What is it?" aria-label="Name"><input class="pr" value="'+esc(it.price)+'" data-f="price" placeholder="$" inputmode="decimal" aria-label="Price"><input class="qt" value="'+(it.qty==null?"":it.qty)+'" data-f="qty" placeholder="how many" inputmode="numeric" aria-label="How many"></div>'+
-      '<div class="row"><input class="nt" value="'+esc(it.note)+'" data-f="note" placeholder="Note (size, pairs only, feeding…)" aria-label="Note"></div>'+
+      '<div class="row"><input class="nt" value="'+esc(it.note)+'" data-f="note" placeholder="Note (${escHtml(NOTE_HINT[listKind(record)])}…)" aria-label="Note"></div>'+
       '<div class="row"><input class="bc" value="'+esc(it.barcode||"")+'" data-f="barcode" placeholder="Barcode (scan or type)" inputmode="numeric" aria-label="Barcode" style="flex:1 1 9em"><button class="ic" data-a="scan" type="button" title="Scan the barcode with the camera">▦</button></div>'+
       '<div class="row"><button class="chip'+(it.soldOut?' on':'')+'" data-a="sold" type="button">'+(it.soldOut?'Sold out · tap when back':'In stock · tap if sold out')+'</button><button class="ic" data-a="delitem" title="Remove">🗑</button></div></div></div>'}).join("")+
     '<button class="add" data-a="additem" type="button">+ Add to this ${escHtml(sec)}</button></section>'}).join("");
@@ -326,9 +593,41 @@ function scanInto(cb,input){var det=null;try{det=("BarcodeDetector" in window)?n
     var loop=function(){if(!scanStream)return;if(v.readyState>=2){det.detect(v).then(function(codes){var c=codes&&codes.length&&codes[0].rawValue;if(c){scanStop();cb(String(c).replace(/[^0-9A-Za-z\-._]/g,"").slice(0,64))}else scanT=setTimeout(loop,250)}).catch(function(){scanT=setTimeout(loop,400)})}else scanT=setTimeout(loop,250)};loop()
   }).catch(function(){scanStop();alert("Couldn't open the camera. Type the code instead.");if(input)input.focus()})}
 document.getElementById("scanCancel").addEventListener("click",scanStop);
+var find=document.getElementById("find");var findBar=document.getElementById("findbar");
+function applyFind(){var q=(find.value||"").trim().toLowerCase();var n=0,shown=0;m.querySelectorAll("[data-s]").forEach(function(sec){var s=data.sections[+sec.dataset.s];var secHit=!q||s.name.toLowerCase().indexOf(q)>=0;var any=false;sec.querySelectorAll("[data-i]").forEach(function(row){var it=s.items[+row.dataset.i];n++;var hit=secHit||(it.name||"").toLowerCase().indexOf(q)>=0||(it.barcode||"").indexOf(q)>=0||(it.note||"").toLowerCase().indexOf(q)>=0;row.style.display=hit?"":"none";if(hit){any=true;shown++}});sec.style.display=any||secHit?"":"none"});document.getElementById("findMsg").textContent=q?shown+" of "+n+" shown":""}
+find.addEventListener("input",applyFind);
+var _render=render;render=function(){_render();var n=0;data.sections.forEach(function(s){n+=s.items.length});findBar.hidden=n<15;if(!findBar.hidden&&find.value)applyFind()};
+var impPrev=document.getElementById("impPrev"),impMsg=document.getElementById("impMsg"),impText=document.getElementById("impText"),impCols=null,impHeader=null;
+document.getElementById("impFile").addEventListener("change",function(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>2000000){impMsg.textContent="That file is over 2 MB. Split it in two.";return}var rd=new FileReader();rd.onload=function(){impText.value=String(rd.result||"");impCols=null;impHeader=null;preview()};rd.readAsText(f)});
+function imp(body){return fetch(BASE+"/import",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Import failed ("+r.status+")");return j})})}
+function preview(){impMsg.textContent="Reading…";var body={text:impText.value,dryRun:true};if(impCols)body.columns=impCols;if(impHeader!==null)body.hasHeader=impHeader;
+  imp(body).then(function(j){var p=j.preview;impCols=p.columns.map(function(c){return c.field});impHeader=p.hasHeader;impMsg.textContent="";
+    var h='<p style="margin:8px 0 4px"><b>'+p.rows+' item'+(p.rows===1?'':'s')+'</b> in <b>'+p.sections+' ${escHtml(sec)}'+(p.sections===1?'':'s')+'</b>'+(p.hasHeader?' (first row is the headings)':' (no heading row)')+'. Check what each column is:</p><div class="row">';
+    p.columns.forEach(function(c,i){h+='<label class="small" style="flex:1 1 140px">'+(c.header?esc(c.header):'Column '+(i+1))+'<br><span class="muted">e.g. '+esc(c.sample||'—')+'</span><select data-col="'+i+'" style="width:100%;margin-top:2px;font:inherit;padding:6px;border:1px solid var(--line);border-radius:8px">'+p.choices.map(function(ch){return '<option value="'+esc(ch[0])+'"'+(ch[0]===c.field?' selected':'')+'>'+esc(ch[1])+'</option>'}).join('')+'</select></label>'});
+    h+='</div><label class="small" style="display:block;margin:8px 0"><input type="checkbox" id="impHdr"'+(p.hasHeader?' checked':'')+'> The first row is headings, not an item</label>';
+    h+='<label class="small" style="display:block;margin:8px 0">Rows with no ${escHtml(sec)} go in <input id="impSec" value="'+esc(p.fallback)+'" style="font:inherit;padding:6px;border:1px solid var(--line);border-radius:8px"></label>';
+    h+='<div class="small" style="margin:8px 0"><label style="display:block"><input type="radio" name="impMode" value="merge" checked> <b>Add &amp; update</b>: items already on the board (same barcode or name) get the new price and count; new ones are added. Photos stay.</label><label style="display:block;margin-top:4px"><input type="radio" name="impMode" value="replace"> <b>Replace everything</b>: the board becomes exactly this list (photos and cards are kept by name).</label></div>';
+    if(p.sample.length){h+='<p class="small muted" style="margin:4px 0">First rows: '+p.sample.map(function(r){return esc(r.section)+' › '+esc(r.name)+(r.price?' '+esc(r.price):'')+(r.qty!=null?' ×'+r.qty:'')}).join(' · ')+'</p>'}
+    h+='<button class="btn" id="impGo" type="button" style="margin-top:6px">Put '+p.rows+' item'+(p.rows===1?'':'s')+' on the board</button>';
+    impPrev.innerHTML=h;impPrev.hidden=false;
+    impPrev.querySelectorAll("select[data-col]").forEach(function(sel){sel.addEventListener("change",function(){impCols[+sel.dataset.col]=sel.value;preview()})});
+    document.getElementById("impHdr").addEventListener("change",function(e){impHeader=e.target.checked;preview()});
+    document.getElementById("impGo").addEventListener("click",function(){var mode=(impPrev.querySelector('input[name="impMode"]:checked')||{}).value||"merge";if(mode==="replace"&&!confirm("Replace everything on the board with this list?"))return;impMsg.textContent="Importing…";document.getElementById("impGo").disabled=true;
+      imp({text:impText.value,mode:mode,columns:impCols,hasHeader:impHeader,section:document.getElementById("impSec").value}).then(function(j){var r=j.result;impMsg.textContent="Done ✓ "+r.added+" added, "+r.updated+" updated"+(r.skipped?", "+r.skipped+" skipped (the board holds 2,000 items)":"")+". "+r.items+" items in "+r.sections+" ${escHtml(sec)}s.";impPrev.hidden=true;impText.value="";impCols=null;impHeader=null;load();window.scrollTo(0,0)}).catch(function(e){impMsg.textContent=e.message;document.getElementById("impGo").disabled=false})});
+  }).catch(function(e){impMsg.textContent=e.message;impPrev.hidden=true})}
+document.getElementById("impPreview").addEventListener("click",function(){impCols=null;impHeader=null;preview()});
 document.getElementById("addTank").addEventListener("click",function(){var n=prompt("${escHtml(W.section)} or section name (e.g. ${escHtml(W.section)} 12, New arrivals)");if(!n||!n.trim())return;data.sections.push({name:n.trim(),slug:"",note:"",items:[]});render();save(true);window.scrollTo(0,document.body.scrollHeight)});
 load();
 })();
 </script></body></html>`;
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "referrer-policy": "no-referrer", "content-security-policy": "default-src 'self'; img-src 'self' blob: data: https:; media-src 'self' blob: mediastream:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex",
+      "referrer-policy": "no-referrer",
+      "content-security-policy":
+        "default-src 'self'; img-src 'self' blob: data: https:; media-src 'self' blob: mediastream:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'",
+    },
+  });
 }

@@ -569,6 +569,24 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
+- ⬆️ Whole-inventory import (Oct 2026, `src/worker/stock-import.ts`; built so an auto parts store can use the inventory system
+  without typing): the board's "Put a whole list on at once" section (every kind; `POST /c/<token>/import {text, mode, section?,
+  columns?, hasHeader?, dryRun?}` = `runImport` in tankboard.ts) takes a paste from Excel / Sheets (tabs) or a .csv (register /
+  POS export; `parseTable` picks the delimiter, handles quotes + BOM), `detectColumns` guesses name / price / qty / barcode /
+  section / note from POS-style headings (`HEADERS`) or from the data when there's no heading row, and maps columns matching the
+  kind's info-card fields (Part #, Fits, Brand, …) to `info:<key>` → `ItemInfo.facts`; the page shows the guess with a drop-down
+  per column ("Check it first"), a heading-row tick, the fallback section, and Add & update (`merge`: match by barcode then name,
+  photos/cards stay) or Replace everything (`replace`: sections rebuilt, photos/cards/barcodes back by name; duplicate rows in one
+  section add up). Caps `IMPORT_MAX_ITEMS` 2,000 / `IMPORT_MAX_SECTIONS` 100 (ItemsBody raised to 100 × 2,000). `GET
+  /c/<token>/export.csv` (`exportCsv`: section, name, price, how many, barcode, note, sold out + the kind's card fields) is the
+  backup and the template. The board shows a Find box at 15+ items (name / barcode / section) and kind-aware note hints. Extras
+  added (DEFAULT_ADDONS + live Settings + STANDARD_EXTRA_TERMS + OFFER_HINT): "Tablet display, supplied & set up" $99 each,
+  "Barcode scanner, paired to the tablet" $59 each, "Stock list loaded for you" $49 one-time. Plan copy updated for the inventory
+  system everywhere (DEFAULT_LIST_PLAN / SUGGESTED_PLANS includes, PLAN_TAGLINE.list, EVERY_PLAN live-price-list line,
+  PLAN_PITCH.list, LIST_PLAN_NOTE, call-guide lines in pitch.ts for any category with sections + retail / auto parts / vehicles
+  without), the guide gained "Getting a whole inventory in" (title now "Live inventory: …"), /price-list FAQ ("How do I get my
+  whole inventory in?", "Is it only for fish stores?"), the training lesson, the texted board link (kind words). Standalone use
+  = the Price list plan on a hand-added lead (the business must be on Google). `test/worker/stock-import.test.ts`.
 - 🐠 Tank board (Oct 2026, `src/worker/tankboard.ts`, migration 0018 `leads.client_key` / `prices_dirty`; built for King Fish Aquatics, whose
   tanks change several times a day): the client's own live editor for `ext.retail.priceList`, no login. The team taps "💬 Text them their
   tank board link" / "Open it here" on a ready retail lead (web lead page, Android `LeadScreen` 2.25; `POST /api/leads/:id/clientlink`,

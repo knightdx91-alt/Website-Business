@@ -1567,9 +1567,9 @@
     basic: "Get found on Google and get the phone ringing.",
     plus: "Your website, plus getting found on Google Maps.",
     pro: "Everything handled for you, every month.",
-    list: "Just the prices: a live price page, QR tags and the Tank board. Not a website.",
+    list: "Just the prices: a live price page, QR tags, a tablet and your board. Not a website.",
   };
-  const EVERY_PLAN = ["We build it for you", "Fast, secure hosting", "Changes when you text us", "Made for phones", "Your name, photos and words stay yours"];
+  const EVERY_PLAN = ["We build it for you", "Fast, secure hosting", "Changes when you text us", "Made for phones", "A live price list with QR tags and a tablet display, if your stock changes", "Your name, photos and words stay yours"];
 
   async function viewShowPlans(leadId) {
     stopPolling();
@@ -1688,10 +1688,11 @@
       line: "You run the business. We'll keep you looking sharp online every month.",
     },
     list: {
-      fit: "A shop whose stock changes daily (fish, plants, produce, resale) and isn't ready for a whole website.",
+      fit: "Any business whose stock or prices change often (fish, plants, produce, bakeries, resale, feed, auto parts, used cars) that isn't ready for a whole website.",
       points: [
-        "They change what's in each tank from their phone in seconds. No login, no computer. Sold out hides it; the count shows how many are left.",
-        "QR tags on every tank open that tank's live prices; a cheap tablet by the tank shows them with no QR at all.",
+        "They change what's in each tank, bin or row from their phone in seconds. No login, no computer. Sold out hides it; the count shows how many are left.",
+        "QR tags on every section open its live prices; a cheap tablet by the tank or counter shows them with no QR at all, and in staff mode counts stock in and out by barcode.",
+      "A long list goes on in one go: paste it from a spreadsheet or the register's export and it's sorted into sections. No retyping.",
         "No minimum and no setup fee, so there's nothing to think about. Cancel any time.",
         "Every dollar of the month they're on it counts toward a full website when they're ready; the price page just becomes part of it.",
       ],
@@ -2512,7 +2513,7 @@
   function priceListEditCard(r) {
     const pl = (r.ext.retail && r.ext.retail.priceList) || {};
     return `<section class="card"><h2>Live price list & QR labels</h2>
-      <p class="small muted">Optional. A page with a section per case, shelf, bench or bin that the owner keeps current from their phone or a tablet; each section gets a QR label.</p>
+      <p class="small muted">Optional. A page with a section per case, shelf, bench or bin that the owner keeps current from their phone or a tablet; each section gets a QR label. A long list (a spreadsheet, a register export)? Open their board from the lead page ("Open it here") and use "Put a whole list on at once".</p>
       <label class="field">Price list <span class="hint">One item per line: Name | $Price | Note. Start a section with # Section name.</span><textarea name="plText" rows="6" placeholder="# Case&#10;Sourdough loaf | $8 | Baked daily&#10;Cinnamon rolls (6) | $14&#10;&#10;# Shelf&#10;Local honey, 16 oz | $12">${esc(pl.sections ? priceListText(pl.sections) : "")}</textarea></label>
       <div class="row"><label class="field">Page title<input name="plTitle" maxlength="40" value="${esc(pl.title || "")}" placeholder="Today's prices"></label>
       <label class="field">What's on it<select name="plKind">${PRICE_KINDS.map(([k, t]) => `<option value="${k}"${pl.kind === k ? " selected" : ""}>${t}</option>`).join("")}</select></label></div>
@@ -2554,7 +2555,7 @@
       <label class="field">Occasions (one per line)<textarea name="rtOcc2" rows="3" placeholder="Homecoming&#10;Game day&#10;Prom&#10;Baby showers">${esc((x.occasions || []).join("\n"))}</textarea></label>` : ""}
       ${booths || v === "furniture" ? `<label class="field">Hold line<input name="rtHold" maxlength="160" value="${esc(x.holdNote || "")}" placeholder="Call to hold an item for 24 hours."></label>` : ""}
       <h3>Price list &amp; QR labels</h3>
-      <label class="field">Price list <span class="hint">One item per line: Name | $Price | Note. Start a section with # Section name (one per tank, shelf or rack).</span><textarea name="rtPriceList" rows="8" placeholder="# Freshwater community&#10;Neon tetra | $2.99 | Schooling fish, keep 6+&#10;Corydoras | $6.99&#10;&#10;# Saltwater&#10;Ocellaris clownfish | $24.99">${esc(x.priceList && x.priceList.sections ? priceListText(x.priceList.sections) : "")}</textarea></label>
+      <label class="field">Price list <span class="hint">One item per line: Name | $Price | Note. Start a section with # Section name (one per tank, shelf or rack). A long list pastes in from a spreadsheet on their board ("Open it here" on the lead page → "Put a whole list on at once").</span><textarea name="rtPriceList" rows="8" placeholder="# Freshwater community&#10;Neon tetra | $2.99 | Schooling fish, keep 6+&#10;Corydoras | $6.99&#10;&#10;# Saltwater&#10;Ocellaris clownfish | $24.99">${esc(x.priceList && x.priceList.sections ? priceListText(x.priceList.sections) : "")}</textarea></label>
       <div class="row"><label class="field">Page title<input name="rtPriceTitle" maxlength="40" value="${esc((x.priceList && x.priceList.title) || "")}" placeholder="Fish & prices"></label>
       <label class="field">What's on it<select name="rtPriceKind">${PRICE_KINDS.map(([k, t]) => `<option value="${k}"${(x.priceList && x.priceList.kind) === k ? " selected" : ""}>${t}</option>`).join("")}</select></label></div>
       ${cb("rtPricesPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", !x.priceList || x.priceList.public !== false)}
@@ -3238,7 +3239,7 @@
         <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
       <section class="card"><h2>📖 Guides</h2>
         <p class="small muted">How to set up and sell what we offer, with the exact buttons to tap. Prices in the guides come from Settings.</p>
-        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">🐠 Tank board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/training">🎓 Training course</a></div></section>
+        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">🐠 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/training">🎓 Training course</a></div></section>
       <section class="card"><h2>💵 Costs & usage</h2>
         <p class="small muted">Every outside service the app depends on: what it costs, what we've used this month, when it renews and what stops if it lapses. For whoever minds the bills.</p>
         <div class="btns btns--full"><a class="btn btn--primary" href="#/costs">💵 Open Costs & usage</a><a class="btn" href="#/guide/costs">📖 The guide</a></div></section>
@@ -3353,7 +3354,7 @@
     { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page" },
     { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
     { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
-    { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your shop, with a section for every tank or shelf\nThe Tank board: change names, prices, counts and photos from your phone, any time, no login\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every tank or shelf (first sheet included) and a tablet display page\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
+    { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out, scan barcodes, add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
   ];
   const UNIT_LABEL = { month: "/month", each: " each", "one-time": " one-time", quote: " (priced per job)" };
   const addonPrice = (a) => (a.unit === "quote" ? "Priced per job" : `${money(a.price)}${UNIT_LABEL[a.unit] || ""}`);
@@ -3374,6 +3375,9 @@
     [/review card|nfc/i, "Busy counters: restaurants, salons, shops. More reviews, higher on Maps."],
     [/changes/i, "Bigger jobs beyond the plan: a new page or section, a redesign."],
     [/ads?\b|ad management/i, "Contractors in busy season; restaurants with a new menu or event."],
+    [/tablet/i, "Any shop with a board: one tablet by the busiest tank, shelf or counter. We bring it, set it up and mount it."],
+    [/scanner/i, "Shops with packaged stock (feed, filters, parts, bottles): a delivery is counted in by scanning."],
+    [/stock list|inventory/i, "Shops with a long list in a spreadsheet, a register export or on paper who don't want to type it."],
   ];
   const offerHint = (name) => (OFFER_HINT.find(([re]) => re.test(name)) || [null, ""])[1];
 

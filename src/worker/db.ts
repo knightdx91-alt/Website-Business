@@ -63,19 +63,33 @@ export interface RunRow {
   options_json: string | null;
 }
 
-export async function getSetting(env: Env, key: string): Promise<string | null> {
-  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = ?").bind(key).first<{ value: string }>();
+export async function getSetting(
+  env: Env,
+  key: string,
+): Promise<string | null> {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = ?")
+    .bind(key)
+    .first<{ value: string }>();
   return row?.value ?? null;
 }
 
-export async function setSetting(env: Env, key: string, value: string): Promise<void> {
-  await env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(key, value).run();
+export async function setSetting(
+  env: Env,
+  key: string,
+  value: string,
+): Promise<void> {
+  await env.DB.prepare(
+    "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+  )
+    .bind(key, value)
+    .run();
 }
 
 /** The three website plans, plus "list": the Price list plan (price page + Tank board + QR tags, no full website). */
 export type PlanId = "basic" | "plus" | "pro" | "list";
 export const PLAN_IDS: PlanId[] = ["basic", "plus", "pro", "list"];
-export const isPlanId = (x: unknown): x is PlanId => typeof x === "string" && (PLAN_IDS as string[]).includes(x);
+export const isPlanId = (x: unknown): x is PlanId =>
+  typeof x === "string" && (PLAN_IDS as string[]).includes(x);
 /** A plan that is not a website: hosting for the price page only. Billing is monthly with no minimum, or yearly. */
 export const isListPlan = (p: { id: string }) => p.id === "list";
 /** Added to Settings when it has website plans but no Price list plan yet; blank the monthly price to hide it. */
@@ -85,10 +99,12 @@ export const DEFAULT_LIST_PLAN: Plan = {
   setup: 0,
   monthly: 29,
   includes: [
-    "A live price page for your shop, with a section for every tank or shelf",
-    "The Tank board: change names, prices, counts and photos from your phone, any time, no login",
+    "A live price page for your business, with a section for every tank, shelf, bin or row",
+    "Your board: change names, prices, counts and photos from your phone, any time, no login",
+    "Put your whole list on at once: paste it from a spreadsheet or your register's export",
     "Sold out hides an item until it's back; the page shows how many are left",
-    "QR price tags for every tank or shelf (first sheet included) and a tablet display page",
+    "QR price tags for every section (first sheet included) and a tablet display page",
+    "Staff mode on the tablet: count stock in and out, scan barcodes, add new items, PIN-locked",
     "Fast, secure hosting; changes when you text us",
     "No minimum: cancel any time. Upgrade to a full website any time",
   ].join("\n"),
@@ -123,25 +139,138 @@ export interface AddOn {
 export function addonPrice(a: Pick<AddOn, "price" | "unit">): string {
   if (a.unit === "quote") return "priced per job";
   const p = `$${Number.isInteger(a.price) ? a.price : a.price.toFixed(2)}`;
-  return a.unit === "month" ? `${p}/month` : a.unit === "each" ? `${p} each` : `${p} one-time`;
+  return a.unit === "month"
+    ? `${p}/month`
+    : a.unit === "each"
+      ? `${p} each`
+      : `${p} one-time`;
 }
 
 export const DEFAULT_ADDONS: AddOn[] = [
-  { name: "Online ordering or booking hookup", price: 99, unit: "one-time", about: "We connect your Square, Toast, DoorDash, Calendly or Booksy so customers can order or book right from your site." },
-  { name: "Get listed everywhere", price: 99, unit: "one-time", about: "We set up or fix your listings on Apple Maps, Bing, Yelp, Facebook, Nextdoor and the BBB so your hours and number match everywhere." },
-  { name: "Google Business Profile setup", price: 149, unit: "one-time", about: "We set up or tune up your Google listing: hours, photos, services and description, so more people find you on Google Maps." },
-  { name: "Photo shoot", price: 199, unit: "one-time", about: "We come by and take 20 to 30 photos of your place, your work and your team for your website and Google profile." },
-  { name: "Spanish version of your site", price: 99, unit: "one-time", about: "A Spanish page with your hours, services and how to reach you, linked from every page." },
-  { name: "\"We're hiring\" section", price: 49, unit: "one-time", about: "Show the jobs you're filling and how to apply. We update it free whenever your openings change." },
-  { name: "Same-day build", price: 49, unit: "one-time", about: "Live the same business day you approve it." },
-  { name: "Social media posts", price: 129, unit: "month", about: "8 to 12 Facebook and Instagram posts a month written for your business. You approve them before they go up." },
-  { name: "QR price tags & shelf labels", price: 49, unit: "each", about: "A printed sheet of QR labels for your tanks, shelves or racks. Each one opens that section of your price list, so a price change on the site is a price change on the shelf." },
-  { name: "QR table tents & window sign", price: 49, unit: "each", about: "A printed set with QR codes for your website, menu and Google reviews, for your tables, counter or front window." },
-  { name: "Business cards, yard signs & door hangers", price: 0, unit: "quote", about: "Printed pieces that match your website, from a local print shop." },
-  { name: "Logo refresh", price: 179, unit: "one-time", about: "A clean, simple logo in your site's colors, ready for signs, shirts and cards." },
-  { name: "Tap-to-review card (NFC)", price: 35, unit: "each", about: "Customers tap their phone on the card at your counter to leave a Google review." },
-  { name: "Extra changes", price: 50, unit: "each", about: "Bigger jobs beyond your plan's included updates, like a new page or section. We always quote first." },
-  { name: "Ad management", price: 149, unit: "month", about: "We run your Google or Facebook ads and report what they bring in. Ad spend is paid separately." },
+  {
+    name: "Online ordering or booking hookup",
+    price: 99,
+    unit: "one-time",
+    about:
+      "We connect your Square, Toast, DoorDash, Calendly or Booksy so customers can order or book right from your site.",
+  },
+  {
+    name: "Get listed everywhere",
+    price: 99,
+    unit: "one-time",
+    about:
+      "We set up or fix your listings on Apple Maps, Bing, Yelp, Facebook, Nextdoor and the BBB so your hours and number match everywhere.",
+  },
+  {
+    name: "Google Business Profile setup",
+    price: 149,
+    unit: "one-time",
+    about:
+      "We set up or tune up your Google listing: hours, photos, services and description, so more people find you on Google Maps.",
+  },
+  {
+    name: "Photo shoot",
+    price: 199,
+    unit: "one-time",
+    about:
+      "We come by and take 20 to 30 photos of your place, your work and your team for your website and Google profile.",
+  },
+  {
+    name: "Spanish version of your site",
+    price: 99,
+    unit: "one-time",
+    about:
+      "A Spanish page with your hours, services and how to reach you, linked from every page.",
+  },
+  {
+    name: '"We\'re hiring" section',
+    price: 49,
+    unit: "one-time",
+    about:
+      "Show the jobs you're filling and how to apply. We update it free whenever your openings change.",
+  },
+  {
+    name: "Same-day build",
+    price: 49,
+    unit: "one-time",
+    about: "Live the same business day you approve it.",
+  },
+  {
+    name: "Social media posts",
+    price: 129,
+    unit: "month",
+    about:
+      "8 to 12 Facebook and Instagram posts a month written for your business. You approve them before they go up.",
+  },
+  {
+    name: "QR price tags & shelf labels",
+    price: 49,
+    unit: "each",
+    about:
+      "A printed sheet of QR labels for your tanks, shelves or racks. Each one opens that section of your price list, so a price change on the site is a price change on the shelf.",
+  },
+  {
+    name: "QR table tents & window sign",
+    price: 49,
+    unit: "each",
+    about:
+      "A printed set with QR codes for your website, menu and Google reviews, for your tables, counter or front window.",
+  },
+  {
+    name: "Business cards, yard signs & door hangers",
+    price: 0,
+    unit: "quote",
+    about: "Printed pieces that match your website, from a local print shop.",
+  },
+  {
+    name: "Logo refresh",
+    price: 179,
+    unit: "one-time",
+    about:
+      "A clean, simple logo in your site's colors, ready for signs, shirts and cards.",
+  },
+  {
+    name: "Tap-to-review card (NFC)",
+    price: 35,
+    unit: "each",
+    about:
+      "Customers tap their phone on the card at your counter to leave a Google review.",
+  },
+  {
+    name: "Extra changes",
+    price: 50,
+    unit: "each",
+    about:
+      "Bigger jobs beyond your plan's included updates, like a new page or section. We always quote first.",
+  },
+  {
+    name: "Ad management",
+    price: 149,
+    unit: "month",
+    about:
+      "We run your Google or Facebook ads and report what they bring in. Ad spend is paid separately.",
+  },
+  {
+    name: "Tablet display, supplied & set up",
+    price: 99,
+    unit: "each",
+    about:
+      "A tablet by your tank, shelf or counter that shows that section live and doubles as your staff's stock station. We bring it, set it up and mount it.",
+  },
+  {
+    name: "Barcode scanner, paired to the tablet",
+    price: 59,
+    unit: "each",
+    about:
+      "A handheld scanner paired to your tablet, so a delivery is counted in by scanning each product instead of finding it in a list.",
+  },
+  {
+    name: "Stock list loaded for you",
+    price: 49,
+    unit: "one-time",
+    about:
+      "Send us your spreadsheet, register export or a photo of your price board and we put the whole list on your board, sorted into sections.",
+  },
 ];
 
 export type Billing = "short" | "standard" | "flex" | "annual";
@@ -164,7 +293,11 @@ function dollars(n: number): string {
  * The ways a client can pay for a plan: a 6-month or 12-month commitment (no setup fee), month to month
  * (the only one with a setup fee), or yearly up front (months free).
  */
-export function billingOptions(plan: Plan, s: BillingSettings, opts: { category?: string } = {}): BillingOption[] {
+export function billingOptions(
+  plan: Plan,
+  s: BillingSettings,
+  opts: { category?: string } = {},
+): BillingOption[] {
   const min = s.minMonths ?? 12;
   const short = s.shortMonths ?? 6;
   const church = opts.category === "church";
@@ -173,10 +306,22 @@ export function billingOptions(plan: Plan, s: BillingSettings, opts: { category?
   const out: BillingOption[] = [];
   if (isListPlan(plan)) {
     // Nothing is built up front for a price page, so there is no minimum term and no month-to-month setup fee.
-    out.push({ id: "standard", label: "Monthly", detail: `${dollars(plan.monthly)}/month · ${setup} · no minimum, cancel any time`, monthlyEquivalent: plan.monthly, payLink: plan.payLink });
+    out.push({
+      id: "standard",
+      label: "Monthly",
+      detail: `${dollars(plan.monthly)}/month · ${setup} · no minimum, cancel any time`,
+      monthlyEquivalent: plan.monthly,
+      payLink: plan.payLink,
+    });
     if (free) {
       const yearly = plan.monthly * (12 - free);
-      out.push({ id: "annual", label: `Pay yearly (${free} months free)`, detail: `${dollars(yearly)} for 12 months (you pay for ${12 - free}, ${free} are free) instead of ${dollars(plan.monthly * 12)} · ${setup} · renews yearly`, monthlyEquivalent: Math.round((yearly / 12) * 100) / 100, payLink: plan.payLinkAnnual });
+      out.push({
+        id: "annual",
+        label: `Pay yearly (${free} months free)`,
+        detail: `${dollars(yearly)} for 12 months (you pay for ${12 - free}, ${free} are free) instead of ${dollars(plan.monthly * 12)} · ${setup} · renews yearly`,
+        monthlyEquivalent: Math.round((yearly / 12) * 100) / 100,
+        payLink: plan.payLinkAnnual,
+      });
     }
     return out;
   }
@@ -190,15 +335,13 @@ export function billingOptions(plan: Plan, s: BillingSettings, opts: { category?
       payLink: plan.payLinkShort || plan.payLink,
     });
   }
-  out.push(
-    {
-      id: "standard",
-      label: min ? `${min}-month plan` : "Monthly",
-      detail: `${dollars(plan.monthly)}/month · ${setup} · ${min ? `${min}-month minimum, then cancel any time` : "cancel any time"}`,
-      monthlyEquivalent: plan.monthly,
-      payLink: plan.payLink,
-    },
-  );
+  out.push({
+    id: "standard",
+    label: min ? `${min}-month plan` : "Monthly",
+    detail: `${dollars(plan.monthly)}/month · ${setup} · ${min ? `${min}-month minimum, then cancel any time` : "cancel any time"}`,
+    monthlyEquivalent: plan.monthly,
+    payLink: plan.payLink,
+  });
   if (min && s.flexSetup) {
     out.push({
       id: "flex",
@@ -212,7 +355,9 @@ export function billingOptions(plan: Plan, s: BillingSettings, opts: { category?
     const yearly = plan.monthly * (12 - free);
     out.push({
       id: "annual",
-      label: church ? "Pay yearly (ministry rate)" : `Pay yearly (${free} months free)`,
+      label: church
+        ? "Pay yearly (ministry rate)"
+        : `Pay yearly (${free} months free)`,
       detail: church
         ? `Ministry rate: 12 months for the price of ${12 - free} — ${dollars(yearly)}/year · ${setup} · renews yearly`
         : `${dollars(yearly)} for 12 months (you pay for ${12 - free}, ${free} are free) instead of ${dollars(plan.monthly * 12)} · ${setup} · renews yearly`,
@@ -224,56 +369,123 @@ export function billingOptions(plan: Plan, s: BillingSettings, opts: { category?
 }
 
 /** The settings billingOptions reads. churchAnnualMonthsFree is optional here so older callers and tests still type-check. */
-export type BillingSettings = Pick<AppSettings, "minMonths" | "shortMonths" | "flexSetup" | "annualMonthsFree"> & { churchAnnualMonthsFree?: number };
+export type BillingSettings = Pick<
+  AppSettings,
+  "minMonths" | "shortMonths" | "flexSetup" | "annualMonthsFree"
+> & { churchAnnualMonthsFree?: number };
 
 /** Months free on the yearly option: the ministry rate for churches and nonprofits, the standard rate for everyone else. */
-export function annualMonthsFreeFor(s: BillingSettings, category?: string): number {
-  return category === "church" ? (s.churchAnnualMonthsFree ?? 4) : (s.annualMonthsFree ?? 0);
+export function annualMonthsFreeFor(
+  s: BillingSettings,
+  category?: string,
+): number {
+  return category === "church"
+    ? (s.churchAnnualMonthsFree ?? 4)
+    : (s.annualMonthsFree ?? 0);
 }
 
 /** Shown wherever someone is about to buy, and in the agreement's TIMING section. */
-export const GO_LIVE_TEXT = "Your site goes live within 3 business days of your OK on the details (same day only with the paid Same-day build extra).";
+export const GO_LIVE_TEXT =
+  "Your site goes live within 3 business days of your OK on the details (same day only with the paid Same-day build extra).";
 
 /**
  * Plain-language lines every agreement carries. They're woven into defaultTerms; when the owner has written their own
  * service agreement in Settings, contract.ts adds the ones that text doesn't already cover.
  */
 /** The late fee and early-payoff discount as the agreement states them. */
-export type PenaltySettings = Pick<AppSettings, "lateFee" | "payoffDiscount" | "interestRate" | "reinstatementFee" | "returnedPaymentFee">;
-export const lateFeeOf = (s: PenaltySettings) => Math.max(0, Math.round((s.lateFee ?? 15) * 100) / 100);
-export const payoffDiscountOf = (s: PenaltySettings) => Math.max(0, Math.min(100, Math.round(s.payoffDiscount ?? 15)));
+export type PenaltySettings = Pick<
+  AppSettings,
+  | "lateFee"
+  | "payoffDiscount"
+  | "interestRate"
+  | "reinstatementFee"
+  | "returnedPaymentFee"
+>;
+export const lateFeeOf = (s: PenaltySettings) =>
+  Math.max(0, Math.round((s.lateFee ?? 15) * 100) / 100);
+export const payoffDiscountOf = (s: PenaltySettings) =>
+  Math.max(0, Math.min(100, Math.round(s.payoffDiscount ?? 15)));
 /** Capped at 8: Alabama's legal maximum for a rate written into a contract (Ala. Code § 8-8-1). */
-export const interestRateOf = (s: PenaltySettings) => Math.max(0, Math.min(8, Math.round((s.interestRate ?? 8) * 100) / 100));
-export const reinstatementFeeOf = (s: PenaltySettings) => Math.max(0, Math.round((s.reinstatementFee ?? 49) * 100) / 100);
-export const returnedFeeOf = (s: PenaltySettings) => Math.max(0, Math.round((s.returnedPaymentFee ?? 15) * 100) / 100);
+export const interestRateOf = (s: PenaltySettings) =>
+  Math.max(0, Math.min(8, Math.round((s.interestRate ?? 8) * 100) / 100));
+export const reinstatementFeeOf = (s: PenaltySettings) =>
+  Math.max(0, Math.round((s.reinstatementFee ?? 49) * 100) / 100);
+export const returnedFeeOf = (s: PenaltySettings) =>
+  Math.max(0, Math.round((s.returnedPaymentFee ?? 15) * 100) / 100);
 export const money2 = (n: number) => `$${n % 1 ? n.toFixed(2) : n}`;
 const fee = (s: PenaltySettings) => money2(lateFeeOf(s));
 /** "pay it now less 15%" or, with no discount, "pay it now". */
-const payoffWords = (s: PenaltySettings) => (payoffDiscountOf(s) ? `pay it now, less ${payoffDiscountOf(s)}%,` : "pay it now,");
+const payoffWords = (s: PenaltySettings) =>
+  payoffDiscountOf(s)
+    ? `pay it now, less ${payoffDiscountOf(s)}%,`
+    : "pay it now,";
 
-export function coreTerms(s: PenaltySettings = {}): Array<{ key: RegExp; text: string }> {
+export function coreTerms(
+  s: PenaltySettings = {},
+): Array<{ key: RegExp; text: string }> {
   return [
-    { key: /early cancellation fee|remaining months of the minimum/i, text: `If you cancel before the end of your plan's minimum term, you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term: keep paying monthly until the term ends, or ${payoffWords(s)} and we close your account. We may charge the card on file for it.` },
-    { key: /isn't fixed within 30 days|not fixed within 30 days/i, text: "If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up; after 60 days we may end the agreement and the whole balance is due." },
-    ...(lateFeeOf(s) ? [{ key: /late fee/i, text: `A payment still unpaid 10 days after it fails carries a ${fee(s)} late fee, once per missed payment.` }] : []),
-    { key: /dispute/i, text: "Disputing a charge with your bank that was due under this agreement counts as a missed payment." },
-    { key: /total liability/i, text: "Our total liability to you is limited to what you paid us in the 12 months before the problem, and we aren't liable for indirect losses such as lost profits. Alabama law applies." },
-    { key: /undergroundassociates\.com\/terms/i, text: "Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign." },
-    { key: /30 days before a yearly renewal/i, text: "Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews." },
-    { key: /templates, designs and code/i, text: "Your name, logo, photos, text and domain are yours; the templates, designs and code we build with are ours. If you leave, you may ask for a copy of your site's pages within 30 days." },
-    { key: /right to use any photos/i, text: "You confirm you have the right to use any photos, logo or text you send us and that what you tell us about your business is true; claims arising from them are yours to cover." },
-    { key: /guarantee search rankings/i, text: "No one can guarantee search rankings, visitors, calls or sales, or that a site is never down." },
-    { key: /Cullman County/i, text: "Alabama law applies and any case is filed in the state courts in Cullman County, Alabama, after we've first tried for 30 days to work it out." },
+    {
+      key: /early cancellation fee|remaining months of the minimum/i,
+      text: `If you cancel before the end of your plan's minimum term, you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term: keep paying monthly until the term ends, or ${payoffWords(s)} and we close your account. We may charge the card on file for it.`,
+    },
+    {
+      key: /isn't fixed within 30 days|not fixed within 30 days/i,
+      text: "If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up; after 60 days we may end the agreement and the whole balance is due.",
+    },
+    ...(lateFeeOf(s)
+      ? [
+          {
+            key: /late fee/i,
+            text: `A payment still unpaid 10 days after it fails carries a ${fee(s)} late fee, once per missed payment.`,
+          },
+        ]
+      : []),
+    {
+      key: /dispute/i,
+      text: "Disputing a charge with your bank that was due under this agreement counts as a missed payment.",
+    },
+    {
+      key: /total liability/i,
+      text: "Our total liability to you is limited to what you paid us in the 12 months before the problem, and we aren't liable for indirect losses such as lost profits. Alabama law applies.",
+    },
+    {
+      key: /undergroundassociates\.com\/terms/i,
+      text: "Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign.",
+    },
+    {
+      key: /30 days before a yearly renewal/i,
+      text: "Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews.",
+    },
+    {
+      key: /templates, designs and code/i,
+      text: "Your name, logo, photos, text and domain are yours; the templates, designs and code we build with are ours. If you leave, you may ask for a copy of your site's pages within 30 days.",
+    },
+    {
+      key: /right to use any photos/i,
+      text: "You confirm you have the right to use any photos, logo or text you send us and that what you tell us about your business is true; claims arising from them are yours to cover.",
+    },
+    {
+      key: /guarantee search rankings/i,
+      text: "No one can guarantee search rankings, visitors, calls or sales, or that a site is never down.",
+    },
+    {
+      key: /Cullman County/i,
+      text: "Alabama law applies and any case is filed in the state courts in Cullman County, Alabama, after we've first tried for 30 days to work it out.",
+    },
   ];
 }
 /** Kept for callers that only need the default numbers. */
 export const CORE_TERMS = coreTerms();
 
 /** The core lines a (custom) service agreement doesn't already say. */
-export function missingCoreTerms(text: string, s: PenaltySettings = {}): string[] {
-  return coreTerms(s).filter((c) => !c.key.test(text)).map((c) => c.text);
+export function missingCoreTerms(
+  text: string,
+  s: PenaltySettings = {},
+): string[] {
+  return coreTerms(s)
+    .filter((c) => !c.key.test(text))
+    .map((c) => c.text);
 }
-
 
 export interface AppSettings {
   defaultCap: number;
@@ -369,12 +581,21 @@ export interface AppSettings {
  * overdue, offline at 30 days, agreement may end at 60, $49 to reinstate, 15% off an early payoff, 12-month liability
  * cap, a free month for >24 h of our-fault downtime, 3-business-day updates, 7-day deemed approval. Not legal advice.
  */
-export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | "minMonths" | "shortMonths"> & PenaltySettings): string {
+export function defaultTerms(
+  s: Pick<
+    AppSettings,
+    "companyName" | "legalName" | "minMonths" | "shortMonths"
+  > &
+    PenaltySettings,
+): string {
   const us = s.legalName || s.companyName || "We";
   const late = lateFeeOf(s);
   const min = s.minMonths ?? 12;
   const short = s.shortMonths ?? 6;
-  const terms = short && short < min ? `${short}-month or ${min}-month plan` : `${min}-month plan`;
+  const terms =
+    short && short < min
+      ? `${short}-month or ${min}-month plan`
+      : `${min}-month plan`;
   return [
     `1. What you get. ${us} builds your website, hosts it and keeps it running, and does the updates listed in your plan: changes to your text, hours, prices, services, menu and photos. New pages, new features and design changes beyond your plan are quoted before we start.`,
     "2. Approving your site. You saw a preview before signing. We make the changes you ask for, you give us a yes, and the site goes live within 3 business days of that yes; same-day timing is only with the paid Same-day build extra (see Timing). If we don't hear from you within 7 days of sending you a change, we treat it as approved so your site isn't held up.",
@@ -385,7 +606,7 @@ export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | 
     "5. Renewal and how to cancel. Monthly plans continue after any minimum term until you cancel. Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews. To cancel, text or email us or use your billing link; it takes effect at the end of your paid period. Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign.",
     `6. Late payments. If a payment fails we'll tell you and retry the card.${late ? ` If it's still unpaid after 10 days, we add a ${fee(s)} late fee, once per missed payment.` : ""}${interestRateOf(s) ? ` Balances more than 30 days overdue earn interest at ${interestRateOf(s)}% a year.` : ""} Your plan keeps billing while a payment is late. If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up. 60 days after a missed payment we may end this agreement, and the whole balance, including the rest of any minimum term, is due.${reinstatementFeeOf(s) ? ` Putting a site back online costs ${money2(reinstatementFeeOf(s))}.` : ""} If we send a balance to collections or court, you also owe our reasonable collection costs and attorney's fees as far as Alabama law allows.`,
     `7. Payment disputes. Contact us before disputing a charge with your bank; we refund billing mistakes in full. A dispute of a charge that was due under this agreement counts as a missed payment: we may take the site offline right away, and you owe the amount${returnedFeeOf(s) ? `, a ${money2(returnedFeeOf(s))} dispute fee` : ""}${reinstatementFeeOf(s) ? " and the reinstatement fee" : ""} once it's resolved.`,
-    "8. Your content stays yours. Your business name, logo, photos, the text about your business and your domain belong to you. You confirm you have the right to use any photos, logo or text you send us, and that what you tell us about your business, prices and licenses is true. The templates, designs and code we build with are ours, and we use them for other businesses too. While your plan is active you may use the site as we host it. We may show your site in our portfolio and keep a small \"Website by\" line in the footer unless you ask us not to.",
+    '8. Your content stays yours. Your business name, logo, photos, the text about your business and your domain belong to you. You confirm you have the right to use any photos, logo or text you send us, and that what you tell us about your business, prices and licenses is true. The templates, designs and code we build with are ours, and we use them for other businesses too. While your plan is active you may use the site as we host it. We may show your site in our portfolio and keep a small "Website by" line in the footer unless you ask us not to.',
     "9. Website text. We draft your site's text with software from your public listing and what you tell us, then you review it. Check prices, hours, licenses and promises before you approve; once approved, the text is yours and you're responsible for it.",
     "10. Your domain and email. If you already own your domain it stays yours; we only need DNS changes. If we register one for you, we put it in your name where the registrar allows, pay renewals while your plan is active, and transfer it to you within 10 business days after your final balance is paid (registrars lock a domain against moving for 60 days after an ownership change). Email forwarding to your own inbox is free with plans that include it. A Google mailbox is billed to you by Google under Google's terms; we set it up but don't control Google's prices or service.",
     "11. If you leave. The site comes down at the end of your last paid period. Ask within 30 days and we'll send you a copy of your site's pages and images to use anywhere for your business (not our build tools or licensed fonts). Any messages sent through your site's forms are yours and are delivered to you as they arrive.",
@@ -403,10 +624,25 @@ export function defaultTerms(s: Pick<AppSettings, "companyName" | "legalName" | 
   ].join("\n");
 }
 
-export const MODEL_PRICES: Record<string, { input: number; output: number; label: string }> = {
-  "claude-opus-5-5": { input: 4, output: 20, label: "Claude Opus 5.5 (best writing)" },
-  "claude-sonnet-5-5": { input: 2, output: 10, label: "Claude Sonnet 5.5 (about half the cost)" },
-  "claude-haiku-5-5": { input: 0.1, output: 0.5, label: "Claude Haiku 5.5 (cheapest)" },
+export const MODEL_PRICES: Record<
+  string,
+  { input: number; output: number; label: string }
+> = {
+  "claude-opus-5-5": {
+    input: 4,
+    output: 20,
+    label: "Claude Opus 5.5 (best writing)",
+  },
+  "claude-sonnet-5-5": {
+    input: 2,
+    output: 10,
+    label: "Claude Sonnet 5.5 (about half the cost)",
+  },
+  "claude-haiku-5-5": {
+    input: 0.1,
+    output: 0.5,
+    label: "Claude Haiku 5.5 (cheapest)",
+  },
 };
 
 export async function getSettings(env: Env): Promise<AppSettings> {
@@ -415,10 +651,19 @@ export async function getSettings(env: Env): Promise<AppSettings> {
   const plans = s.plans?.length
     ? s.plans
     : s.monthlyPrice
-      ? [{ id: "basic" as const, name: "Website", setup: s.setupPrice ?? 0, monthly: s.monthlyPrice, includes: s.offerIncludes ?? "" }]
+      ? [
+          {
+            id: "basic" as const,
+            name: "Website",
+            setup: s.setupPrice ?? 0,
+            monthly: s.monthlyPrice,
+            includes: s.offerIncludes ?? "",
+          },
+        ]
       : [];
   // The Price list plan (Oct 2026) joins saved settings once; the owner can rename it, reprice it or blank the price to hide it.
-  if (plans.length && !plans.some((p) => p.id === "list")) plans.push(DEFAULT_LIST_PLAN);
+  if (plans.length && !plans.some((p) => p.id === "list"))
+    plans.push(DEFAULT_LIST_PLAN);
   return {
     ...s,
     plans,
@@ -434,30 +679,58 @@ export async function getSettings(env: Env): Promise<AppSettings> {
     annualMonthsFree: s.annualMonthsFree ?? 2,
     churchAnnualMonthsFree: s.churchAnnualMonthsFree ?? 4,
     dailyCalls: s.dailyCalls ?? 0,
-    companyFacebookUrl: s.companyFacebookUrl ?? "https://www.facebook.com/undergroundassociates",
+    companyFacebookUrl:
+      s.companyFacebookUrl ?? "https://www.facebook.com/undergroundassociates",
     defaultCap: s.defaultCap ?? 50,
-    copyModel: s.copyModel && MODEL_PRICES[s.copyModel] ? s.copyModel : "claude-opus-5-5",
+    copyModel:
+      s.copyModel && MODEL_PRICES[s.copyModel]
+        ? s.copyModel
+        : "claude-opus-5-5",
   };
 }
 
 export async function getLead(env: Env, id: string): Promise<LeadRow | null> {
-  return env.DB.prepare("SELECT * FROM leads WHERE id = ?").bind(id).first<LeadRow>();
+  return env.DB.prepare("SELECT * FROM leads WHERE id = ?")
+    .bind(id)
+    .first<LeadRow>();
 }
 
-export async function updateLead(env: Env, id: string, fields: Partial<LeadRow>): Promise<void> {
+export async function updateLead(
+  env: Env,
+  id: string,
+  fields: Partial<LeadRow>,
+): Promise<void> {
   const entries = Object.entries({ ...fields, updated_at: Date.now() });
-  await env.DB.prepare(`UPDATE leads SET ${entries.map(([k]) => `${k} = ?`).join(", ")} WHERE id = ?`)
+  await env.DB.prepare(
+    `UPDATE leads SET ${entries.map(([k]) => `${k} = ?`).join(", ")} WHERE id = ?`,
+  )
     .bind(...entries.map(([, v]) => (v === undefined ? null : v)), id)
     .run();
 }
 
-export async function addUsage(env: Env, u: { places?: number; photos?: number; aiIn?: number; aiOut?: number; costMicro?: number }): Promise<void> {
+export async function addUsage(
+  env: Env,
+  u: {
+    places?: number;
+    photos?: number;
+    aiIn?: number;
+    aiOut?: number;
+    costMicro?: number;
+  },
+): Promise<void> {
   await env.DB.prepare(
     `INSERT INTO usage (day, places_requests, photo_requests, ai_input, ai_output, ai_cost_microdollars) VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(day) DO UPDATE SET places_requests = places_requests + excluded.places_requests, photo_requests = photo_requests + excluded.photo_requests,
      ai_input = ai_input + excluded.ai_input, ai_output = ai_output + excluded.ai_output, ai_cost_microdollars = ai_cost_microdollars + excluded.ai_cost_microdollars`,
   )
-    .bind(today(), u.places ?? 0, u.photos ?? 0, u.aiIn ?? 0, u.aiOut ?? 0, u.costMicro ?? 0)
+    .bind(
+      today(),
+      u.places ?? 0,
+      u.photos ?? 0,
+      u.aiIn ?? 0,
+      u.aiOut ?? 0,
+      u.costMicro ?? 0,
+    )
     .run();
 }
 
@@ -466,4 +739,6 @@ export async function addUsage(env: Env, u: { places?: number; photos?: number; 
  * its Buy extras page offers only a $1 item, so Tap to Pay, the card sheet and refunds can be tried with a real card.
  */
 export const PAYTEST_PLACE_ID = "paytest";
-export const isPayTest = (lead: { place_id?: string | null } | null | undefined): boolean => lead?.place_id === PAYTEST_PLACE_ID;
+export const isPayTest = (
+  lead: { place_id?: string | null } | null | undefined,
+): boolean => lead?.place_id === PAYTEST_PLACE_ID;

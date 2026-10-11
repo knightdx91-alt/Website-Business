@@ -2971,12 +2971,17 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (action === "/clientlink" && m === "POST") {
       // Tank board: the client's own live price-list editor (retail only; see tankboard.ts).
       const link = await clientLink(env, lead, url.origin);
-      const text = `Hi! Here's your ${lead.name} tank board: ${link}  Open it on your phone, bookmark it, and change what's in each tank any time. Prices and "sold out" show on your website within a minute.`;
+      const recW = lead.record_json
+        ? kindWords(JSON.parse(lead.record_json) as BusinessRecord)
+        : null;
+      const board = (recW?.board ?? "Tank board").toLowerCase();
+      const secW = (recW?.section ?? "tank").toLowerCase();
+      const text = `Hi! Here's your ${lead.name} ${board}: ${link}  Open it on your phone, bookmark it, and change what's in each ${secW} any time. Prices and "sold out" show on your website within a minute. Have your stock in a spreadsheet? "Put a whole list on at once" on the board takes it.`;
       await notify(env, {
         kind: "status",
         actor: session,
         leadId: lead.id,
-        text: `${session.name} sent ${lead.name} their tank board link`,
+        text: `${session.name} sent ${lead.name} their ${board} link`,
       });
       return json({ url: link, text });
     }
@@ -3330,9 +3335,7 @@ async function allRows(
 }
 
 /** Everything needed to rebuild the database (the owner's password hash left out). */
-async function backupData(
-  env: Env,
-): Promise<{
+async function backupData(env: Env): Promise<{
   day: string;
   at: number;
   tables: Record<string, Record<string, unknown>[]>;
