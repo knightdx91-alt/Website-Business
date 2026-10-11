@@ -3461,8 +3461,7 @@
         <div class="row"><label class="field">Company domain<input name="googleDomain" value="${esc(s.googleDomain || "undergroundassociates.com")}"></label>
         <label class="field">Owner's Google address <span class="hint">This address signs in as the owner</span><input name="ownerEmail" type="email" value="${esc(s.ownerEmail || "")}" placeholder="post@undergroundassociates.com"></label></div>
         <label class="check"><input type="checkbox" name="requireGoogle"${s.requireGoogle ? " checked" : ""}> Turn passwords off (Google only). Turn this on once your own Google sign-in works.</label>
-      </section>
-      <section class="card"><h2>Phone alerts (Firebase)</h2>
+        <h2 style="margin-top:18px">Phone alerts (Firebase)</h2>
         <p class="small muted">Instant pushes to every phone with the Android app: a new app build and team alerts arrive within seconds instead of up to 15 minutes. One-time Firebase setup, then paste the four public values from Project settings → General (Sender ID is under Cloud Messaging). The service-account JSON goes in Cloudflare as the Worker secret <code>FCM_SERVICE_ACCOUNT</code>, never here.</p>
         <p class="small">${meta.fcm && meta.fcm.server ? `<span class="chip chip--good">Worker secret set</span>` : `<span class="chip chip--warn">Worker secret FCM_SERVICE_ACCOUNT not set yet: the server can't send pushes</span>`}</p>
         <label class="field">App ID <span class="hint">Looks like 1:123456789:android:0a1b2c…</span><input name="fcmAppId" value="${esc(s.fcmAppId || "")}" placeholder="1:…:android:…" autocomplete="off"></label>
@@ -3516,7 +3515,7 @@
         <label class="field">Default most sites per run<input name="cap" type="number" min="1" max="500" value="${s.defaultCap}"></label>
         <label class="field">AI writer<select name="model">${meta.models.map((m) => `<option value="${esc(m.id)}"${m.id === s.copyModel ? " selected" : ""}>${esc(m.label)}</option>`).join("")}</select></label>
         <div class="sticky-save"><button class="btn btn--primary" type="submit" style="width:100%">Save settings</button></div></form>
-      <section class="card"><h2>Spending, last 30 days</h2><ul class="list">
+      <section class="card"><h2>Spending, last 30 days</h2><p class="small muted">The full picture, every service we pay for, this month's usage and renewals: <a href="#/costs">💵 Costs &amp; usage</a>.</p><ul class="list">
         <li>AI writing: <strong>$${u.aiCost.toFixed(2)}</strong> <span class="muted small">(${u.aiTokensIn.toLocaleString()} in / ${u.aiTokensOut.toLocaleString()} out tokens)</span></li>
         <li>Google: about <strong>$${u.googleCostEstimate.toFixed(2)}</strong> <span class="muted small">(${u.googleRequests} searches, ${u.googlePhotos} photos; estimate, before Google's free monthly credit)</span></li></ul></section>
       ${callersCard(callers)}
