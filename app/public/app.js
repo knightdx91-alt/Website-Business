@@ -872,7 +872,8 @@
         </div></section>` : ""}
       ${ready && l.category === "retail" ? `<section class="card"><h2>🐠 Tank board</h2>
         <p class="muted small">Their own page for what's in each tank (or on each shelf): name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it.</p>
-        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their tank board link</button><button class="btn" type="button" data-clientlink="open">Open it here</button></div></section>` : ""}
+        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their tank board link</button><button class="btn" type="button" data-clientlink="open">Open it here</button>${owner ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
+        <p class="muted small">A tablet by a tank can show that tank live: the 📺 link on each tank in the board. Sell it as the <strong>Price list</strong> plan when they don't want a whole website.</p></section>` : ""}
       ${owner ? `<section class="card"><h2>More</h2><div class="btns">
         ${ready ? `<button class="btn btn--small" data-act="rewrite">Rewrite text with AI</button>` : ""}
         ${l.salesStatus !== "live" ? `<button class="btn btn--small btn--danger" data-act="delete">Delete lead</button>` : ""}
@@ -1562,6 +1563,7 @@
     basic: "Get found on Google and get the phone ringing.",
     plus: "Your website, plus getting found on Google Maps.",
     pro: "Everything handled for you, every month.",
+    list: "Just the prices: a live price page, QR tags and the Tank board. Not a website.",
   };
   const EVERY_PLAN = ["We build it for you", "Fast, secure hosting", "Changes when you text us", "Made for phones", "Your name, photos and words stay yours"];
 
@@ -1648,6 +1650,16 @@
       ],
       line: "You run the business. We'll keep you looking sharp online every month.",
     },
+    list: {
+      fit: "A shop whose stock changes daily (fish, plants, produce, resale) and isn't ready for a whole website.",
+      points: [
+        "They change what's in each tank from their phone in seconds. No login, no computer. Sold out hides it; the count shows how many are left.",
+        "QR tags on every tank open that tank's live prices; a cheap tablet by the tank shows them with no QR at all.",
+        "No minimum and no setup fee, so there's nothing to think about. Cancel any time.",
+        "Every dollar of the month they're on it counts toward a full website when they're ready; the price page just becomes part of it.",
+      ],
+      line: "Try the price list for a month. If it saves you one argument about a price, it's paid for itself.",
+    },
   };
 
   const PLAN_QUESTIONS = [
@@ -1660,7 +1672,7 @@
 
   // Common things owners say on the call, and an honest answer to each.
   function playbookObjections(s, plans) {
-    const cheapest = plans.reduce((a, p) => (p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
+    const cheapest = plans.reduce((a, p) => (p.id !== "list" && p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
     const low = cheapest ? `${esc(cheapest.name)} is ${money(cheapest.monthly)} a month, about ${money(Math.round((cheapest.monthly * 12 / 365) * 100) / 100)} a day` : "Our starter plan is low monthly";
     const t = payTerms(s);
     const min = t.min;
@@ -2517,7 +2529,7 @@
       : l.presence === "outdated" || l.presence === "free_builder" ? `I pulled up your website on my phone and it was hard to use`
       : `I noticed ${biz} doesn't have a website`;
     const mid = plans.find((p) => p.id === "plus") || plans[Math.floor(plans.length / 2)] || plans[0];
-    const cheapest = plans.reduce((a, p) => (p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
+    const cheapest = plans.reduce((a, p) => (p.id !== "list" && p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
     const noSetup = t.commits.length ? ` with no setup fee on the ${commitWords(t)} plan` : "";
     const priceShort = cheapest ? `plans start at ${money(cheapest.monthly)} a month${noSetup}` : "it's a low monthly price";
     // What to point at on the preview: only things the preview really has.
@@ -2683,6 +2695,12 @@
         else location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(text)}`;
       } catch (err) { toast(err.message); } finally { cb.disabled = false; }
     }));
+    const rv = $app.querySelector("[data-clientrevoke]");
+    if (rv) rv.addEventListener("click", async () => {
+      if (!confirm("Stop every tank board link sent so far? You'll text them a new one.")) return;
+      rv.disabled = true;
+      try { await api(`/leads/${l.id}/clientlink`, { method: "DELETE" }); toast("Old links no longer work. Text them a new one."); } catch (err) { toast(err.message); } finally { rv.disabled = false; }
+    });
     const xb = $app.querySelector("[data-extraslink]");
     if (xb) xb.addEventListener("click", async () => {
       xb.disabled = true;
@@ -3161,13 +3179,14 @@
     }));
   }
 
-  const PLAN_IDS = ["basic", "plus", "pro"];
+  const PLAN_IDS = ["basic", "plus", "pro", "list"];
   // Priced from market research (Oct 2026): pay-monthly website services charge $78-150/mo, Hibu $99-159/mo,
   // Google Business Profile management $100-400/mo on its own.
   const SUGGESTED_PLANS = [
     { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page" },
     { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
     { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
+    { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your shop, with a section for every tank or shelf\nThe Tank board: change names, prices, counts and photos from your phone, any time, no login\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every tank or shelf (first sheet included) and a tablet display page\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
   ];
   const UNIT_LABEL = { month: "/month", each: " each", "one-time": " one-time", quote: " (priced per job)" };
   const addonPrice = (a) => (a.unit === "quote" ? "Priced per job" : `${money(a.price)}${UNIT_LABEL[a.unit] || ""}`);

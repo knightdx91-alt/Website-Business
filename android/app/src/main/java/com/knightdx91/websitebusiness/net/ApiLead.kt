@@ -180,6 +180,9 @@ suspend fun Api.extrasLink(id: String): String = postJson("/leads/$id/extraslink
 /** Tank board: the client's own live price-list editor (retail). Returns the link and a ready-to-send text. */
 suspend fun Api.clientLink(id: String): Pair<String, String> = postJson("/leads/$id/clientlink").let { it.optString("url") to it.optString("text") }
 
+/** Every tank board link sent so far stops working; the next clientLink makes a fresh one. Owner only. */
+suspend fun Api.revokeClientLink(id: String) { deleteJson("/leads/$id/clientlink") }
+
 suspend fun Api.clearFollowUp(id: String): JSONObject = putJson("/leads/$id/followup", JSONObject().put("date", JSONObject.NULL))
 suspend fun Api.deleteNote(id: String, noteId: String) { deleteJson("/leads/$id/notes/$noteId") }
 

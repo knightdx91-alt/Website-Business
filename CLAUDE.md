@@ -509,8 +509,21 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `GET /l/<leadId>/photo/<file>`; every built copy of the site gets `liveData` (`BuildInput.liveData` → `<div id="prices-live"
   data-live>`; previews point at `/l/…`, published sites at the app origin) and the client script refetches it on load, so the QR
   label on a tank shows the change within about a minute. Live sites get `prices_dirty = 1` and the minute cron republishes them
-  (`republishDirty`, 2 a minute, after `announceUpdate`). `test/worker/tankboard.test.ts`. Not yet: a "revoke link" button, a
-  4th "Price list only" plan ($29/mo was the advice) for QR-only clients.
+  (`republishDirty`, 2 a minute, after `announceUpdate`). `test/worker/tankboard.test.ts`. "Revoke old links" (owner; `DELETE
+  /api/leads/:id/clientlink` = a new `client_key`, every link sent so far dies; web + Android 2.26). **Tablet display**
+  `/d/<leadId>/<tank-slug>` (`serveDisplay`; no slug = every tank, rotating every 10 s): a full-screen dark page for a cheap
+  tablet or TV by the tank (big name + price, photo, "n left", wake lock, re-reads the feed every 30 s; public like the feed,
+  noindex). The board has a 📺 link per tank and an "All tanks, rotating" link in its footer.
+- Price list plan (Oct 2026, `PlanId` "list" in db.ts; `DEFAULT_LIST_PLAN` $29/mo is appended to saved Settings that lack it,
+  blank its monthly price to hide it): a live price page + Tank board + QR tags + display page, NOT a website, for shops whose
+  stock changes daily. `billingOptions` gives it only Monthly (no minimum, no setup) and yearly; the agreement adds
+  `LIST_PLAN_NOTE` under YOUR PLAN (not a website plan, no minimum, no early-cancel fee, "site" reads "price page"); checkout's
+  billing labels say no minimum. `isListPlan()`. Company site: `sitePlans()` / `lowestOf()` keep the plan grids, "from $49",
+  compare table and schema price range to website plans; `priceListHtml()` is a "Just need a live price list?" strip on /pricing
+  and /websites-for/shops; /terms lists it with a note. App: `PLAN_IDS` has 4 (web Settings + Android `SettingsScreen`),
+  `PLAN_TAGLINE.list` / `PLAN_PITCH.list` (app.js + content.ts), `cheapestOf` / "plans start at" / the ministry-rate list skip
+  it; Show plans, sign-up links (`/a/<id>.list.…`), the sign-up page, Stripe Checkout and the native sign-up take it like any
+  plan. Delivery is the normal publish (the whole site goes live; the plan only promises the price page).
 - Thrift donations (retail pack, `ext.retail.donations`, Oct 2026): on by default for `thrift` (`donationsOn` in actions.ts), any shop can
   turn it on in Edit → "Donations" (`donationsEditCard`). Section #donations after What's new: intro `note`, "We gladly take" /
   "We can't take" chips (`accepts` / `doesNotAccept`), `dropOffHours`, nonprofit `receipts` line, and with `pickup` a "Request a furniture

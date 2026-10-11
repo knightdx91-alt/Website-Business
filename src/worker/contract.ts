@@ -1,5 +1,5 @@
 import type { PricedOrder } from "./checkout.ts";
-import { addonPrice, defaultTerms, lateFeeOf, missingCoreTerms, money2, returnedFeeOf, type AddOn, type AppSettings, type PenaltySettings } from "./db.ts";
+import { isListPlan, addonPrice, defaultTerms, lateFeeOf, missingCoreTerms, money2, returnedFeeOf, type AddOn, type AppSettings, type PenaltySettings } from "./db.ts";
 
 /**
  * Agreements built from exactly what's being bought: the main service agreement, the plan and way to pay, and the
@@ -94,6 +94,10 @@ function serviceTerms(s: AppSettings): { text: string; also: string[] } {
   return { text, also: missingCoreTerms(text, s) };
 }
 
+/** Said under YOUR PLAN for the Price list plan, which is hosting for a price page rather than a website build. */
+export const LIST_PLAN_NOTE =
+  "The Price list plan is not a website plan: we host your live price page, the Tank board you edit from your phone and your QR price tags. It has no minimum term and no early cancellation fee; cancel any time with 30 days' notice, and the price page comes down at the end of your paid month. Where this agreement says \"website\" or \"site\", read \"price page\". You can move to a website plan at any time and the page becomes part of your site.";
+
 /** The exact agreement text stored with a signature. */
 export function contractText(s: AppSettings, order: PricedOrder, o: ContractInput): string {
   const legal = legalName(s);
@@ -105,6 +109,7 @@ export function contractText(s: AppSettings, order: PricedOrder, o: ContractInpu
     if (order.plan) {
       const inc = order.plan.includes.split("\n").map((x) => x.trim()).filter(Boolean);
       out.push("", `YOUR PLAN: ${order.plan.name.toUpperCase()}`, `$${order.plan.monthly} a month. Includes:`, ...inc.map((x) => `- ${x}`));
+      if (isListPlan(order.plan)) out.push(LIST_PLAN_NOTE);
     }
     if (order.option) out.push("", "HOW YOU PAY", `${order.option.label}: ${order.option.detail}${order.invoice ? `\n${invoiceText(s)}` : ""}`);
     out.push("", "PAYMENT AUTHORIZATION", paymentAuthText(s));

@@ -32,7 +32,7 @@ test("plan copy (taglines, pitch, questions, every-plan list) matches app.js", (
     inAppJs("PLAN_QUESTIONS", a);
   }
   for (const x of PLAYBOOK_ALWAYS) inAppJs("PLAYBOOK_ALWAYS", x);
-  assert.deepEqual(SUGGESTED_PLANS.map((p) => p.monthly), [49, 89, 149]);
+  assert.deepEqual(SUGGESTED_PLANS.map((p) => p.monthly), [49, 89, 149, 29]);
   for (const p of SUGGESTED_PLANS) inAppJs("SUGGESTED_PLANS", p.includes.split("\n")[0]!);
 });
 
@@ -102,7 +102,7 @@ test("ways to pay match app.js payWays(): commitments, month to month, invoice, 
   const s = { minMonths: 12, shortMonths: 6, flexSetup: 299, annualMonthsFree: 2, churchAnnualMonthsFree: 4, invoiceForAll: true };
   const ways = payWays(s, SUGGESTED_PLANS);
   assert.deepEqual(ways.map(([t]) => t), ["6-month plan", "12-month plan", "Month to month", "Pay by invoice", "Pay yearly, 2 months free"]);
-  assert.equal(ways[4]![1], "12 months for the price of 10, no setup fee. Basic $490/year · Plus $890/year · Pro $1490/year");
+  assert.equal(ways[4]![1], "12 months for the price of 10, no setup fee. Basic $490/year · Plus $890/year · Pro $1490/year · Price list $290/year");
   for (const part of [
     "-month plan", "The monthly price, no setup fee. After ", " months, cancel any time with 30 days' notice.", "Month to month", "Same monthly price plus a one-time ",
     " setup fee. No contract, cancel any time.", "Pay by invoice", "We send an invoice; pay by check or bank transfer. Monthly invoices are due in 15 days, yearly in 30. Nothing is charged online.",
@@ -151,7 +151,7 @@ test("GET /api/content carries every block the app needs, filled from Settings",
 test("GET /api/plans/options prices every way to pay for every plan, with what is due today", () => {
   const o = plansOptions(settings());
   assert.equal(o.church, false);
-  assert.deepEqual(o.plans.map((p) => p.id), ["basic", "plus", "pro"]);
+  assert.deepEqual(o.plans.map((p) => p.id), ["basic", "plus", "pro", "list"]);
   const plus = o.plans[1]!;
   assert.equal(plus.perDay, 2.93);
   assert.deepEqual(plus.includes.slice(0, 2), ["Everything in Basic", "Monthly visitor report by text"]);
@@ -174,5 +174,5 @@ test("GET /api/plans/options prices every way to pay for every plan, with what i
   assert.equal(church.plans[1]!.options.at(-1)!.label, "Pay yearly (ministry rate)");
   // A plan with no monthly price is left out (like the web); no plans at all → the suggested ones.
   assert.equal(plansOptions(settings({ plans: [{ ...SUGGESTED_PLANS[0]!, monthly: 0 }, SUGGESTED_PLANS[1]!] })).plans.length, 1);
-  assert.equal(plansOptions(settings({ plans: [] })).plans.length, 3);
+  assert.equal(plansOptions(settings({ plans: [] })).plans.length, 4);
 });

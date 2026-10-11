@@ -18,6 +18,7 @@ export const PLAN_TAGLINE: Record<string, string> = {
   basic: "Get found on Google and get the phone ringing.",
   plus: "Your website, plus getting found on Google Maps.",
   pro: "Everything handled for you, every month.",
+  list: "Just the prices: a live price page, QR tags and the Tank board. Not a website.",
 };
 
 export const EVERY_PLAN = ["We build it for you", "Fast, secure hosting", "Changes when you text us", "Made for phones", "Your name, photos and words stay yours"];
@@ -58,6 +59,16 @@ export const PLAN_PITCH: Record<string, PlanPitch> = {
       "Agencies charge $100 to $400 a month just to manage a Google profile.",
     ],
     line: "You run the business. We'll keep you looking sharp online every month.",
+  },
+  list: {
+    fit: "A shop whose stock changes daily (fish, plants, produce, resale) and isn't ready for a whole website.",
+    points: [
+      "They change what's in each tank from their phone in seconds. No login, no computer. Sold out hides it; the count shows how many are left.",
+      "QR tags on every tank open that tank's live prices; a cheap tablet by the tank shows them with no QR at all.",
+      "No minimum and no setup fee, so there's nothing to think about. Cancel any time.",
+      "Every dollar of the month they're on it counts toward a full website when they're ready; the price page just becomes part of it.",
+    ],
+    line: "Try the price list for a month. If it saves you one argument about a price, it's paid for itself.",
   },
 };
 
@@ -213,7 +224,8 @@ export function payWays(s: Partial<AppSettings>, plans: Plan[], church = false):
   return out;
 }
 
-const cheapestOf = (plans: Plan[]) => plans.reduce<Plan | null>((a, p) => (p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
+/** The cheapest website plan: the Price list plan is not a website, so "plans start at" never names it. */
+const cheapestOf = (plans: Plan[]) => plans.reduce<Plan | null>((a, p) => (p.id !== "list" && p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
 
 /** "plans start at $49 a month with no setup fee on the 6- or 12-month plan" (the walk-in `{price}`). */
 export function priceShort(s: Partial<AppSettings>, plans: Plan[], church = false): string {
@@ -277,6 +289,7 @@ export const SUGGESTED_PLANS: Plan[] = [
   { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page" },
   { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
   { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
+  { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your shop, with a section for every tank or shelf\nThe Tank board: change names, prices, counts and photos from your phone, any time, no login\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every tank or shelf (first sheet included) and a tablet display page\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
 ];
 
 /** "$49 one-time", "$129/month", "$35 each", "Priced per job" (the app's capitalised form). */
@@ -309,7 +322,7 @@ export function appContent(s: AppSettings) {
     walkinAlways: WALKIN_ALWAYS,
     /** Playbook → Churches & nonprofits card: the ministry rate, when there is one. */
     churchYearly: church.free
-      ? { free: church.free, payFor: 12 - church.free, plans: plans.filter((p) => p.monthly).map((p) => ({ name: p.name, year: money(p.monthly * (12 - church.free)) })) }
+      ? { free: church.free, payFor: 12 - church.free, plans: plans.filter((p) => p.monthly && p.id !== "list").map((p) => ({ name: p.name, year: money(p.monthly * (12 - church.free)) })) }
       : null,
   };
 }

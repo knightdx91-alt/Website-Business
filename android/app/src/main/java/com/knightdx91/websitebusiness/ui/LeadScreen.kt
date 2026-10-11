@@ -77,6 +77,7 @@ import com.knightdx91.websitebusiness.net.deleteNote
 import com.knightdx91.websitebusiness.net.domain
 import com.knightdx91.websitebusiness.net.extrasLink
 import com.knightdx91.websitebusiness.net.clientLink
+import com.knightdx91.websitebusiness.net.revokeClientLink
 import com.knightdx91.websitebusiness.net.fill
 import com.knightdx91.websitebusiness.net.flyerLeft
 import com.knightdx91.websitebusiness.net.leadFull
@@ -619,7 +620,13 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
                             OutlinedButton(onClick = { act("clientlink") { val (_, text) = state.api.clientLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them their tank board link") }
                             OutlinedButton(onClick = { act("clientopen") { val (url, _) = state.api.clientLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open it here") }
+                            if (isOwner) OutlinedButton(onClick = {
+                                ask = Ask("Revoke tank board links", "Stop every tank board link sent so far? You'll text them a new one.", "Revoke", danger = true) {
+                                    act("clientrevoke") { state.api.revokeClientLink(id); context.toast("Old links no longer work. Text them a new one.") }
+                                }
+                            }, enabled = busy == null) { Text("Revoke old links") }
                         }
+                        Text("A tablet by a tank can show that tank live: the 📺 link on each tank in the board. Sell it as the Price list plan when they don't want a whole website.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
             }

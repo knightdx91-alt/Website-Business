@@ -194,10 +194,10 @@ export async function serveTankBoard(env: Env, req: Request, leadId: string, sig
   }
   if (rest && rest !== "/") return Response.redirect(`${origin}${base}/`, 302);
   if (!rest) return Response.redirect(`${origin}${base}/`, 301);
-  return boardPage(record, base);
+  return boardPage(record, base, leadId);
 }
 
-export function boardPage(record: BusinessRecord, base: string): Response {
+export function boardPage(record: BusinessRecord, base: string, leadId = ""): Response {
   const name = escHtml(record.name);
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#14213d"><title>Tank board · ${name}</title>
@@ -233,15 +233,15 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 <header><div><h1>${name} · Tank board</h1><div class="st" id="st">Loading…</div></div><a id="open" class="small" style="color:#fff" hidden target="_blank" rel="noopener">Open price page ↗</a></header>
 <main id="m"><p class="empty">Loading your tanks…</p></main>
 <div class="bar"><button class="btn btn--line" id="addTank" type="button">+ Add a tank</button><span class="small muted">Changes save by themselves.</span></div>
-<footer>Tank board by Underground Associates · Anything odd? Text us.</footer>
+<footer>📺 means "show this tank on a screen": open that link on a tablet by the tank and it shows what's in it, live. <a href="/d/${escHtml(leadId)}/" target="_blank" rel="noopener">All tanks, rotating</a>.<br>Tank board by Underground Associates · Anything odd? Text us.</footer>
 <script>
 (function(){
-var BASE=${JSON.stringify(base)};var data=null;var timer=null;var st=document.getElementById("st");var m=document.getElementById("m");
+var BASE=${JSON.stringify(base)};var LEAD=${JSON.stringify(leadId)};var data=null;var timer=null;var st=document.getElementById("st");var m=document.getElementById("m");
 function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function status(t,cls){st.textContent=t;st.className="st "+(cls||"")}
 function render(){
   if(!data.sections.length){m.innerHTML='<p class="empty">No tanks yet. Tap <b>+ Add a tank</b> below, then add what\\'s in it.</p>';return}
-  m.innerHTML=data.sections.map(function(s,si){return '<section class="tank" data-s="'+si+'"><div class="tank__h"><span>🐟</span><input value="'+esc(s.name)+'" data-f="sname" aria-label="Tank name"><button class="ic" data-a="up" title="Move up">▲</button><button class="ic" data-a="down" title="Move down">▼</button><button class="ic" data-a="deltank" title="Remove tank">🗑</button></div>'+
+  m.innerHTML=data.sections.map(function(s,si){return '<section class="tank" data-s="'+si+'"><div class="tank__h"><span>🐟</span><input value="'+esc(s.name)+'" data-f="sname" aria-label="Tank name"><button class="ic" data-a="up" title="Move up">▲</button><button class="ic" data-a="down" title="Move down">▼</button><button class="ic" data-a="deltank" title="Remove tank">🗑</button><a class="ic" href="/d/'+LEAD+'/'+esc(s.slug||'')+'" target="_blank" rel="noopener" title="Show this tank on a tablet or TV">📺</a></div>'+
     s.items.map(function(it,ii){return '<div class="item'+(it.soldOut?' out':'')+'" data-i="'+ii+'"><label class="ph" title="Take or pick a photo">'+(it.image?'<img src="'+esc(it.image)+'" alt="">':'📷')+'<input type="file" accept="image/*" capture="environment" data-a="photo"></label><div>'+
       '<div class="row"><input class="nm" value="'+esc(it.name)+'" data-f="name" placeholder="What is it?" aria-label="Name"><input class="pr" value="'+esc(it.price)+'" data-f="price" placeholder="$" inputmode="decimal" aria-label="Price"><input class="qt" value="'+(it.qty==null?"":it.qty)+'" data-f="qty" placeholder="how many" inputmode="numeric" aria-label="How many"></div>'+
       '<div class="row"><input class="nt" value="'+esc(it.note)+'" data-f="note" placeholder="Note (size, pairs only, feeding…)" aria-label="Note"></div>'+
@@ -273,4 +273,62 @@ load();
 })();
 </script></body></html>`;
   return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "referrer-policy": "no-referrer", "content-security-policy": "default-src 'self'; img-src 'self' blob: data: https:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
+}
+
+
+/**
+ * `/d/<leadId>/<tank-slug>`: a full-screen, always-on page for a cheap tablet or TV by the tank. Reads the live feed every
+ * 30 s (same data as the QR price page), keeps the screen awake, and with no slug rotates through every tank. Public like
+ * the feed (no prices beyond what the QR label shows), noindex.
+ */
+export async function serveDisplay(env: Env, leadId: string, slug: string, origin: string): Promise<Response> {
+  const lead = await getLead(env, leadId);
+  const record = lead && recordOf(lead);
+  if (!lead || !record || lead.status === "expired") return new Response("Not found", { status: 404 });
+  const feed = pricesFeed(lead, record, origin);
+  const tank = slug ? feed.sections.find((x) => x.slug === slug) : null;
+  const title = tank ? `${tank.name} · ${record.name}` : `${feed.title} · ${record.name}`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>${escHtml(title)}</title>
+<style>
+:root{--bg:#0b1324;--ink:#f6f7fb;--muted:#9aa6bf;--gold:#fca311;--card:#141f38}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--ink);font:clamp(18px,2.6vw,30px)/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:none;overflow:hidden}
+header{display:flex;justify-content:space-between;align-items:baseline;padding:2vh 3vw 1vh;gap:2vw}
+h1{margin:0;font-size:clamp(28px,5vw,64px);line-height:1.1}
+.shop{color:var(--muted);font-size:.75em;white-space:nowrap}
+main{padding:0 3vw 3vh;height:calc(100% - 12vh);overflow:hidden}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22em),1fr));gap:1.2vmin}
+.it{display:grid;grid-template-columns:auto 1fr auto;gap:1em;align-items:center;background:var(--card);border-radius:1em;padding:.7em 1em}
+.ph{width:3.4em;height:3.4em;border-radius:.7em;object-fit:cover;background:#1e2b4b}
+.ph--none{display:grid;place-items:center;font-size:1.6em;opacity:.5}
+.nm{font-weight:700;font-size:1.15em}.nt{color:var(--muted);font-size:.8em}
+.pr{font-weight:800;font-size:1.5em;color:var(--gold);white-space:nowrap;text-align:right}
+.left{display:block;font-size:.55em;color:var(--muted);font-weight:600}
+.empty{color:var(--muted);font-size:1.3em;padding:10vh 0;text-align:center}
+footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:1vh 3vw;color:var(--muted);font-size:.6em}
+.dots{display:flex;gap:.5em}.dots i{width:.6em;height:.6em;border-radius:50%;background:#2b3a5e}.dots i.on{background:var(--gold)}
+</style></head><body>
+<header><h1 id="h">${escHtml(tank ? tank.name : feed.title)}</h1><span class="shop">${escHtml(record.name)}</span></header>
+<main id="m"><p class="empty">Loading…</p></main>
+<footer><span id="u"></span><span class="dots" id="dots"></span></footer>
+<script>
+(function(){
+var FEED=${JSON.stringify(`/l/${leadId}/prices.json`)},SLUG=${JSON.stringify(slug)},data=null,i=0,ROTATE=10000;
+function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function pick(){if(!data)return null;if(SLUG){for(var k=0;k<data.sections.length;k++)if(data.sections[k].slug===SLUG)return data.sections[k];return{name:"",items:[]}}return data.sections.length?data.sections[i%data.sections.length]:null}
+function render(){var s=pick();var m=document.getElementById("m"),h=document.getElementById("h"),d=document.getElementById("dots");
+  if(!s){m.innerHTML='<p class="empty">Nothing on the board yet.</p>';return}
+  if(s.name)h.textContent=s.name;
+  m.innerHTML=s.items.length?'<div class="grid">'+s.items.map(function(it){var left=it.qty!=null&&it.qty<=5?'<span class="left">'+it.qty+' left</span>':'';
+    return '<div class="it">'+(it.image?'<img class="ph" src="'+esc(it.image)+'" alt="">':'<div class="ph ph--none">🐟</div>')+'<div><div class="nm">'+esc(it.name)+'</div>'+(it.note?'<div class="nt">'+esc(it.note)+'</div>':'')+'</div><div class="pr">'+esc(it.price||"Ask")+left+'</div></div>'}).join("")+'</div>':'<p class="empty">Sold out for now. Ask us what\'s coming.</p>';
+  d.innerHTML=SLUG||data.sections.length<2?"":data.sections.map(function(_,k){return '<i'+(k===i%data.sections.length?' class="on"':'')+'></i>'}).join("");
+  document.getElementById("u").textContent=data.updatedAt?"Updated "+data.updatedAt:"";}
+function load(){fetch(FEED,{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){data=j;render()}).catch(function(){})}
+load();setInterval(load,30000);
+if(!SLUG)setInterval(function(){i++;render()},ROTATE);
+function wake(){if(navigator.wakeLock)navigator.wakeLock.request("screen").catch(function(){})}
+wake();document.addEventListener("visibilitychange",function(){if(!document.hidden)wake()});
+})();
+</script></body></html>`;
+  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "content-security-policy": "default-src 'self'; img-src 'self' https: data:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
 }

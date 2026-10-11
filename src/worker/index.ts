@@ -19,7 +19,7 @@ import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } fro
 import { resolvePresence } from "../places/web-presence.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
 import { LAST_ANNOUNCE_KEY, TICK_KEY, announceUpdate, fcmClientConfig, serviceAccount, serviceAccountProblem } from "./fcm.ts";
-import { clientLink, republishDirty, servePhoto, servePricesFeed, serveTankBoard } from "./tankboard.ts";
+import { clientLink, republishDirty, serveDisplay, servePhoto, servePricesFeed, serveTankBoard } from "./tankboard.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf, priceTagsPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
@@ -547,7 +547,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         plans: z
           .array(
             z.object({
-              id: z.enum(["basic", "plus", "pro"]),
+              id: z.enum(["basic", "plus", "pro", "list"]),
               name: z.string().trim().min(1).max(40),
               setup: z.number().min(0).max(100_000),
               monthly: z.number().min(0).max(10_000),
@@ -878,7 +878,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const action = leadMatch[2] ?? "";
     const sub = leadMatch[3];
     const lead: LeadRow = await requireLead(env, id);
-    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/signups", "/flyer", "/extraslink", "/contact", "/clientlink"].includes(action) || (action === "/flyer.pdf" && m === "GET");
+    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/signups", "/flyer", "/extraslink", "/contact"].includes(action) || (action === "/clientlink" && m === "POST") || (action === "/flyer.pdf" && m === "GET");
     if (!callerSafe) ownerOnly();
 
     if (action === "" && m === "GET") {
@@ -924,7 +924,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const input = await body(
         req,
         z.object({
-          plan: z.enum(["basic", "plus", "pro"]),
+          plan: z.enum(["basic", "plus", "pro", "list"]),
           billing: z.string().trim().max(20),
           picks: z.array(z.object({ index: z.number().int().min(0).max(50), qty: z.number().int().min(1).max(20).default(1) })).max(30).default([]),
           business: z.string().trim().max(120).optional(),
@@ -940,7 +940,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       return json(await appSignup(env, req, { lead, origin: url.origin, input, sentBy: session.name, tapReady: ready.ready, cardReady: await cardReady(env, settings) }));
     }
     if (action === "/signup" && m === "POST") {
-      const { plan } = await body(req, z.object({ plan: z.enum(["basic", "plus", "pro"]) }));
+      const { plan } = await body(req, z.object({ plan: z.enum(["basic", "plus", "pro", "list"]) }));
       const settings = await getSettings(env);
       const p = settings.plans.find((x) => x.id === plan);
       if (!p) throw new HttpError(400, "Set up your plans in Settings first");
@@ -1373,6 +1373,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await notify(env, { kind: "status", actor: session, leadId: lead.id, text: `${session.name} sent ${lead.name} their tank board link` });
       return json({ url: link, text });
     }
+    if (action === "/clientlink" && m === "DELETE") {
+      // Revoke: a new key means every tank board link sent so far stops working; the next "Text them" makes a fresh one.
+      await updateLead(env, id, { client_key: newId() });
+      await notify(env, { kind: "status", actor: session, leadId: lead.id, text: `${session.name} revoked ${lead.name}'s tank board links` });
+      return json({ ok: true });
+    }
     if (action === "/rewrite" && m === "POST") {
       await updateLead(env, id, { rewrite: 1, status: "queued" });
       await env.JOBS.send({ type: "build", leadId: id });
@@ -1595,10 +1601,12 @@ export default {
       }
       const client = /^\/c\/([a-z0-9]+)\.([A-Za-z0-9_-]+)(\/.*)?$/.exec(url.pathname);
       if (client) return await serveTankBoard(env, req, client[1]!, client[2]!, client[3] ?? "", url.origin);
+      const display = /^\/d\/([a-z0-9]+)(?:\/([a-z0-9-]*))?$/.exec(url.pathname);
+      if (display && req.method === "GET") return await serveDisplay(env, display[1]!, display[2] ?? "", url.origin);
       const live = /^\/l\/([a-z0-9]+)\/(prices\.json|photo\/([A-Za-z0-9_.-]+))$/.exec(url.pathname);
       if (live) return live[2] === "prices.json" ? await servePricesFeed(env, live[1]!, url.origin) : await servePhoto(env, live[1]!, live[3]!);
       if (url.pathname === "/.well-known/assetlinks.json") return json(ASSET_LINKS, 200, { "cache-control": "public, max-age=3600" });
-      const signup = /^\/a\/([a-z0-9]+)\.(basic|plus|pro)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(url.pathname);
+      const signup = /^\/a\/([a-z0-9]+)\.(basic|plus|pro|list)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(url.pathname);
       if (signup && (req.method === "GET" || req.method === "POST")) {
         const [, leadId, plan, exp, sig] = signup as unknown as [string, string, string, string, string];
         if (!(await verifySignup(env, leadId, plan, exp, sig))) {

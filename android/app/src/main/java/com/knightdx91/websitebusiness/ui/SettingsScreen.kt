@@ -84,7 +84,7 @@ import java.util.Locale
 
 /* ---------- the form (mirrors viewSettings() in app/public/app.js, field for field) ---------- */
 
-private val PLAN_IDS = listOf("basic", "plus", "pro")
+private val PLAN_IDS = listOf("basic", "plus", "pro", "list")
 
 private data class SuggestedPlan(val id: String, val name: String, val setup: Double, val monthly: Double, val includes: String)
 
@@ -93,6 +93,7 @@ private val SUGGESTED_PLANS = listOf(
     SuggestedPlan("basic", "Basic", 0.0, 49.0, "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page"),
     SuggestedPlan("plus", "Plus", 0.0, 89.0, "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter"),
     SuggestedPlan("pro", "Pro", 0.0, 149.0, "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes"),
+    SuggestedPlan("list", "Price list", 0.0, 29.0, "A live price page for your shop, with a section for every tank or shelf\nThe Tank board: change names, prices, counts and photos from your phone, any time, no login\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every tank or shelf (first sheet included) and a tablet display page\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time"),
 )
 
 private val UNIT_OPTIONS = listOf("month" to "per month", "each" to "each", "one-time" to "one-time", "quote" to "quote per job")

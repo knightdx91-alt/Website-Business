@@ -51,3 +51,27 @@ test("saving from the board keeps photos by file, applies counts and sold-out, a
   assert.equal(pl.title, "Fish & prices", "title and public flag survive");
   assert.notEqual(pl.lastUpdated, "Oct 11, 9:00 AM");
 });
+
+test("the Price list plan bills monthly with no minimum or yearly, never month-to-month with a setup fee", async () => {
+  const { billingOptions, DEFAULT_LIST_PLAN } = await import("../../src/worker/db.ts");
+  const s = { minMonths: 12, shortMonths: 6, flexSetup: 299, annualMonthsFree: 2 };
+  const list = billingOptions(DEFAULT_LIST_PLAN, s);
+  assert.deepEqual(list.map((o) => o.id), ["standard", "annual"]);
+  assert.match(list[0]!.detail, /no minimum, cancel any time/);
+  assert.match(list[1]!.detail, /\$290 for 12 months/);
+  const site = billingOptions({ id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "" }, s);
+  assert.deepEqual(site.map((o) => o.id), ["short", "standard", "flex", "annual"], "website plans are unchanged");
+});
+
+test("the Price list agreement says it is not a website plan and has no minimum", async () => {
+  const { contractText } = await import("../../src/worker/contract.ts");
+  const { priceSignup } = await import("../../src/worker/checkout.ts");
+  const { DEFAULT_LIST_PLAN, DEFAULT_ADDONS } = await import("../../src/worker/db.ts");
+  const s = { plans: [DEFAULT_LIST_PLAN], addons: DEFAULT_ADDONS, minMonths: 12, shortMonths: 6, flexSetup: 299, annualMonthsFree: 2, companyName: "Underground Associates" } as unknown as import("../../src/worker/db.ts").AppSettings;
+  const order = priceSignup(s, "list", "standard", [], {});
+  const text = contractText(s, order, { kind: "signup", business: "King Fish Aquatics" } as never);
+  assert.match(text, /YOUR PLAN: PRICE LIST/);
+  assert.match(text, /not a website plan/);
+  assert.match(text, /no minimum term and no early cancellation fee/);
+  assert.match(text, /Monthly: \$29\/month · no setup fee · no minimum/);
+});

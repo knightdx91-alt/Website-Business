@@ -72,8 +72,30 @@ export async function setSetting(env: Env, key: string, value: string): Promise<
   await env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(key, value).run();
 }
 
+/** The three website plans, plus "list": the Price list plan (price page + Tank board + QR tags, no full website). */
+export type PlanId = "basic" | "plus" | "pro" | "list";
+export const PLAN_IDS: PlanId[] = ["basic", "plus", "pro", "list"];
+export const isPlanId = (x: unknown): x is PlanId => typeof x === "string" && (PLAN_IDS as string[]).includes(x);
+/** A plan that is not a website: hosting for the price page only. Billing is monthly with no minimum, or yearly. */
+export const isListPlan = (p: { id: string }) => p.id === "list";
+/** Added to Settings when it has website plans but no Price list plan yet; blank the monthly price to hide it. */
+export const DEFAULT_LIST_PLAN: Plan = {
+  id: "list",
+  name: "Price list",
+  setup: 0,
+  monthly: 29,
+  includes: [
+    "A live price page for your shop, with a section for every tank or shelf",
+    "The Tank board: change names, prices, counts and photos from your phone, any time, no login",
+    "Sold out hides an item until it's back; the page shows how many are left",
+    "QR price tags for every tank or shelf (first sheet included) and a tablet display page",
+    "Fast, secure hosting; changes when you text us",
+    "No minimum: cancel any time. Upgrade to a full website any time",
+  ].join("\n"),
+};
+
 export interface Plan {
-  id: "basic" | "plus" | "pro";
+  id: PlanId;
   name: string;
   setup: number;
   monthly: number;
@@ -149,6 +171,15 @@ export function billingOptions(plan: Plan, s: BillingSettings, opts: { category?
   const free = annualMonthsFreeFor(s, opts.category);
   const setup = plan.setup ? `${dollars(plan.setup)} setup` : "no setup fee";
   const out: BillingOption[] = [];
+  if (isListPlan(plan)) {
+    // Nothing is built up front for a price page, so there is no minimum term and no month-to-month setup fee.
+    out.push({ id: "standard", label: "Monthly", detail: `${dollars(plan.monthly)}/month · ${setup} · no minimum, cancel any time`, monthlyEquivalent: plan.monthly, payLink: plan.payLink });
+    if (free) {
+      const yearly = plan.monthly * (12 - free);
+      out.push({ id: "annual", label: `Pay yearly (${free} months free)`, detail: `${dollars(yearly)} for 12 months (you pay for ${12 - free}, ${free} are free) instead of ${dollars(plan.monthly * 12)} · ${setup} · renews yearly`, monthlyEquivalent: Math.round((yearly / 12) * 100) / 100, payLink: plan.payLinkAnnual });
+    }
+    return out;
+  }
   if (short && min && short < min) {
     out.push({
       id: "short",
@@ -386,6 +417,8 @@ export async function getSettings(env: Env): Promise<AppSettings> {
     : s.monthlyPrice
       ? [{ id: "basic" as const, name: "Website", setup: s.setupPrice ?? 0, monthly: s.monthlyPrice, includes: s.offerIncludes ?? "" }]
       : [];
+  // The Price list plan (Oct 2026) joins saved settings once; the owner can rename it, reprice it or blank the price to hide it.
+  if (plans.length && !plans.some((p) => p.id === "list")) plans.push(DEFAULT_LIST_PLAN);
   return {
     ...s,
     plans,

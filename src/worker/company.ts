@@ -1,5 +1,5 @@
 import { notify } from "./notify.ts";
-import { addonPrice, billingOptions, defaultTerms, getSettings, GO_LIVE_TEXT, interestRateOf, lateFeeOf, money2, payoffDiscountOf, reinstatementFeeOf, returnedFeeOf, type AppSettings } from "./db.ts";
+import { isListPlan, addonPrice, billingOptions, defaultTerms, getSettings, GO_LIVE_TEXT, interestRateOf, lateFeeOf, money2, payoffDiscountOf, reinstatementFeeOf, returnedFeeOf, type AppSettings } from "./db.ts";
 import { dollars, pickerHtml, picksFromForm, priceSignup, type PricedOrder } from "./checkout.ts";
 import { agreementPage, agreementPdf, manageBillingHtml, orderSummary, saveOrder } from "./signup.ts";
 import { contractSectionsHtml, contractText } from "./contract.ts";
@@ -652,7 +652,7 @@ function marketingPage(
   const name = s.companyName || "Underground Associates";
   const legal = s.legalName || name;
   const phone = s.companyPhone;
-  const lowest = s.plans.length ? Math.min(...s.plans.map((p) => p.monthly)) : null;
+  const lowest = lowestOf(s);
   const n = nonce();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${e(o.title)}</title><meta name="description" content="${e(o.description)}"><link rel="canonical" href="${ORIGIN}${o.path}">
@@ -681,9 +681,10 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
 /** The business node every page references: a service-area business (city, no street), with what Google reads in 2026. */
 function businessLd(s: AppSettings): Record<string, unknown> {
   const name = s.companyName || "Underground Associates";
-  const plans = s.plans;
-  const lo = plans.length ? Math.min(...plans.map((p) => p.monthly)) : null;
-  const hi = plans.length ? Math.max(...plans.map((p) => p.monthly)) : null;
+  const plans = s.plans.filter((p) => p.monthly);
+  const site = sitePlans(s);
+  const lo = site.length ? Math.min(...site.map((p) => p.monthly)) : null;
+  const hi = site.length ? Math.max(...site.map((p) => p.monthly)) : null;
   return {
     "@type": ["ProfessionalService", "LocalBusiness"],
     "@id": `${ORIGIN}/#business`,
@@ -745,6 +746,22 @@ function quoteHtml(t: { quote: string; who: string }): string {
 }
 
 /** Both prices on one card: the no-setup-fee term price and month to month with the setup fee. */
+/** The website plans: what the plan grids, "from $X" lines and the schema price range describe. The Price list plan is sold separately. */
+const sitePlans = (s: AppSettings) => s.plans.filter((p) => !isListPlan(p) && p.monthly);
+const listPlan = (s: AppSettings) => s.plans.find((p) => isListPlan(p) && p.monthly) ?? null;
+const lowestOf = (s: AppSettings) => (sitePlans(s).length ? Math.min(...sitePlans(s).map((p) => p.monthly)) : null);
+
+/** "Just need a price page?" strip for shops whose stock changes daily (fish, plants, resale): the Price list plan. */
+function priceListHtml(s: AppSettings): string {
+  const p = listPlan(s);
+  if (!p) return "";
+  const lines = p.includes.split(/\n/).map((x) => x.trim()).filter(Boolean).slice(0, 4);
+  return `<section class="sec" id="price-list"><div class="wrap narrow"><h2>Just need a live price list?</h2>
+<p class="lead">For shops whose stock changes every day: fish stores, plant nurseries, produce stands, resale. A price page with a section for every tank or shelf, QR tags, and a board you update from your phone. ${money(p.monthly)} a month, no minimum.</p>
+<ul>${lines.map((x) => `<li>${e(x)}</li>`).join("")}</ul>
+<p><a class="btn btn--small" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a> <a class="btn btn--small btn--line" href="/#contact">Ask us about it</a></p></div></section>`;
+}
+
 function planCard(p: AppSettings["plans"][number], s: AppSettings, o: { full?: boolean } = {}): string {
   const term = (s.minMonths ?? 12) ? `No setup fee on a ${commitText(s)} plan` : "No setup fee";
   const flex = s.flexSetup ? `Month to month: ${money(p.monthly)}/mo + ${money(s.flexSetup)} setup, cancel any time` : "";
@@ -813,8 +830,9 @@ function earlyCancelText(s: AppSettings): string {
 }
 
 function compareHtml(s: AppSettings): string {
-  const lo = s.plans.length ? money(Math.min(...s.plans.map((p) => p.monthly))) : "$49";
-  const hi = s.plans.length ? money(Math.max(...s.plans.map((p) => p.monthly))) : "$149";
+  const site = sitePlans(s);
+  const lo = site.length ? money(Math.min(...site.map((p) => p.monthly))) : "$49";
+  const hi = site.length ? money(Math.max(...site.map((p) => p.monthly))) : "$149";
   const rows: Array<[string, string, string, string]> = [
     ["Who builds it", "You, on your weekends", "A designer, after a deposit", "Us, before you pay"],
     ["See it before you commit", "No, you build it", "A mockup after sign-up", "Yes, the finished site"],
@@ -912,8 +930,8 @@ async function home(env: Env, url: URL): Promise<Response> {
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
   const phone = s.companyPhone;
-  const plans = s.plans;
-  const lowest = plans.length ? Math.min(...plans.map((p) => p.monthly)) : null;
+  const plans = sitePlans(s);
+  const lowest = lowestOf(s);
   const sent = url.searchParams.get("sent") === "1";
   const missing = url.searchParams.get("missing") === "1";
   const [ownerPhoto, live] = await Promise.all([ownerPhotoExists(env), liveClients(env)]);
@@ -974,18 +992,19 @@ ${contactSection(s, { sent, missing })}`;
 async function pricingPage(env: Env): Promise<Response> {
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
-  const lowest = s.plans.length ? Math.min(...s.plans.map((p) => p.monthly)) : null;
+  const lowest = lowestOf(s);
   const title = `Pricing | ${name}`;
   const description = `Website plans for Cullman-area businesses${lowest ? ` from ${money(lowest)}/month` : ""}: hosting, security and updates included, no setup fee on ${commitText(s)} plans, see your site before you pay. Extras, ways to pay and the fine print.`;
   const quotes = testimonials(s);
   const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Pricing</p><h1>Simple monthly pricing. No surprises.</h1>
 <p class="lead">You see your finished site first. If you want it live, pick a plan. The monthly price covers the site, hosting, security and the changes you ask for. ${e(GO_LIVE_TEXT)}</p></div></section>
-${s.plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap"><div class="grid plans">${s.plans.map((p) => planCard(p, s)).join("")}</div>
+${sitePlans(s).length ? `<section class="sec sec--alt" id="plans"><div class="wrap"><div class="grid plans">${sitePlans(s).map((p) => planCard(p, s, { full: true })).join("")}</div>
 <p class="paynote">Every plan includes hosting, security and the changes you ask for. Rather see your site first? <a href="/#contact">Get the free preview</a> and decide after.</p>
 ${waysToPayHtml(s)}
 <h3 class="xgroup">Leaving early</h3><p>${earlyCancelText(s)}</p>
 ${s.churchAnnualMonthsFree ? `<p class="small muted">Churches and nonprofits: 12 months for the price of ${12 - s.churchAnnualMonthsFree} on a yearly plan, and we can invoice instead of taking a card.</p>` : ""}
 </div></section>` : ""}
+${priceListHtml(s)}
 ${extrasHtml(s)}
 <section class="sec sec--alt" id="compare"><div class="wrap"><h2>Why a monthly plan</h2><p class="lead">A website is never finished: hours change, prices change, photos age. The plan pays for someone to keep it right.</p>${compareHtml(s)}</div></section>
 ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</h2><div class="grid">${quotes.slice(0, 3).map(quoteHtml).join("")}</div></div></section>` : ""}
@@ -1029,7 +1048,7 @@ ${contactSection(s)}`;
 async function tradePage(env: Env, t: Trade): Promise<Response> {
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
-  const lowest = s.plans.length ? Math.min(...s.plans.map((p) => p.monthly)) : null;
+  const lowest = lowestOf(s);
   const x = exampleFor(t.cat);
   const groups = SEARCH_GROUPS.filter((g) => g.category === t.cat).map((g) => g.label);
   const title = `${t.h1} | ${name}`;
@@ -1043,7 +1062,8 @@ async function tradePage(env: Env, t: Trade): Promise<Response> {
 ${groups.length ? `<p class="small muted">Covers: ${e(groups.join(" · "))}.</p>` : ""}</div>
 ${x ? `<a class="trade__example" href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of ${e(x.record.name)}, an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>Example ${e(x.kind.toLowerCase())} site · tap to open</span></a>` : ""}
 </div></section>
-${s.plans.length ? `<section class="sec" id="plans"><div class="wrap narrow"><h2>What it costs</h2><p class="lead">${lowest ? `From ${money(lowest)} a month` : "One monthly price"}, with hosting, security and changes included${(s.minMonths ?? 12) ? `, and no setup fee on ${commitText(s)} plans` : ""}. You see the finished site before you pay anything.</p><p><a class="btn btn--line" href="/pricing">See plans and pricing</a></p></div></section>
+${sitePlans(s).length ? `<section class="sec" id="plans"><div class="wrap narrow"><h2>What it costs</h2><p class="lead">${lowest ? `From ${money(lowest)} a month` : "One monthly price"}, with hosting, security and changes included${(s.minMonths ?? 12) ? `, and no setup fee on ${commitText(s)} plans` : ""}. You see the finished site before you pay anything.</p><p><a class="btn btn--line" href="/pricing">See plans and pricing</a></p></div></section>
+${t.cat === "retail" ? priceListHtml(s) : ""}
 ` : ""}
 <section class="sec sec--alt" id="faq"><div class="wrap narrow"><h2>Questions ${e(t.name.split(",")[0]!.replace(/ and .*/, ""))} ask</h2>${faqHtml(t.faq)}<p class="small muted" style="margin-top:14px">Other trades: ${TRADES.filter((o) => o.slug !== t.slug).map((o) => `<a href="/websites-for/${o.slug}">${e(o.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a>`).join(" · ")}.</p></div></section>
 ${contactSection(s)}`;
@@ -1172,7 +1192,7 @@ async function policyPage(env: Env, kind: "terms" | "privacy"): Promise<Response
       sec("Who we are", `<p>${e(legal)} ("we", "us") builds, hosts and maintains websites for local businesses from Cullman, Alabama. Questions? ${reach}.</p>`),
       sec("Free previews", `<p>We may build a free preview website for your business from your public Google business listing. Looking at it costs nothing and you're under no obligation. Previews are private, hidden from search engines, and deleted if you don't sign up.</p>`),
       s.plans.length
-        ? sec("Plans and prices", `${ul(s.plans.map((p) => `<strong>${e(p.name)}</strong>: ${money(p.monthly)} a month${p.setup ? ` plus ${money(p.setup)} setup` : ""}`))}
+        ? sec("Plans and prices", `${ul(s.plans.filter((p) => p.monthly).map((p) => `<strong>${e(p.name)}</strong>: ${money(p.monthly)} a month${p.setup ? ` plus ${money(p.setup)} setup` : ""}${isListPlan(p) ? " (a live price page, QR tags and the Tank board rather than a website; no minimum term, cancel any time)" : ""}`))}
 <p>Ways to pay:</p>${ul(ways.map((o) => `<strong>${e(o.label)}</strong>: ${e(
           o.id === "flex"
             ? `the monthly price plus a one-time ${money(s.flexSetup ?? 0)} setup fee. No minimum.`

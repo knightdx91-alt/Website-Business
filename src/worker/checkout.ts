@@ -1,4 +1,4 @@
-import { addonPrice, annualMonthsFreeFor, billingOptions, type AddOn, type AppSettings, type Billing, type BillingOption, type Plan } from "./db.ts";
+import { isListPlan, addonPrice, annualMonthsFreeFor, billingOptions, type AddOn, type AppSettings, type Billing, type BillingOption, type Plan } from "./db.ts";
 import { HttpError, type Env } from "./env.ts";
 
 /**
@@ -218,7 +218,11 @@ export function pickerHtml(s: AppSettings, o: PickerOptions): string {
   };
   const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
   const billingLabel = (b: BillingOption) =>
-    b.id === "flex"
+    isListPlan(plan)
+      ? b.id === "annual"
+        ? `Pay 12 months up front for the price of ${12 - free}. No setup fee.`
+        : "Monthly price, no setup fee, no minimum. Cancel any time."
+      : b.id === "flex"
       ? `Monthly price plus a one-time ${money((plan.setup ?? 0) + (s.flexSetup ?? 0))} setup fee. No minimum.`
       : b.id === "annual"
         ? church
