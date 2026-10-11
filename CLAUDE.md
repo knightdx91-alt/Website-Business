@@ -368,6 +368,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   confirmed `site_photos`, sets `found_url` NULL (presence `elsewhere` → `none`, reason "No website …") so the next build
   doesn't read the page again, `rewrite = 1`, queues a build. The minute cron also runs `requeueStuck()` (builds "queued" for
   20+ min get their job sent again, 5 a minute). RPS Tire Shop and Otto Mechanic (loc8nearme.com) were reset this way by SQL.
+  Second find on RPS: Google's own profile linked lomyu.me → bizsite.link/rps-tire-shop-511316-us ("RPS Tire Shop - Locations
+  from All Over the World"), a spam site generator with generic AI pictures (the "restaurant photo"), so the rebuild re-imported
+  it from `websiteUri`. `isDirectoryPage` also matches those hosts, that title and the `/<slug>-511316-us` path shape;
+  `isJunkSite()` in qualify.ts makes `webPresence` return "none" for them (runs and hand-adds pitch them as no website), `runBuild`
+  skips them as `siteUrl`, and `detail().website` hides them so there's no Import button.
 - Pages elsewhere (Oct 2026, `src/places/web-presence.ts`, migration 0016 `leads.found_url`): Google only reports the website linked
   on the profile, so "No website" can be wrong (Luna's BBQ has a page on stonebridgewedding.com). With Worker secret
   `BRAVE_SEARCH_API_KEY` (Brave Search API, free 2,000 queries/month, ~$3/1,000 after; without it nothing changes) the app runs one
