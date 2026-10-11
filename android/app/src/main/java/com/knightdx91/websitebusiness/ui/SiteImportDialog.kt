@@ -49,6 +49,9 @@ fun SiteImportDialog(api: Api, leadId: String, url: String, onDone: (changed: Bo
     var result by remember { mutableStateOf<String?>(null) }
     var failed by remember { mutableStateOf(false) }
     val handler = remember { Handler(Looper.getMainLooper()) }
+    // Google often stores the plain http address. Try https first; fall back to the address as given if that fails.
+    val secure = if (url.startsWith("http://")) url.replaceFirst("http://", "https://") else url
+    var triedFallback by remember { mutableStateOf(secure == url) }
 
     fun collect(web: WebView) {
         stage = "Reading the page…"
@@ -106,10 +109,18 @@ fun SiteImportDialog(api: Api, leadId: String, url: String, onDone: (changed: Bo
                                     handler.postDelayed({ collect(view) }, 500L * steps.size + 2_500L)
                                 }
                                 override fun onReceivedError(view: WebView, request: android.webkit.WebResourceRequest, error: android.webkit.WebResourceError) {
-                                    if (request.isForMainFrame && !done) { done = true; failed = true; busy = false; result = "Their site didn't load on this phone either: ${error.description}" }
+                                    if (!request.isForMainFrame || done) return
+                                    if (!triedFallback) {
+                                        triedFallback = true
+                                        stage = "Secure address didn't answer; trying the plain one…"
+                                        handler.post { view.loadUrl(url) }
+                                        return
+                                    }
+                                    done = true; failed = true; busy = false
+                                    result = "Their site didn't load on this phone either: ${error.description}"
                                 }
                             }
-                            loadUrl(url)
+                            loadUrl(secure)
                         }
                     },
                 )
