@@ -23,7 +23,7 @@ export interface Guide {
   sections: GuideSection[];
 }
 
-export const GUIDE_IDS = ["tankboard"] as const;
+export const GUIDE_IDS = ["tankboard", "pricetags"] as const;
 
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
@@ -152,6 +152,98 @@ export function tankBoardGuide(s: AppSettings): Guide {
   };
 }
 
+
+export function priceTagsGuide(s: AppSettings): Guide {
+  const tags = s.addons.find((a) => /price tag|shelf label/i.test(a.name));
+  const tagName = tags?.name ?? "QR price tags & shelf labels";
+  const tagPrice = tags ? addonPrice(tags) : "the price in Settings → Extras";
+  const list = s.plans.find((p) => p.id === "list" && p.monthly);
+  const company = s.companyName || "Underground Associates";
+  return {
+    id: "pricetags",
+    title: "🏷️ QR price tags (the extra)",
+    intro:
+      `A printed sheet of labels, one per tank, shelf or rack. Each label carries a QR code that opens that section of the shop's live price page, so a price change on the website is a price change on the shelf, and nobody rewrites a tag. Sold as the extra "${tagName}" (${tagPrice}); the first sheet is included with the ${list?.name ?? "Price list"} plan. Only shops (the Shops type) have a price list, so only they can get tags.`,
+    sections: [
+      {
+        title: "What a sheet is",
+        steps: [
+          "Letter paper, 8 labels per sheet: 2 across, 4 down, each 3.75 × 2.5 inches, with light cut lines between them.",
+          "Each label: a big QR code on the left; on the right the section name (\"Tank 12\", \"Perennials\"), \"Scan for today's prices\", the shop's name and its web address.",
+          "One label per section of the price list, in the order the sections are in. 9 to 16 sections = 2 sheets, and so on. A sheet is a price unit, so a shop with 20 tanks buys 3 sheets.",
+          "The QR opens the live price page straight at that section. The page reads the live list every time it loads, so the tag never goes out of date unless the section is renamed.",
+        ],
+      },
+      {
+        title: "Before you can print",
+        numbered: true,
+        steps: [
+          "The shop's site has to be live: the QR points at the real address (their own domain if one is attached, else the pages.dev address). The button says \"Publish the site first\" until then.",
+          "The price list needs at least one section: Edit → Shop details → \"Price list & QR labels\", or the shop adds tanks on their Tank board. Each section becomes one label.",
+          "Check the section names read well on a 1.35-inch-wide line: \"Tank 12\" is good, \"Freshwater community tanks, left wall\" wraps and gets small. Rename in Edit or on the board; the page and the label follow.",
+          "A private price list (\"Public\" unticked) is fine: the labels still open it. It just isn't in the site's menu or on Google.",
+        ],
+      },
+      {
+        title: "Print the sheet",
+        numbered: true,
+        steps: [
+          "Open the lead → \"Client site\" card → \"QR price tags\". The PDF opens (on the phone it opens in the app's PDF viewer with Print and Share).",
+          "Print at 100% (\"Actual size\", not \"Fit to page\"), colour or black and white both scan.",
+          "Paper: full-sheet sticker paper (Avery 8165 or any 8.5 × 11 label sheet) and cut on the lines, or card stock in a sleeve. Near water, run the cut labels through a laminator or use clear packing tape over the QR.",
+          "Scan every label once with your own phone camera before you hand them over. If one won't scan, print that sheet again at a slightly larger scale; the QR has room.",
+          "Hand them over with the tank names in order so they go on the right tanks. Or stick them on yourself; it takes five minutes and the shop remembers it.",
+        ],
+        note: "The agreement says the shop approves the layout before printing: show them the PDF on your phone first and get a yes.",
+      },
+      {
+        title: "When to print again",
+        steps: [
+          "A section was renamed: the QR goes to the section by its name, so the old label points at a section that no longer exists (the page just opens at the top). Print again.",
+          "A tank or shelf was added: print again; the new sheet has every section, so swap only the new label.",
+          "Items changed, prices changed, sold out, photos: never. That is the whole point.",
+          "Wear, water, sun: print again. Laminated labels last a year or more by a tank; paper lasts weeks.",
+          `Pricing: reprints after a section change are at cost, per the agreement. A courtesy reprint for a good client is cheaper than the call about the broken tag. A new sheet for new tanks is a normal ${tagPrice.replace(/^\$/, "$")} purchase.`,
+        ],
+      },
+      {
+        title: "How to sell it",
+        numbered: true,
+        steps: [
+          `At sign-up: it's in the extras list on the sign-up page and in the in-person sign-up on the phone (tick it, set the quantity to the number of sheets). On the ${list?.name ?? "Price list"} plan the first sheet is already included, so only add it for a second sheet.`,
+          "After the sale: open the client → \"💬 Text 'Buy extras' link\". They tick the tags, pick how many sheets, sign and pay online. Or they tap \"Already a client? Add extras\" on our website and it lands in the Inbox.",
+          "Quantity = sheets, not labels. Count their sections first: 8 or fewer is one sheet.",
+          "Pair it with the Tank board: \"Your phone changes the price; the tag on the tank is already right.\" Then scan one in front of them.",
+          "Who buys it: fish and reptile stores, plant nurseries, antique malls with booth numbers, farm and feed stores, produce stands, resale with sections, bakery cases. Anything with a section name you can stick a label on.",
+          "Not for: restaurants (they get QR table tents and the menu instead), service businesses (no price list).",
+        ],
+      },
+      {
+        title: "After they pay",
+        numbered: true,
+        steps: [
+          "The purchase shows on the client's lead screen under their sign-up with the signed extras agreement; it's marked paid by Stripe when the card goes through (Inbox requests from the website need you to send the Buy extras link or take payment in person).",
+          "Print the sheets from the \"QR price tags\" button, scan-test, deliver. Log it in the call log (\"Delivered 2 sheets of tags\") so the whole team knows.",
+          "Set a task for 30 days out: \"Check King Fish's tags\" with the lead attached. A quick look catches a renamed tank before customers do.",
+        ],
+      },
+      {
+        title: "Trouble",
+        steps: [
+          "\"Publish the site first\": the site isn't live. Publish from the lead, or if it's a Price list client that's not live yet, publish now; the plan only promises the price page but the whole site goes up.",
+          "\"Add a price list first\": no sections yet. Edit → Shop details, or the Tank board.",
+          "QR opens the page but not the right section: the section was renamed since printing. Reprint.",
+          "QR opens a 404 or an old domain: a custom domain was attached or removed after printing. Reprint; the labels carry the domain.",
+          "QR won't scan: printed too small (\"Fit to page\" shrinks it), glossy lamination glare, or a crease through the code. Print at 100%, matte lamination, flat.",
+          `Anything else: text ${company} from the client's call log so everyone sees it.`,
+        ],
+      },
+    ],
+  };
+}
+
 export function guideById(id: string, s: AppSettings): Guide | null {
-  return id === "tankboard" ? tankBoardGuide(s) : null;
+  if (id === "tankboard") return tankBoardGuide(s);
+  if (id === "pricetags") return priceTagsGuide(s);
+  return null;
 }

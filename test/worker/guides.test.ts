@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_ADDONS, DEFAULT_LIST_PLAN, type AppSettings } from "../../src/worker/db.ts";
-import { guideById, tankBoardGuide } from "../../src/worker/guides.ts";
+import { guideById, priceTagsGuide, tankBoardGuide } from "../../src/worker/guides.ts";
 
 const settings = (over: Partial<AppSettings> = {}) => ({ plans: [{ id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "" }, DEFAULT_LIST_PLAN], addons: DEFAULT_ADDONS, companyName: "Underground Associates", ...over }) as unknown as AppSettings;
 
@@ -15,6 +15,12 @@ test("the Tank board guide covers setup, the board, QR tags, the tablet and sell
   assert.match(text, /QR price tags & shelf labels: \$49 each/);
   assert.match(text, /\/d\/<lead>\/<tank>/);
   assert.equal(guideById("nope", settings()), null);
+  const tags = priceTagsGuide(settings());
+  assert.equal(guideById("pricetags", settings())?.id, "pricetags");
+  const tagTitles = tags.sections.map((x) => x.title.toLowerCase());
+  for (const need of ["what a sheet is", "before you can print", "print the sheet", "print again", "sell", "after they pay", "trouble"]) assert.ok(tagTitles.some((t) => t.includes(need)), need);
+  assert.match(JSON.stringify(tags), /\$49 each/);
+  assert.match(JSON.stringify(tags), /8 labels per sheet/);
   const noList = tankBoardGuide(settings({ plans: [{ id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "" }] }));
   assert.match(JSON.stringify(noList), /turn it on in Settings/);
 });
