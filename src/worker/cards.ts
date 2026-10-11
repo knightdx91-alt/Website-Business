@@ -175,7 +175,7 @@ export function previewFlyerPdf(o: { business: string; previewUrl: string; compa
     { t: "text", x: LETTER.w / 2, y: 6.8 * IN, size: 11, text: o.previewUrl, align: "center", gray: 0.2 },
     { t: "text", x: 0.9 * IN, y: 7.6 * IN, size: 13, text: "Nothing is published and nothing is owed. If you like it, we'll make it yours: your photos, your words, your domain.", maxW: LETTER.w - 1.8 * IN },
     { t: "text", x: 0.9 * IN, y: 8.3 * IN, size: 13, text: `This preview stays up for ${o.days} days.`, maxW: LETTER.w - 1.8 * IN },
-    { t: "text", x: 0.9 * IN, y: 9.3 * IN, size: 15, bold: true, text: [o.caller, o.company].filter(Boolean).join(" · ") || "Website Business" },
+    { t: "text", x: 0.9 * IN, y: 9.3 * IN, size: 15, bold: true, text: [o.caller, o.company].filter(Boolean).join(" · ") || "Underground Associates" },
     ...(o.phone ? [{ t: "text", x: 0.9 * IN, y: 9.6 * IN, size: 15, text: `Call or text ${o.phone}` } as Draw] : []),
   ];
   return drawPdf([ops], `Preview flyer: ${o.business}`);

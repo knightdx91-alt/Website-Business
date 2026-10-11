@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="appName">Website Business</string>
+    <string name="appName">Underground Associates</string>
     <string name="alertsChannel">Team alerts</string>
     <string name="alertsChannelAbout">Calls logged, sales, sign-ups, payments and prospects opening their preview.</string>
     <!-- Tap to Pay screen -->

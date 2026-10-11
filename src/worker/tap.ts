@@ -84,7 +84,7 @@ export async function setupTap(env: Env): Promise<{ locationId: string; address:
   const existing = await terminalLocation(env);
   if (existing) return { locationId: existing, address };
   const loc = await stripe<{ id: string }>(env, "terminal/locations", {
-    display_name: `${s.companyName || "Website Business"} (in person)`,
+    display_name: `${s.companyName || "Underground Associates"} (in person)`,
     address: { line1: s.companyStreet, city: s.companyCity, state: s.companyState || "AL", postal_code: s.companyZip, country: "US" },
   });
   await setSetting(env, LOCATION_KEY, loc.id);
@@ -227,7 +227,7 @@ export async function tapSession(env: Env, row: TapSignupRow): Promise<Record<st
     plan: `${plan.name} plan${plan.billingLabel ? ` · ${plan.billingLabel}` : ""}`,
     renews: extras?.renews ? { amountCents: extras.renews.amount, interval: extras.renews.interval } : null,
     locationId,
-    merchant: s.companyName || "Website Business",
+    merchant: s.companyName || "Underground Associates",
     receiptEmail: row.signer_email,
     paid: !!row.paid,
   };

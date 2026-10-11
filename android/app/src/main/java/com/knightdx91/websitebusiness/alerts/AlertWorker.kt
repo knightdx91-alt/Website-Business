@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.work.CoroutineWorker
@@ -40,6 +41,8 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 val pi = PendingIntent.getActivity(applicationContext, e.id.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 val notification = Notification.Builder(applicationContext, CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
+                    .setLargeIcon(Icon.createWithResource(applicationContext, R.mipmap.ic_launcher))
+                    .setColor(0xFFFCA311.toInt())
                     .setContentTitle(e.leadName ?: applicationContext.getString(R.string.appName))
                     .setContentText(e.text)
                     .setStyle(Notification.BigTextStyle().bigText(e.text))

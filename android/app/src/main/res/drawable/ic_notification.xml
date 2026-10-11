@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Status-bar notification icon: a plain white bell (Android tints it). -->
+<!-- Status-bar notification icon: the Underground Associates seal centre (ring + UA + bar) as a white silhouette; Android tints it.
+     Paths are the same as ic_launcher_foreground.xml (scripts/logo.mts android-icon), drawn a little larger for the 24 dp box. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="#FFFFFFFF"
-        android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.9,2 2,2zM18,16v-5c0,-3.07 -1.64,-5.64 -4.5,-6.32V4c0,-0.83 -0.67,-1.5 -1.5,-1.5s-1.5,0.67 -1.5,1.5v0.68C7.63,5.36 6,7.92 6,11v5l-2,2v1h16v-1l-2,-2z" />
+    android:width="24dp" android:height="24dp" android:viewportWidth="100" android:viewportHeight="100">
+    <group android:pivotX="50" android:pivotY="50" android:scaleX="1.5" android:scaleY="1.5" android:translateY="-1">
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="4.5" android:pathData="M50 21 A29 29 0 1 1 49.99 21 Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M39.37 58.42L39.37 58.42Q37.48 58.42 36.01 58.05Q34.54 57.67 33.46 56.95Q32.38 56.23 31.67 55.21Q30.97 54.19 30.62 52.91Q30.28 51.64 30.28 50.14L30.28 50.14L30.28 38.20L35.14 38.20L35.14 49.99Q35.14 51.43 35.59 52.36Q36.04 53.29 36.97 53.73Q37.90 54.16 39.34 54.16L39.34 54.16Q40.78 54.16 41.70 53.73Q42.64 53.29 43.09 52.36Q43.54 51.43 43.54 49.99L43.54 49.99L43.54 38.20L48.37 38.20L48.37 50.14Q48.37 54.07 46.13 56.24Q43.90 58.42 39.37 58.42ZM56.02 58L50.73 58L57.45 38.20L64.53 38.20L71.25 58L65.97 58L64.86 54.28L57.13 54.28L56.02 58ZM58.08 51.04L63.91 51.04L61.23 41.98L60.75 41.98L58.08 51.04Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M37.5 63.5 H62.5 A2 2 0 0 1 62.5 67.5 H37.5 A2 2 0 0 1 37.5 63.5 Z" />
+    </group>
 </vector>

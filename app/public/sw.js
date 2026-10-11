@@ -1,5 +1,5 @@
 // Caches the app shell so it opens instantly; never caches API data or previews.
-const VERSION = "v50";
+const VERSION = "v51";
 const SHELL = ["/", "/app.css", "/app.js", "/manifest.webmanifest", "/icons/icon-192.png"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -34,7 +34,7 @@ self.addEventListener("push", (e) => {
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
       .then((n) => {
-        const d = n || { title: "Website Business", body: "Something new. Tap to see.", url: "/#/notifications", unread: 0 };
+        const d = n || { title: "Underground Associates", body: "Something new. Tap to see.", url: "/#/notifications", unread: 0 };
         if (self.navigator.setAppBadge && d.unread) self.navigator.setAppBadge(d.unread).catch(() => {});
         return self.registration.showNotification(d.title, { body: d.body, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png", tag: "wb-updates", renotify: true, data: { url: d.url } });
       }),

@@ -102,13 +102,13 @@ export async function latestForPush(env: Env, userId: string, caller = false) {
   const test = Number((await getSetting(env, `push_test_${userId}`)) ?? 0);
   if (test && Date.now() - test < 120_000) {
     await setSetting(env, `push_test_${userId}`, "0");
-    return { title: "Website Business", body: "Test notification: you're all set. You'll get one whenever someone else adds or changes something on a lead.", url: "/#/notifications", unread: 0 };
+    return { title: "Underground Associates", body: "Test notification: you're all set. You'll get one whenever someone else adds or changes something on a lead.", url: "/#/notifications", unread: 0 };
   }
   const { items, unread } = await listEvents(env, userId, 5, caller);
   const top = items.find((i) => i.unread) ?? items[0];
-  if (!top) return { title: "Website Business", body: "Nothing new.", url: "/#/notifications", unread: 0 };
+  if (!top) return { title: "Underground Associates", body: "Nothing new.", url: "/#/notifications", unread: 0 };
   return {
-    title: unread > 1 ? `${unread} new updates` : PUSH_TITLE[top.kind] ?? "Website Business",
+    title: unread > 1 ? `${unread} new updates` : PUSH_TITLE[top.kind] ?? "Underground Associates",
     body: top.text,
     url: top.leadId ? `/#/lead/${top.leadId}` : "/#/notifications",
     unread,
