@@ -127,7 +127,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Online checkout: sign-up links, website Buy now, Buy extras links (Stripe Checkout)
 - [x] Stripe keys set as Worker secrets; live checkout + webhook verified with a $1 test
 - [x] Email: MailerSend worked in a test, then turned the account down (Oct 2026). Switched to Resend (RESEND_API_KEY secret wins over MAILERSEND_API_KEY)
-- [ ] Owner to do: our own Google Business Profile + review link
+- [ ] Owner to do: our own Google Business Profile (service-area business, primary "Website designer", services with prices)
+      + review link; verify undergroundassociates.com as a Domain property in Search Console and submit /sitemap.xml;
+      Chamber of Commerce, Bing Places, Apple Business Connect listings; add `app/public/owner.jpg`
 - [x] Tax & finance pack and churches & nonprofits pack (Oct 2026), 25 looks each. Hand-added businesses can have a typed-in phone
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
@@ -798,6 +800,25 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   as custom domains in wrangler.jsonc; www redirects to apex). `src/worker/company.ts` renders it per request from
   Settings (plans, phone, email), so price changes show immediately. Its contact form posts to `/contact` and lands
   in the app Inbox under lead id `company`. Assets use `run_worker_first: true`; the app stays on workers.dev.
+  Rebuilt Oct 2026 after a 25-site study (`research/company-website-2026.md`; SEO: `research/seo-playbook-2026.md`):
+  `marketingPage()` shell (per-page title/description/canonical, `pageLd()` = @graph of `businessLd()`
+  [ProfessionalService + LocalBusiness: city, geo, areaServed from towns, priceRange, makesOffer per plan, logo],
+  WebSite, WebPage + breadcrumb). Pages: `/` (hero with a phone mockup of the restaurant example, `proofRow()` 4 badges,
+  3 steps + `firstWeekHtml()` timeline, `tradeCards()`, compact plans + `badgesHtml()` + extras chips, `ownerSection()`,
+  FAQ, `contactSection()`), `/pricing` (`planCard(full)` with both prices, ways to pay, `earlyCancelText()` from the
+  agreement numbers, extras grouped by unit, `compareHtml()` DIY/agency/us table, pricing FAQ), `/about`,
+  `/websites-for/<slug>` (one per pack from `TRADES`: trade copy, includes, example, FAQ, Service schema), `/cullman-county`
+  (one service-area page, never per-town clones), `/portfolio`. Sitemap lists them all with lastmod. Copy uses
+  `MARKET_TOWN` ("Cullman"); the registered city (Settings → business address, Hanceville) is only in the schema address.
+  Settings → **Website** (web + Android): `siteHeadline`, `siteLead`, `siteBio`, `siteTestimonials` (`Quote | Name,
+  Business` per line; real clients only, nothing shows until typed), `siteTowns` (comma list → county page, footer,
+  areaServed). `liveClients()` (sold + live) replaces the first badge from 3 up. No FAQPage schema (Google dropped FAQ
+  rich results 7 May 2026), no aggregateRating. Owner photo: add `app/public/owner.jpg` (square); until then the UA badge.
+- Client-site SEO (Oct 2026): titles were already `<Business> | <Service> in <Town>, AL`; added `x-default` hreflang,
+  `record.seo.googleSiteVerification` (Edit → Links → "Search Console code"; `<meta name="google-site-verification">`
+  on published pages only; `editform` field `gsc`), `rel="nofollow"` on the footer "Website by" credit, and two SEO
+  rows at the top of the Get-listed checklist (GBP website field, Search Console verified + sitemap submitted; Bing
+  Places row says import from GBP). Not built: Search Console / Business Profile Performance API in the monthly report.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

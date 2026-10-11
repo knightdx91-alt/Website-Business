@@ -610,7 +610,7 @@ ${ctx.theme.dna.footer === "bigcta" ? html`<div class="ftr__cta"><p>${ctx.copy.c
 </div>
 ${extra.note ?? ""}
 <p class="ftr__legal">© <span data-year>${new Date().getFullYear()}</span> ${r.name}${ctx.hasForm ? html` · <a href="/privacy/">Privacy</a>` : ""}${
-    ctx.credit ? html` · Website by <a href="${ctx.credit.url}">${ctx.credit.company}</a> · <a href="${ctx.credit.changeUrl}" rel="nofollow">Request a change</a>` : ""
+    ctx.credit ? html` · Website by <a href="${ctx.credit.url}" rel="nofollow">${ctx.credit.company}</a> · <a href="${ctx.credit.changeUrl}" rel="nofollow">Request a change</a>` : ""
   }</p>
 </div></footer>`;
 }

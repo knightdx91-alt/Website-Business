@@ -176,6 +176,11 @@ export const EditsSchema = z.object({
         .object({ order: url, reserve: url, booking: url, facebook: url, instagram: url, shop: url, giftCards: url })
         .partial()
         .optional(),
+      /** Search-engine hookups: Google Search Console's HTML-tag code for this site (published pages only). */
+      seo: z
+        .object({ googleSiteVerification: z.string().trim().max(120).regex(/^[A-Za-z0-9_-]*$/, "Just the code from content=\"…\" in Google's tag") })
+        .partial()
+        .optional(),
       /** Owner proof (every category): awards, memberships, named clients, stats. Empty lists clear. */
       proof: z
         .object({
@@ -557,6 +562,10 @@ export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { 
     if (e.petSafe !== undefined) c.petSafe = e.petSafe;
   }
   applyFsrpEdits(r, e);
+  if (e.seo) {
+    const code = e.seo.googleSiteVerification || undefined;
+    r.seo = code ? { ...r.seo, googleSiteVerification: code } : undefined;
+  }
   if (e.links) {
     const l = e.links;
     if (l.giftCards !== undefined) r.links.giftCards = l.giftCards || undefined;

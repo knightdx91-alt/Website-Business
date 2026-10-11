@@ -81,8 +81,10 @@ private val GBP_CHECKS = listOf(
 
 /** "Get listed everywhere" extra: the free directories worth claiming, with the same name, address, phone and hours. */
 private val GBP_LISTINGS = listOf(
+    Triple("listing_gbp_site", "Google Business Profile: website field points at the live site, and the booking/menu links too", "https://business.google.com/"),
+    Triple("listing_gsc", "Google Search Console: site verified under our account (Edit → Links → Search Console code), sitemap.xml submitted", "https://search.google.com/search-console"),
     Triple("listing_apple", "Apple Maps (Apple Business Connect)", "https://businessconnect.apple.com/"),
-    Triple("listing_bing", "Bing Places", "https://www.bingplaces.com/"),
+    Triple("listing_bing", "Bing Places (import from Google Business Profile, turn on sync)", "https://www.bingplaces.com/"),
     Triple("listing_yelp", "Yelp for Business", "https://biz.yelp.com/"),
     Triple("listing_facebook", "Facebook page: hours, phone and website filled in", "https://www.facebook.com/"),
     Triple("listing_nextdoor", "Nextdoor business page", "https://business.nextdoor.com/"),

@@ -293,6 +293,15 @@ export interface AppSettings {
   /** Stripe publishable key (pk_live_…; not a secret) for the Android app's native card entry. */
   stripePublishableKey?: string;
   /** Firebase (Phone alerts): the public client values the Android app initialises with. All four or nothing. */
+  /** Company website copy (Settings → Website). Blank = the defaults in company.ts. */
+  siteHeadline?: string;
+  siteLead?: string;
+  /** The owner's paragraph in "Who you'll work with". */
+  siteBio?: string;
+  /** One per line, `Quote | Name, Business`. Only real clients, typed by the owner; nothing is ever made up. */
+  siteTestimonials?: string;
+  /** Towns served, comma-separated: the county page, the proof row and schema areaServed. */
+  siteTowns?: string;
   fcmAppId?: string;
   fcmApiKey?: string;
   fcmProjectId?: string;

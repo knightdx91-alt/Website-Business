@@ -15,7 +15,7 @@ test("live sites carry the credit and Request a change link; previews don't", as
   const credit = { company: "Underground Associates", url: "https://undergroundassociates.com", changeUrl: "https://undergroundassociates.com/change?b=abc123" };
   const live = await buildSite({ record: ex.record, copy: ex.copy, site: { slug: ex.slug, look: ex.design, origin: "https://example.test" }, mode: "publish", credit });
   const home = String(live.files.get("index.html"));
-  assert.match(home, /Website by <a href="https:\/\/undergroundassociates.com">Underground Associates<\/a>/);
+  assert.match(home, /Website by <a href="https:\/\/undergroundassociates.com" rel="nofollow">Underground Associates<\/a>/);
   assert.match(home, /change\?b=abc123/);
   const preview = await buildSite({ record: ex.record, copy: ex.copy, site: { slug: ex.slug, look: ex.design }, mode: "preview", credit });
   assert.doesNotMatch(String(preview.files.get("index.html")), /Request a change/);

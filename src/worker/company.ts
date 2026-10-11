@@ -12,6 +12,7 @@ import { SEARCH_GROUPS } from "../places/queries.ts";
 import { EXAMPLES } from "../examples/examples.ts";
 import { LAYOUTS } from "../generator/layouts.ts";
 import { LOOKS, parseDesign } from "../generator/themes.ts";
+import type { CategoryId } from "../generator/types.ts";
 
 /** Underground Associates' own website, served on the company domain from live Settings (prices, phone, email). */
 export const COMPANY_HOSTS = ["undergroundassociates.com", "www.undergroundassociates.com"];
@@ -102,10 +103,19 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
     return tok.endsWith(".pdf") ? agreementPdf(env, tok.slice(0, -4)) : agreementPage(env, tok);
   }
   if (path === "/portfolio" && req.method === "GET") return portfolio(env);
+  if (path === "/pricing" && req.method === "GET") return pricingPage(env);
+  if (path === "/about" && req.method === "GET") return aboutPage(env);
+  if (path === "/cullman-county" && req.method === "GET") return countyPage(env);
+  if (path.startsWith("/websites-for/") && req.method === "GET") {
+    const t = TRADES.find((x) => `/websites-for/${x.slug}` === path);
+    if (t) return tradePage(env, t);
+  }
   if (path === "/extras" && (req.method === "GET" || req.method === "POST")) return extrasRequest(env, req, url);
   if (path === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`, { headers: { "content-type": "text/plain" } });
   if (path === "/sitemap.xml") {
-    return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${ORIGIN}/</loc></url><url><loc>${ORIGIN}/portfolio</loc></url><url><loc>${ORIGIN}/terms</loc></url><url><loc>${ORIGIN}/privacy</loc></url></urlset>\n`, { headers: { "content-type": "application/xml" } });
+    const today = new Date().toISOString().slice(0, 10);
+    const urls = ["/", "/pricing", "/portfolio", "/about", "/cullman-county", ...TRADES.map((t) => `/websites-for/${t.slug}`), "/terms", "/privacy"];
+    return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((u) => `<url><loc>${ORIGIN}${u}</loc><lastmod>${today}</lastmod></url>`).join("")}</urlset>\n`, { headers: { "content-type": "application/xml", "cache-control": "public, max-age=3600" } });
   }
   // Fonts and icons come from the app's static assets.
   if (path.startsWith("/fonts/") || path.startsWith("/icons/") || path.startsWith("/brand/") || path === "/og.png") return null;
@@ -163,9 +173,9 @@ ${s.companyPhone ? `<p class="direct">Or text or call <a href="${telHref(s.compa
   const n = nonce();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Request a change | ${e(name)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(s.gaMeasurementId, n)}<style>${CSS}</style></head><body>
-${header(name, s.companyPhone)}
+${header(name, s.companyPhone, null, "/change")}
 <main id="main" class="sec sec--dark"><div class="wrap narrow">${body}</div></main>
-${footer(s.legalName || name)}</body></html>`;
+${footer(s.legalName || name, s)}</body></html>`;
   return new Response(html, { status: lead ? 200 : 404, headers: { ...HEADERS, "cache-control": "no-store", "content-security-policy": csp(n, { ga: !!s.gaMeasurementId }) } });
 }
 
@@ -243,7 +253,7 @@ ${esignHtml({ sectionsHtml: contractSectionsHtml(s, { business: "your business",
 ${env.STRIPE_SECRET_KEY ? `<p class="small muted">Payment is handled securely by Stripe. We never see your card number.</p>` : `<p class="small muted">We'll send you an invoice by email.</p>`}
 </form>
 <p class="small muted" style="margin-top:20px">Rather see it before you pay? <a href="/#contact">Get a free preview</a> instead.</p>`;
-  return policyShell(name, legal, "Get started", body, { script: true, phone: s.companyPhone, ga: s.gaMeasurementId });
+  return policyShell(name, legal, "Get started", body, { script: true, phone: s.companyPhone, ga: s.gaMeasurementId, settings: s, path: "/start" });
 }
 
 async function startThanks(env: Env, url: URL): Promise<Response> {
@@ -263,7 +273,7 @@ async function startThanks(env: Env, url: URL): Promise<Response> {
 <p><strong>${GO_LIVE_TEXT}</strong></p>${copy}
 ${manageBillingHtml(s)}
 <p><a class="btn" href="/">Back to the home page</a></p>`;
-  return policyShell(name, s.legalName || name, "Thank you", body, { phone: s.companyPhone, ga: s.gaMeasurementId, gaEvents });
+  return policyShell(name, s.legalName || name, "Thank you", body, { phone: s.companyPhone, ga: s.gaMeasurementId, gaEvents, settings: s });
 }
 
 const digits = (t: string) => t.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
@@ -377,20 +387,20 @@ ${s.addons.map((a, i) => `<label class="xopt"><input type="checkbox" name="x_${i
 <button class="btn" type="submit">Send my request</button>
 </form>
 <p class="small muted" style="margin-top:20px">Not a client yet? <a href="/start">Get started</a> or <a href="/#contact">get a free preview</a>.</p>`;
-  return policyShell(name, s.legalName || name, "Add extras", body, { phone: s.companyPhone, ga: s.gaMeasurementId });
+  return policyShell(name, s.legalName || name, "Add extras", body, { phone: s.companyPhone, ga: s.gaMeasurementId, settings: s });
 }
 
 /** Simple light page in the company style (header, narrow column, footer). */
-function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean; wide?: boolean; phone?: string; description?: string; status?: number; from?: number | null; ga?: string; gaEvents?: GaEvent[] }): Response {
+function policyShell(name: string, legal: string, title: string, body: string, o: { script?: boolean; wide?: boolean; phone?: string; description?: string; status?: number; from?: number | null; ga?: string; gaEvents?: GaEvent[]; path?: string; settings?: AppSettings }): Response {
   const n = nonce();
   const meta = o.description
-    ? `<meta name="description" content="${e(o.description)}"><link rel="canonical" href="${ORIGIN}/portfolio"><meta property="og:image" content="${ORIGIN}/og.png">`
+    ? `<meta name="description" content="${e(o.description)}"><link rel="canonical" href="${ORIGIN}${o.path ?? "/"}"><meta property="og:image" content="${ORIGIN}/og.png">`
     : `<meta name="robots" content="noindex">`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${e(title)} | ${e(name)}</title>${meta}<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(o.ga, n, o.gaEvents)}<style>${CSS}</style></head><body>
-${header(name, o.phone, o.from)}
+${header(name, o.phone, o.from, o.path ?? "")}
 <main id="main" class="sec"><div class="wrap${o.wide ? "" : " narrow"}">${body}</div></main>
-${footer(legal)}</body></html>`;
+${footer(legal, o.settings ?? ({ plans: [], addons: [] } as unknown as AppSettings))}</body></html>`;
   return new Response(html, { status: o.status ?? 200, headers: { ...HEADERS, "cache-control": "no-store", "content-security-policy": csp(n, { ga: !!o.ga, inlineScript: o.script, stripe: true }) } });
 }
 
@@ -426,146 +436,226 @@ async function contactPost(env: Env, req: Request): Promise<Response> {
   return back("sent=1");
 }
 
-async function home(env: Env, url: URL): Promise<Response> {
-  const s = await getSettings(env);
+/** Cullman's center, for the LocalBusiness `geo` (a service-area business: no street address in the markup). */
+const CULLMAN_GEO = { "@type": "GeoCoordinates", latitude: 34.17482, longitude: -86.84361 };
+const DEFAULT_TOWNS = ["Cullman", "Hanceville", "Good Hope", "Vinemont", "Holly Pond", "Dodge City", "Hartselle", "Arab", "Jasper", "Decatur"];
+/** The market we sell to, in copy. The registered address (Settings → business street/city) is only used in the schema. */
+const MARKET_TOWN = "Cullman";
+const DEFAULT_HEADLINE = "Your website is already built. See it before you pay a dime.";
+const DEFAULT_BIO = "I build the site, show it to you in person, and keep it running. No agency hand-offs, no ticket queue: when something on your site needs changing, you text me.";
+
+function headlineHtml(s: AppSettings): string {
+  const h = s.siteHeadline?.trim() || DEFAULT_HEADLINE;
+  // Gold on the risk-killer phrase when the owner's headline (or the default) carries one.
+  const m = /(before you pay[^.?!]*)/i.exec(h);
+  return m ? `${e(h.slice(0, m.index))}<span class="hl">${e(m[1]!)}</span>${e(h.slice(m.index + m[1]!.length))}` : e(h);
+}
+
+function leadText(s: AppSettings, lowest: number | null): string {
+  if (s.siteLead?.trim()) return s.siteLead.trim();
+  return `We build a real website for your business from your Google listing, free. Look it over on your phone. If you like it, it goes live${lowest ? ` from ${money(lowest)} a month` : ""} with hosting, updates and support included. No setup fee on ${commitText(s)} plans.`;
+}
+
+function townList(s: AppSettings): string[] {
+  const typed = (s.siteTowns ?? "").split(",").map((t) => t.trim()).filter(Boolean);
+  return typed.length ? typed : DEFAULT_TOWNS;
+}
+
+/** Settings → Website → testimonials: `Quote | Name, Business` per line. Nothing shows until the owner types one. */
+function testimonials(s: AppSettings): Array<{ quote: string; who: string }> {
+  return (s.siteTestimonials ?? "")
+    .split(/\n+/)
+    .map((l) => l.split("|").map((x) => x.trim()))
+    .filter((p) => p[0])
+    .map((p) => ({ quote: p[0]!, who: p.slice(1).join(", ") }));
+}
+
+/** Clients whose site is paid for or live: the one count the site may print, and only from 3 up. */
+async function liveClients(env: Env): Promise<number> {
+  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM leads WHERE status != 'expired' AND sales_status IN ('sold', 'live')").first<{ n: number }>().catch(() => null);
+  return row?.n ?? 0;
+}
+
+interface Trade {
+  slug: string;
+  cat: CategoryId;
+  /** Plural, lower case: "restaurants and cafes". */
+  name: string;
+  h1: string;
+  intro: string;
+  includes: string[];
+  faq: Array<[string, string]>;
+}
+
+/** One page per template pack: what a site for that trade includes, in that trade's words. Linked from the home page cards. */
+const TRADES: Trade[] = [
+  {
+    slug: "restaurants",
+    cat: "restaurant",
+    name: "restaurants, cafes and food trucks",
+    h1: "Websites for restaurants and cafes in Cullman, AL",
+    intro: "Most people decide where to eat on their phone, in the car, in about ten seconds. Your site answers the three questions they have: are you open, what's on the menu, how do I get there. Then it gets out of the way.",
+    includes: ["Your menu as a real page Google can read, not a photo of a printout", "Open or closed right now, with today's hours up top", "Tap to call, tap for directions, order-online and reservation buttons that go to the tools you already use (Toast, Square, DoorDash)", "Your dishes as photos once you send them; Google's photos are only used in the preview", "Catering and private-event requests sent straight to your phone", "Food trucks: this week's stops and a 'book the truck' form"],
+    faq: [
+      ["Can you keep my menu updated?", "Yes. Text us the change and it's live within a business day. Seasonal menus and prices are the most common change we make."],
+      ["I already take orders through Toast / Square / DoorDash.", "Good. The site's Order button goes straight there. We don't replace your ordering system; we send people to it."],
+      ["Do I need professional photos?", "No. Phone photos in daylight work well. We'll tell you which five to take."],
+    ],
+  },
+  {
+    slug: "contractors",
+    cat: "contractor",
+    name: "plumbers, HVAC, electricians, roofers and other trades",
+    h1: "Websites for contractors and home services in Cullman, AL",
+    intro: "When a pipe bursts, nobody reads an About page. They want a number, proof you're real and a way to reach you after hours. A trades site is built around the call.",
+    includes: ["A call button on every screen, and a 'Request service' form for jobs that can wait", "Your services listed the way customers search for them, with your service area by town", "Emergency and after-hours line shown the way you confirm it, never 24/7 unless you say so", "Alabama license number where the law wants it (HVAC, home builders)", "Financing and warranty bands when you offer them, worded to stay inside the rules", "Before-and-after photo pairs from your own jobs"],
+    faq: [
+      ["I get all my work from word of mouth.", "Those referrals look you up before they call. A site with your number, your towns and a few job photos turns a referral into a call instead of a 'never mind'."],
+      ["Can the form ask the right questions?", "Yes. It asks what the job is, whether it's an emergency, the town, and the best way to reach them. You get it as a text or email."],
+      ["Do you handle my Google listing too?", "Plus and Pro plans include a Google Business Profile tune-up: categories, services, hours, photos and a review link."],
+    ],
+  },
+  {
+    slug: "salons",
+    cat: "salon",
+    name: "hair salons, barbershops, nail salons, spas and groomers",
+    h1: "Websites for salons, barbers and spas in Cullman, AL",
+    intro: "New clients want to see the work, know the prices and book without calling. Your site does all three and sends the booking to the tool you already use.",
+    includes: ["Services and prices in a clean list, with times when you want them shown", "A Book button that opens your Booksy, Square, Vagaro or GlossGenius page", "Meet-the-team cards with each stylist's own booking link", "Your gallery: the cuts, colors and sets you're proudest of", "Policies (deposits, late arrivals, kids) stated once, politely, so you stop repeating them", "Massage and grooming variants with the details Alabama requires"],
+    faq: [
+      ["My Instagram does this already.", "Instagram shows the work; it hides your prices, hours and booking link behind taps and logins. The site links to your Instagram and gives Google a page to send people to."],
+      ["Can each stylist have their own link?", "Yes. Each team card has its own Book button if you give us each person's link."],
+      ["Will you add my new prices?", "Text us the change. It's live within a business day."],
+    ],
+  },
+  {
+    slug: "auto-repair",
+    cat: "auto",
+    name: "auto repair, body shops, tire shops, detailing and towing",
+    h1: "Websites for auto shops in Cullman, AL",
+    intro: "Car trouble is a phone search and a phone call. Your site is built so that search finds you and that call takes one tap.",
+    includes: ["Call and directions buttons that stay on screen", "Services and specialties (diesel, transmissions, alignment) listed so Google matches you to the search", "'Need a tow?' strip with the tow number for towing shops", "Tire shops: a get-a-quote form that asks size, vehicle and quantity", "Body shops: what to do after a wreck, the insurers you work with, and your right-to-choose line", "Warranty, financing and the programs you honor, worded to stay inside the rules"],
+    faq: [
+      ["Can customers request an appointment?", "Yes. The form asks vehicle, the problem and a good time. If you use Tekmetric, Shopmonkey or AutoLeap, the Book button goes there instead."],
+      ["I don't want to list prices.", "You don't have to. Most shops list services and specialties and leave pricing to the estimate."],
+      ["Do you show my Google reviews?", "The site shows your rating and links to your Google reviews. We never copy review text onto the site."],
+    ],
+  },
+  {
+    slug: "lawn-care",
+    cat: "landscaping",
+    name: "lawn care and landscaping crews",
+    h1: "Websites for lawn care and landscaping in Cullman, AL",
+    intro: "Homeowners want to know what you do, where you work and roughly what it costs before they text. Your site answers that and asks for the address.",
+    includes: ["Services by season, so spring clean-ups and fall leaf work show when they matter", "Your service area by town, which is what Google matches", "Ways to work with you: weekly, every two weeks, one-time", "A quote form that asks the address, property size and what they want done", "Before-and-after photos of your own yards", "Alabama pesticide permit number where you apply treatments"],
+    faq: [
+      ["I'm booked in summer. Why would I want more calls?", "To fill the shoulder seasons and to pick your customers. A site brings the kind of work you ask for, in the towns you choose."],
+      ["Can I put prices on it?", "Yes, as starting points ('from $45 a cut'). Or leave prices off and let the form do the asking."],
+      ["What about texting?", "Tick 'this number takes texts' and the site gets a Text us button next to Call."],
+    ],
+  },
+  {
+    slug: "cleaning",
+    cat: "cleaning",
+    name: "house cleaning, commercial cleaning and pressure washing",
+    h1: "Websites for cleaning services in Cullman, AL",
+    intro: "Trust is the whole sale. Your site shows exactly what's included, who's coming, and makes asking for a quote painless.",
+    includes: ["A what's-included checklist by room, with standard, deep and move-out tiers", "Simple plans for recurring cleanings and flat rates for pressure washing", "A quote form that asks the right questions (size, frequency, pets, add-ons)", "Commercial: facilities you serve and a 'request a walkthrough' button", "Your guarantee, in your words, shown under the services", "Before-and-after photos and your team's faces, if you want them shown"],
+    faq: [
+      ["Most of my clients come from Facebook groups.", "They still look you up before they book. The site is the page they land on, with the checklist and the quote form that Facebook can't hold."],
+      ["Can clients request a specific day?", "Yes. The form asks preferred days and how often. You confirm by text."],
+      ["Do you write the checklist?", "We start you with a standard one for your type of cleaning. You edit it to match what you actually do."],
+    ],
+  },
+  {
+    slug: "print-shops",
+    cat: "print",
+    name: "screen printers, embroiderers, sign shops and print shops",
+    h1: "Websites for print, sign and shirt shops in Cullman, AL",
+    intro: "Quote requests are your lifeblood and most arrive half-finished. Your site asks for quantity, deadline, placement and artwork up front, so you quote once.",
+    includes: ["A quote form built for your work: quantity, needed-by date, placements, artwork status, rush", "'Send us your design' with your file-upload link (Dropbox or Drive)", "Turnaround, minimums and quantity breaks stated once", "Your best work as a gallery: teams, businesses, events", "Store link if you sell online or run team stores", "Call and text buttons for the customer who just wants to talk"],
+    faq: [
+      ["Can the site take file uploads?", "The site links to your Dropbox or Google Drive file-request page, which takes any file size. Uploads on a site this price are not reliable; the link is."],
+      ["I do a lot of team and school orders.", "The quote form has a 'team store' option and the gallery can show your school work first."],
+      ["Can you list rush pricing?", "Yes, if you want it shown. Many shops prefer 'ask about rush' and quote it by phone."],
+    ],
+  },
+  {
+    slug: "shops",
+    cat: "retail",
+    name: "boutiques, gift shops, antique malls, thrift stores, florists, feed and furniture stores",
+    h1: "Websites for shops and boutiques in Cullman, AL",
+    intro: "People drive past you every day and still don't know what you carry or when you're open. Your site fixes that and gives your Facebook posts somewhere to point.",
+    includes: ["Hours, address and the street line up top, with open or closed right now", "What you carry, by department or brand, so Google matches the search", "What's new this week, in your words, with a photo", "Shop-online or order-flowers buttons that go to your Square or Shopify store", "Florists: occasions, delivery area and cut-off times; vendor booths and donations for antique malls and thrift stores", "Gift cards and events when you have them"],
+    faq: [
+      ["I post everything on Facebook already.", "Keep posting. The site gives those posts a link, and it's the page Google shows the person who doesn't use Facebook."],
+      ["Can customers buy on the site?", "The site sends them to your online store if you have one. We don't build a separate checkout; one store is enough to run."],
+      ["How often can I change 'what's new'?", "As often as you like. Text us the line and a photo."],
+    ],
+  },
+  {
+    slug: "tax-and-finance",
+    cat: "finance",
+    name: "tax preparers, bookkeepers, CPAs and insurance agencies",
+    h1: "Websites for tax, accounting and insurance offices in Cullman, AL",
+    intro: "Clients choose a tax or insurance office on trust and convenience. Your site shows who they'll work with, what to bring, and how to start, without promising anything the rules don't allow.",
+    includes: ["Who you'll work with: names, titles and credentials, confirmed by you before it goes live", "Services and fees as of a date, if you want them shown", "Tax season hours shown separately from the rest of the year", "A what-to-bring page for tax clients", "Insurance: start-a-quote form and a pay-a-bill or report-a-claim list for your carriers", "Wording that stays inside the rules: no refund, rate or guarantee claims, PTIN and firm permit shown where required"],
+    faq: [
+      ["I'm a financial advisor. Can my firm approve it?", "Yes. We build it so compliance can review the exact pages, and nothing goes live until they sign off. Reviews stay off unless the firm allows them."],
+      ["Can clients book a time?", "The Book button goes to your Calendly or the scheduler your firm uses."],
+      ["Do you handle secure document upload?", "The site links to your portal (Drake, Intuit Link, your firm's) rather than taking documents itself."],
+    ],
+  },
+  {
+    slug: "churches",
+    cat: "church",
+    name: "churches, civic posts, charities and community centers",
+    h1: "Websites for churches and nonprofits in Cullman County, AL",
+    intro: "A visitor's first questions are when, where and what to expect. Your site answers them plainly, in your words, and points to giving and watching online.",
+    includes: ["Service times with a 'next service' note, office hours shown separately", "Plan a visit: what to wear, where to park, what's there for kids", "Give and watch-online buttons to the tools you already use", "This season's announcements and events, which drop off on their own", "Beliefs and pastor's welcome in your exact words", "Civic posts: meetings and hall rental; charities: help hours and how to give or volunteer"],
+    faq: [
+      ["Who approves the text?", "You do, line by line. Nothing about doctrine or your people is written for you; it's typed in by you or copied from what you give us."],
+      ["Do you use photos of our members?", "Only ones you send and approve. We never pull people photos from Google for a church site."],
+      ["Is there a nonprofit rate?", "Yes. Churches and nonprofits pay 12 months for the price of 8 on a yearly plan."],
+    ],
+  },
+];
+
+function tradeFor(cat: CategoryId): Trade | undefined {
+  return TRADES.find((t) => t.cat === cat);
+}
+
+function exampleFor(cat: CategoryId) {
+  return EXAMPLES.find((x) => x.record.category === cat);
+}
+
+/** The shared head + header + footer for every marketing page; JSON-LD per page. */
+function marketingPage(
+  s: AppSettings,
+  o: { path: string; title: string; description: string; body: string; ld: Record<string, unknown>; bodyClass?: string; gaEvents?: GaEvent[]; cache?: string },
+): Response {
   const name = s.companyName || "Underground Associates";
   const legal = s.legalName || name;
   const phone = s.companyPhone;
-  const email = s.companyEmail;
-  const plans = s.plans;
-  const lowest = plans.length ? Math.min(...plans.map((p) => p.monthly)) : null;
-  const sent = url.searchParams.get("sent") === "1";
-  const missing = url.searchParams.get("missing") === "1";
-  const options = plans[0] ? billingOptions(plans[0], s) : [];
-  const title = `${name} | Websites for Cullman, AL Businesses`;
-  const description = `Local websites for Cullman-area businesses. We build your site first, free, so you can see it before you pay.${lowest ? ` Plans from ${money(lowest)}/month with hosting and updates included.` : ""}`;
-  const ld = {
-    "@context": "https://schema.org",
-    "@type": "ProfessionalService",
-    name,
-    legalName: legal,
-    url: `${ORIGIN}/`,
-    ...(phone ? { telephone: phone } : {}),
-    ...(email ? { email } : {}),
-    address: { "@type": "PostalAddress", addressLocality: "Cullman", addressRegion: "AL", addressCountry: "US" },
-    areaServed: ["Cullman", "Hanceville", "Good Hope", "Vinemont", "Hartselle", "Arab"].map((n) => ({ "@type": "City", name: `${n}, AL` })),
-    ...(s.companyFacebookUrl ? { sameAs: [s.companyFacebookUrl] } : {}),
-    description,
-  };
-  const callBtn = phone ? `<a class="btn btn--ghost" href="${telHref(phone)}">Call ${e(phone)}</a>` : "";
-  const owner = (s.callerName || "Post").split(" ")[0]!;
-  const ownerPhoto = await ownerPhotoExists(env);
+  const lowest = s.plans.length ? Math.min(...s.plans.map((p) => p.monthly)) : null;
   const n = nonce();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${e(title)}</title><meta name="description" content="${e(description)}"><link rel="canonical" href="${ORIGIN}/">
-<meta property="og:type" content="website"><meta property="og:title" content="${e(title)}"><meta property="og:description" content="${e(description)}"><meta property="og:url" content="${ORIGIN}/">
+<title>${e(o.title)}</title><meta name="description" content="${e(o.description)}"><link rel="canonical" href="${ORIGIN}${o.path}">
+<meta property="og:type" content="website"><meta property="og:site_name" content="${e(name)}"><meta property="og:title" content="${e(o.title)}"><meta property="og:description" content="${e(o.description)}"><meta property="og:url" content="${ORIGIN}${o.path}">
 <meta property="og:image" content="${ORIGIN}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(s.gaMeasurementId, n, sent ? [["generate_lead", { method: "contact_form" }]] : [])}
+<meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/brand/logo-192.png">${gaTag(s.gaMeasurementId, n, o.gaEvents)}
 <link rel="preload" href="/fonts/bricolage-grotesque-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
-<style>${CSS}</style><script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script></head><body>
+<style>${CSS}</style><script type="application/ld+json">${JSON.stringify(o.ld).replace(/</g, "\\u003c")}</script></head><body${o.bodyClass ? ` class="${o.bodyClass}"` : ""}>
 <a class="skip" href="#main">Skip to content</a>
-${header(name, phone, lowest)}
-<main id="main">
-<section class="hero"><div class="wrap">
-<p class="eyebrow">Websites for Cullman-area businesses</p>
-<h1>See your new website <span class="hl">before you pay</span> a dime.</h1>
-<p class="lead">We build your website first, free. If you like it, it goes live${lowest ? ` from ${money(lowest)} a month` : ""}, with hosting, updates and support included. No setup fee on ${commitText(s)} plans.</p>
-<div class="btns"><a class="btn" href="#contact">Get my free preview</a>${callBtn}</div>
-<p style="margin:18px 0 0"><a href="/portfolio" style="color:#fff">See our work</a></p>
-</div></section>
-
-<section class="sec" id="how"><div class="wrap">
-<h2>How it works</h2>
-<ol class="steps">
-<li><strong>We build a free preview.</strong> We use your public Google listing to put together a real website for your business, at no cost to you.</li>
-<li><strong>You look it over.</strong> Check it on your phone. We swap in your own photos and fix any detail until it's right.</li>
-<li><strong>Say yes and it goes live.</strong> We handle the hosting, security and updates. You get back to running your business.</li>
-</ol></div></section>
-
-<section class="sec sec--alt" id="included"><div class="wrap">
-<h2>What every site includes</h2>
-<div class="grid">${INCLUDED.map(([t, b]) => `<div class="card"><h3>${e(t)}</h3><p>${e(b)}</p></div>`).join("")}</div>
-</div></section>
-
-<section class="sec" id="work"><div class="wrap">
-<h2>Our work</h2>
-<p class="lead">Every business gets its own look. Here are a few examples, made-up businesses so you can see the range.</p>
-<ul class="examples">${EXAMPLES.slice(0, 4).map((x) => exampleCard(x, false)).join("")}</ul>
-<p class="small muted" style="margin-top:14px">${e(EXAMPLES_NOTE)}</p>
-<p style="margin-top:14px"><a class="btn btn--line" href="/portfolio">See the full portfolio (${EXAMPLES.length} sites)</a></p>
-</div></section>
-
-<section class="sec about" id="about"><div class="wrap about__in">
-<!-- Owner photo: add app/public/owner.jpg (a square headshot, about 400px) and it shows here automatically. -->
-${ownerPhoto ? `<img class="about__photo" src="/owner.jpg" alt="${e(owner)}, owner of ${e(name)}" width="128" height="128" loading="lazy" decoding="async">` : ""}
-<div><h2>Hi, I'm ${e(owner)}.</h2>
-<p class="lead">${e(name)} is a Cullman company — I build the site, show it to you in person, and keep it running.${phone ? ` Call or text me: <a href="${telHref(phone)}">${e(phone)}</a>.` : ""}</p>
-${legal !== name ? `<p class="small muted">${e(legal)} · Cullman, Alabama</p>` : `<p class="small muted">Cullman, Alabama</p>`}</div>
-</div></section>
-
-${plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap">
-<h2>Simple monthly plans</h2>
-<p class="lead">${(s.minMonths ?? 12) ? `<strong>No setup fee on ${commitText(s)} plans.</strong>${s.flexSetup ? ` Month to month has a one-time ${money(s.flexSetup)} setup fee.` : ""}` : "No setup fee. Cancel any time."} ${e(GO_LIVE_TEXT)}</p>
-<div class="grid plans">${plans
-        .map(
-          (p) => `<div class="card plan${p.id === "plus" ? " plan--pick" : ""}">${p.id === "plus" ? `<p class="tag">Most popular</p>` : ""}<h3>${e(p.name)}</h3>
-<p class="price">${money(p.monthly)}<span>/month</span></p>${p.setup ? `<p class="small">${money(p.setup)} setup</p>` : ""}
-<ul>${p.includes.split(/\n/).map((x) => x.trim()).filter(Boolean).map((x) => `<li>${e(x)}</li>`).join("")}</ul>
-<p style="margin-top:14px"><a class="btn btn--small" href="/start?plan=${p.id}">Buy ${e(p.name)}</a></p></div>`,
-        )
-        .join("")}</div>
-<p class="small muted" style="margin-top:14px">Rather see your site first? <a href="#contact">Get a free preview</a> and pay only if you like it.</p>
-${options.length ? `<h3 style="margin-top:28px">Ways to pay</h3><div class="grid">${options
-        .map((o) => {
-          const text =
-            o.id === "flex"
-              ? `No contract. A one-time ${money(s.flexSetup ?? 0)} setup fee, then cancel any time.`
-              : o.id === "annual"
-                ? `Pay for a year up front: 12 months for the price of ${12 - (s.annualMonthsFree ?? 0)}. No setup fee.`
-                : `No setup fee. After ${o.id === "short" ? s.shortMonths : s.minMonths} months, cancel any time with 30 days' notice.`;
-          return `<div class="card"><h3>${e(o.label)}</h3><p>${e(text)}</p></div>`;
-        })
-        .join("")}</div>` : ""}
-${s.addons.length ? `<h3 style="margin-top:28px">Extras</h3><p class="small muted">Add any of these to any plan. Already a client? <a href="/extras">Add extras here</a>.</p><div class="grid extras">${s.addons.map((a) => `<div class="card"><h3>${e(a.name)}</h3><p class="xprice">${e(addonPrice(a))}</p>${a.about ? `<p>${e(a.about)}</p>` : ""}</div>`).join("")}</div>` : ""}
-</div></section>` : ""}
-
-<section class="sec" id="who"><div class="wrap">
-<h2>Who we work with</h2>
-<p class="lead">Independent local businesses in Cullman, Hanceville, Good Hope, Vinemont, Hartselle, Arab and nearby, including:</p>
-<ul class="chips">${CATEGORIES.map((c) => `<li>${e(c)}</li>`).join("")}</ul>
-<p class="small muted">Don't see yours? <a href="#contact">Ask us</a>. If you serve local customers, we can build for you.</p>
-</div></section>
-
-<section class="sec sec--alt" id="faq"><div class="wrap narrow">
-<h2>Questions</h2>
-${faq(s).map(([q, a]) => `<details><summary>${e(q)}</summary><p>${e(a)}</p></details>`).join("")}
-</div></section>
-
-<section class="sec sec--dark" id="contact"><div class="wrap narrow">
-<h2>Get your free preview</h2>
-<p>Tell us about your business and we'll build a preview you can look at on your phone. No cost, no obligation.</p>
-${sent ? `<p class="note" role="status">Thanks! We got your message and will be in touch soon.</p>` : ""}
-${missing ? `<p class="note note--warn" role="alert">Please add your name and a phone number or email so we can reach you.</p>` : ""}
-<form method="post" action="/contact" class="form">
-<label>Your name<input name="name" autocomplete="name" required maxlength="200"></label>
-<label>Business name<input name="business" autocomplete="organization" maxlength="200"></label>
-<label>Phone<input name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
-<label>Email<input name="email" type="email" autocomplete="email" maxlength="200"></label>
-<label>Anything we should know? <span class="opt">(optional)</span><textarea name="message" rows="3" maxlength="2000"></textarea></label>
-<div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
-<button class="btn" type="submit">Send</button>
-</form>
-${phone || email ? `<p class="direct">Rather talk? ${phone ? `<a href="${telHref(phone)}">${e(phone)}</a>` : ""}${phone && email ? " · " : ""}${email ? `<a href="mailto:${e(email)}">${e(email)}</a>` : ""}</p>` : ""}
-${s.directEmail && s.directEmail !== email ? `<p class="direct">Need ${s.callerName ? e(s.callerName.split(" ")[0]!) : "the owner"} directly? <a href="mailto:${e(s.directEmail)}">${e(s.directEmail)}</a></p>` : ""}
-</div></section>
-</main>
-${footer(legal, s.companyReviewUrl, s.companyFacebookUrl)}
-${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)}">Call</a><a href="#contact">Free preview</a></nav>` : ""}
+${header(name, phone, lowest, o.path)}
+<main id="main">${o.body}</main>
+${footer(legal, s)}
+${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)}">Call</a><a href="/#contact">Free preview</a></nav>` : ""}
 </body></html>`;
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "cache-control": "public, max-age=300",
+      "cache-control": o.cache ?? "public, max-age=300",
       "x-content-type-options": "nosniff",
       "referrer-policy": "strict-origin-when-cross-origin",
       "content-security-policy": csp(n, { ga: !!s.gaMeasurementId }),
@@ -573,9 +663,369 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
   });
 }
 
-/** Site header: name, Our work, Plans (with the lowest monthly price), and a Call (or Contact) button. */
-function header(name: string, phone?: string, from?: number | null): string {
-  return `<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/"><img src="/brand/logo-192.png" alt="" width="40" height="40">${e(name)}</a><nav class="hdr__nav" aria-label="Main"><a href="/portfolio">Our work</a><a class="hdr__plans" href="/#plans">Plans${from ? ` <small>from ${money(from)}/mo</small>` : ""}</a>${
+/** The business node every page references: a service-area business (city, no street), with what Google reads in 2026. */
+function businessLd(s: AppSettings): Record<string, unknown> {
+  const name = s.companyName || "Underground Associates";
+  const plans = s.plans;
+  const lo = plans.length ? Math.min(...plans.map((p) => p.monthly)) : null;
+  const hi = plans.length ? Math.max(...plans.map((p) => p.monthly)) : null;
+  return {
+    "@type": ["ProfessionalService", "LocalBusiness"],
+    "@id": `${ORIGIN}/#business`,
+    name,
+    legalName: s.legalName || name,
+    url: `${ORIGIN}/`,
+    logo: `${ORIGIN}/brand/logo-512.png`,
+    image: [`${ORIGIN}/og.png`],
+    ...(s.companyPhone ? { telephone: s.companyPhone } : {}),
+    ...(s.companyEmail ? { email: s.companyEmail } : {}),
+    address: { "@type": "PostalAddress", addressLocality: s.companyCity || "Cullman", addressRegion: s.companyState || "AL", ...(s.companyZip ? { postalCode: s.companyZip } : {}), addressCountry: "US" },
+    geo: CULLMAN_GEO,
+    areaServed: townList(s).map((t) => ({ "@type": "City", name: `${t}, AL` })),
+    ...(lo && hi ? { priceRange: lo === hi ? `${money(lo)}/month` : `${money(lo)}–${money(hi)} per month` } : {}),
+    ...(s.companyFacebookUrl ? { sameAs: [s.companyFacebookUrl] } : {}),
+    foundingDate: String(FOUNDED),
+    knowsAbout: ["Small business websites", "Local SEO", "Google Business Profile", "Website hosting"],
+    ...(plans.length
+      ? {
+          makesOffer: plans.map((p) => ({
+            "@type": "Offer",
+            name: `${p.name} website plan`,
+            price: p.monthly,
+            priceCurrency: "USD",
+            priceSpecification: { "@type": "UnitPriceSpecification", price: p.monthly, priceCurrency: "USD", unitText: "month" },
+            itemOffered: { "@type": "Service", name: `${p.name} website plan`, serviceType: "Website design and hosting", provider: { "@id": `${ORIGIN}/#business` } },
+          })),
+        }
+      : {}),
+  };
+}
+
+function pageLd(s: AppSettings, path: string, title: string, description: string, extra: Record<string, unknown>[] = []): Record<string, unknown> {
+  const crumbs = path === "/" ? [] : [{ "@type": "ListItem", position: 1, name: "Home", item: `${ORIGIN}/` }, { "@type": "ListItem", position: 2, name: title.split(" | ")[0], item: `${ORIGIN}${path}` }];
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      businessLd(s),
+      { "@type": "WebSite", "@id": `${ORIGIN}/#website`, url: `${ORIGIN}/`, name: s.companyName || "Underground Associates", publisher: { "@id": `${ORIGIN}/#business` } },
+      { "@type": "WebPage", "@id": `${ORIGIN}${path}#page`, url: `${ORIGIN}${path}`, name: title, description, isPartOf: { "@id": `${ORIGIN}/#website` }, about: { "@id": `${ORIGIN}/#business` }, ...(crumbs.length ? { breadcrumb: { "@type": "BreadcrumbList", itemListElement: crumbs } } : {}) },
+      ...extra,
+    ],
+  };
+}
+
+/** The four promises under the hero; the first becomes the live-client count once there are three. */
+function proofRow(s: AppSettings, live: number): string {
+  const items: Array<[string, string]> = [
+    live >= 3 ? [`${live}`, "Cullman-area businesses live"] : ["Built first", "You see it before you pay"],
+    ["$0 setup", `on ${commitText(s)} plans`],
+    ["All-in", "hosting, updates and support included"],
+    ["In person", `${MARKET_TOWN}, Alabama. We come to you.`],
+  ];
+  return `<ul class="proof" aria-label="Why us">${items.map(([big, small]) => `<li><strong>${e(big)}</strong><span>${e(small)}</span></li>`).join("")}</ul>`;
+}
+
+function quoteHtml(t: { quote: string; who: string }): string {
+  return `<figure class="quote"><blockquote>“${e(t.quote)}”</blockquote>${t.who ? `<figcaption>${e(t.who)}</figcaption>` : ""}</figure>`;
+}
+
+/** Both prices on one card: the no-setup-fee term price and month to month with the setup fee. */
+function planCard(p: AppSettings["plans"][number], s: AppSettings, o: { full?: boolean } = {}): string {
+  const term = (s.minMonths ?? 12) ? `No setup fee on a ${commitText(s)} plan` : "No setup fee";
+  const flex = s.flexSetup ? `Month to month: ${money(p.monthly)}/mo + ${money(s.flexSetup)} setup, cancel any time` : "";
+  const yearly = s.annualMonthsFree ? `Pay yearly: 12 months for the price of ${12 - s.annualMonthsFree} (${money(p.monthly * (12 - s.annualMonthsFree))})` : "";
+  const lines = p.includes.split(/\n/).map((x) => x.trim()).filter(Boolean);
+  return `<div class="card plan${p.id === "plus" ? " plan--pick" : ""}">${p.id === "plus" ? `<p class="tag">Most popular</p>` : ""}<h3>${e(p.name)}</h3>
+<p class="price">${money(p.monthly)}<span>/month</span></p>
+<p class="plan__term">${e(term)}</p>${flex ? `<p class="plan__flex">${e(flex)}</p>` : ""}${o.full && yearly ? `<p class="plan__flex">${e(yearly)}</p>` : ""}
+<ul>${lines.map((x) => `<li>${e(x)}</li>`).join("")}</ul>
+<p class="plan__cta"><a class="btn btn--small" href="/start?plan=${p.id}">Start with ${e(p.name)}</a></p>
+<p class="small muted plan__see">Rather see your site first? <a href="/#contact">Free preview</a>.</p></div>`;
+}
+
+function badgesHtml(s: AppSettings): string {
+  const b = ["See it before you pay", `No setup fee on ${commitText(s)} plans`, "Hosting, security and updates included", "Cancel after your term with 30 days' notice", "You own your name, logo, photos, text and domain"];
+  return `<ul class="badges">${b.map((x) => `<li>${e(x)}</li>`).join("")}</ul>`;
+}
+
+const UNIT_GROUP: Record<string, string> = { "one-time": "One-time set-ups", month: "Monthly services", each: "Per item", quote: "Priced per job" };
+
+function extrasHtml(s: AppSettings, o: { compact?: boolean } = {}): string {
+  if (!s.addons.length) return "";
+  if (o.compact) {
+    return `<div class="xrow"><h3>Add-ons for any plan</h3><ul class="chips chips--x">${s.addons.map((a) => `<li><b>${e(a.name)}</b> <span>${e(addonPrice(a))}</span></li>`).join("")}</ul><p class="small muted">Details and contract terms for each are on the <a href="/pricing#extras">pricing page</a>. Already a client? <a href="/extras">Add extras here</a>.</p></div>`;
+  }
+  const groups = new Map<string, typeof s.addons>();
+  for (const a of s.addons) groups.set(a.unit, [...(groups.get(a.unit) ?? []), a]);
+  return `<section class="sec" id="extras"><div class="wrap"><h2>Extras</h2><p class="lead">Add any of these to any plan, at sign-up or later. Already a client? <a href="/extras">Add extras here</a>.</p>
+${[...groups.entries()].map(([unit, list]) => `<h3 class="xgroup">${e(UNIT_GROUP[unit] ?? unit)}</h3><div class="grid extras">${list.map((a) => `<div class="card"><h3>${e(a.name)}</h3><p class="xprice">${e(addonPrice(a))}</p>${a.about ? `<p>${e(a.about)}</p>` : ""}</div>`).join("")}</div>`).join("")}
+</div></section>`;
+}
+
+function waysToPayHtml(s: AppSettings): string {
+  const options = s.plans[0] ? billingOptions(s.plans[0], s) : [];
+  if (!options.length) return "";
+  return `<h3 class="xgroup">Ways to pay</h3><div class="grid">${options
+    .map((o) => {
+      const text =
+        o.id === "flex"
+          ? `No contract. A one-time ${money(s.flexSetup ?? 0)} setup fee, then cancel any time with 30 days' notice.`
+          : o.id === "annual"
+            ? `Pay for a year up front: 12 months for the price of ${12 - (s.annualMonthsFree ?? 0)}. No setup fee.`
+            : `No setup fee. After ${o.id === "short" ? s.shortMonths : s.minMonths} months, cancel any time with 30 days' notice.`;
+      return `<div class="card"><h3>${e(o.label)}</h3><p>${e(text)}</p></div>`;
+    })
+    .join("")}</div>`;
+}
+
+/** Early cancellation, in one honest sentence from the same numbers the agreement uses. */
+function earlyCancelText(s: AppSettings): string {
+  const off = payoffDiscountOf(s);
+  return `Leave before a ${commitText(s)} term ends and you owe the months left on it${off ? `, less ${off}% if you pay them at once` : ""}. Month to month has no term and no cancellation fee. Full wording: <a href="/terms#refunds">terms &amp; refunds</a>.`;
+}
+
+function compareHtml(s: AppSettings): string {
+  const lo = s.plans.length ? money(Math.min(...s.plans.map((p) => p.monthly))) : "$49";
+  const hi = s.plans.length ? money(Math.max(...s.plans.map((p) => p.monthly))) : "$149";
+  const rows: Array<[string, string, string, string]> = [
+    ["Who builds it", "You, on your weekends", "A designer, after a deposit", "Us, before you pay"],
+    ["See it before you commit", "No, you build it", "A mockup after sign-up", "Yes, the finished site"],
+    ["Up-front cost", "$0, then your time", "Typically $2,000 to $5,000", "$0 on a term plan"],
+    ["Monthly", "$16 to $36 for the builder, more with a domain and email", "Hosting and a care plan on top", `${lo} to ${hi}, all-in`],
+    ["Changes", "You make them", "Billed by the hour", "Text us; included"],
+    ["Someone local to call", "No", "Sometimes", "Yes, in person"],
+  ];
+  return `<div class="cmpwrap"><table class="cmp"><caption>How the options compare</caption><thead><tr><th scope="col"></th><th scope="col">Do-it-yourself builder</th><th scope="col">Web designer or agency</th><th scope="col">${e(s.companyName || "Underground Associates")}</th></tr></thead><tbody>${rows.map(([h, a, b, c]) => `<tr><th scope="row">${e(h)}</th><td>${e(a)}</td><td>${e(b)}</td><td class="cmp__us">${e(c)}</td></tr>`).join("")}</tbody></table><p class="small muted">Builder and agency figures are typical published prices in 2026, not quotes; yours may differ.</p></div>`;
+}
+
+function faqHtml(items: Array<[string, string]>): string {
+  return items.map(([q, a]) => `<details><summary>${e(q)}</summary><p>${e(a)}</p></details>`).join("");
+}
+
+function contactSection(s: AppSettings, o: { sent?: boolean; missing?: boolean } = {}): string {
+  const phone = s.companyPhone;
+  const email = s.companyEmail;
+  return `<section class="sec sec--dark" id="contact"><div class="wrap narrow">
+<h2>Get your free preview</h2>
+<p>Tell us about your business. We'll build a preview you can look at on your phone, then call or text you. No cost, no obligation, and we never ask for a card to show it.</p>
+${o.sent ? `<p class="note" role="status">Thanks! We got your message and will be in touch soon.</p>` : ""}
+${o.missing ? `<p class="note note--warn" role="alert">Please add your name and a phone number or email so we can reach you.</p>` : ""}
+<form method="post" action="/contact" class="form">
+<label>Your name<input name="name" autocomplete="name" required maxlength="200"></label>
+<label>Business name<input name="business" autocomplete="organization" maxlength="200"></label>
+<label>Phone<input name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
+<label>Email<input name="email" type="email" autocomplete="email" maxlength="200"></label>
+<label>Anything we should know? <span class="opt">(optional)</span><textarea name="message" rows="3" maxlength="2000"></textarea></label>
+<div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
+<button class="btn" type="submit">Show me my site</button>
+</form>
+${phone || email ? `<p class="direct">Rather talk? ${phone ? `<a href="${telHref(phone)}">${e(phone)}</a>` : ""}${phone && email ? " · " : ""}${email ? `<a href="mailto:${e(email)}">${e(email)}</a>` : ""}</p>` : ""}
+${s.directEmail && s.directEmail !== email ? `<p class="direct">Need ${s.callerName ? e(s.callerName.split(" ")[0]!) : "the owner"} directly? <a href="mailto:${e(s.directEmail)}">${e(s.directEmail)}</a></p>` : ""}
+</div></section>`;
+}
+
+function ownerSection(s: AppSettings, ownerPhoto: boolean, o: { heading?: string } = {}): string {
+  const name = s.companyName || "Underground Associates";
+  const legal = s.legalName || name;
+  const owner = (s.callerName || "Post").split(" ")[0]!;
+  const phone = s.companyPhone;
+  const bio = s.siteBio?.trim() || DEFAULT_BIO;
+  return `<section class="sec about" id="about"><div class="wrap about__in">
+${ownerPhoto ? `<img class="about__photo" src="/owner.jpg" alt="${e(owner)}, owner of ${e(name)}" width="160" height="160" loading="lazy" decoding="async">` : `<img class="about__photo about__photo--logo" src="/brand/logo-192.png" alt="" width="160" height="160" loading="lazy" decoding="async">`}
+<div><p class="eyebrow eyebrow--dark">${e(o.heading ?? "Who you'll work with")}</p><h2>Hi, I'm ${e(owner)}.</h2>
+<p class="lead">${e(bio)}</p>
+<p class="about__facts">${e(legal)} · ${e(MARKET_TOWN)}, Alabama · since ${FOUNDED}${phone ? ` · <a href="${telHref(phone)}">${e(phone)}</a>` : ""}</p></div>
+</div></section>`;
+}
+
+function stepsHtml(): string {
+  return `<ol class="steps">
+<li><strong>We build a free preview.</strong> From your public Google listing we put together a real website for your business, at no cost to you. It takes us about a day.</li>
+<li><strong>You look it over.</strong> On your phone, in person if you like. We swap in your own photos and fix any detail until it's right.</li>
+<li><strong>Say yes and it goes live.</strong> You sign and pay on the phone. We handle hosting, security and updates from then on.</li>
+</ol>`;
+}
+
+function firstWeekHtml(): string {
+  const t: Array<[string, string]> = [
+    ["Day 1", "You OK the preview, sign on the phone and pick a plan. We ask for your five best photos."],
+    ["Days 1–3", "Photos in, text fixed, hours and services confirmed. Your Google listing gets linked to the site."],
+    ["Within 3 business days", "Live on the web, on your own domain if you have one. Same-day build is available as an extra."],
+    ["Every month after", "A short visitor report by text on Plus and Pro, and changes whenever you text us."],
+  ];
+  return `<div class="week"><h3>What happens after you say yes</h3><ol class="timeline">${t.map(([k, v]) => `<li><b>${e(k)}</b><span>${e(v)}</span></li>`).join("")}</ol></div>`;
+}
+
+function tradeCards(): string {
+  return `<ul class="trades">${TRADES.map((t) => {
+    const x = exampleFor(t.cat);
+    return `<li><a href="/websites-for/${t.slug}">${x ? `<img src="/examples/${x.slug}.jpg" alt="Phone screenshot of an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async">` : ""}<span><strong>${e(t.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</strong>${x ? `<em>Example: ${e(x.record.name)}</em>` : ""}<b>What's included →</b></span></a></li>`;
+  }).join("")}</ul>`;
+}
+
+async function home(env: Env, url: URL): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const phone = s.companyPhone;
+  const plans = s.plans;
+  const lowest = plans.length ? Math.min(...plans.map((p) => p.monthly)) : null;
+  const sent = url.searchParams.get("sent") === "1";
+  const missing = url.searchParams.get("missing") === "1";
+  const [ownerPhoto, live] = await Promise.all([ownerPhotoExists(env), liveClients(env)]);
+  const title = `${name} | Website Design for Cullman, AL Businesses`;
+  const description = `We build your business a real website first, free, from your Google listing. See it on your phone, then pay only if you want it live${lowest ? `: from ${money(lowest)}/month` : ""} with hosting and updates included. Cullman, Alabama.`;
+  const quotes = testimonials(s);
+  const heroExample = exampleFor("restaurant") ?? EXAMPLES[0];
+  const body = `
+<section class="hero"><div class="wrap hero__grid">
+<div class="hero__text">
+<p class="eyebrow">${e(MARKET_TOWN)}, Alabama · websites for local businesses</p>
+<h1>${headlineHtml(s)}</h1>
+<p class="lead">${e(leadText(s, lowest))}</p>
+<div class="btns"><a class="btn" href="#contact">See my free preview</a>${phone ? `<a class="btn btn--ghost" href="${telHref(phone)}">Call ${e(phone)}</a>` : ""}</div>
+<p class="hero__fine">No card to see it. ${e(GO_LIVE_TEXT.split(" (")[0]!)}.</p>
+</div>
+${heroExample ? `<div class="hero__visual"><div class="phone"><img src="/examples/${heroExample.slug}.jpg" alt="Example website for a cafe, shown on a phone" width="390" height="780" fetchpriority="high" decoding="async"></div><p class="hero__cap">Built from a Google listing in a day. <a href="/examples/${heroExample.slug}/">Try this example</a></p></div>` : ""}
+</div></section>
+
+<section class="proofsec"><div class="wrap">${proofRow(s, live)}${quotes[0] ? quoteHtml(quotes[0]) : ""}</div></section>
+
+<section class="sec" id="how"><div class="wrap">
+<h2>How it works</h2>
+${stepsHtml()}
+${firstWeekHtml()}
+</div></section>
+
+<section class="sec sec--alt" id="work"><div class="wrap">
+<h2>Built for your kind of business</h2>
+<p class="lead">Every trade gets the pages, buttons and forms that trade's customers actually use, and every business gets its own look. Tap yours.</p>
+${tradeCards()}
+<p class="small muted" style="margin-top:14px">${e(EXAMPLES_NOTE)} <a href="/portfolio">See the full portfolio</a> or <a href="/cullman-county">where we work</a>.</p>
+</div></section>
+
+${plans.length ? `<section class="sec" id="plans"><div class="wrap">
+<h2>Simple monthly plans</h2>
+<p class="lead">One price covers the site, hosting, security and changes. ${(s.minMonths ?? 12) ? `No setup fee on ${commitText(s)} plans.` : "No setup fee."}</p>
+<div class="grid plans">${plans.map((p) => planCard(p, s)).join("")}</div>
+${badgesHtml(s)}
+${extrasHtml(s, { compact: true })}
+<p style="margin-top:18px"><a class="btn btn--line" href="/pricing">Full pricing, ways to pay and the fine print</a></p>
+</div></section>` : ""}
+
+${ownerSection(s, ownerPhoto)}
+${quotes.length > 1 ? `<section class="sec sec--alt"><div class="wrap"><h2>From our clients</h2><div class="grid">${quotes.slice(1, 4).map(quoteHtml).join("")}</div></div></section>` : ""}
+
+<section class="sec sec--alt" id="faq"><div class="wrap narrow">
+<h2>Questions</h2>
+${faqHtml(faq(s))}
+<p class="small muted" style="margin-top:14px">More on the <a href="/pricing#faq">pricing page</a> and <a href="/about">about us</a>.</p>
+</div></section>
+
+${contactSection(s, { sent, missing })}`;
+  return marketingPage(s, { path: "/", title, description, body, ld: pageLd(s, "/", title, description), gaEvents: sent ? [["generate_lead", { method: "contact_form" }]] : [] });
+}
+
+async function pricingPage(env: Env): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const lowest = s.plans.length ? Math.min(...s.plans.map((p) => p.monthly)) : null;
+  const title = `Pricing | ${name}`;
+  const description = `Website plans for Cullman-area businesses${lowest ? ` from ${money(lowest)}/month` : ""}: hosting, security and updates included, no setup fee on ${commitText(s)} plans, see your site before you pay. Extras, ways to pay and the fine print.`;
+  const quotes = testimonials(s);
+  const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Pricing</p><h1>Simple monthly pricing. No surprises.</h1>
+<p class="lead">You see your finished site first. If you want it live, pick a plan. The monthly price covers the site, hosting, security and the changes you ask for. ${e(GO_LIVE_TEXT)}</p></div></section>
+${s.plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap"><div class="grid plans">${s.plans.map((p) => planCard(p, s, { full: true })).join("")}</div>${badgesHtml(s)}
+${waysToPayHtml(s)}
+<h3 class="xgroup">Leaving early</h3><p>${earlyCancelText(s)}</p>
+${s.churchAnnualMonthsFree ? `<p class="small muted">Churches and nonprofits: 12 months for the price of ${12 - s.churchAnnualMonthsFree} on a yearly plan, and we can invoice instead of taking a card.</p>` : ""}
+</div></section>` : ""}
+${extrasHtml(s)}
+<section class="sec sec--alt" id="compare"><div class="wrap"><h2>Why a monthly plan</h2><p class="lead">A website is never finished: hours change, prices change, photos age. The plan pays for someone to keep it right.</p>${compareHtml(s)}</div></section>
+${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</h2><div class="grid">${quotes.slice(0, 3).map(quoteHtml).join("")}</div></div></section>` : ""}
+<section class="sec sec--alt" id="faq"><div class="wrap narrow"><h2>Pricing questions</h2>${faqHtml([
+    ["What does the monthly price cover?", "Your website, fast secure hosting, the security certificate, backups, and the text, hours and photo changes you ask for. Plus and Pro add the Google profile work and reports listed on the cards."],
+    ["Is the price the same every month?", `Yes. The plan price is fixed for your term. If prices change later, you're told 30 days ahead at renewal.`],
+    ["What if I want to stop?", earlyCancelText(s).replace(/<[^>]+>/g, "")],
+    ["Who owns the website?", "You own your business name, logo, photos, text and domain. We own the templates and code the site runs on. If you leave, you get a copy of your pages within 30 days and your domain transfers to you."],
+    ["Do you charge for changes?", "Everyday changes (hours, prices, a new photo, a line of text) are included on every plan. Bigger jobs (a new page, a redesign) are quoted first; the Extra changes add-on covers them."],
+    ["Can I pay by check or bank transfer?", "Yes for churches, nonprofits and anyone who prefers an invoice. Everyone else pays by card on the phone, and the card on file is charged each month or year."],
+  ])}</div></section>
+${contactSection(s)}`;
+  return marketingPage(s, { path: "/pricing", title, description, body, ld: pageLd(s, "/pricing", title, description) });
+}
+
+async function aboutPage(env: Env): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const legal = s.legalName || name;
+  const ownerPhoto = await ownerPhotoExists(env);
+  const title = `About | ${name}`;
+  const description = `${legal} is a Cullman, Alabama company that builds local businesses a website first, shows it in person, and keeps it running for a flat monthly price. Who we are and how we work.`;
+  const towns = townList(s);
+  const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">About</p><h1>A Cullman company that builds your site before you pay.</h1>
+<p class="lead">We started ${name} because most local businesses around here don't have a website, and the ones that do paid too much for something nobody updates. So we flipped the order: we build it first, show it to you in person, and you only pay if you want it live.</p></div></section>
+${ownerSection(s, ownerPhoto, { heading: "The owner" })}
+<section class="sec sec--alt"><div class="wrap"><h2>How we work</h2>${stepsHtml()}${firstWeekHtml()}</div></section>
+<section class="sec"><div class="wrap"><h2>What you can count on</h2><div class="grid">
+<div class="card"><h3>You see it first</h3><p>The preview is the real site, built for your business. No deposit, no card, no mockup that turns into something else.</p></div>
+<div class="card"><h3>You own your content</h3><p>Your name, logo, photos, text and domain are yours. Leave, and you get a copy of your pages within 30 days.</p></div>
+<div class="card"><h3>Changes are included</h3><p>Hours, prices, photos, a line of text: text us and it's done within a business day. No hourly bills.</p></div>
+<div class="card"><h3>Nothing made up</h3><p>Every line about your business is checked by you before it goes live. We never copy Google review text onto your site or use photos you haven't approved.</p></div>
+<div class="card"><h3>Local and in person</h3><p>We're based in ${e(MARKET_TOWN)} and work with businesses in ${e(towns.slice(0, 5).join(", "))} and the towns around them. We'll come by.</p></div>
+<div class="card"><h3>Plain terms</h3><p>The agreement is in plain English and you read it on your phone before you sign. <a href="/terms">Read it any time</a>.</p></div>
+</div></div></section>
+<section class="sec sec--alt"><div class="wrap narrow"><h2>The company</h2><p>${e(legal)}, ${e(MARKET_TOWN)}, Alabama, since ${FOUNDED}.${s.companyPhone ? ` Phone <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>.` : ""}${s.companyEmail ? ` Email <a href="mailto:${e(s.companyEmail)}">${e(s.companyEmail)}</a>.` : ""} Hosting on Cloudflare's network; payments through Stripe; we never store card numbers. <a href="/privacy">Privacy</a> · <a href="/terms">Terms &amp; refunds</a> · <a href="/cullman-county">Where we work</a> · <a href="/portfolio">Our work</a>.</p></div></section>
+${contactSection(s)}`;
+  return marketingPage(s, { path: "/about", title, description, body, ld: pageLd(s, "/about", title, description) });
+}
+
+async function tradePage(env: Env, t: Trade): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const lowest = s.plans.length ? Math.min(...s.plans.map((p) => p.monthly)) : null;
+  const x = exampleFor(t.cat);
+  const groups = SEARCH_GROUPS.filter((g) => g.category === t.cat).map((g) => g.label);
+  const title = `${t.h1} | ${name}`;
+  const description = `${t.intro.split(". ")[0]}. We build ${t.name} a real website first, free; see it on your phone, then pay${lowest ? ` from ${money(lowest)}/month` : ""} only if you want it live.`;
+  const serviceLd = { "@type": "Service", "@id": `${ORIGIN}/websites-for/${t.slug}#service`, name: t.h1.replace(/ in Cullman.*$/, ""), serviceType: "Website design and hosting", provider: { "@id": `${ORIGIN}/#business` }, areaServed: townList(s).map((n) => ({ "@type": "City", name: `${n}, AL` })), audience: { "@type": "BusinessAudience", name: t.name } };
+  const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Websites for ${e(t.name.split(",")[0]!.replace(/ and .*/, ""))}</p><h1>${e(t.h1)}</h1><p class="lead">${e(t.intro)}</p>
+<div class="btns"><a class="btn" href="/#contact">See my free preview</a>${x ? `<a class="btn btn--line" href="/examples/${x.slug}/">Try the ${e(x.kind.toLowerCase())} example</a>` : ""}</div></div></section>
+<section class="sec sec--alt"><div class="wrap trade__grid">
+<div><h2>What your site includes</h2><ul class="ticks">${t.includes.map((i) => `<li>${e(i)}</li>`).join("")}</ul>
+<p class="small muted">Plus what every site gets: tap to call and directions, open or closed right now, your Google listing linked, requests sent to your phone, fast hosting and the changes you ask for.</p>
+${groups.length ? `<p class="small muted">Covers: ${e(groups.join(" · "))}.</p>` : ""}</div>
+${x ? `<a class="trade__example" href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of ${e(x.record.name)}, an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>Example ${e(x.kind.toLowerCase())} site · tap to open</span></a>` : ""}
+</div></section>
+${s.plans.length ? `<section class="sec" id="plans"><div class="wrap"><h2>Plans</h2><p class="lead">${lowest ? `From ${money(lowest)} a month, ` : ""}hosting and changes included. ${(s.minMonths ?? 12) ? `No setup fee on ${commitText(s)} plans.` : ""}</p><div class="grid plans">${s.plans.map((p) => planCard(p, s)).join("")}</div><p style="margin-top:14px"><a href="/pricing">Full pricing, extras and ways to pay</a></p></div></section>` : ""}
+<section class="sec sec--alt" id="faq"><div class="wrap narrow"><h2>Questions ${e(t.name.split(",")[0]!.replace(/ and .*/, ""))} ask</h2>${faqHtml(t.faq)}<p class="small muted" style="margin-top:14px">Other trades: ${TRADES.filter((o) => o.slug !== t.slug).map((o) => `<a href="/websites-for/${o.slug}">${e(o.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a>`).join(" · ")}.</p></div></section>
+${contactSection(s)}`;
+  return marketingPage(s, { path: `/websites-for/${t.slug}`, title, description, body, ld: pageLd(s, `/websites-for/${t.slug}`, title, description, [serviceLd]) });
+}
+
+async function countyPage(env: Env): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const towns = townList(s);
+  const title = `Website Design in Cullman County, AL | ${name}`;
+  const description = `Local websites for businesses in ${towns.slice(0, 6).join(", ")} and nearby. We build it first and show it to you in person; pay only if you want it live. Based in ${MARKET_TOWN}, Alabama.`;
+  const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Where we work</p><h1>Websites for businesses in Cullman County and nearby</h1>
+<p class="lead">We're based in ${e(MARKET_TOWN)} and we drive out. The preview gets shown to you in person, at your counter or your shop, on a phone, because that's how your customers will see it.</p></div></section>
+<section class="sec sec--alt"><div class="wrap"><h2>Towns we serve</h2><ul class="chips">${towns.map((t) => `<li>${e(t)}, AL</li>`).join("")}</ul>
+<p class="small muted">Not on the list? If you're within an hour of ${e(MARKET_TOWN)}, <a href="/#contact">ask</a>. The website works anywhere; the in-person visit is the only part that needs us nearby.</p></div></section>
+<section class="sec"><div class="wrap"><h2>Why local matters for a website</h2><div class="grid">
+<div class="card"><h3>Google is local</h3><p>Searches like "plumber near me" are answered by your Google Business Profile and the website linked to it. We set both up so Google knows what you do and the towns you serve.</p></div>
+<div class="card"><h3>Your towns, named</h3><p>Your site lists the towns you actually work in, in text Google can read, not a map image. That's what gets you found from the next town over.</p></div>
+<div class="card"><h3>We know the area</h3><p>Cullman time on the hours, county roads in the directions, the churches, trades and shops that make up Main Street. The copy reads like it was written here, because it was checked here.</p></div>
+</div></div></section>
+<section class="sec sec--alt"><div class="wrap"><h2>By trade</h2><ul class="chips">${TRADES.map((t) => `<li><a href="/websites-for/${t.slug}">${e(t.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a></li>`).join("")}</ul></div></section>
+${contactSection(s)}`;
+  return marketingPage(s, { path: "/cullman-county", title, description, body, ld: pageLd(s, "/cullman-county", title, description) });
+}
+
+/** Site header: name, Our work, Pricing, About, and a Call (or Contact) button. */
+function header(name: string, phone?: string, from?: number | null, path = "/"): string {
+  const link = (href: string, label: string, cls = "") => `<a href="${href}"${path === href ? ` aria-current="page"` : ""}${cls ? ` class="${cls}"` : ""}>${label}</a>`;
+  return `<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/"><img src="/brand/logo-192.png" alt="" width="40" height="40">${e(name)}</a><nav class="hdr__nav" aria-label="Main">${link("/portfolio", "Our work")}${link("/pricing", `Pricing${from ? ` <small>from ${money(from)}/mo</small>` : ""}`, "hdr__plans")}${link("/about", "About", "hdr__about")}${
     phone ? `<a class="hdr__call" href="${telHref(phone)}">Call</a>` : `<a class="hdr__call" href="/#contact">Contact</a>`
   }</nav></div></header>`;
 }
@@ -589,26 +1039,34 @@ function designName(id: string): string {
 }
 
 function exampleCard(x: (typeof EXAMPLES)[number], withDesign: boolean): string {
-  return `<li><a href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>${e(x.kind)}${withDesign ? `<em>${e(designName(x.design))}</em>` : ""}<b>View the site →</b></span></a></li>`;
+  const t = tradeFor(x.record.category);
+  return `<li><a href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>${e(x.kind)}${withDesign ? `<em>${e(designName(x.design))}</em>` : ""}<b>View the site →</b></span></a>${withDesign && t ? `<a class="examples__more" href="/websites-for/${t.slug}">What a ${e(x.kind.toLowerCase())} site includes</a>` : ""}</li>`;
 }
 
 /** Portfolio: every example site, with its type and design. */
 async function portfolio(env: Env): Promise<Response> {
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
-  const body = `<p class="eyebrow" style="color:var(--goldtext)">Our work</p>
+  const title = `Our work | ${name}`;
+  const description = `Example websites by ${name} for Cullman-area businesses: restaurants, contractors, salons, auto shops, lawn care, cleaning, print shops, boutiques, tax offices and churches. Each with its own design.`;
+  const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Our work</p>
 <h1>Portfolio</h1>
 <p class="lead">Every business gets its own design: colors, fonts and page layout picked for what you do, built for phones first. Tap any one to try the full site.</p>
 <p class="small muted">${e(EXAMPLES_NOTE)}</p>
 <ul class="examples examples--full">${EXAMPLES.map((x) => exampleCard(x, true)).join("")}</ul>
 <div class="card" style="margin-top:32px"><h2 style="font-size:1.4rem">Want to see yours?</h2><p>We'll build a free preview of your website first. You only pay if you like it.</p>
-<div class="btns"><a class="btn" href="/#contact">Get my free preview</a><a class="btn btn--line" href="/#plans">See plans</a></div></div>`;
-  const from = s.plans.length ? Math.min(...s.plans.map((p) => p.monthly)) : null;
-  return policyShell(name, s.legalName || name, "Portfolio", body, { wide: true, phone: s.companyPhone, ga: s.gaMeasurementId, from, description: `Example websites by ${name} for Cullman-area businesses: restaurants, contractors, salons, auto shops, lawn care, cleaning, print shops and boutiques.` });
+<div class="btns"><a class="btn" href="/#contact">Get my free preview</a><a class="btn btn--line" href="/pricing">See pricing</a></div></div></div></section>`;
+  return marketingPage(s, { path: "/portfolio", title, description, body, ld: pageLd(s, "/portfolio", title, description) });
 }
 
-function footer(legal: string, reviewUrl?: string, facebookUrl?: string): string {
-  return `<footer class="ftr"><div class="wrap">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)} · Cullman, Alabama · <a href="/extras">Clients: add extras</a> · <a href="/terms">Terms &amp; refunds</a> · <a href="/privacy">Privacy</a>${facebookUrl ? ` · <a href="${e(facebookUrl)}" rel="noopener">Facebook</a>` : ""}${reviewUrl ? ` · <a href="${e(reviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</div></footer>`;
+function footer(legal: string, s: AppSettings): string {
+  const towns = townList(s).slice(0, 6).join(", ");
+  return `<footer class="ftr"><div class="wrap ftr__grid">
+<div><p class="ftr__name">${e(legal)}</p><p>${e(MARKET_TOWN)}, Alabama${s.companyPhone ? ` · <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : ""}${s.companyEmail ? ` · <a href="mailto:${e(s.companyEmail)}">${e(s.companyEmail)}</a>` : ""}</p><p class="small">Serving ${e(towns)} and nearby.</p></div>
+<nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/portfolio">Our work</a><a href="/about">About</a><a href="/cullman-county">Where we work</a><a href="/extras">Clients: add extras</a><a href="/terms">Terms &amp; refunds</a><a href="/privacy">Privacy</a>${s.companyFacebookUrl ? `<a href="${e(s.companyFacebookUrl)}" rel="noopener">Facebook</a>` : ""}${s.companyReviewUrl ? `<a href="${e(s.companyReviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</nav>
+<nav aria-label="Websites by trade" class="ftr__trades">${TRADES.map((t) => `<a href="/websites-for/${t.slug}">${e(t.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a>`).join("")}</nav>
+<p class="small">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)}</p>
+</div></footer>`;
 }
 
 /** Per-response CSP nonce for the inline Google tag snippet. */
@@ -731,9 +1189,9 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
 <title>${e(title)} | ${e(name)}</title><meta name="description" content="${e(`${title} for ${legal}, Cullman, Alabama.`)}"><link rel="canonical" href="${ORIGIN}/${kind}">
 <meta name="theme-color" content="#14213d"><link rel="icon" href="/brand/logo-192.png" type="image/png">${gaTag(s.gaMeasurementId, n)}<style>${CSS}</style></head><body>
 <a class="skip" href="#main">Skip to content</a>
-${header(name, phone)}
+${header(name, phone, null, `/${kind}`)}
 <main id="main" class="sec"><div class="wrap narrow legal"><h1>${e(title)}</h1><p class="small muted">Last updated ${POLICIES_UPDATED}</p>${body}</div></main>
-${footer(legal)}
+${footer(legal, s)}
 </body></html>`;
   return new Response(html, { headers: { ...HEADERS, "content-security-policy": csp(n, { ga: !!s.gaMeasurementId }) } });
 }
@@ -804,4 +1262,40 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .bar a{flex:1;text-align:center;min-height:48px;display:flex;align-items:center;justify-content:center;border-radius:10px;font-weight:700;text-decoration:none;background:var(--gold);color:var(--navy)}
 .bar a+a{background:#fff}
 @media (min-width:760px){.bar{display:none}}
+.hero__grid{display:grid;gap:28px;align-items:center}@media (min-width:860px){.hero__grid{grid-template-columns:1.15fr .85fr}.hero{padding:72px 0 80px}}
+.hero__fine{margin:14px 0 0;color:#c9d1e0;font-size:.95rem}
+.hero__visual{display:grid;justify-items:center;gap:10px}
+.phone{width:min(250px,70vw);aspect-ratio:1/2;border-radius:30px;background:#0d1629;padding:10px;box-shadow:0 24px 60px rgba(0,0,0,.45),inset 0 0 0 2px #3b4a6b;position:relative}
+.phone::before{content:"";position:absolute;top:10px;left:50%;transform:translateX(-50%);width:34%;height:16px;background:#0d1629;border-radius:0 0 12px 12px;z-index:1}
+.phone img{display:block;width:100%;height:100%;object-fit:cover;object-position:top;border-radius:22px}
+@media (max-width:859px){.phone{width:min(200px,60vw);aspect-ratio:1/1.5}}
+.hero__cap{margin:0;color:#dfe4ee;font-size:.92rem;text-align:center}.hero__cap a{color:var(--gold)}
+.proofsec{background:#fff;border-bottom:1px solid var(--line);padding:18px 0}
+.proof{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:12px 18px}@media (min-width:760px){.proof{grid-template-columns:repeat(4,1fr)}}
+.proof li{display:grid;gap:2px;padding:10px 12px;border-left:3px solid var(--gold)}.proof strong{font-family:"Bricolage",sans-serif;font-size:1.35rem;line-height:1.1;color:var(--navy)}.proof span{font-size:.9rem;color:var(--muted)}
+.quote{margin:18px 0 0;padding:16px 20px;background:var(--alt);border-radius:14px}.quote blockquote{margin:0;font-size:1.08rem;font-style:italic}.quote figcaption{margin-top:8px;font-weight:700;color:var(--muted);font-size:.92rem}
+.week{margin-top:28px}.week h3{font-size:1.2rem}
+.timeline{list-style:none;margin:0;padding:0;display:grid;gap:10px}@media (min-width:760px){.timeline{grid-template-columns:repeat(4,1fr)}}
+.timeline li{display:grid;gap:4px;padding:14px 16px;background:var(--alt);border-radius:12px;border-top:4px solid var(--gold)}.timeline b{color:var(--navy)}.timeline span{font-size:.95rem;color:var(--muted)}
+.trades{list-style:none;padding:0;margin:24px 0 0;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}@media (min-width:760px){.trades{grid-template-columns:repeat(5,1fr)}}
+.trades a{display:block;text-decoration:none;color:var(--ink)}.trades img{display:block;width:100%;height:auto;aspect-ratio:1/1.3;object-fit:cover;object-position:top;border-radius:14px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(20,33,61,.1);background:#fff}
+.trades span{display:block;margin-top:8px;font-size:.9rem;color:var(--muted)}.trades strong{display:block;color:var(--ink);font-size:1rem;line-height:1.25}.trades em{display:block;font-style:normal;font-size:.85rem}.trades b{display:block;color:var(--blue);margin-top:4px}
+.trades a:hover strong{text-decoration:underline}
+.plan__term{color:var(--goldtext)!important;font-weight:700;margin:0!important;font-size:.95rem}.plan__flex{margin:4px 0 0!important;font-size:.9rem}.plan__cta{margin:16px 0 0!important}.plan__see{margin-top:8px!important}
+.badges{list-style:none;padding:0;margin:20px 0 0;display:flex;flex-wrap:wrap;gap:8px}.badges li{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:.92rem}.badges li::before{content:"✓";color:var(--goldtext);font-weight:800}
+.xrow{margin-top:28px}.xrow h3{font-size:1.2rem}.chips--x li{font-weight:400;display:inline-flex;gap:8px;align-items:baseline}.chips--x b{font-weight:700}.chips--x span{color:var(--goldtext);font-weight:700;font-size:.9rem}
+.xgroup{margin-top:28px;font-size:1.2rem}
+.sec--head{padding-bottom:28px}.sec--head h1{font-size:clamp(2rem,6vw,3.2rem)}.sec--head+.sec{padding-top:36px}
+.eyebrow--dark{color:var(--goldtext)}
+.about__photo--logo{border-color:var(--line);background:var(--navy);padding:18px;object-fit:contain}.about__facts{margin:10px 0 0;color:var(--muted);font-size:.95rem}
+.ticks{list-style:none;padding:0;margin:0;display:grid;gap:10px}.ticks li{padding-left:28px;position:relative}.ticks li::before{content:"✓";position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--gold);color:var(--navy);font-weight:800;font-size:.8rem;display:grid;place-items:center}
+.trade__grid{display:grid;gap:28px;align-items:start}@media (min-width:860px){.trade__grid{grid-template-columns:1.3fr .7fr}}
+.trade__example{display:block;text-decoration:none;color:var(--ink);max-width:300px;justify-self:center}.trade__example img{display:block;width:100%;height:auto;border-radius:16px;border:1px solid var(--line);box-shadow:0 10px 30px rgba(20,33,61,.15)}.trade__example span{display:block;margin-top:8px;font-size:.92rem;color:var(--muted)}.trade__example strong{display:block;color:var(--ink)}
+.cmpwrap{overflow-x:auto;margin-top:8px}.cmp{width:100%;border-collapse:collapse;min-width:640px;background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--line)}.cmp caption{text-align:left;font-weight:700;padding:0 0 10px;color:var(--muted)}
+.cmp th,.cmp td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;font-size:.95rem}.cmp thead th{background:var(--navy);color:#fff;font-size:.9rem}.cmp tbody th{font-weight:700;width:22%}.cmp__us{background:#fff7e6;font-weight:700}
+.examples__more{display:block;margin-top:6px;font-size:.88rem}
+.hdr__about{display:none}@media (min-width:760px){.hdr__about{display:inline}}
+.ftr__grid{display:grid;gap:14px}.ftr__name{font-weight:700;color:#fff;margin:0 0 4px}.ftr p{margin:0 0 4px}.ftr nav{display:flex;flex-wrap:wrap;gap:6px 16px}.ftr__trades a{font-size:.88rem;color:#aeb7c8}
+.chips a{color:var(--navy);text-decoration:none}.chips a:hover{text-decoration:underline}
+.sec--dark .btn{background:var(--gold)}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}`;

@@ -585,6 +585,8 @@ export function editForm(l: EditDetail): EditForm {
     ...(isA && !isParts ? [note("Ask which shop software they use. Tekmetric: Settings → Online Booking gives a public “direct link”. Shopmonkey: the Work Request form has a shareable public URL. ShopGenie: the online scheduling page has its own link. AutoLeap: the online booking page URL. Paste that link here and the site's main button becomes Book online.")] : []),
     url("facebook", "Facebook page", social.facebook || "", { placeholder: "https://facebook.com/…" }),
     url("instagram", "Instagram", social.instagram || "", { placeholder: "https://instagram.com/…" }),
+    txt("gsc", "Search Console code", r.seo?.googleSiteVerification || "", { placeholder: "AbC123…" }),
+    note("Google Search Console → Add property → URL prefix (the live address) → HTML tag: paste only the code between content=\"…\". It goes on the live site, never the preview. Then submit /sitemap.xml."),
   ]);
 
   const textFields: Field[] = [
@@ -862,6 +864,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
     suppliesIncluded: on("suppliesIncluded"),
     petSafe: on("petSafe"),
     links: clean({ order: v("order"), reserve: v("reserve"), booking: v("booking"), facebook: v("facebook"), instagram: v("instagram"), shop: isRt ? v("shop") : undefined, giftCards: isR || isS || isRt ? v("giftCards") : undefined }),
+    seo: has("gsc") ? { googleSiteVerification: v("gsc") } : undefined,
     proof: has("prAwards") ? proof : undefined,
     closures: has("vsClosures") ? closures : undefined,
     visit: has("vsPay") ? visit : undefined,

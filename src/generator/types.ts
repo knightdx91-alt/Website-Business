@@ -498,6 +498,11 @@ export interface BusinessRecord {
     social: Partial<Record<"facebook" | "instagram" | "tiktok" | "youtube" | "nextdoor", string>>;
   };
   media: { logo?: Image; hero?: Image; gallery: Image[] };
+  /** Search-engine hookups the owner pastes in (Edit → Links). */
+  seo?: {
+    /** The `content` of Google Search Console's HTML-tag verification for this site (published pages only). */
+    googleSiteVerification?: string;
+  };
   /** Optional "We're hiring" section: the jobs open and how to apply, in the owner's words. */
   hiring?: { roles: string[]; how?: string };
   /** Dated events, specials and announcements in the owner's words; past ones drop off on their own. */

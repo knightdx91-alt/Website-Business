@@ -166,6 +166,11 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
     var calendarEmail by mutableStateOf(s.txt("calendarEmail"))
     var gaMeasurementId by mutableStateOf(s.txt("gaMeasurementId"))
     var directEmail by mutableStateOf(s.txt("directEmail"))
+    var siteHeadline by mutableStateOf(s.txt("siteHeadline"))
+    var siteLead by mutableStateOf(s.txt("siteLead"))
+    var siteBio by mutableStateOf(s.txt("siteBio"))
+    var siteTestimonials by mutableStateOf(s.txt("siteTestimonials"))
+    var siteTowns by mutableStateOf(s.txt("siteTowns"))
     var gbpEmail by mutableStateOf(s.txt("gbpEmail"))
     var callerName by mutableStateOf(s.txt("callerName"))
     var googleClientId by mutableStateOf(s.txt("googleClientId"))
@@ -238,6 +243,11 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         putStr("companyZip", companyZip)
         putStr("directEmail", directEmail)
         putStr("companyReviewUrl", companyReviewUrl)
+        putStr("siteHeadline", siteHeadline)
+        putStr("siteLead", siteLead)
+        putStr("siteBio", siteBio)
+        putStr("siteTestimonials", siteTestimonials)
+        putStr("siteTowns", siteTowns)
         putStr("companyFacebookUrl", companyFacebookUrl)
         putStr("gaMeasurementId", gaMeasurementId) { it.uppercase(Locale.US) }
         putStr("calendarEmail", calendarEmail)
@@ -461,6 +471,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                     }
                 } else {
                     item { BusinessCard(f, showsCallerName) }
+                    item { WebsiteCard(f) }
                     item { SignInCard(f) }
                     item { PushCard(f, m.fcmServer) }
                     item { PlansCard(f, m, mailOut, mailBusy) { sendTestMail() } }
@@ -639,6 +650,19 @@ private fun Hint(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun SubHead(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+}
+
+/** Settings → Website: the copy undergroundassociates.com is rendered from (prices and extras come from Sales / Extras). */
+@Composable
+private fun WebsiteCard(f: SettingsForm) {
+    CollapsibleCard("Website") {
+        Text("undergroundassociates.com is built from these settings every time it loads. Blank fields use the standard wording.", style = MaterialTheme.typography.bodySmall)
+        Field(f.siteHeadline, { f.siteHeadline = it.take(120) }, "Headline", hint = "The big line at the top. Standard: \"Your website is already built. See it before you pay a dime.\"", caps = KeyboardCapitalization.Sentences)
+        Field(f.siteLead, { f.siteLead = it.take(400) }, "Lead line", hint = "The sentence or two under the headline. Blank writes it from your prices.", caps = KeyboardCapitalization.Sentences, singleLine = false, minLines = 3)
+        Field(f.siteBio, { f.siteBio = it.take(1200) }, "About you", hint = "The paragraph next to your photo (\"Hi, I'm Post.\").", caps = KeyboardCapitalization.Sentences, singleLine = false, minLines = 4)
+        Field(f.siteTestimonials, { f.siteTestimonials = it.take(3000) }, "Client quotes", hint = "One per line: Quote | Name, Business. Only real clients who said it.", caps = KeyboardCapitalization.Sentences, singleLine = false, minLines = 4)
+        Field(f.siteTowns, { f.siteTowns = it.take(400) }, "Towns served", hint = "Comma-separated: the where-we-work page, the footer and what Google is told you serve.", placeholder = "Cullman, Hanceville, Good Hope, Vinemont", caps = KeyboardCapitalization.Words)
+    }
 }
 
 @Composable

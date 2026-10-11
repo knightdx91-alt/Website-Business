@@ -1217,6 +1217,7 @@
         ${isR || isS || isRt ? `<label class="field">Gift cards link (Square, Toast, their booking tool)<input name="giftCards" type="url" value="${esc(r.links.giftCards || "")}" placeholder="https://"></label>` : ""}
         ${isA && !isParts ? `<p class="small muted">Ask which shop software they use. Tekmetric: Settings → Online Booking gives a public “direct link” (or an embed; use the link). Shopmonkey: the Work Request form has a shareable public URL. ShopGenie: the online scheduling page has its own link. AutoLeap: the online booking page URL. Paste that link here and the site's main button becomes Book online.</p>` : ""}
         <label class="field">Facebook page<input name="facebook" type="url" value="${esc(r.links.social.facebook || "")}" placeholder="https://facebook.com/…"></label>
+        <label class="field">Search Console code <span class="hint">Google Search Console → Add property → URL prefix (the live address) → HTML tag: paste only the code between content="…". Goes on the live site, never the preview. Then submit /sitemap.xml.</span><input name="gsc" value="${esc((r.seo && r.seo.googleSiteVerification) || "")}" maxlength="120" placeholder="AbC123…" autocapitalize="off" spellcheck="false"></label>
         <label class="field">Instagram<input name="instagram" type="url" value="${esc(r.links.social.instagram || "")}" placeholder="https://instagram.com/…"></label>
       </section>
     </div><div>
@@ -1347,6 +1348,7 @@
           suppliesIncluded: on("suppliesIncluded"),
           petSafe: on("petSafe"),
           links: { order: val("order"), reserve: val("reserve"), booking: val("booking"), facebook: val("facebook"), instagram: val("instagram"), ...(isRt ? { shop: val("shop") } : {}), ...(isR || isS || isRt ? { giftCards: val("giftCards") } : {}) },
+          seo: { googleSiteVerification: val("gsc") },
           proof: proofEditValues(f),
           ...visitEditValues(f),
           ...(isR ? { restaurant: restaurantEditValues(f), menuItems: menuItemsEditValues(f) } : {}),
@@ -2605,8 +2607,10 @@
 
   // "Get listed everywhere" extra: the free directories worth claiming, with the same name, address, phone and hours.
   const LISTINGS = [
+    ["listing_gbp_site", "Google Business Profile: website field points at the live site, and the booking/menu links too", "https://business.google.com/"],
+    ["listing_gsc", "Google Search Console: site verified under our account (Edit → Links → Search Console code), sitemap.xml submitted", "https://search.google.com/search-console"],
     ["listing_apple", "Apple Maps (Apple Business Connect)", "https://businessconnect.apple.com/"],
-    ["listing_bing", "Bing Places", "https://www.bingplaces.com/"],
+    ["listing_bing", "Bing Places (import from Google Business Profile, turn on sync)", "https://www.bingplaces.com/"],
     ["listing_yelp", "Yelp for Business", "https://biz.yelp.com/"],
     ["listing_facebook", "Facebook page: hours, phone and website filled in", "https://www.facebook.com/"],
     ["listing_nextdoor", "Nextdoor business page", "https://business.nextdoor.com/"],
@@ -3207,6 +3211,13 @@
         <label class="field">Owner's direct email <span class="hint">Shown on your website as "Need the owner directly?"</span><input name="directEmail" type="email" value="${esc(s.directEmail || "")}" placeholder="post@undergroundassociates.com"></label>
         <label class="field">Google account for client profiles <span class="hint">Clients add this email as a Manager on their Google listing</span><input name="gbpEmail" type="email" value="${esc(s.gbpEmail || "")}" placeholder="yourbusiness@gmail.com"></label>
         ${!meta.me.id || meta.me.id === "owner" ? `<label class="field">Your name <span class="hint">Your texts say "Hi, this is ___ with ${esc(s.companyName || "your company")}". Everyone else's texts use their own login names.</span><input name="callerName" value="${esc(s.callerName || "")}" placeholder="e.g. Post"></label>` : ""}
+        <h2 style="margin-top:18px">Website</h2>
+        <p class="small muted">undergroundassociates.com is built from these settings every time it loads (prices, plans and extras come from the Sales and Extras sections). Blank fields use the standard wording.</p>
+        <label class="field">Headline <span class="hint">The big line at the top. Standard: "Your website is already built. See it before you pay a dime."</span><input name="siteHeadline" value="${esc(s.siteHeadline || "")}" maxlength="120" placeholder="Your website is already built. See it before you pay a dime."></label>
+        <label class="field">Lead line <span class="hint">The sentence or two under the headline. Blank writes it from your prices.</span><textarea name="siteLead" rows="2" maxlength="400" placeholder="We build a real website for your business from your Google listing, free…">${esc(s.siteLead || "")}</textarea></label>
+        <label class="field">About you <span class="hint">The paragraph next to your photo ("Hi, I'm Post."). Add app/public/owner.jpg for the photo.</span><textarea name="siteBio" rows="3" maxlength="1200">${esc(s.siteBio || "")}</textarea></label>
+        <label class="field">Client quotes <span class="hint">One per line: <code>Quote | Name, Business</code>. Only real clients who said it; the first shows under the top of the home page, the rest on the pricing page.</span><textarea name="siteTestimonials" rows="3" maxlength="3000" placeholder="They had the site done before I'd even decided. | Jane Doe, Doe's Diner">${esc(s.siteTestimonials || "")}</textarea></label>
+        <label class="field">Towns served <span class="hint">Comma-separated. The "where we work" page, the footer and what Google is told you serve.</span><input name="siteTowns" value="${esc(s.siteTowns || "")}" maxlength="400" placeholder="Cullman, Hanceville, Good Hope, Vinemont, Holly Pond, Hartselle, Arab"></label>
         <h2 style="margin-top:18px">Team sign-in (Google)</h2>
         <p class="small muted">Everyone signs in with their company Google account. One-time setup in Google Cloud (see the Android app card below for the steps), then paste the web client ID here.</p>
         <label class="field">Google client ID <span class="hint">The OAuth “Web application” client, ends in .apps.googleusercontent.com</span><input name="googleClientId" value="${esc(s.googleClientId || "")}" placeholder="1234567890-abc.apps.googleusercontent.com" autocomplete="off"></label>
@@ -3327,6 +3338,11 @@
             companyState: v("companyState").toUpperCase() || undefined,
             companyZip: v("companyZip") || undefined,
             directEmail: v("directEmail") || undefined,
+            siteHeadline: v("siteHeadline") || undefined,
+            siteLead: v("siteLead") || undefined,
+            siteBio: v("siteBio") || undefined,
+            siteTestimonials: v("siteTestimonials") || undefined,
+            siteTowns: v("siteTowns") || undefined,
             companyReviewUrl: v("companyReviewUrl") || undefined,
             companyFacebookUrl: v("companyFacebookUrl") || undefined,
             gaMeasurementId: v("gaMeasurementId").toUpperCase() || undefined,
