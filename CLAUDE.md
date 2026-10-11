@@ -285,7 +285,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `ownerEmail` → owner; a `users` row with that email → their role (disabled rows refused); any other address on the domain →
   a new caller row (password `google.<uuid>`, unusable; the owner is notified) which Settings → Team shows with "Google sign-in
   only". The response sets the cookie and returns `token` (same value) for the app. `GET /api/auth/config` (public) carries the
-  client ID, domain, `requireGoogle`. `requireGoogle` (Settings checkbox "Turn passwords off") makes `/auth/login` refuse
+  client ID, domain, `requireGoogle`. The app shell's CSP (`app/public/_headers`) must allow accounts.google.com/gsi/ in
+  script-src, connect-src, frame-src and style-src, or the button never renders (it did not until Oct 2026; the login page
+  now says so after ~9 s instead of staying blank). `requireGoogle` (Settings checkbox "Turn passwords off") makes `/auth/login` refuse
   passwords; the owner's password login keeps working until then (and `/auth/setup` always). Team rows take an email
   (`POST/PUT /api/callers` `email`; add form: email and/or password). Owner's one-time Google Cloud setup: OAuth consent
   screen (Internal, Workspace) → credentials: a **Web application** client (authorized JavaScript origin

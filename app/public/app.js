@@ -140,10 +140,16 @@
           else go("#/");
         } catch (err) { const m = document.getElementById("gmsg"); if (m) m.textContent = err.message; }
       };
+      let tries = 0;
       const render = () => {
         const el = document.getElementById("gbtn");
         if (!el) return;
-        if (!window.google || !window.google.accounts) { setTimeout(render, 300); return; }
+        if (!window.google || !window.google.accounts) {
+          // Google's script hasn't loaded (blocked, offline, or an ad blocker): say so instead of showing nothing forever.
+          if (++tries > 30) { const m = document.getElementById("gmsg"); if (m) m.textContent = "Google's sign-in button couldn't load. Check your connection or an ad/script blocker, then reload."; return; }
+          setTimeout(render, 300);
+          return;
+        }
         window.google.accounts.id.initialize({ client_id: cfg.googleClientId, hosted_domain: cfg.domain || undefined, callback: (r) => finish(r.credential), ux_mode: "popup", auto_select: false });
         window.google.accounts.id.renderButton(el, { theme: "outline", size: "large", text: "signin_with", shape: "pill", width: 280 });
       };
