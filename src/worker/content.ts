@@ -126,7 +126,7 @@ export const OFFER_HINT: Array<{ match: string; text: string }> = [
     text: "Restaurants and trades that are hiring. Look for “Now hiring” on their Facebook.",
   },
   {
-    match: "rush",
+    match: "rush|same-day",
     text: "Grand openings, busy season, or an event coming up.",
   },
   {
@@ -511,7 +511,7 @@ export const SUGGESTED_PLANS: Plan[] = [
     setup: 0,
     monthly: 49,
     includes:
-      "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page",
+      "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page\nLive price list with QR tags and a tablet display, if your stock changes",
   },
   {
     id: "plus",

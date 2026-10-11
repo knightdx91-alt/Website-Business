@@ -64,11 +64,12 @@ const BUSINESS_TYPES = [
   "Restaurant, cafe or food truck",
   "Contractor or home services",
   "Salon, barber or spa",
-  "Auto repair, body shop or towing",
+  "Auto repair, parts, tires, body shop or towing",
+  "Car, trailer or equipment dealer",
   "Landscaping or lawn care",
   "Cleaning or pressure washing",
   "Print, sign or shirt shop",
-  "Shop or boutique",
+  "Shop, boutique, pet or plant store",
   "Tax, accounting or insurance",
   "Church or nonprofit",
   "Something else",
@@ -143,6 +144,10 @@ function faq(s: AppSettings): Array<[string, string]> {
     [
       "I already have a website. Can you use what's on it?",
       "Yes. If your current site is yours (not a directory's listing for you), we bring its text over as facts for the new one and move your own photos across; you confirm they're yours before anything goes live. A site that's old, slow or broken on phones is exactly what we replace.",
+    ],
+    [
+      "My prices or stock change all the time. Can the site keep up?",
+      "Yes. Every plan includes a live price list: a page with a section for every tank, shelf, bin or row that you change from your phone, with QR tags for the shelf and a tablet display by the stock. Packaged goods scan in and out by barcode, and a whole inventory pastes in from a spreadsheet. Shops that only want that, with no website, take the Price list plan.",
     ],
     [
       "Who owns my content?",
@@ -940,6 +945,7 @@ const TRADES: Trade[] = [
       "Your dishes as photos once you send them; Google's photos are only used in the preview",
       "Catering and private-event requests sent straight to your phone",
       "Food trucks: this week's stops and a 'book the truck' form",
+      "Bakeries, markets and butcher counters: a live 'today's case' list that hides what's sold out, changed from your phone",
     ],
     faq: [
       [
@@ -1019,7 +1025,7 @@ const TRADES: Trade[] = [
   {
     slug: "auto-repair",
     cat: "auto",
-    name: "auto repair, body shops, tire shops, detailing and towing",
+    name: "auto repair, auto parts stores, body shops, tire shops, detailing and towing",
     h1: "Websites for auto shops in Cullman, AL",
     intro:
       "Car trouble is a phone search and a phone call. Your site is built so that search finds you and that call takes one tap.",
@@ -1030,6 +1036,7 @@ const TRADES: Trade[] = [
       "Tire shops: a get-a-quote form that asks size, vehicle and quantity",
       "Body shops: what to do after a wreck, the insurers you work with, and your right-to-choose line",
       "Warranty, financing and the programs you honor, worded to stay inside the rules",
+      "Auto parts stores: what you carry, a reserve-a-part form, and a live in-stock list by bin (part number, fits, brand) with QR labels, a tablet at the counter and barcode scanning",
     ],
     faq: [
       [
@@ -1060,6 +1067,7 @@ const TRADES: Trade[] = [
       "A quote form that asks the address, property size and what they want done",
       "Before-and-after photos of your own yards",
       "Alabama pesticide permit number where you apply treatments",
+      "Nurseries and garden centers: a live plant list by bench with QR tags, a tablet display and photos from your phone",
     ],
     faq: [
       [
@@ -1247,6 +1255,7 @@ TRADES.push({
     "A message or quote form that lands on your phone",
     "Your photos, your Google rating and a link to your reviews",
     "Service businesses get a service-area list by town and a three-step 'how it works'",
+    "Car, trailer and equipment lots, or any changing stock: a live list by row or shelf (year, miles, condition on the card) with QR tags and a tablet display, changed from your phone",
   ],
   faq: [
     [
@@ -1475,7 +1484,7 @@ function priceListHtml(s: AppSettings): string {
     .filter(Boolean)
     .slice(0, 4);
   return `<section class="sec" id="price-list"><div class="wrap narrow"><h2>Just need a live price list?</h2>
-<p class="lead">For any business whose stock changes: fish stores, nurseries, bakeries, resale, auto parts and tire shops, car lots. A price page with a section for every tank or shelf, QR tags, and a board you update from your phone. ${money(p.monthly)} a month, no minimum.</p>
+<p class="lead">For any business whose stock changes: fish stores, nurseries, bakeries, resale, auto parts and tire shops, car lots. A price page with a section for every tank, shelf, bin or row, QR tags, a board you update from your phone, a tablet display with barcode scanning, and a whole inventory pasted in from a spreadsheet. ${money(p.monthly)} a month, no minimum, or included with every website plan.</p>
 <ul>${lines.map((x) => `<li>${e(x)}</li>`).join("")}</ul>
 <p><a class="btn btn--small" href="/price-list">How it works</a> <a class="btn btn--small btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a></p></div></section>`;
 }
@@ -1824,6 +1833,9 @@ async function priceListPage(env: Env): Promise<Response> {
   const p = listPlan(s);
   const lowest = lowestOf(s);
   const tags = s.addons.find((a) => /price tag|shelf label/i.test(a.name));
+  const tablet = s.addons.find((a) => /tablet/i.test(a.name));
+  const scanner = s.addons.find((a) => /scanner/i.test(a.name));
+  const load = s.addons.find((a) => /stock list|inventory/i.test(a.name));
   const title = `Live price list, QR price tags and Stock board for any shop | ${name}`;
   const description = `For Cullman-area shops whose stock changes daily: a price page with a section per tank or shelf, QR tags that open it, a board you update from your phone, a tablet display by the tank, barcode scanning for packaged stock, and a whole inventory loaded from a spreadsheet in one go. For fish stores, parts counters, nurseries, bakeries, lots and any shop.${p ? ` ${money(p.monthly)} a month, no minimum, or included with any website plan.` : ""}`;
   const serviceLd = {
@@ -1874,7 +1886,7 @@ async function priceListPage(env: Env): Promise<Response> {
   const steps: Array<[string, string]> = [
     [
       "We set it up",
-      "Your price page goes on your website, your first tanks go on the board with you, and we print your first sheet of QR tags.",
+      "Your price page goes on your website, your stock goes on the board with you (paste it from a spreadsheet or your register's export, or we load it for you), and we print your first sheet of QR tags.",
     ],
     [
       "You change it from your phone or the tablet",
@@ -1916,7 +1928,9 @@ async function priceListPage(env: Env): Promise<Response> {
 ${p ? `<li><strong>Just the price list, board and tags:</strong> the ${e(p.name)} plan, ${money(p.monthly)} a month. No minimum term and no setup fee; cancel any time with 30 days' notice.${tags ? " Your first sheet of QR tags is included." : ""}</li>` : ""}
 <li><strong>With a website:</strong> included in every website plan${lowest ? `, from ${money(lowest)} a month` : ""}. Every month on the ${p ? e(p.name) : "Price list"} plan counts toward a website later; the price page just becomes part of it.</li>
 ${tags ? `<li><strong>More QR tag sheets</strong> (8 tags each): ${e(addonPrice(tags))}. Reprints after you rename or add a tank are at cost.</li>` : ""}
-<li><strong>Tablet by the tank:</strong> any $40 to $80 tablet works; we'll set it up for you.</li></ul>
+${tablet ? `<li><strong>Tablet by the tank:</strong> any $40 to $80 Android tablet works and the display page is included; ${e(tablet.name)} is ${e(addonPrice(tablet))} if we bring one, set it up and mount it.</li>` : "<li><strong>Tablet by the tank:</strong> any $40 to $80 tablet works; we'll set it up for you.</li>"}
+${scanner ? `<li><strong>Barcode scanner:</strong> the tablet camera scans for free; ${e(scanner.name)} is ${e(addonPrice(scanner))} for shops that count whole deliveries.</li>` : ""}
+${load ? `<li><strong>Your stock loaded for you:</strong> pasting a spreadsheet yourself is free; ${e(load.name)} is ${e(addonPrice(load))} when you'd rather send us the list, a register export or photos of your price board.</li>` : ""}</ul>
 <div class="btns" style="margin-top:18px"><a class="btn" href="/#contact">Ask us about it</a>${p ? `<a class="btn btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a>` : ""}<a class="btn btn--line" href="/pricing">All plans and pricing</a></div></div></section>
 <section class="sec sec--alt" id="faq"><div class="wrap narrow"><h2>Questions shops ask</h2>${faqHtml(
     [
@@ -1986,7 +2000,7 @@ ${
       )
         .map((p) => planCard(p, s, { full: true }))
         .join("")}</div>
-<p class="paynote">Every plan includes hosting, security and the changes you ask for. Rather see your site first? <a href="/#contact">Get the free preview</a> and decide after.</p>
+<p class="paynote">Every plan includes hosting, security, the changes you ask for, and the <a href="/price-list">live price list</a> with QR tags and a tablet display if your stock changes. Rather see your site first? <a href="/#contact">Get the free preview</a> and decide after.</p>
 ${waysToPayHtml(s)}
 <h3 class="xgroup">Leaving early</h3><p>${earlyCancelText(s)}</p>
 ${s.churchAnnualMonthsFree ? `<p class="small muted">Churches and nonprofits: 12 months for the price of ${12 - s.churchAnnualMonthsFree} on a yearly plan, and we can invoice instead of taking a card.</p>` : ""}
@@ -2001,13 +2015,18 @@ ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</
     [
       [
         "What does the monthly price cover?",
-        "Your website, fast secure hosting, the security certificate, backups, and the text, hours and photo changes you ask for. Plus and Pro add the Google profile work and reports listed on the cards.",
+        "Your website, fast secure hosting, the security certificate, backups, and the text, hours and photo changes you ask for. Every plan also includes the live price list, its board, the QR tags' first sheet and the tablet display page if your stock changes. Plus and Pro add the Google profile work and reports listed on the cards.",
       ],
       [
         "Is the price the same every month?",
         `Yes. The plan price is fixed for your term. If prices change later, you're told 30 days ahead at renewal.`,
       ],
-      ["What if I want to stop?", earlyCancelText(s).replace(/<[^>]+>/g, "")],
+      [
+        "What if I want to stop?",
+        earlyCancelText(s)
+          .replace(/<[^>]+>/g, "")
+          .replace(/&amp;/g, "&"),
+      ],
       [
         "Who owns the website?",
         "You own your business name, logo, photos, text and domain. We own the templates and code the site runs on. If you leave, you get a copy of your pages within 30 days and your domain transfers to you.",
@@ -2015,6 +2034,10 @@ ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</
       [
         "Do you charge for changes?",
         "Everyday changes (hours, prices, a new photo, a line of text) are included on every plan. Bigger jobs (a new page, a redesign) are quoted first; the Extra changes add-on covers them.",
+      ],
+      [
+        "Is the live price list extra?",
+        "No. It comes with every website plan. On its own, with no website, it is the Price list plan with no minimum term. The extras around it are optional: more QR tag sheets, a tablet we supply and set up, a barcode scanner paired to it, and loading your stock list for you.",
       ],
       [
         "Can I pay by check or bank transfer?",
@@ -2093,7 +2116,7 @@ ${x ? `<a class="trade__example" href="/examples/${x.slug}/"><img src="/examples
 ${
   sitePlans(s).length
     ? `<section class="sec" id="plans"><div class="wrap narrow"><h2>What it costs</h2><p class="lead">${lowest ? `From ${money(lowest)} a month` : "One monthly price"}, with hosting, security and changes included${(s.minMonths ?? 12) ? `, and no setup fee on ${commitText(s)} plans` : ""}. You see the finished site before you pay anything.</p><p><a class="btn btn--line" href="/pricing">See plans and pricing</a></p></div></section>
-${t.cat === "retail" ? priceListHtml(s) : ""}
+${t.cat === "retail" || t.cat === "auto" || t.cat === "general" || t.cat === "restaurant" || t.cat === "landscaping" ? priceListHtml(s) : ""}
 `
     : ""
 }
@@ -2341,7 +2364,7 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
             s.annualMonthsFree
               ? "Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews."
               : "",
-            "Extras: one-time extras aren't refundable once delivered unless we made the mistake (printed and programmed items once printed or programmed). Monthly extras can be canceled with 30 days' notice. A same-day build is refunded if we miss the window through our own fault; Google Business Profile setup is refunded half if Google refuses to verify.",
+            "Extras: one-time extras aren't refundable once delivered unless we made the mistake (printed and programmed items once printed or programmed; a tablet or scanner we supplied once it is set up, with the maker's warranty covering hardware faults). Monthly extras can be canceled with 30 days' notice. A same-day build is refunded if we miss the window through our own fault; Google Business Profile setup is refunded half if Google refuses to verify.",
             `Late payments: ${lateFeeOf(s) ? `a ${money(lateFeeOf(s))} late fee 10 days after a failed payment, ` : ""}${interestRateOf(s) ? `${interestRateOf(s)}% a year on balances over 30 days overdue, ` : ""}the site may go offline after 30 days, the agreement may end after 60 days with the balance due${reinstatementFeeOf(s) ? `, and ${money2(reinstatementFeeOf(s))} to put a site back online` : ""}.`,
             `Payment disputes: please contact us first; we refund billing mistakes in full. Disputing a charge that was due counts as a missed payment${returnedFeeOf(s) ? ` and adds a ${money2(returnedFeeOf(s))} fee` : ""}.`,
             "If we fail you: a month free for more than 24 hours of downtime in a month that's our fault. Three such months in a year, or a problem not fixed within 14 days of your written notice, lets you cancel without the rest of your term and get unused prepaid months back.",
@@ -2382,7 +2405,8 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
           "<strong>When you contact us:</strong> your name, business name, phone, email and message, plus your IP address to block spam.",
           "<strong>When you sign up:</strong> your name, title, email, the plan you chose, the agreement you accepted, and your IP address and browser type as a record of your signature.",
           "<strong>Payments:</strong> Stripe handles them. We see whether a payment went through, not your card number.",
-          "<strong>Business information:</strong> to build previews we use public details from Google business listings (name, address, phone, hours, category and ratings). Google's photos are only shown in private previews and never on a live website.",
+          "<strong>Business information:</strong> to build previews we use public details from Google business listings (name, address, phone, hours, category and ratings), and a web search of the business name to see whether it already has a website. Google's photos are only shown in private previews and never on a live website.",
+          "<strong>Live price lists:</strong> what a client puts on their board (items, prices, counts, photos) is published on their price page and read by their QR tags and tablet. Barcodes scanned on a tablet may be looked up in a public product database to suggest a name; no personal information is sent.",
           "<strong>Preview links:</strong> when someone opens a preview link we sent, we note that it was opened and when, so we know when to follow up.",
           "<strong>Our clients' websites:</strong> we count page views and taps on buttons like Call and Directions, without cookies and without identifying visitors. Messages sent through a client's website form go to that business; we store them only to deliver them.",
         ]),
@@ -2398,7 +2422,7 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
       sec(
         "Who we share it with",
         ul([
-          "Service providers that run our business: Cloudflare (hosting), Google (email, business listings and website analytics), Stripe (payments), and an AI writing tool that helps draft website text from public business details (never your personal contact information).",
+          "Service providers that run our business: Cloudflare (hosting), Google (email, business listings, website analytics and phone alerts for our team), Stripe (payments), Resend (the emails we send you, such as your agreement or calendar invites), Brave Search (checking whether a business already has a website), and an AI writing tool that helps draft website text and product info cards from public business details (never your personal contact information).",
           "Anyone the law requires us to share with.",
         ]),
       ),

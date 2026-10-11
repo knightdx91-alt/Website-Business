@@ -3351,7 +3351,7 @@
   // Priced from market research (Oct 2026): pay-monthly website services charge $78-150/mo, Hibu $99-159/mo,
   // Google Business Profile management $100-400/mo on its own.
   const SUGGESTED_PLANS = [
-    { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page" },
+    { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page\nLive price list with QR tags and a tablet display, if your stock changes" },
     { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
     { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
     { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out, scan barcodes, add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
@@ -3367,7 +3367,7 @@
     [/photo/i, "Anyone with no photos, or only Google's. Their site looks twice as good."],
     [/spanish/i, "Mexican restaurants, landscapers, cleaners and shops with Spanish-speaking customers."],
     [/hiring/i, "Restaurants and trades that are hiring. Look for “Now hiring” on their Facebook."],
-    [/rush/i, "Grand openings, busy season, or an event coming up."],
+    [/rush|same-day/i, "Grand openings, busy season, or an event coming up."],
     [/social/i, "Busy owners whose Facebook hasn't posted in months."],
     [/table|window/i, "Restaurants (table tents), shops and salons (counter and window)."],
     [/cards|yard|door/i, "Trades (yard signs, door hangers) and anyone out of business cards."],

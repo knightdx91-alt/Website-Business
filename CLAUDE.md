@@ -569,6 +569,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
+- Company site audit (Oct 2026): every plan card says the live price list is included (Basic includes line in live Settings +
+  SUGGESTED_PLANS mirrors), the pricing page says it under the cards and in two FAQs, the home FAQ has "My prices or stock change
+  all the time", `priceListHtml` shows on the shops, auto, other-businesses, restaurants and lawn-care trade pages, the auto /
+  restaurants / lawn-care / other-businesses trade pages name their inventory use (parts counter, bakery case, nursery bench, car
+  lot), /price-list prices the tablet / scanner / stock-list extras from Settings, /terms covers supplied hardware, /privacy lists
+  Resend, Brave Search, Firebase pushes, the barcode lookup and the board. Live Settings: "Rush build" renamed "Same-day build".
 - Naming (Oct 2026): the product is the **board**, generic name "Stock board"; each shop sees its kind's name (`KINDS[kind].board`:
   Tank board / Bench board / Enclosure board / Case board / Parts board / Lot board / Stock board) via `detail().boardName`,
   `kindWords(record).board` (texted links, the `/b/` customer page's `board` option, tablet unlock text) and the guide wording.
