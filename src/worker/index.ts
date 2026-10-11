@@ -823,7 +823,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json({ leads: rows.results.map(summary) });
   }
 
-  const leadMatch = /^\/leads\/([a-z0-9]+)(\/[a-z]+)?(?:\/([a-z0-9]+))?$/.exec(path);
+  // Actions are letters, optionally ".pdf" (flyer.pdf, reviewcard.pdf, tents.pdf, window.pdf for the Android app).
+  const leadMatch = /^\/leads\/([a-z0-9]+)(\/[a-z]+(?:\.pdf)?)?(?:\/([a-z0-9]+))?$/.exec(path);
   if (leadMatch) {
     const id = leadMatch[1]!;
     const action = leadMatch[2] ?? "";
