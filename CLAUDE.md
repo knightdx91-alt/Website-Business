@@ -184,6 +184,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   /api/signups/:id/refund {chargeId, amountCents, cancelPlan, reason}` (`refundSignup`: Stripe refund, optional subscription
   delete, sign-up unpaid on a full refund with the plan ended, call-log note, alert). The dialog restates the agreement's refund
   rules. Card-sheet payments now also store `stripe_payment_intent`.
+- Android 2.14 (Oct 2026): updates announce themselves. `AlertWorker` (every 15 min in the background) calls
+  `Updater.notifyIfNewer()`: one "Update available: X" notification per new versionCode (`Prefs.updateNotifiedCode`,
+  id `UPDATE_NOTIFICATION_ID`), whose tap opens MainActivity with extra `update=true` (onCreate or `onNewIntent`, launchMode
+  singleTask) → `AppRoot` shows the pop-up ignoring any snooze. While the app is open it also re-checks every 15 minutes
+  (`IN_APP_CHECK_MS` loop in AppRoot) and on each resume (at most every 5 min); `clearNotification()` on launch removes a
+  stale notification after installing.
 - Android 2.13 (Oct 2026): loaders clear `loading` in `finally` (Home, Edit), so a cancelled request never leaves the spinner on
   (2.8's rethrow had skipped the reset after the try).
 - Android 2.8 (Oct 2026): every `catch (e: Exception)` in the app is preceded by `catch (e: kotlinx.coroutines.CancellationException)

@@ -52,6 +52,8 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 nm.notify(e.id.hashCode(), notification)
             }
             if (fresh.isNotEmpty()) api.prefs.lastAlertAt = fresh.last().at
+            // A newer build on the server gets its own notification, once per version.
+            com.knightdx91.websitebusiness.update.Updater.notifyIfNewer(applicationContext, api)
             Result.success()
         } catch (e: Api.Unauthorized) {
             Result.success()

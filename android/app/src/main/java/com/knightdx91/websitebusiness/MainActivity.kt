@@ -22,6 +22,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import android.content.Intent
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,11 +75,19 @@ import com.knightdx91.websitebusiness.update.Updater
 /** Everything the app shows lives in one Compose activity; the Tap to Pay screen is the only other activity. */
 class MainActivity : ComponentActivity() {
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    /** Set by the "Update available" notification (at launch or while the app is open): show the update pop-up now. */
+    private val wantUpdate = mutableStateOf(false)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra("update", false)) wantUpdate.value = true
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val startLead = intent?.getStringExtra("lead")
-        setContent { WbTheme { CompositionLocalProvider(LocalWindowInfo provides rememberWindowInfo()) { AppRoot(startLead) } } }
+        wantUpdate.value = intent?.getBooleanExtra("update", false) == true
+        setContent { WbTheme { CompositionLocalProvider(LocalWindowInfo provides rememberWindowInfo()) { AppRoot(startLead, wantUpdate) } } }
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -110,21 +123,40 @@ class AppState(val api: Api) {
 
 
 @Composable
-fun AppRoot(startLead: String?) {
+fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
     val context = LocalContext.current
     val state = remember { AppState(Api(context)) }
     val nav = rememberNavController()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.loggedIn) {
         if (state.loggedIn) {
+            Updater.clearNotification(context)
             state.refreshMeta()
             if (startLead != null) nav.navigate("lead/$startLead")
             state.update = Updater.newerBuild(state.api)
+            // While the app stays open, keep looking: a new build shows up within 15 minutes without closing the app.
+            while (true) {
+                delay(Updater.IN_APP_CHECK_MS)
+                if (state.update == null) state.update = Updater.newerBuild(state.api)
+            }
+        }
+    }
+    // The "Update available" notification was tapped (at launch, or while the app was already open).
+    LaunchedEffect(wantUpdate.value, state.loggedIn) {
+        if (wantUpdate.value && state.loggedIn) {
+            state.update = Updater.newerBuild(state.api, ignoreSnooze = true)
+            wantUpdate.value = false
         }
     }
     state.update?.let { u -> UpdateDialog(state.api, u) { state.update = null } }
     LifecycleResumeEffect(state.loggedIn) {
-        if (state.loggedIn) state.unread = state.unread // refreshed by screens on resume
+        if (state.loggedIn) {
+            state.unread = state.unread // refreshed by screens on resume
+            // Coming back to the app: re-check once (at most every 5 minutes) so an update found by the background
+            // worker also pops up here, not only in the notification shade.
+            if (System.currentTimeMillis() - state.api.prefs.lastUpdateCheck > 5 * 60_000L) scope.launch { if (state.update == null) state.update = Updater.newerBuild(state.api) }
+        }
         onPauseOrDispose {}
     }
 

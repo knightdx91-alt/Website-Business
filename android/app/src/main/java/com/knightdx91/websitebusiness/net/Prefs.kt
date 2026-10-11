@@ -36,6 +36,10 @@ class Prefs(context: Context) {
     var updateSnoozedAt: Long
         get() = p.getLong("updateSnoozedAt", 0L)
         set(v) = p.edit().putLong("updateSnoozedAt", v).apply()
+    /** The versionCode the background worker already posted an "Update available" notification for. */
+    var updateNotifiedCode: Int
+        get() = p.getInt("updateNotifiedCode", 0)
+        set(v) = p.edit().putInt("updateNotifiedCode", v).apply()
 
     val isOwner: Boolean get() = role == "owner"
     val loggedIn: Boolean get() = !token.isNullOrBlank()
