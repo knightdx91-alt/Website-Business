@@ -15,7 +15,7 @@ const home = async (record: BusinessRecord, copy?: Copy, mode: "preview" | "publ
   const out = await build(record, copy, mode, look);
   return { out, html: String(out.files.get("index.html")) };
 };
-const future = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+const future = (days: number) => new Date(Date.now() + days * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }); // Cullman dates, not UTC
 const owner = (src: string, alt: string, extra: Partial<BusinessRecord["media"]["gallery"][number]> = {}) => ({ src, alt, source: "owner" as const, width: 1200, height: 900, ...extra });
 const confirmedAll: BusinessRecord["confirmed"] = ["name", "phone", "address", "services", "service_area"];
 

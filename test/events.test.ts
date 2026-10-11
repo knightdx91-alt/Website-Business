@@ -4,7 +4,7 @@ import { todayIso, upcomingEvents } from "../src/generator/components.ts";
 import { buildSite } from "../src/generator/render.ts";
 import { categoryRecord, sampleCopy } from "./fixtures.ts";
 
-const future = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+const future = (days: number) => new Date(Date.now() + days * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" }); // Cullman dates, not UTC
 
 test("dated events show near the top, past ones drop off, and the page hides them itself", async () => {
   const record = categoryRecord("auto", {

@@ -12,7 +12,8 @@ import { buildSite } from "../src/generator/render.ts";
 import type { BusinessRecord, CategoryId, Copy, Image } from "../src/generator/types.ts";
 import { categoryRecord, restaurantRecord, sampleCopy } from "./fixtures.ts";
 
-const future = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+// Cullman dates (not UTC), or "yesterday" is still today for an hour after midnight UTC and expiry checks go wrong.
+const future = (days: number) => new Date(Date.now() + days * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 const past = (days: number) => future(-days);
 const site = { slug: "s", look: "" };
 const build = (record: BusinessRecord, copy: Copy = sampleCopy(), mode: "preview" | "publish" = "preview", look = "") => buildSite({ record, copy, site: { ...site, look }, mode, formEndpoint: "https://app.example/f/1" });
