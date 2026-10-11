@@ -167,6 +167,35 @@ if (ns) {
     }
   } catch (err) {}
 }
+// Price page with a live feed (tank board): swap in what's in stock right now, without a rebuild.
+var lp = d.querySelector("#prices-live[data-live]");
+if (lp && typeof fetch === "function") {
+  try {
+    fetch(lp.getAttribute("data-live"), { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (!j || !j.sections) return;
+      var esc = function (t) { return String(t == null ? "" : t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+      var out = '<nav class="menu-nav" aria-label="Sections">';
+      for (var a = 0; a < j.sections.length; a++) out += '<a href="#sec-' + esc(j.sections[a].slug) + '">' + esc(j.sections[a].name) + "</a>";
+      out += "</nav>";
+      for (var b = 0; b < j.sections.length; b++) {
+        var sec = j.sections[b];
+        out += '<section class="menu-sec" id="sec-' + esc(sec.slug) + '" aria-labelledby="sec-' + esc(sec.slug) + '-t"><h2 id="sec-' + esc(sec.slug) + '-t">' + esc(sec.name) + "</h2>" + (sec.note ? '<p class="muted">' + esc(sec.note) + "</p>" : "") + '<ul class="menu-items">';
+        for (var c = 0; c < sec.items.length; c++) {
+          var it = sec.items[c];
+          var note = [it.note, it.qty > 0 && it.qty <= 5 ? it.qty + " left" : ""].filter(Boolean).join(" · ");
+          var inf = it.info || null, rows = inf ? [["Adult size", inf.maxSize], ["Eats", inf.diet], ["Temperament", inf.temperament], ["Minimum tank", inf.minTank], ["Care level", inf.care], ["Water", inf.water], ["From", inf.origin]].filter(function (x) { return x[1]; }) : [];
+          var more = rows.length || (inf && inf.notes) ? '<details class="menu-item__more"><summary>About this one</summary><dl>' + rows.map(function (x) { return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>"; }).join("") + "</dl>" + (inf && inf.notes ? "<p>" + esc(inf.notes) + "</p>" : "") + "</details>" : "";
+          var row = '<div class="menu-item__row"><span>' + esc(it.name) + '</span><span class="dots" aria-hidden="true"></span>' + (it.price ? "<span>" + esc(it.price) + "</span>" : "") + "</div>" + (note ? "<p>" + esc(note) + "</p>" : "") + more;
+          out += it.image ? '<li class="menu-item menu-item--photo"><img class="menu-item__img" src="' + esc(it.image) + '" alt="' + esc(it.name) + '" loading="lazy" decoding="async"><div>' + row + "</div></li>" : '<li class="menu-item">' + row + "</li>";
+        }
+        out += "</ul></section>";
+      }
+      lp.innerHTML = out;
+      var lu = d.querySelector("[data-live-updated]");
+      if (lu && j.updatedAt) lu.textContent = j.updatedAt;
+    }).catch(function () {});
+  } catch (err) {}
+}
 var fy = d.querySelectorAll("[data-year]");
 for (var y = 0; y < fy.length; y++) fy[y].textContent = String(new Date().getFullYear());
 })();

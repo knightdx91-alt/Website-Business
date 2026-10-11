@@ -1490,7 +1490,7 @@ function priceListHtml(s: AppSettings): string {
   return `<section class="sec" id="price-list"><div class="wrap narrow"><h2>Just need a live price list?</h2>
 <p class="lead">For any business whose stock changes: fish stores, nurseries, bakeries, resale, auto parts and tire shops, car lots. A price page with a section for every tank, shelf, bin or row, QR tags, a board you update from your phone, a tablet display with barcode scanning, and a whole inventory pasted in from a spreadsheet. ${money(p.monthly)} a month, no minimum, or included with every website plan.</p>
 <ul>${lines.map((x) => `<li>${e(x)}</li>`).join("")}</ul>
-<p><a class="btn btn--small" href="/price-list">How it works</a> <a class="btn btn--small btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a></p></div></section>`;
+<p><a class="btn btn--small" href="/price-list">How it works</a> <a class="btn btn--small btn--line" href="/examples/willow-wren/prices/">See an example</a> <a class="btn btn--small btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a></p></div></section>`;
 }
 
 function planCard(
@@ -1917,7 +1917,8 @@ async function priceListPage(env: Env): Promise<Response> {
   const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Live price list</p>
 <h1>A price list that changes when you change it</h1>
 <p class="lead">Built for shops whose stock changes every day. You change what's in a tank or on a shelf from your phone; your website's price page, the QR tag on the shelf and the screen by the tank all follow within a minute.</p>
-<div class="btns"><a class="btn" href="/#contact">Ask us about it</a>${p ? `<a class="btn btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a>` : ""}</div></div></section>
+<div class="btns"><a class="btn" href="/#contact">Ask us about it</a><a class="btn btn--line" href="/examples/willow-wren/prices/">See an example price page</a>${p ? `<a class="btn btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a>` : ""}</div>
+<p class="small muted">Example pages: <a href="/examples/willow-wren/prices/">a boutique</a>, <a href="/examples/crossroads-auto/prices/">an auto shop's parts counter</a>, <a href="/examples/magnolia-table/prices/">a cafe's case</a>. Made-up businesses; the items are samples.</p></div></section>
 <section class="sec sec--alt"><div class="wrap"><h2>How it works</h2><ol class="steps">${steps.map(([h, t]) => `<li><h3>${e(h)}</h3><p>${e(t)}</p></li>`).join("")}</ol></div></section>
 <section class="sec"><div class="wrap"><h2>The pieces</h2><div class="grid">${pieces.map(([i, h, t]) => `<div class="card"><p style="font-size:2rem;margin:0">${i}</p><h3>${e(h)}</h3><p>${e(t)}</p></div>`).join("")}</div></div></section>
 <section class="sec sec--alt"><div class="wrap trade__grid"><div><h2>What your customers get</h2><ul class="ticks">
@@ -2205,7 +2206,7 @@ function exampleCard(
   withDesign: boolean,
 ): string {
   const t = tradeFor(x.record.category);
-  return `<li><a href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>${e(x.kind)}${withDesign ? `<em>${e(designName(x.design))}</em>` : ""}<b>View the site →</b></span></a>${withDesign && t ? `<a class="examples__more" href="/websites-for/${t.slug}">What a ${e(x.kind.toLowerCase())} site includes</a>` : ""}</li>`;
+  return `<li><a href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>${e(x.kind)}${withDesign ? `<em>${e(designName(x.design))}</em>` : ""}<b>View the site →</b></span></a>${withDesign && t ? `<a class="examples__more" href="/websites-for/${t.slug}">What a ${e(x.kind.toLowerCase())} site includes</a>` : ""}${withDesign && x.record.ext.retail?.priceList?.sections.length ? `<a class="examples__more" href="/examples/${x.slug}/prices/">See its live price list</a>` : ""}</li>`;
 }
 
 /** Portfolio: every example site, with its type and design. */

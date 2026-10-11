@@ -569,6 +569,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
+- Example sites carry sample stock (Oct 2026): the pure sample-stock code lives in `src/generator/sample-stock.ts` (the worker's
+  `sample-stock.ts` re-exports it) so `src/examples/examples.ts` can call `withSampleStock(record)` for Magnolia Table Cafe (a
+  bakery case, "Today's case"), Crossroads Auto Care (parts, "In stock") and Willow & Wren Boutique (goods, "In stock"); the
+  `sample` flags are stripped there because example sites build in publish mode. Their /prices/ pages are linked from /price-list
+  (hero button + the three example links), the pricing strip ("See an example") and the portfolio cards ("See its live price
+  list"). `npm run examples` rebuilds them (screenshots too).
 - 🧪 Sample stock for previews (Oct 2026, `src/worker/sample-stock.ts`): when a prospect is interested in the inventory system,
   the lead page's board card has "🧪 Add sample items (preview only)" (owner / full access; web + Android 2.39) = `POST
   /api/leads/:id/samplestock` → `addSampleStock(record)`: believable made-up stock for their kind of business (`SETS`, picked by

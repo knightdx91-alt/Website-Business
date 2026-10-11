@@ -1,4 +1,5 @@
 import { parseMenuText } from "../generator/menu.ts";
+import { addSampleStock } from "../generator/sample-stock.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 
 /**
@@ -17,6 +18,13 @@ export interface Example {
 }
 
 const day = (open: string, close: string) => [{ open, close }];
+
+/** The live price list, filled with the same sample stock a prospect's preview gets; the flags come off because example sites publish. */
+function withSampleStock(record: BusinessRecord): void {
+  addSampleStock(record);
+  for (const s of record.ext.retail!.priceList!.sections) for (const it of s.items) delete it.sample;
+  record.ext.retail!.priceList!.lastUpdated = "this morning";
+}
 
 function base(o: { slug: string; name: string; category: CategoryId; variant: string; phone: string; street?: string; storefront: boolean }): BusinessRecord {
   const weekday = day("08:00", "17:00");
@@ -88,6 +96,7 @@ Turnip greens | $3`),
       if (["Biscuits & sausage gravy", "Meat & three", "Fried chicken plate"].includes(it.name)) it.tags = ["popular"];
       if (["Fried okra", "Turnip greens", "Mac & cheese"].includes(it.name)) it.tags = ["vegetarian"];
     }
+    withSampleStock(record);
     record.testimonials = [said("Best biscuits we've had in years. The staff knows everybody by name.", "Linda P."), said("Meat and three every Friday. Never had a bad meal.", "Jerry W."), said("Fast, friendly and the sweet tea is just right.", "Amanda R.")];
     return {
       slug: "magnolia-table",
@@ -188,6 +197,7 @@ Turnip greens | $3`),
     const record = base({ slug: "crossroads-auto", name: "Crossroads Auto Care", category: "auto", variant: "general", phone: "0104", street: "1500 Example Rd SW", storefront: true });
     record.services = svc(["Brakes", "Oil changes", "Check engine light", "A/C repair", "Tires & alignment", "Inspections"]);
     record.ext.auto = { ase: true, freeEstimates: true, warranty: { months: 12, miles: 12000 } };
+    withSampleStock(record);
     record.testimonials = [said("They told me what could wait and what couldn't. That's rare.", "Steve L."), said("Fair price on brakes and done the same day.", "Megan D."), said("I trust them with all three of our family's cars.", "Ron G.")];
     return {
       slug: "crossroads-auto",
@@ -343,6 +353,7 @@ Turnip greens | $3`),
     record.services = svc(["Tops & blouses", "Dresses", "Jeans & bottoms", "Shoes & boots", "Jewelry & accessories", "Gifts"]);
     record.links.social = { instagram: "https://www.instagram.com/", facebook: "https://www.facebook.com/" };
     record.ext.retail = { giftCards: true, shopUrl: "https://example.com/" };
+    withSampleStock(record);
     record.testimonials = [said("Always something new, and they help you put an outfit together.", "Kayla N."), said("My go-to for gifts. Everything is so cute.", "Melissa O."), said("Friendly owners and great prices.", "Tasha W.")];
     return {
       slug: "willow-wren",
