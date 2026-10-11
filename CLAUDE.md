@@ -953,8 +953,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (name "Payment test (not a real business)", placeId paytest, phone 256-555-0100, sample stock + scanning on, approved copy,
   confirmed fields) built locally with `buildSite` the way `renderPreview` does (basePath `/p/<id>`, liveData) and uploaded to R2
   `previews/<id>/` with `wrangler r2 object put`; record_json / copy_json / look / lint_json set by D1 SQL (scratchpad
-  `build-paytest.mts`). Reset for a fresh run-through: sales_status 'new', signups cleared. Publishing it makes a real Pages
-  project: delete it afterwards.
+  `build-paytest.mts`). It is the **training aid** (Oct 2026, `src/worker/practice.ts`): `summary().payTest` marks it; the lead page shows a 🎓 Practice
+  card (web + Android 2.41) with "🔁 Reset for the next run" (owner; `POST /api/leads/:id/practice/reset` = `resetPracticeLead`:
+  refunds every paid sign-up's remaining charges through `refundable` / `refundSignup`, deletes the Pages project if published,
+  deletes R2 `owner/<id>/`, deletes purchases / signups / lead_notes / tasks, resets the lead row to New with no callback, contact,
+  live_url, pages_project, custom_domain, client_key, pitch or gbp, drops owner photos and the staff PIN, puts fresh sample stock
+  back with scanning on, and re-renders the preview; 403 for any other lead). It never expires (`EXPIRE_SQL` skips `paytest`),
+  never counts in Sales (`salesDashboard` sales list + shown count skip it) and never shows as a "New" suggestion on the web Today
+  card. Training lesson 13 `full-run` is the nine-step run-through ending with the reset.
   Verified end to end in Oct 2026 (checkout → webhook → purchase marked paid → notification); refund it in Stripe after.
 - "Already a client? Add extras" (`/extras` on the company site, `extrasRequest` in company.ts): existing clients pick
   extras and leave business name, name and phone; `findClient` matches a sold/live lead by phone (10 digits) or
@@ -1019,6 +1025,18 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Signing: the preview opened from a lead has "✍️ Sign this agreement" (POSTs `/api/leads/:id/signup` for the shown plan, then
   opens the sign-up page `/a/<token>?billing=<id>`, which pre-picks that way to pay); the sign-up page is the only place a client
   signs (name + drawn signature + consent, then payment). Without a lead the preview explains the Show them the plans → Choose path.
+- First live run-through fixes (Oct 2026, Android 2.42): (1) Stripe's `2026-09-30.endive` API version removed `payment_method_types`
+  from PaymentIntents and SetupIntents, and the account's default moved to it, so Tap to Pay died with "The payment_method_types
+  parameter is no longer supported". Terminal still needs a `card_present` intent (and the card sheet a `card` SetupIntent), so every
+  call in tap.ts sends `Stripe-Version: 2026-08-26.dahlia` (`STRIPE_VERSION`; `stripe()`, `stripeGet()`, the subscription DELETE).
+  Checkout sessions / the billing portal (checkout.ts) pass no payment method types and stay on the account default. If Stripe ever
+  retires dahlia, Terminal's docs name the replacement. (2) The native sign-up screen lost its state when "View the signed agreement"
+  (the `pdf` route) or Tap to Pay left it, so coming back showed the blank form and asked for a second signature: plan, billing, picks
+  (`PICKS_SAVER`), the typed details, `signed` (`SIGNED_SAVER` over `SignupResult.raw`, the response JSON), paid text and `tapUntil`
+  are `rememberSaveable` now, and the loader only fills the business name when it is blank. (3) Both signature pads lift the pen when the
+  finger leaves the box (Compose: `clipToBounds()` + `inBox` in `SignaturePad`, strokes drawn past the edge used to show outside it; web
+  esign.ts: points outside the canvas rect end the stroke, a return starts a new one). (4) The service agreement's section 2 now says
+  "(see the Timing section above)": the TIMING section sits before SERVICE AGREEMENT and readers looked for it below.
 - Tap to Pay (Oct 2026, research/android-tap-to-pay-2026.md; `src/worker/tap.ts`, migration 0014 `signups.stripe_payment_intent /
   paid_via / tap_nonce`): in-person card payments on the owner's phone with Stripe Terminal. Android app 2.0 keeps the TWA and adds one
   native Kotlin screen, `tap/TapToPayActivity` (Stripe Terminal SDK 6.0.0, `stripeterminal-taptopay` + `-core`, arm64 only, APK ≈40 MB;

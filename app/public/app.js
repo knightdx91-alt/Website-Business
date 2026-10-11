@@ -393,7 +393,7 @@
     const add = (l, why, cls) => { if (seen.has(l.id) || rows.length >= 15) return; seen.add(l.id); rows.push({ l, why, cls }); };
     due.forEach((l) => add(l, l.followUp < dayFromNow(0) ? "Overdue" : "Callback", "chip--warn"));
     opened.filter((l) => l.salesStatus !== "sold" && l.salesStatus !== "live" && l.previewOpenedAt > weekAgo).forEach((l) => add(l, `Opened preview${l.previewOpens > 1 ? ` ${l.previewOpens}×` : ""} · ${ago(l.previewOpenedAt)}`, "chip--good"));
-    fresh.filter((l) => l.status === "ready" && l.salesStatus === "new" && (!l.lastContact || l.lastContact < weekAgo)).sort((a, b) => (b.score || 0) - (a.score || 0)).forEach((l) => add(l, "New", ""));
+    fresh.filter((l) => !l.payTest && l.status === "ready" && l.salesStatus === "new" && (!l.lastContact || l.lastContact < weekAgo)).sort((a, b) => (b.score || 0) - (a.score || 0)).forEach((l) => add(l, "New", ""));
     const goal = Number(meta.settings.dailyCalls) || 0;
     const done = loggedToday();
     const head = `Today: ${rows.length} call${rows.length === 1 ? "" : "s"}${done ? ` · you've logged ${done} so far today` : ""}`;
@@ -873,6 +873,9 @@
           <button class="btn btn--good" data-act="publish"${blockers.length ? " disabled" : ""}>${l.liveUrl ? "Republish changes" : "Publish to Cloudflare"}</button>
           <button class="btn" data-act="zip"${blockers.length ? " disabled" : ""}>Download zip</button>
         </div></section>` : ""}
+      ${l.payTest ? `<section class="card" style="border:2px solid #fca311"><h2>🎓 Practice lead</h2>
+        <p class="small">This is the training aid, not a real business. Take it from New to Live the way you would a real sale: every payment on it is <strong>$1</strong>, it never expires, and it never counts in Sales. The full run-through is the last lesson in Training.</p>
+        ${owner ? `<p class="small">When a trainee is done: <button class="btn btn--small" type="button" data-practice-reset>🔁 Reset for the next run</button> <span class="muted">refunds their $1, clears the sign-ups, call log and tasks, takes down anything published, forgets board links and photos, and puts fresh sample items back.</span></p>` : `<p class="small muted">When you're done, the owner resets it for the next person.</p>`}</section>` : ""}
       ${ready ? `<section class="card"><h2>📋 ${esc(l.boardName || "Stock board")}</h2>
         <p class="muted small">Their own page for what's in each tank, case, bench or shelf: name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it. Set "What's on it" in Edit → Live price list.</p>
         <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their ${esc((l.boardName || "Stock board").toLowerCase())} link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the ${esc(l.boardName || "Stock board")} page</button>${owner ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
@@ -2888,6 +2891,12 @@
       if (!confirm("Stop every board link sent so far? You'll text them a new one.")) return;
       rv.disabled = true;
       try { await api(`/leads/${l.id}/clientlink`, { method: "DELETE" }); toast("Old links no longer work. Text them a new one."); } catch (err) { toast(err.message); } finally { rv.disabled = false; }
+    });
+    const pr = $app.querySelector("[data-practice-reset]");
+    if (pr) pr.addEventListener("click", async () => {
+      if (!confirm("Reset the practice lead? This refunds any $1 payments, removes every sign-up, note and task on it, takes down anything published, and puts fresh sample items back.")) return;
+      pr.disabled = true; pr.textContent = "Resetting…";
+      try { const r = await api(`/leads/${l.id}/practice/reset`, { method: "POST" }); toast(`Reset. ${r.refunded ? `Refunded ${r.refunded} payment${r.refunded === 1 ? "" : "s"}. ` : ""}${r.signups} sign-up${r.signups === 1 ? "" : "s"} and ${r.notes} note${r.notes === 1 ? "" : "s"} cleared${r.pagesDeleted ? ", site taken down" : ""}.`); setTimeout(() => render(), 600); } catch (err) { toast(err.message); pr.disabled = false; pr.textContent = "🔁 Reset for the next run"; }
     });
     const ss = $app.querySelector("[data-samplestock]");
     if (ss) ss.addEventListener("click", async () => {

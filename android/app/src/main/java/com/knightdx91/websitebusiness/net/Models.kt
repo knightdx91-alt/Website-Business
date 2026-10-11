@@ -81,6 +81,8 @@ data class Lead(
     val lastContact: Long?,
     val previewOpens: Int,
     val previewOpenedAt: Long?,
+    /** The practice lead (training aid): $1 payments, never expires, never counted, resettable. */
+    val payTest: Boolean = false,
     val contact: String?,
     val bestTime: String?,
     val unpaidSignup: Boolean,
@@ -117,6 +119,7 @@ data class Lead(
             followUp = j.str("followUp"),
             lastContact = if (j.isNull("lastContact")) null else j.optLong("lastContact"),
             previewOpens = j.optInt("previewOpens", 0),
+            payTest = j.optBoolean("payTest"),
             previewOpenedAt = if (j.isNull("previewOpenedAt")) null else j.optLong("previewOpenedAt"),
             contact = j.str("contact"),
             bestTime = j.str("bestTime"),

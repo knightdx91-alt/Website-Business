@@ -37,6 +37,13 @@ interface StripeError {
   error?: { message?: string; code?: string; type?: string };
 }
 
+/**
+ * Pinned Stripe API version. 2026-09-30.endive removed `payment_method_types` from PaymentIntents and SetupIntents,
+ * but Terminal still needs a `card_present` intent and the card sheet a `card` SetupIntent, so every call from here
+ * names the last version that takes it (the account default moved on in Oct 2026 and broke Tap to Pay).
+ */
+export const STRIPE_VERSION = "2026-08-26.dahlia";
+
 async function stripe<T>(
   env: Env,
   path: string,
@@ -49,6 +56,7 @@ async function stripe<T>(
     method: "POST",
     headers: {
       authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "stripe-version": STRIPE_VERSION,
       "content-type": "application/x-www-form-urlencoded",
       ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
     },
@@ -70,7 +78,12 @@ async function stripeGet<T>(
   const qs = stripeForm(query).toString();
   const res = await fetch(
     `https://api.stripe.com/v1/${path}${qs ? `?${qs}` : ""}`,
-    { headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } },
+    {
+      headers: {
+        authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+        "stripe-version": STRIPE_VERSION,
+      },
+    },
   );
   const data = (await res.json()) as T & StripeError;
   if (!res.ok)
@@ -1013,7 +1026,10 @@ export async function refundSignup(
       `https://api.stripe.com/v1/subscriptions/${row.stripe_subscription}`,
       {
         method: "DELETE",
-        headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
+        headers: {
+          authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+          "stripe-version": STRIPE_VERSION,
+        },
       },
     );
     planCancelled = res.ok;

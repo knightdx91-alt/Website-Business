@@ -91,8 +91,10 @@ function fill(){
 }
 function sizePad(){var r=pad.getBoundingClientRect(),k=window.devicePixelRatio||1;pad.width=Math.round(r.width*k);pad.height=Math.round(r.height*k);cx.setTransform(k,0,0,k,0,0);cx.lineWidth=2.6;cx.lineCap="round";cx.lineJoin="round";cx.strokeStyle="#111";inked=false;}
 function pt(e){var r=pad.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]}
-pad.addEventListener("pointerdown",function(e){e.preventDefault();drawing=true;pad.setPointerCapture(e.pointerId);var p=pt(e);cx.beginPath();cx.moveTo(p[0],p[1]);});
-pad.addEventListener("pointermove",function(e){if(!drawing)return;var p=pt(e);cx.lineTo(p[0],p[1]);cx.stroke();inked=true;});
+function inBox(p){var r=pad.getBoundingClientRect();return p[0]>=0&&p[1]>=0&&p[0]<=r.width&&p[1]<=r.height}
+var pen=false;
+pad.addEventListener("pointerdown",function(e){e.preventDefault();drawing=true;pad.setPointerCapture(e.pointerId);var p=pt(e);pen=inBox(p);if(pen){cx.beginPath();cx.moveTo(p[0],p[1]);}});
+pad.addEventListener("pointermove",function(e){if(!drawing)return;var p=pt(e);if(!inBox(p)){pen=false;return;}if(!pen){pen=true;cx.beginPath();cx.moveTo(p[0],p[1]);return;}cx.lineTo(p[0],p[1]);cx.stroke();inked=true;});
 ["pointerup","pointercancel","pointerleave"].forEach(function(n){pad.addEventListener(n,function(){drawing=false})});
 function open(){if(bizField){var bz=q('[name="'+bizField+'"]');if(bz&&!bz.value.trim()){bz.focus();st.className="es-status warn";st.textContent="Type your business name first.";box.checked=false;return;}}
  fill();document.getElementById("es-err").hidden=true;dlg.showModal();dlg.querySelector(".es-body").scrollTop=0;setTimeout(sizePad,30);}

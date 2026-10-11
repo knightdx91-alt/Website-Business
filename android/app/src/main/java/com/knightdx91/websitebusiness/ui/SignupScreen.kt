@@ -57,6 +57,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -69,7 +73,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.pointer.pointerInput
+import org.json.JSONObject
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -182,6 +188,18 @@ private fun wayDetail(o: PlanOptions, p: PlanOffer, b: BillingChoice): String {
 
 private fun cleanName(s: String) = s.trim().replace(Regex("\\s+"), " ").take(100)
 
+/** The extras picked, as [index, qty, index, qty, …] for rememberSaveable. */
+private val PICKS_SAVER = listSaver<SnapshotStateMap<Int, Int>, Int>(
+    save = { m -> m.entries.flatMap { listOf(it.key, it.value) } },
+    restore = { l -> mutableStateMapOf<Int, Int>().apply { var i = 0; while (i + 1 < l.size) { put(l[i], l[i + 1]); i += 2 } } },
+)
+
+/** The signed order, kept as its JSON ("" = not signed yet). */
+private val SIGNED_SAVER = Saver<SignupResult?, String>(
+    save = { it?.raw ?: "" },
+    restore = { if (it.isEmpty()) null else SignupResult.from(JSONObject(it)) },
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId: String?) {
@@ -193,17 +211,19 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
     var lead by remember { mutableStateOf<Lead?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    var plan by remember { mutableStateOf(planId ?: "") }
+    // What was typed and signed survives leaving this screen (the signed-agreement PDF, Tap to Pay) and coming back:
+    // before this, "View the signed agreement" came back to a blank form that asked for a second signature.
+    var plan by rememberSaveable { mutableStateOf(planId ?: "") }
     var changingPlan by remember { mutableStateOf(false) }
-    var billing by remember { mutableStateOf("standard") }
+    var billing by rememberSaveable { mutableStateOf("standard") }
     var moreWays by remember { mutableStateOf(false) }
     var moreExtras by remember { mutableStateOf(false) }
-    val picks = remember { mutableStateMapOf<Int, Int>() }
+    val picks = rememberSaveable(saver = PICKS_SAVER) { mutableStateMapOf<Int, Int>() }
 
-    var business by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var title by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
+    var business by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var title by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
     var tried by remember { mutableStateOf(false) }
 
     var agreementOpen by remember { mutableStateOf(false) }
@@ -211,21 +231,21 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
     var padSize by remember { mutableStateOf(IntSize.Zero) }
     var consent by remember { mutableStateOf(false) }
     var signing by remember { mutableStateOf(false) }
-    var signed by remember { mutableStateOf<SignupResult?>(null) }
+    var signed by rememberSaveable(stateSaver = SIGNED_SAVER) { mutableStateOf<SignupResult?>(null) }
 
     // Paying on this phone, after signing.
     var paySecret by remember { mutableStateOf<String?>(null) }
     var payBusy by remember { mutableStateOf(false) }
-    var paidText by remember { mutableStateOf<String?>(null) }
-    var payNote by remember { mutableStateOf<String?>(null) }
-    var tapUntil by remember { mutableLongStateOf(0L) }
+    var paidText by rememberSaveable { mutableStateOf<String?>(null) }
+    var payNote by rememberSaveable { mutableStateOf<String?>(null) }
+    var tapUntil by rememberSaveable { mutableLongStateOf(0L) }
 
     LaunchedEffect(leadId) {
         try {
             val o = state.api.planOptions(leadId)
             val d = state.api.lead(leadId)
             lead = d.lead
-            business = d.lead.name
+            if (business.isBlank()) business = d.lead.name
             if (o.plans.none { it.id == plan }) plan = (o.plans.firstOrNull { it.id == "plus" } ?: o.plans.firstOrNull())?.id ?: ""
             options = o
         } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "Couldn't load the plans" }
@@ -663,14 +683,22 @@ private fun SignaturePad(strokes: SnapshotStateList<List<Offset>>, onSize: (IntS
     Canvas(
         modifier
             .background(Color.White, shape)
+            .clipToBounds()
             .onSizeChanged(onSize)
             .pointerInput(Unit) {
                 detectTapGestures { p -> strokes.add(listOf(p, Offset(p.x + 0.5f, p.y))) }
             }
             .pointerInput(Unit) {
+                // A finger that slides out of the box lifts the pen; it draws again once it is back inside.
+                fun inBox(p: Offset) = p.x >= 0f && p.y >= 0f && p.x <= size.width && p.y <= size.height
                 detectDragGestures(
-                    onDragStart = { p -> current = listOf(p) },
-                    onDrag = { change, _ -> change.consume(); current = current + change.position },
+                    onDragStart = { p -> current = if (inBox(p)) listOf(p) else emptyList() },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val p = change.position
+                        if (inBox(p)) current = current + p
+                        else if (current.isNotEmpty()) { if (current.size > 1) strokes.add(current); current = emptyList() }
+                    },
                     onDragEnd = { if (current.isNotEmpty()) strokes.add(current); current = emptyList() },
                     onDragCancel = { if (current.isNotEmpty()) strokes.add(current); current = emptyList() },
                 )

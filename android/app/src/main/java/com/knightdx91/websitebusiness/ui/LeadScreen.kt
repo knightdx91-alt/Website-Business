@@ -78,6 +78,7 @@ import com.knightdx91.websitebusiness.net.domain
 import com.knightdx91.websitebusiness.net.extrasLink
 import com.knightdx91.websitebusiness.net.clientLink
 import com.knightdx91.websitebusiness.net.boardLink
+import com.knightdx91.websitebusiness.net.resetPractice
 import com.knightdx91.websitebusiness.net.revokeClientLink
 import com.knightdx91.websitebusiness.net.sampleStock
 import com.knightdx91.websitebusiness.net.forgetSiteImport
@@ -616,6 +617,24 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                                 Text("They buy the domain (about $10–15 a year, at Cloudflare, GoDaddy or Namecheap), then add it here.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
                             }
                         }
+                    }
+                }
+            }
+
+            // ---- the practice lead (training aid) ----
+            if (l.payTest) item {
+                Card(Modifier.fillMaxWidth(), border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("🎓 Practice lead", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("This is the training aid, not a real business. Take it from New to Live the way you would a real sale: every payment on it is \$1, it never expires, and it never counts in Sales. The full run-through is the last lesson in Training.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
+                        if (isOwner) {
+                            OutlinedButton(onClick = {
+                                ask = Ask("Reset the practice lead", "This refunds any \$1 payments, removes every sign-up, note and task on it, takes down anything published, forgets board links and photos, and puts fresh sample items back.", "Reset") {
+                                    act("practicereset") { val r = state.api.resetPractice(id); context.toast("Reset. ${r.optInt("signups")} sign-ups and ${r.optInt("notes")} notes cleared" + (if (r.optInt("refunded") > 0) ", ${r.optInt("refunded")} payment(s) refunded" else "") + (if (r.optBoolean("pagesDeleted")) ", site taken down" else "") + "."); load() }
+                                }
+                            }, enabled = busy == null, modifier = Modifier.padding(top = 6.dp)) { Text("🔁 Reset for the next run") }
+                            Text("Refunds their \$1, clears the sign-ups, call log and tasks, takes down anything published, forgets board links and photos, and puts fresh sample items back.", style = MaterialTheme.typography.bodySmall, color = muted)
+                        } else Text("When you're done, the owner resets it for the next person.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
             }

@@ -50,6 +50,8 @@ data class SignupResult(
     val tapReady: Boolean,
     /** Stripe is set up, so a card can be typed into PaymentSheet on this phone. */
     val cardReady: Boolean,
+    /** The JSON this came from, so the sign-up screen can keep the result across navigation (rememberSaveable). */
+    val raw: String = "",
 ) {
     companion object {
         fun from(j: JSONObject): SignupResult {
@@ -64,6 +66,7 @@ data class SignupResult(
                 agreementPdf = j.optString("agreementPdf"),
                 tapReady = j.optBoolean("tapReady"),
                 cardReady = j.optBoolean("cardReady"),
+                raw = j.toString(),
             )
         }
     }

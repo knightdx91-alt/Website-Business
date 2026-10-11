@@ -79,6 +79,7 @@ import {
   hasSampleStock,
   removeSampleStock,
 } from "./sample-stock.ts";
+import { resetPracticeLead } from "./practice.ts";
 import { serveDisplay, serveDisplayMeta, serveStation } from "./tablet.ts";
 import {
   addCaller,
@@ -362,6 +363,8 @@ function summary(
     followUp: l.follow_up,
     lastContact: l.last_contact,
     placeId: l.place_id,
+    /** The practice lead (training aid): $1 payments, never expires, never counted, resettable. */
+    payTest: l.place_id === "paytest",
     lat: l.lat,
     lng: l.lng,
     customDomain: l.custom_domain,
@@ -2993,6 +2996,17 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         text: `${session.name} sent ${lead.name} their ${board} link`,
       });
       return json({ url: link, text });
+    }
+    if (action === "/practice/reset" && m === "POST") {
+      // The training aid goes back to square one for the next trainee (refunds, sign-ups, notes, tasks, Pages project, uploads, fresh samples).
+      const out = await resetPracticeLead(env, lead, session.name);
+      await notify(env, {
+        kind: "status",
+        actor: session,
+        leadId: lead.id,
+        text: `${session.name} reset the practice lead for the next run${out.refundedCents ? ` (refunded ${(out.refundedCents / 100).toFixed(2)} dollars)` : ""}`,
+      });
+      return json({ ok: true, ...out });
     }
     if (action === "/samplestock" && (m === "POST" || m === "DELETE")) {
       // Preview-only sample stock for a prospect: believable items for their kind of business, removable in one tap, never published.

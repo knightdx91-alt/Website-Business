@@ -189,6 +189,9 @@ suspend fun Api.extrasLink(id: String): String = postJson("/leads/$id/extraslink
 /** Tank board: the client's own live price-list editor (retail). Returns the link and a ready-to-send text. */
 suspend fun Api.clientLink(id: String): Pair<String, String> = postJson("/leads/$id/clientlink").let { it.optString("url") to it.optString("text") }
 
+/** The practice lead only (owner): refunds, sign-ups, notes, tasks, published site, uploads and samples go back to square one. */
+suspend fun Api.resetPractice(id: String): JSONObject = postJson("/leads/$id/practice/reset")
+
 /** Preview-only sample stock for a prospect (owner): add puts made-up items for their kind of business on the price list; remove takes exactly those out. */
 suspend fun Api.sampleStock(id: String, add: Boolean): JSONObject = if (add) postJson("/leads/$id/samplestock") else deleteJson("/leads/$id/samplestock")
 

@@ -124,7 +124,7 @@ export async function salesDashboard(env: Env) {
        (SELECT s.paid FROM signups s WHERE s.lead_id = l.id ORDER BY s.created_at DESC LIMIT 1) AS paid,
        (SELECT n.author FROM lead_notes n WHERE n.lead_id = l.id AND n.outcome = 'sold' ORDER BY n.created_at DESC LIMIT 1) AS sold_by,
        (SELECT n.created_at FROM lead_notes n WHERE n.lead_id = l.id AND n.outcome = 'sold' ORDER BY n.created_at DESC LIMIT 1) AS sold_at
-     FROM leads l WHERE l.sales_status IN ('sold', 'live')`,
+     FROM leads l WHERE l.sales_status IN ('sold', 'live') AND l.place_id != 'paytest'`,
   ).all<{
     id: string;
     name: string;
@@ -185,7 +185,7 @@ export async function salesDashboard(env: Env) {
   const shownCount =
     (
       await env.DB.prepare(
-        "SELECT COUNT(*) AS n FROM leads WHERE sales_status = 'shown' AND status != 'expired'",
+        "SELECT COUNT(*) AS n FROM leads WHERE sales_status = 'shown' AND status != 'expired' AND place_id != 'paytest'",
       ).first<{ n: number }>()
     )?.n ?? 0;
   // What the prospects we've shown would be worth on the Plus plan (else the middle plan).

@@ -418,6 +418,38 @@ const LESSONS: Lesson[] = [
       },
     ],
   },
+  {
+    id: "full-run",
+    title: "The full run-through on the practice lead",
+    minutes: 15,
+    who: "everyone",
+    why: "Every piece in one sitting, on a lead that can't hurt anyone: the Payment test lead is a pretend shop, every payment on it is $1, and the owner resets it for the next person.",
+    steps: [
+      'Leads → "Payment test (not a real business)". Tap Preview. Look at "What\'s in right now" on the home page and the In stock page in the menu; tap 🧪 Remove sample items, watch them go, and add them back.',
+      "Log a call or visit → 🚶 Talked in person → 👍 Interested. The lead becomes Shown and books its own callback two days out.",
+      '"📋 Show them the plans": read it as the customer. Then "📋 Show them the Stock board" → "Try the board on this phone": add an item, mark one sold out, scan a barcoded product with the camera if one is handy.',
+      "Back on the lead, pick a plan. In the sign-up, choose a way to pay and tick one add-on under Inventory add-ons or Add extras. The total stays $1.",
+      "Tick \"I've read the agreement\", read the pop-up (your add-on's terms are in it), type the name, draw a signature, consent.",
+      '"💳 Tap card on this phone" with your own card. NFC on, Location on, Developer options off. You should see "Paid $1 in person by tap" in the call log, the sign-up marked paid, and an alert.',
+      "Status → Sold. Owner or full access: Edit → Confirm what it asks for, remove the sample items, Publish to Cloudflare. Open the live address, find the In stock page, print the QR price tags from the Live card.",
+      "Try the after-sale screens too: ↩ Refund on the paid sign-up, the Buy extras link, Ask for a review, the monthly report.",
+      'Done? The owner taps "🔁 Reset for the next run" on the lead\'s Practice card: it refunds the $1, clears the sign-ups, notes and tasks, takes the published site down, forgets board links and photos, and puts the sample items back. The practice lead never expires and never counts in Sales.',
+    ],
+    tryIt:
+      "Do all nine steps once, start to finish, then ask the owner to reset it.",
+    check: [
+      {
+        q: "A trainee finished the run-through and published the practice site. What now?",
+        options: [
+          "Leave it live as an example",
+          "The owner taps Reset for the next run, which also takes the site down and refunds the $1",
+          "Delete the lead",
+        ],
+        answer: 1,
+        why: "Reset puts everything back, including removing the published site and refunding the trainee's dollar. Deleting the lead would lose the training aid.",
+      },
+    ],
+  },
 ];
 
 const money = (n: number | undefined) =>
