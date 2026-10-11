@@ -107,6 +107,12 @@ function withExtras(ctx: Ctx, body: Raw): Raw {
   }
   const jobs = hiring(ctx).value;
   if (jobs) out = /<section class="cta[ "]/.test(out) ? out.replace(/<section class="cta[ "]/, (m) => jobs + m) : out.replace("</main>", `${jobs}</main>`);
+  // Sample stock put on the price list to show a prospect how it works never goes live: a REQUIRED to-do until it is removed.
+  const sample = (ctx.r.ext.retail?.priceList?.sections ?? []).some((s) => s.items.some((it) => it.sample));
+  if (sample) {
+    const t = todo(ctx, "Remove the sample items from the price list", "The price list is filled with sample items so you could see how it works. Put your real stock on the board (or paste it in from a spreadsheet), then have us remove the samples: lead page → Remove sample items.", true).value;
+    if (t) out = out.replace("</main>", `${t}</main>`);
+  }
   // Photos taken from their old website go live only once the owner says they're theirs (not the builder's stock).
   const fromSite = [ctx.r.media.hero, ...ctx.r.media.gallery].some((p) => p?.source === "site");
   if (fromSite && !ctx.r.confirmed.includes("site_photos")) {

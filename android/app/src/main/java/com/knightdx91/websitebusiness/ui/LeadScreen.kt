@@ -79,6 +79,7 @@ import com.knightdx91.websitebusiness.net.extrasLink
 import com.knightdx91.websitebusiness.net.clientLink
 import com.knightdx91.websitebusiness.net.boardLink
 import com.knightdx91.websitebusiness.net.revokeClientLink
+import com.knightdx91.websitebusiness.net.sampleStock
 import com.knightdx91.websitebusiness.net.forgetSiteImport
 import com.knightdx91.websitebusiness.net.fill
 import com.knightdx91.websitebusiness.net.flyerLeft
@@ -634,6 +635,15 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                                     act("clientrevoke") { state.api.revokeClientLink(id); context.toast("Old links no longer work. Text them a new one.") }
                                 }
                             }, enabled = busy == null) { Text("Revoke old links") }
+                        }
+                        if (isOwner) {
+                            Text(if (detail.sampleStock) "🧪 Sample items are on the price list (preview only; publishing is blocked until they go)." else "Showing it to someone interested? Fill the preview's price page, board and tablet with made-up stock for their kind of business.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 8.dp))
+                            if (detail.sampleStock) OutlinedButton(onClick = {
+                                ask = Ask("Remove sample items", "Remove every sample item from the price list? Anything they typed themselves stays.", "Remove") {
+                                    act("samplestock") { state.api.sampleStock(id, add = false); context.toast("Sample items removed. The preview is rebuilding."); load() }
+                                }
+                            }, enabled = busy == null) { Text("Remove sample items") }
+                            else OutlinedButton(onClick = { act("samplestock") { val r = state.api.sampleStock(id, add = true); context.toast("${r.optInt("items")} sample items added. The preview is rebuilding."); load() } }, enabled = busy == null) { Text("🧪 Add sample items (preview only)") }
                         }
                         Text("A tablet beside a tank, case or shelf shows it live and lets staff update it (the 📺 link on each one in the board). Sell it as the Price list plan when they don't want a whole website.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 6.dp))
                     }

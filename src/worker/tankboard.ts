@@ -12,7 +12,12 @@ import type {
   MenuSection,
 } from "../generator/types.ts";
 import { escHtml } from "./page.ts";
-import { appIconSvg, homescreenHead, homescreenPrompt, webManifest } from "./homescreen.ts";
+import {
+  appIconSvg,
+  homescreenHead,
+  homescreenPrompt,
+  webManifest,
+} from "./homescreen.ts";
 import { renderPreview } from "./pipeline.ts";
 import { publishLead } from "./publish.ts";
 import {
@@ -164,6 +169,7 @@ export function pricesFeed(
             imageSrc: it.image?.src ?? null,
             info: it.info ?? null,
             barcode: it.barcode ?? "",
+            sample: !!it.sample,
           })),
       }))
       .filter((s) => all || s.items.length),
@@ -184,6 +190,7 @@ const ItemsBody = z.object({
               note: z.string().trim().max(200).optional(),
               qty: z.number().int().min(0).max(9999).nullable().optional(),
               barcode: z.string().trim().max(80).optional(),
+              sample: z.boolean().optional(),
               soldOut: z.boolean().optional(),
               /** The gallery file the item's photo is (kept across edits); "" clears. */
               imageSrc: z.string().max(200).nullable().optional(),
@@ -289,6 +296,7 @@ export function applyClientItems(
         it.barcode === undefined
           ? codeByName.get(it.name.toLowerCase())
           : normalizeCode(it.barcode) || undefined,
+      sample: it.sample || undefined,
     })),
   }));
   autoMatchPhotos(sections, record.media.gallery);
@@ -423,9 +431,17 @@ export async function serveTankBoard(
   }
   if (rest === "/manifest.webmanifest" && req.method === "GET") {
     const W = kindWords(record);
-    return webManifest({ name: `${record.name} · ${W.board}`, shortName: record.name.length <= 14 ? record.name : W.board, description: `What's in every ${W.section.toLowerCase()} at ${record.name}: prices, counts and photos, changed from your phone.`, startUrl: `${base}/`, scope: `${base}/`, iconUrl: `${base}/icon.svg` });
+    return webManifest({
+      name: `${record.name} · ${W.board}`,
+      shortName: record.name.length <= 14 ? record.name : W.board,
+      description: `What's in every ${W.section.toLowerCase()} at ${record.name}: prices, counts and photos, changed from your phone.`,
+      startUrl: `${base}/`,
+      scope: `${base}/`,
+      iconUrl: `${base}/icon.svg`,
+    });
   }
-  if (rest === "/icon.svg" && req.method === "GET") return appIconSvg(record.name);
+  if (rest === "/icon.svg" && req.method === "GET")
+    return appIconSvg(record.name);
   if (rest === "/lookup" && req.method === "GET") {
     // The board's Scan mode: what a code is (a row here, something from the catalog, or a product name from its UPC).
     if (!scanningOn(record))
@@ -568,6 +584,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 </style></head><body>
 <header><div><h1>${name} · ${escHtml(W.board)}</h1><div class="st" id="st">Loading…</div></div><a id="open" class="small" style="color:#fff" hidden target="_blank" rel="noopener">Open price page ↗</a></header>
 <div id="findbar" style="max-width:720px;margin:0 auto;padding:12px 12px 0" hidden><input id="find" type="search" placeholder="Find by name, barcode or ${escHtml(sec)}…" aria-label="Find" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit"><p class="small muted" id="findMsg" style="margin:4px 0 0"></p></div>
+<div id="sampleNote" class="small" style="max-width:720px;margin:12px auto 0;padding:10px 12px;background:#fff7e6;border:1px solid #f4b183;border-radius:12px" hidden>🧪 <b>Sample items.</b> We put made-up stock on your board so you can see how it works. Replace it with your own (type it, scan it, or paste a list below), then ask us to remove the samples.</div>
 <main id="m"><p class="empty">Loading your ${escHtml(sec)}s…</p></main>
 <section class="tank" id="importbox" style="max-width:720px;margin:0 auto 12px"><div class="tank__h"><span>⬆️</span><b>Put a whole list on at once</b></div><div style="padding:10px 12px" class="small">
 <p style="margin:0 0 8px">Have your stock in a spreadsheet or your register's export? Paste the cells here (open it in Excel or Google Sheets, select all, copy, paste) or pick the .csv file. A column for the name is all it needs; price, how many, barcode or SKU and ${escHtml(sec)} / category are used when you have them.</p>
@@ -594,20 +611,20 @@ function status(t,cls){st.textContent=t;st.className="st "+(cls||"")}
 function render(){
   if(!data.sections.length){m.innerHTML='<p class="empty">Nothing yet. Tap <b>+ Add a ${escHtml(sec)}</b> below, then add what\\'s in it.</p>';return}
   m.innerHTML=data.sections.map(function(s,si){return '<section class="tank" data-s="'+si+'"><div class="tank__h"><span>${W.emoji}</span><input value="'+esc(s.name)+'" data-f="sname" aria-label="Section name"><button class="ic" data-a="up" title="Move up">▲</button><button class="ic" data-a="down" title="Move down">▼</button><button class="ic" data-a="deltank" title="Remove this ${escHtml(sec)}">🗑</button><a class="ic" href="/d/'+LEAD+'/'+esc(s.slug||'')+'" target="_blank" rel="noopener" title="Show this ${escHtml(sec)} on a tablet or TV">📺</a></div>'+
-    s.items.map(function(it,ii){return '<div class="item'+(it.soldOut?' out':'')+'" data-i="'+ii+'"><label class="ph" title="Take or pick a photo">'+(it.image?'<img src="'+esc(it.image)+'" alt="">':'📷')+'<input type="file" accept="image/*" capture="environment" data-a="photo"></label><div>'+
+    s.items.map(function(it,ii){return '<div class="item'+(it.soldOut?' out':'')+'" data-i="'+ii+'"'+(it.sample?' title="Sample item"':'')+'>'<label class="ph" title="Take or pick a photo">'+(it.image?'<img src="'+esc(it.image)+'" alt="">':'📷')+'<input type="file" accept="image/*" capture="environment" data-a="photo"></label><div>'+
       '<div class="row"><input class="nm" value="'+esc(it.name)+'" data-f="name" placeholder="What is it?" aria-label="Name"><input class="pr" value="'+esc(it.price)+'" data-f="price" placeholder="$" inputmode="decimal" aria-label="Price"><input class="qt" value="'+(it.qty==null?"":it.qty)+'" data-f="qty" placeholder="how many" inputmode="numeric" aria-label="How many"></div>'+
-      '<div class="row"><input class="nt" value="'+esc(it.note)+'" data-f="note" placeholder="Note (${escHtml(NOTE_HINT[listKind(record)])}…)" aria-label="Note"></div>'+
+      (it.sample?'<div class="row"><span class="chip" style="background:#fff7e6;border-color:#f4b183">🧪 sample</span></div>':'')+'<div class="row"><input class="nt" value="'+esc(it.note)+'" data-f="note" placeholder="Note (${escHtml(NOTE_HINT[listKind(record)])}…)" aria-label="Note"></div>'+
       (SCAN?'<div class="row"><input class="bc" value="'+esc(it.barcode||"")+'" data-f="barcode" placeholder="Barcode (scan or type)" inputmode="numeric" aria-label="Barcode" style="flex:1 1 9em"><button class="ic" data-a="scan" type="button" title="Scan the barcode with the camera">▦</button></div>':'')+
       '<div class="row"><button class="chip'+(it.soldOut?' on':'')+'" data-a="sold" type="button">'+(it.soldOut?'Sold out · tap when back':'In stock · tap if sold out')+'</button><button class="ic" data-a="delitem" title="Remove">🗑</button></div></div></div>'}).join("")+
     '<button class="add" data-a="additem" type="button">+ Add to this ${escHtml(sec)}</button></section>'}).join("");
 }
-function collect(){return{sections:data.sections.map(function(s){return{name:s.name,note:s.note||"",items:s.items.map(function(it){return{name:it.name,price:it.price||"",note:it.note||"",qty:(it.qty===""||it.qty==null)?null:Number(it.qty),soldOut:!!it.soldOut,imageSrc:it.imageSrc||"",barcode:it.barcode||""}})}})}}
+function collect(){return{sections:data.sections.map(function(s){return{name:s.name,note:s.note||"",items:s.items.map(function(it){return{name:it.name,price:it.price||"",note:it.note||"",qty:(it.qty===""||it.qty==null)?null:Number(it.qty),soldOut:!!it.soldOut,imageSrc:it.imageSrc||"",barcode:it.barcode||"",sample:!!it.sample}})}})}}
 function save(now){clearTimeout(timer);status("Saving…");timer=setTimeout(function(){
   var body=collect();body.sections=body.sections.filter(function(s){return s.name.trim()});body.sections.forEach(function(s){s.items=s.items.filter(function(i){return i.name.trim()})});
   fetch(BASE+"/items",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error("Save failed ("+r.status+")");return r.json()}).then(function(j){
     var open=document.getElementById("open");if(j.siteUrl){open.href=j.siteUrl;open.hidden=false}
     status("Saved ✓ "+new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}),"saved")}).catch(function(e){status(e.message||"Couldn't save. Check your signal and try again.","err")})},now?0:700)}
-function load(){fetch(BASE+"/data",{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){data=j;var open=document.getElementById("open");if(j.siteUrl){open.href=j.siteUrl;open.hidden=false}render();status(j.updatedAt?"Last change "+j.updatedAt:"Ready");document.getElementById("nfcText").textContent=j.nfcText||"";document.getElementById("pinIn").placeholder=j.staffPinSet?"set (type a new one to change)":"not set"}).catch(function(){status("Couldn't load. Check your signal.","err")})}
+function load(){fetch(BASE+"/data",{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){data=j;document.getElementById("sampleNote").hidden=!j.sections.some(function(s){return s.items.some(function(i){return i.sample})});var open=document.getElementById("open");if(j.siteUrl){open.href=j.siteUrl;open.hidden=false}render();status(j.updatedAt?"Last change "+j.updatedAt:"Ready");document.getElementById("nfcText").textContent=j.nfcText||"";document.getElementById("pinIn").placeholder=j.staffPinSet?"set (type a new one to change)":"not set"}).catch(function(){status("Couldn't load. Check your signal.","err")})}
 document.getElementById("pinSave").addEventListener("click",function(){var v=document.getElementById("pinIn").value.trim();var msg=document.getElementById("staffMsg");fetch(BASE+"/staffpin",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({pin:v})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Failed");return j})}).then(function(j){msg.textContent=j.set?"PIN saved ✓":"PIN removed";document.getElementById("pinIn").value="";load()}).catch(function(e){msg.textContent=e.message})});
 document.getElementById("codeGo").addEventListener("click",function(){var v=document.getElementById("codeIn").value.replace(/\D/g,"");var msg=document.getElementById("staffMsg");fetch(BASE+"/unlock",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code:v})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Failed");return j})}).then(function(){msg.textContent="Tablet unlocked ✓";document.getElementById("codeIn").value=""}).catch(function(e){msg.textContent=e.message})});
 m.addEventListener("input",function(e){var t=e.target;var sec=t.closest("[data-s]");if(!sec)return;var s=data.sections[+sec.dataset.s];var f=t.dataset.f;if(!f)return;if(f==="sname"){s.name=t.value;save();return}var it=s.items[+t.closest("[data-i]").dataset.i];if(f==="qty"){it.qty=t.value.trim()===""?null:Math.max(0,parseInt(t.value,10)||0)}else it[f]=t.value;save()});

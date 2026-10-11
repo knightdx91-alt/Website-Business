@@ -133,7 +133,9 @@ export function pricesPage(ctx: Ctx): PageSpec | null {
   const call = action(r, "call")!;
   const shown = pl.sections.map((s) => ({ ...s, items: s.items.filter((it) => !it.soldOut && it.qty !== 0) })).filter((s) => s.items.length);
   const qtyNote = (it: { qty?: number }) => (it.qty !== undefined && it.qty > 0 && it.qty <= 5 ? `${it.qty} left` : "");
-  const body = html`<div id="prices-live"${ctx.liveData ? raw(` data-live="${ctx.liveData}"`) : ""}><nav class="menu-nav" aria-label="${title} sections">${shown.map((s) => html`<a href="#sec-${sectionSlug(s.name)}">${s.name}</a>`)}</nav>
+  const sample = pl.sections.some((s) => s.items.some((it) => it.sample));
+  const sampleNote = sample && ctx.mode === "preview" ? html`<p class="note" data-sample-note><strong>Sample items.</strong> This is how your live ${title.toLowerCase()} page works: these are made-up items for a business like yours. Your real stock replaces them on your board, from your phone, and the page follows within a minute.</p>` : "";
+  const body = html`${sampleNote}<div id="prices-live"${ctx.liveData ? raw(` data-live="${ctx.liveData}"`) : ""}><nav class="menu-nav" aria-label="${title} sections">${shown.map((s) => html`<a href="#sec-${sectionSlug(s.name)}">${s.name}</a>`)}</nav>
 ${shown.map(
     (s) => html`<section class="menu-sec" id="sec-${sectionSlug(s.name)}" aria-labelledby="sec-${sectionSlug(s.name)}-t"><h2 id="sec-${sectionSlug(s.name)}-t">${s.name}</h2>${s.note ? html`<p class="muted">${s.note}</p>` : ""}
 <ul class="menu-items">${s.items.map((it) => {

@@ -109,7 +109,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
           'Open the lead → the "📋 … board" card (named for the shop: Tank board, Parts board, Lot board, Stock board; it shows on every lead once the preview is ready).',
           'Tap "💬 Text them their … board link". Your messaging app opens with the link and a short note; send it. Callers can do this too.',
           'Or tap "Open it here" to show it on your own phone first. It\'s a good demo: add a tank, tap the camera, mark something sold out, then open the price page and watch it change.',
-          "Tell them: when the board offers \"Add <their shop> to your home screen\", tap Add; it then opens like an app with their name on the icon (iPhone: Share → Add to Home Screen; the board shows those words). Anyone with the link can edit, so they should only share it with staff.",
+          'Tell them: when the board offers "Add <their shop> to your home screen", tap Add; it then opens like an app with their name on the icon (iPhone: Share → Add to Home Screen; the board shows those words). Anyone with the link can edit, so they should only share it with staff.',
           'If the link gets out: "Revoke old links" (owner) kills every link sent so far. Text them a new one.',
         ],
       },
@@ -196,6 +196,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
         title: "Selling it",
         steps: [
           'The opener: "You change what\'s in these tanks every day. What if the price on the tank changed itself when you changed it on your phone?"',
+          'Fill it first: on the lead, "🧪 Add sample items (preview only)" (owner / full access) puts made-up stock for their kind of business (car parts, hardware, a bakery case, tanks of fish, a car lot) on the preview\'s price page, board and tablet display, so the prospect sees it full instead of empty. The page says they\'re samples; "Remove sample items" takes them out, and the site can\'t publish while any remain.',
           "Show, don't tell: open the board on your phone, add a fish, then scan the demo QR or open the price page. Under a minute, in front of them.",
           `Price it simply: ${listLine}. If they take a website plan, it's included.`,
           '"We don\'t need a website": fine, start with the board and the tags. Every month on it counts toward a website later, and the price page just becomes part of the site.',

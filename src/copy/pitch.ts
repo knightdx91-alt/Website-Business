@@ -187,9 +187,10 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
     const pl = r.ext.retail?.priceList;
     const W = kindWords(r);
     const sec = W.section.toLowerCase();
+    const sample = pl?.sections.some((s) => s.items.some((it) => it.sample));
     if (pl?.sections.length)
       f.push(
-        `a live ${(pl.title?.trim() || W.title).toLowerCase()} page by ${sec} with printable QR labels (a ${sec} label opens today's prices), a board they edit from their phone, and a tablet display with a staff station (counts, barcode scanning)`,
+        `a live ${(pl.title?.trim() || W.title).toLowerCase()} page by ${sec}${sample ? " (filled with SAMPLE items to show how it works; their real stock replaces them)" : ""} with printable QR labels (a ${sec} label opens today's prices), a board they edit from their phone, and a tablet display with a staff station (counts, barcode scanning)`,
       );
     else if (
       r.category === "retail" ||

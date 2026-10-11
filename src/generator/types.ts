@@ -116,6 +116,8 @@ export interface MenuItem {
   info?: ItemInfo;
   /** The product's barcode (UPC/EAN or the shop's own label), so the tablet's scanner finds it. */
   barcode?: string;
+  /** Put there by "Add sample items" to show a prospect how the price list works; removed in one tap, never published. */
+  sample?: boolean;
 }
 
 /** What a live price list holds: sets the words (tank / bench / case / shelf) and the care-card fields. See generator/pricelist.ts. */

@@ -54,6 +54,8 @@ data class LeadFull(
     val existingSiteLine: String? = null,
     /** "Tank board" / "Bench board" / "Case board" / "Stock board": the live price list's name for this business. */
     val boardName: String = "Stock board",
+    /** Sample items are on the price list (preview only; publishing is blocked until they go). */
+    val sampleStock: Boolean = false,
 ) {
     val lead get() = detail.lead
 
@@ -111,6 +113,7 @@ data class LeadFull(
                 website = j.str("website"),
                 siteImportError = j.optJSONObject("siteImport")?.str("error"),
                 boardName = j.optString("boardName").ifBlank { "Stock board" },
+                sampleStock = j.optBoolean("sampleStock"),
                 existingSiteLine = j.optJSONObject("existingSite")?.let { x ->
                     val host = runCatching { java.net.URI(x.optString("url")).host?.removePrefix("www.") }.getOrNull() ?: x.optString("url")
                     "Read from $host on ${x.optString("fetchedAt")}${if (x.optString("via") == "app") " (phone)" else ""}: ${x.optInt("images")} photos, ${x.optInt("paragraphs")} paragraphs"
@@ -185,6 +188,9 @@ suspend fun Api.extrasLink(id: String): String = postJson("/leads/$id/extraslink
 
 /** Tank board: the client's own live price-list editor (retail). Returns the link and a ready-to-send text. */
 suspend fun Api.clientLink(id: String): Pair<String, String> = postJson("/leads/$id/clientlink").let { it.optString("url") to it.optString("text") }
+
+/** Preview-only sample stock for a prospect (owner): add puts made-up items for their kind of business on the price list; remove takes exactly those out. */
+suspend fun Api.sampleStock(id: String, add: Boolean): JSONObject = if (add) postJson("/leads/$id/samplestock") else deleteJson("/leads/$id/samplestock")
 
 /** Every tank board link sent so far stops working; the next clientLink makes a fresh one. Owner only. */
 suspend fun Api.revokeClientLink(id: String) { deleteJson("/leads/$id/clientlink") }

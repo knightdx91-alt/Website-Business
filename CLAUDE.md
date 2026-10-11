@@ -569,6 +569,18 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
+- 🧪 Sample stock for previews (Oct 2026, `src/worker/sample-stock.ts`): when a prospect is interested in the inventory system,
+  the lead page's board card has "🧪 Add sample items (preview only)" (owner / full access; web + Android 2.39) = `POST
+  /api/leads/:id/samplestock` → `addSampleStock(record)`: believable made-up stock for their kind of business (`SETS`, picked by
+  `listKind` then a name / `typeLabel` / variant regex: parts, tires, vehicles, fish, plants, pets, bakery case, produce stand,
+  butcher, hardware, feed & seed, thrift / antique, boutique default), each item `MenuItem.sample: true`, appended after any real
+  sections (a clashing name gets "(sample)"), kind set when blank, preview rebuilt via `saveAndRefresh`. "Remove sample items" =
+  `DELETE` → `removeSampleStock` drops exactly the flagged items, empty sections and sample-only catalog names (a list left with
+  nothing disappears). `detail().sampleStock`; the board shows a 🧪 notice + chip and its saves keep the flag (`ItemsBody.sample`,
+  `applyClientItems`); the feed carries `sample`; the preview's /prices/ page shows a "Sample items." note (preview mode only) and
+  render.ts adds the REQUIRED to-do "Remove the sample items from the price list", so `buildSite` in publish mode throws
+  "Publish blocked" while any remain; the call guide says "(filled with SAMPLE items …)". Guide "Selling it" + training lesson say
+  to fill it before showing. `test/worker/sample-stock.test.ts`.
 - Add to home screen with the shop's name (Oct 2026, `src/worker/homescreen.ts`): the board serves a per-shop web app manifest at
   `/c/<token>/manifest.webmanifest` (name "<Shop> · <Board name>", short_name the shop name when ≤14 chars, start_url/scope the
   signed board folder, standalone, navy theme) and `/c/<token>/icon.svg` (`appIconSvg`: navy rounded square, gold initial; the brand

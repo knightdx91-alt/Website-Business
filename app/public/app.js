@@ -876,6 +876,7 @@
       ${ready ? `<section class="card"><h2>📋 ${esc(l.boardName || "Stock board")}</h2>
         <p class="muted small">Their own page for what's in each tank, case, bench or shelf: name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it. Set "What's on it" in Edit → Live price list.</p>
         <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their ${esc((l.boardName || "Stock board").toLowerCase())} link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the ${esc(l.boardName || "Stock board")} page</button>${owner ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
+        ${owner ? `<p class="small" style="margin-top:8px">${l.sampleStock ? `🧪 <strong>Sample items are on the price list</strong> (preview only; publishing is blocked until they go). ` : `Showing it to someone interested? Fill the preview's price page, board and tablet with made-up stock for their kind of business. `}<button class="btn btn--small" type="button" data-samplestock="${l.sampleStock ? "remove" : "add"}">${l.sampleStock ? "Remove sample items" : "🧪 Add sample items (preview only)"}</button></p>` : ""}
         <p class="muted small">A tablet beside a tank, case or shelf shows it live and lets staff update it (the 📺 link on each one in the board). Sell it as the <strong>Price list</strong> plan when they don't want a whole website.</p></section>` : ""}
       ${owner ? `<section class="card"><h2>More</h2><div class="btns">
         ${ready ? `<button class="btn btn--small" data-act="rewrite">Rewrite text with AI</button>` : ""}
@@ -2869,6 +2870,13 @@
       if (!confirm("Stop every board link sent so far? You'll text them a new one.")) return;
       rv.disabled = true;
       try { await api(`/leads/${l.id}/clientlink`, { method: "DELETE" }); toast("Old links no longer work. Text them a new one."); } catch (err) { toast(err.message); } finally { rv.disabled = false; }
+    });
+    const ss = $app.querySelector("[data-samplestock]");
+    if (ss) ss.addEventListener("click", async () => {
+      const add = ss.dataset.samplestock === "add";
+      if (!add && !confirm("Remove every sample item from the price list? Anything they typed themselves stays.")) return;
+      ss.disabled = true;
+      try { const r = await api(`/leads/${l.id}/samplestock`, { method: add ? "POST" : "DELETE" }); toast(add ? `${r.items} sample items added. The preview is rebuilding.` : "Sample items removed. The preview is rebuilding."); setTimeout(() => render(), 400); } catch (err) { toast(err.message); ss.disabled = false; }
     });
     const xb = $app.querySelector("[data-extraslink]");
     if (xb) xb.addEventListener("click", async () => {

@@ -69,10 +69,16 @@ import {
 import {
   clientLink,
   republishDirty,
+  saveAndRefresh,
   servePhoto,
   servePricesFeed,
   serveTankBoard,
 } from "./tankboard.ts";
+import {
+  addSampleStock,
+  hasSampleStock,
+  removeSampleStock,
+} from "./sample-stock.ts";
 import { serveDisplay, serveDisplayMeta, serveStation } from "./tablet.ts";
 import {
   addCaller,
@@ -513,6 +519,8 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
     /** The live price list's words for this business (Tank board / Bench board / Case board / Stock board). */
     boardName: record ? kindWords(record).board : "Stock board",
     listKind: record ? listKind(record) : null,
+    /** Sample items are on the price list (preview only; blocks publishing until removed). */
+    sampleStock: record ? hasSampleStock(record) : false,
     /** Their current website: the page our web check found, else the one Google links (never a social page). */
     website:
       l.found_url ||
@@ -2986,6 +2994,34 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       });
       return json({ url: link, text });
     }
+    if (action === "/samplestock" && (m === "POST" || m === "DELETE")) {
+      // Preview-only sample stock for a prospect: believable items for their kind of business, removable in one tap, never published.
+      const rec = lead.record_json
+        ? (JSON.parse(lead.record_json) as BusinessRecord)
+        : null;
+      if (!rec) throw new HttpError(409, "The preview isn't built yet");
+      if (m === "POST") {
+        const added = addSampleStock(rec);
+        await saveAndRefresh(env, lead, rec);
+        await notify(env, {
+          kind: "status",
+          actor: session,
+          leadId: lead.id,
+          text: `${session.name} put ${added.items} sample items on ${lead.name}'s price list (preview only)`,
+        });
+        return json({ ok: true, ...added, sampleStock: true });
+      }
+      const removed = removeSampleStock(rec);
+      await saveAndRefresh(env, lead, rec);
+      if (removed)
+        await notify(env, {
+          kind: "status",
+          actor: session,
+          leadId: lead.id,
+          text: `${session.name} removed the sample items from ${lead.name}'s price list`,
+        });
+      return json({ ok: true, removed, sampleStock: false });
+    }
     if (action === "/showboard" && m === "GET") {
       // Customer-facing "Show them the board" page (owner + callers): the pitch for this shop, the tablet view address.
       const live = !!lead.live_url;
@@ -3505,9 +3541,17 @@ async function handle(req: Request, env: Env): Promise<Response> {
         pricingUrl: "https://undergroundassociates.com/pricing#price-list",
       });
     }
-    const displayMeta = /^\/d\/([a-z0-9]+)\/(manifest\.webmanifest|icon\.svg)$/.exec(url.pathname);
+    const displayMeta =
+      /^\/d\/([a-z0-9]+)\/(manifest\.webmanifest|icon\.svg)$/.exec(
+        url.pathname,
+      );
     if (displayMeta && req.method === "GET")
-      return await serveDisplayMeta(env, displayMeta[1]!, displayMeta[2] === "icon.svg" ? "icon" : "manifest", url.searchParams.get("tank") ?? "");
+      return await serveDisplayMeta(
+        env,
+        displayMeta[1]!,
+        displayMeta[2] === "icon.svg" ? "icon" : "manifest",
+        url.searchParams.get("tank") ?? "",
+      );
     const display = /^\/d\/([a-z0-9]+)(?:\/([a-z0-9-]*))?$/.exec(url.pathname);
     if (display && req.method === "GET")
       return await serveDisplay(env, display[1]!, display[2] ?? "", url.origin);
