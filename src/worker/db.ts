@@ -406,3 +406,10 @@ export async function addUsage(env: Env, u: { places?: number; photos?: number; 
     .bind(today(), u.places ?? 0, u.photos ?? 0, u.aiIn ?? 0, u.aiOut ?? 0, u.costMicro ?? 0)
     .run();
 }
+
+/**
+ * The payment-test lead (place_id "paytest", made by hand): its sign-ups are always $1, start no plan subscription, and
+ * its Buy extras page offers only a $1 item, so Tap to Pay, the card sheet and refunds can be tried with a real card.
+ */
+export const PAYTEST_PLACE_ID = "paytest";
+export const isPayTest = (lead: { place_id?: string | null } | null | undefined): boolean => lead?.place_id === PAYTEST_PLACE_ID;

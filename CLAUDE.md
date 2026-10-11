@@ -583,8 +583,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `purchases`, monthly extras become their own subscription, reuses the Stripe customer). Checkout metadata kind
   signup/extras lets the webhook mark the exact sign-up or purchase paid. Without the key, everything still records the
   order and says "we'll send an invoice" (sign-up links fall back to the plan payment links). Pages that post to Stripe
-  allow form-action https://checkout.stripe.com in their CSP. Payment test: insert a lead with place_id 'paytest' and
-  sales_status 'sold'; its Buy extras page (open /api/leads/<id>/extraslink while logged in) offers only a $1 item.
+  allow form-action https://checkout.stripe.com in their CSP. Payment test lead (place_id 'paytest', `isPayTest()` in db.ts; one exists in the live
+  app as "Payment test (not a real business)", status ready / shown): every sign-up on it is $1 (`saveOrder` + both sign-up
+  paths), no Stripe Checkout (tap or the card sheet only), `activatePlan` starts no subscription and the note says TEST; its
+  Buy extras page (open /api/leads/<id>/extraslink while logged in) offers only a $1 item.
   Verified end to end in Oct 2026 (checkout → webhook → purchase marked paid → notification); refund it in Stripe after.
 - "Already a client? Add extras" (`/extras` on the company site, `extrasRequest` in company.ts): existing clients pick
   extras and leave business name, name and phone; `findClient` matches a sold/live lead by phone (10 digits) or

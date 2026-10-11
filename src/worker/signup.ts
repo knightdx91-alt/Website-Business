@@ -1,7 +1,7 @@
 import { notify } from "./notify.ts";
 import { shareToken, signupToken } from "./auth.ts";
 import { checkoutParams, createCheckout, dollars, INVOICE_BILLING, pickerHtml, picksFromForm, priceExtras, priceSignup, type Pick, type PricedOrder } from "./checkout.ts";
-import { addonPrice, billingOptions, defaultTerms, getLead, getSettings, GO_LIVE_TEXT, updateLead, type BillingOption, type LeadRow, type Plan } from "./db.ts";
+import { addonPrice, billingOptions, defaultTerms, getLead, getSettings, GO_LIVE_TEXT, isPayTest, updateLead, type BillingOption, type LeadRow, type Plan } from "./db.ts";
 import { HttpError, localDate, newId, now, type Env } from "./env.ts";
 import { escHtml, page } from "./page.ts";
 import { agreementToken, verifyAgreement } from "./auth.ts";
@@ -123,9 +123,13 @@ export async function saveOrder(
     successUrl: string;
     cancelUrl: string;
   },
-): Promise<{ signupId: string; agreementUrl: string; checkoutUrl: string | null; error?: string }> {
+): Promise<{ signupId: string; agreementUrl: string; checkoutUrl: string | null; dueCents: number; test: boolean; error?: string }> {
   const { plan, option } = o.order;
   const invoice = !!o.order.invoice;
+  // The payment-test lead: $1 due whatever was picked, and no Stripe Checkout (tap or the card sheet only).
+  const payTest = o.leadId !== "web" && isPayTest(await getLead(env, o.leadId));
+  if (payTest) o.order = { ...o.order, dueToday: 100 };
+  const dueCents = o.order.dueToday;
   const { payLink: _a, payLinkFlex: _b, payLinkAnnual: _c, payLinkShort: _d, ...rest } = plan!;
   const planSnapshot: SignedPlan = {
     ...rest,
@@ -148,7 +152,7 @@ export async function saveOrder(
     .run();
   const agreementUrl = `${new URL(o.successUrl).origin}/agreement/${await agreementToken(env, "s", signupId)}`;
   // Invoice orders are billed by hand (the owner sends a Stripe invoice); nothing is charged online.
-  if (!env.STRIPE_SECRET_KEY || invoice) return { signupId, agreementUrl, checkoutUrl: null };
+  if (!env.STRIPE_SECRET_KEY || invoice || payTest) return { signupId, agreementUrl, checkoutUrl: null, dueCents, test: payTest };
   const success = new URL(o.successUrl);
   success.searchParams.set("a", agreementUrl.split("/agreement/")[1]!);
   try {
@@ -157,10 +161,10 @@ export async function saveOrder(
       checkoutParams({ order: o.order, successUrl: success.toString(), cancelUrl: o.cancelUrl, clientReferenceId: o.leadId === "web" ? undefined : o.leadId, email: o.email, metadata: { kind: "signup", signupId, leadId: o.leadId } }),
     );
     await env.DB.prepare("UPDATE signups SET stripe_session = ? WHERE id = ?").bind(session.id, signupId).run();
-    return { signupId, agreementUrl, checkoutUrl: session.url };
+    return { signupId, agreementUrl, checkoutUrl: session.url, dueCents, test: payTest };
   } catch (err) {
     console.error("checkout failed", err);
-    return { signupId, agreementUrl, checkoutUrl: null, error: (err as Error).message };
+    return { signupId, agreementUrl, checkoutUrl: null, dueCents, test: payTest, error: (err as Error).message };
   }
 }
 
@@ -215,6 +219,7 @@ export async function serveSignup(env: Env, req: Request, leadId: string, planId
       if (!(err instanceof HttpError)) throw err;
       return page("Sign up", `<div class="wrap"><div class="card"><p>${escHtml(err.message)}. <a href="">Go back</a> and pick again${settings.companyPhone ? `, or call us at ${escHtml(settings.companyPhone)}` : ""}.</p></div></div>`, { brand, status: err.status });
     }
+    if (isPayTest(lead)) order = { ...order, dueToday: 100 };
     const terms = contractText(settings, order, { business, kind: "signup" });
     const sent = await env.DB.prepare("SELECT author FROM lead_notes WHERE lead_id = ? AND outcome = 'signup_sent' ORDER BY created_at DESC LIMIT 1").bind(leadId).first<{ author: string }>();
     const saved = await saveOrder(env, req, { leadId, order, picks, terms, name, signature: signed.signature, title, email, sentBy: sent?.author, source: "link", successUrl: `${here}?paid=1`, cancelUrl: `${here}?canceled=1` });
@@ -650,7 +655,8 @@ export async function appSignup(env: Env, req: Request, o: { lead: LeadRow; orig
   const invoice = input.billing === INVOICE_BILLING;
   if (invoice && !allowInvoice) throw new HttpError(400, "Paying by invoice isn't offered for this client");
   const picks = input.picks.filter((p, i, all) => p.index >= 0 && p.index < settings.addons.length && all.findIndex((x) => x.index === p.index) === i).map((p) => ({ index: p.index, qty: Math.min(20, Math.max(1, p.qty || 1)) }));
-  const order = priceSignup(settings, input.plan, input.billing, picks, { category: lead.category, invoice: allowInvoice });
+  let order = priceSignup(settings, input.plan, input.billing, picks, { category: lead.category, invoice: allowInvoice });
+  if (isPayTest(lead)) order = { ...order, dueToday: 100 };
   const terms = contractText(settings, order, { business, kind: "signup" });
   const here = `${o.origin}/a/${await signupToken(env, lead.id, input.plan)}`;
   const saved = await saveOrder(env, req, { leadId: lead.id, order, picks, terms, name: signed.name, signature: signed.signature, title: (input.title || "").trim().slice(0, 60), email: input.email.trim().slice(0, 120), sentBy: o.sentBy, source: "link", successUrl: `${here}?paid=1`, cancelUrl: `${here}?canceled=1` });
@@ -672,7 +678,7 @@ export async function appSignup(env: Env, req: Request, o: { lead: LeadRow; orig
     agreementPdf: `/api/agreements/s/${saved.signupId}.pdf`,
     agreementUrl: saved.agreementUrl,
     tapReady: o.tapReady && !order.invoice && order.dueToday >= 50,
-    cardReady: o.cardReady && !order.invoice && !!saved.checkoutUrl,
+    cardReady: o.cardReady && !order.invoice && (!!saved.checkoutUrl || saved.test),
     email: input.email.trim(),
     business,
     firstName: signed.name.split(" ")[0],

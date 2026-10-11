@@ -12,7 +12,7 @@
  */
 import { tapToken, verifyTap } from "./auth.ts";
 import { priceSignup, stripeForm, type Pick } from "./checkout.ts";
-import { getLead, getSetting, getSettings, setSetting, updateLead, type AppSettings } from "./db.ts";
+import { getLead, getSetting, getSettings, isPayTest, setSetting, updateLead, type AppSettings } from "./db.ts";
 import { HttpError, newId, now, type Env } from "./env.ts";
 import { notify } from "./notify.ts";
 import type { Session } from "./auth.ts";
@@ -322,7 +322,8 @@ async function activatePlan(
   const lead = await getLead(env, row.lead_id);
   const business = lead?.name ?? "the client";
   const settings = await getSettings(env);
-  const recurring = recurringLines(settings, row, lead?.category);
+  // The payment-test lead never starts a plan: the $1 is the whole test.
+  const recurring = isPayTest(lead) ? [] : recurringLines(settings, row, lead?.category);
   let subscription: string | null = row.stripe_subscription;
   let renewsOn: string | null = null;
   if (o.paymentMethod && o.customer && recurring.length && !subscription) {
@@ -347,7 +348,7 @@ async function activatePlan(
     .run();
   const renewText = subscription && recurring.length ? ` Renews ${recurring[0]!.interval === "year" ? "yearly" : "monthly"}${renewsOn ? ` from ${renewsOn}` : ""} on the same card.` : "";
   const cardText = o.paymentMethod ? "" : recurring.length ? " The card couldn't be saved for renewals (some phone wallets can't be): open their Stripe billing portal to add a card before the next payment." : "";
-  const note = `Paid ${money(o.paidCents)} ${o.how}${o.card ? ` (${o.card})` : ""}.${renewText}${cardText}`;
+  const note = `Paid ${money(o.paidCents)} ${o.how}${o.card ? ` (${o.card})` : ""}.${renewText}${cardText}${isPayTest(lead) ? " TEST payment: no plan was started. Refund it with ↩ Refund." : ""}`;
   if (lead) {
     await updateLead(env, row.lead_id, { follow_up: null });
     await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)").bind(newId(), row.lead_id, o.actorName, note, now()).run();
