@@ -737,10 +737,20 @@ function planCard(p: AppSettings["plans"][number], s: AppSettings, o: { full?: b
   const lines = p.includes.split(/\n/).map((x) => x.trim()).filter(Boolean);
   return `<div class="card plan${p.id === "plus" ? " plan--pick" : ""}">${p.id === "plus" ? `<p class="tag">Most popular</p>` : ""}<h3>${e(p.name)}</h3>
 <p class="price">${money(p.monthly)}<span>/month</span></p>
-<p class="plan__term">${e(term)}</p>${flex ? `<p class="plan__flex">${e(flex)}</p>` : ""}${o.full && yearly ? `<p class="plan__flex">${e(yearly)}</p>` : ""}
+<p class="plan__term">${e(term)}</p>${o.full && flex ? `<p class="plan__flex">${e(flex)}</p>` : ""}${o.full && yearly ? `<p class="plan__flex">${e(yearly)}</p>` : ""}
 <ul>${lines.map((x) => `<li>${e(x)}</li>`).join("")}</ul>
-<p class="plan__cta"><a class="btn btn--small" href="/start?plan=${p.id}">Start with ${e(p.name)}</a></p>
-<p class="small muted plan__see">Rather see your site first? <a href="/#contact">Free preview</a>.</p></div>`;
+<p class="plan__cta"><a class="btn btn--small" href="/start?plan=${p.id}">Start with ${e(p.name)}</a></p>${o.full ? `
+<p class="small muted plan__see">Rather see your site first? <a href="/#contact">Free preview</a>.</p>` : ""}</div>`;
+}
+
+/** Under the compact plan cards: the other ways to pay, said once instead of on every card. */
+function payNote(s: AppSettings): string {
+  const parts = [
+    s.flexSetup ? `Month to month: the same monthly price plus a one-time ${money(s.flexSetup)} setup fee, cancel any time.` : "",
+    s.annualMonthsFree ? `Pay yearly and get ${s.annualMonthsFree} months free.` : "",
+    `Rather see your site first? <a href="/#contact">Get the free preview</a> and decide after.`,
+  ].filter(Boolean);
+  return `<p class="paynote">${parts.join(" ")}</p>`;
 }
 
 function badgesHtml(s: AppSettings): string {
@@ -753,7 +763,10 @@ const UNIT_GROUP: Record<string, string> = { "one-time": "One-time set-ups", mon
 function extrasHtml(s: AppSettings, o: { compact?: boolean } = {}): string {
   if (!s.addons.length) return "";
   if (o.compact) {
-    return `<div class="xrow"><h3>Add-ons for any plan</h3><ul class="chips chips--x">${s.addons.map((a) => `<li><b>${e(a.name)}</b> <span>${e(addonPrice(a))}</span></li>`).join("")}</ul><p class="small muted">Details and contract terms for each are on the <a href="/pricing#extras">pricing page</a>. Already a client? <a href="/extras">Add extras here</a>.</p></div>`;
+    const priced = s.addons.filter((a) => a.price > 0);
+    const lowest = priced.length ? Math.min(...priced.map((a) => a.price)) : null;
+    const names = s.addons.slice(0, 3).map((a) => a.name.replace(/^"|"$/g, "").toLowerCase());
+    return `<p class="xline">${s.addons.length} add-ons for any plan${lowest ? `, from ${money(lowest)}` : ""}: ${e(names.join(", "))} and more. <a href="/pricing#extras">See all extras</a>.</p>`;
   }
   const groups = new Map<string, typeof s.addons>();
   for (const a of s.addons) groups.set(a.unit, [...(groups.get(a.unit) ?? []), a]);
@@ -856,6 +869,23 @@ function firstWeekHtml(): string {
   return `<div class="week"><h3>What happens after you say yes</h3><ol class="timeline">${t.map(([k, v]) => `<li><b>${e(k)}</b><span>${e(v)}</span></li>`).join("")}</ol></div>`;
 }
 
+/** Home: four example sites labelled by trade, then the other trades as one line. The ten-card grid read as clutter. */
+function workStrip(): string {
+  const featured: CategoryId[] = ["restaurant", "contractor", "salon", "auto"];
+  const label = (t: Trade) => t.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, "");
+  const cards = featured
+    .map((cat) => {
+      const t = tradeFor(cat);
+      const x = exampleFor(cat);
+      if (!t || !x) return "";
+      return `<li><a href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of ${e(x.record.name)}, an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"></a><span><strong>${e(x.record.name)}</strong><a href="/websites-for/${t.slug}">${e(x.kind)} · what's included →</a></span></li>`;
+    })
+    .join("");
+  const rest = TRADES.filter((t) => !featured.includes(t.cat));
+  return `<ul class="work">${cards}</ul>
+<p class="work__more"><span>Also built for</span> ${rest.map((t) => `<a href="/websites-for/${t.slug}">${e(label(t))}</a>`).join(", ")}.</p>`;
+}
+
 function tradeCards(): string {
   return `<ul class="trades">${TRADES.map((t) => {
     const x = exampleFor(t.cat);
@@ -893,20 +923,21 @@ ${heroExample ? `<div class="hero__visual"><div class="phone"><img src="/example
 <section class="sec" id="how"><div class="wrap">
 <h2>How it works</h2>
 ${stepsHtml()}
-${firstWeekHtml()}
+<p class="small muted" style="margin-top:16px">What happens after you say yes, week by week: <a href="/about#how">see how we work</a>.</p>
 </div></section>
 
 <section class="sec sec--alt" id="work"><div class="wrap">
 <h2>Built for your kind of business</h2>
-<p class="lead">Every trade gets the pages, buttons and forms that trade's customers actually use, and every business gets its own look. Tap yours.</p>
-${tradeCards()}
-<p class="small muted" style="margin-top:14px">${e(EXAMPLES_NOTE)} <a href="/portfolio">See the full portfolio</a> or <a href="/cullman-county">where we work</a>.</p>
+<p class="lead">Every trade gets the pages, buttons and forms its customers actually use, and every business gets its own look.</p>
+${workStrip()}
+<p class="small muted" style="margin-top:14px">${e(EXAMPLES_NOTE)} <a href="/portfolio">See all ${EXAMPLES.length} example sites</a>.</p>
 </div></section>
 
 ${plans.length ? `<section class="sec" id="plans"><div class="wrap">
 <h2>Simple monthly plans</h2>
 <p class="lead">One price covers the site, hosting, security and changes. ${(s.minMonths ?? 12) ? `No setup fee on ${commitText(s)} plans.` : "No setup fee."}</p>
 <div class="grid plans">${plans.map((p) => planCard(p, s)).join("")}</div>
+${payNote(s)}
 ${badgesHtml(s)}
 ${extrasHtml(s, { compact: true })}
 <p style="margin-top:18px"><a class="btn btn--line" href="/pricing">Full pricing, ways to pay and the fine print</a></p>
@@ -917,8 +948,8 @@ ${quotes.length > 1 ? `<section class="sec sec--alt"><div class="wrap"><h2>From 
 
 <section class="sec sec--alt" id="faq"><div class="wrap narrow">
 <h2>Questions</h2>
-${faqHtml(faq(s))}
-<p class="small muted" style="margin-top:14px">More on the <a href="/pricing#faq">pricing page</a> and <a href="/about">about us</a>.</p>
+${faqHtml(faq(s).slice(0, 5))}
+<p class="small muted" style="margin-top:14px">More answers on the <a href="/pricing#faq">pricing page</a> and <a href="/about">about us</a>.</p>
 </div></section>
 
 ${contactSection(s, { sent, missing })}`;
@@ -937,6 +968,7 @@ async function pricingPage(env: Env): Promise<Response> {
 ${s.plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap"><div class="grid plans">${s.plans.map((p) => planCard(p, s, { full: true })).join("")}</div>${badgesHtml(s)}
 ${waysToPayHtml(s)}
 <h3 class="xgroup">Leaving early</h3><p>${earlyCancelText(s)}</p>
+${firstWeekHtml()}
 ${s.churchAnnualMonthsFree ? `<p class="small muted">Churches and nonprofits: 12 months for the price of ${12 - s.churchAnnualMonthsFree} on a yearly plan, and we can invoice instead of taking a card.</p>` : ""}
 </div></section>` : ""}
 ${extrasHtml(s)}
@@ -965,7 +997,7 @@ async function aboutPage(env: Env): Promise<Response> {
   const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">About</p><h1>A Cullman company that builds your site before you pay.</h1>
 <p class="lead">We started ${name} because most local businesses around here don't have a website, and the ones that do paid too much for something nobody updates. So we flipped the order: we build it first, show it to you in person, and you only pay if you want it live.</p></div></section>
 ${ownerSection(s, ownerPhoto, { heading: "The owner" })}
-<section class="sec sec--alt"><div class="wrap"><h2>How we work</h2>${stepsHtml()}${firstWeekHtml()}</div></section>
+<section class="sec sec--alt" id="how"><div class="wrap"><h2>How we work</h2>${stepsHtml()}${firstWeekHtml()}</div></section>
 <section class="sec"><div class="wrap"><h2>What you can count on</h2><div class="grid">
 <div class="card"><h3>You see it first</h3><p>The preview is the real site, built for your business. No deposit, no card, no mockup that turns into something else.</p></div>
 <div class="card"><h3>You own your content</h3><p>Your name, logo, photos, text and domain are yours. Leave, and you get a copy of your pages within 30 days.</p></div>
@@ -996,7 +1028,7 @@ async function tradePage(env: Env, t: Trade): Promise<Response> {
 ${groups.length ? `<p class="small muted">Covers: ${e(groups.join(" · "))}.</p>` : ""}</div>
 ${x ? `<a class="trade__example" href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of ${e(x.record.name)}, an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>Example ${e(x.kind.toLowerCase())} site · tap to open</span></a>` : ""}
 </div></section>
-${s.plans.length ? `<section class="sec" id="plans"><div class="wrap"><h2>Plans</h2><p class="lead">${lowest ? `From ${money(lowest)} a month, ` : ""}hosting and changes included. ${(s.minMonths ?? 12) ? `No setup fee on ${commitText(s)} plans.` : ""}</p><div class="grid plans">${s.plans.map((p) => planCard(p, s)).join("")}</div><p style="margin-top:14px"><a href="/pricing">Full pricing, extras and ways to pay</a></p></div></section>` : ""}
+${s.plans.length ? `<section class="sec" id="plans"><div class="wrap"><h2>Plans</h2><p class="lead">${lowest ? `From ${money(lowest)} a month, ` : ""}hosting and changes included. ${(s.minMonths ?? 12) ? `No setup fee on ${commitText(s)} plans.` : ""}</p><div class="grid plans">${s.plans.map((p) => planCard(p, s)).join("")}</div>${payNote(s)}<p style="margin-top:14px"><a href="/pricing">Full pricing, extras and ways to pay</a></p></div></section>` : ""}
 <section class="sec sec--alt" id="faq"><div class="wrap narrow"><h2>Questions ${e(t.name.split(",")[0]!.replace(/ and .*/, ""))} ask</h2>${faqHtml(t.faq)}<p class="small muted" style="margin-top:14px">Other trades: ${TRADES.filter((o) => o.slug !== t.slug).map((o) => `<a href="/websites-for/${o.slug}">${e(o.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a>`).join(" · ")}.</p></div></section>
 ${contactSection(s)}`;
   return marketingPage(s, { path: `/websites-for/${t.slug}`, title, description, body, ld: pageLd(s, `/websites-for/${t.slug}`, title, description, [serviceLd]) });
@@ -1017,7 +1049,7 @@ async function countyPage(env: Env): Promise<Response> {
 <div class="card"><h3>Your towns, named</h3><p>Your site lists the towns you actually work in, in text Google can read, not a map image. That's what gets you found from the next town over.</p></div>
 <div class="card"><h3>We know the area</h3><p>Cullman time on the hours, county roads in the directions, the churches, trades and shops that make up Main Street. The copy reads like it was written here, because it was checked here.</p></div>
 </div></div></section>
-<section class="sec sec--alt"><div class="wrap"><h2>By trade</h2><ul class="chips">${TRADES.map((t) => `<li><a href="/websites-for/${t.slug}">${e(t.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a></li>`).join("")}</ul></div></section>
+<section class="sec sec--alt"><div class="wrap"><h2>What we build, by trade</h2><ul class="cols">${TRADES.map((t) => `<li><a href="/websites-for/${t.slug}">${e(t.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a></li>`).join("")}</ul></div></section>
 ${contactSection(s)}`;
   return marketingPage(s, { path: "/cullman-county", title, description, body, ld: pageLd(s, "/cullman-county", title, description) });
 }
@@ -1060,11 +1092,9 @@ async function portfolio(env: Env): Promise<Response> {
 }
 
 function footer(legal: string, s: AppSettings): string {
-  const towns = townList(s).slice(0, 6).join(", ");
-  return `<footer class="ftr"><div class="wrap ftr__grid">
-<div><p class="ftr__name">${e(legal)}</p><p>${e(MARKET_TOWN)}, Alabama${s.companyPhone ? ` · <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : ""}${s.companyEmail ? ` · <a href="mailto:${e(s.companyEmail)}">${e(s.companyEmail)}</a>` : ""}</p><p class="small">Serving ${e(towns)} and nearby.</p></div>
+  return `<footer class="ftr"><div class="wrap">
+<p class="ftr__name">${e(legal)} · ${MARKET_TOWN}, Alabama${s.companyPhone ? ` · <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : ""}${s.companyEmail ? ` · <a href="mailto:${e(s.companyEmail)}">${e(s.companyEmail)}</a>` : ""}</p>
 <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/portfolio">Our work</a><a href="/about">About</a><a href="/cullman-county">Where we work</a><a href="/extras">Clients: add extras</a><a href="/terms">Terms &amp; refunds</a><a href="/privacy">Privacy</a>${s.companyFacebookUrl ? `<a href="${e(s.companyFacebookUrl)}" rel="noopener">Facebook</a>` : ""}${s.companyReviewUrl ? `<a href="${e(s.companyReviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</nav>
-<nav aria-label="Websites by trade" class="ftr__trades">${TRADES.map((t) => `<a href="/websites-for/${t.slug}">${e(t.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a>`).join("")}</nav>
 <p class="small">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)}</p>
 </div></footer>`;
 }
@@ -1295,7 +1325,13 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .cmp th,.cmp td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;font-size:.95rem}.cmp thead th{background:var(--navy);color:#fff;font-size:.9rem}.cmp tbody th{font-weight:700;width:22%}.cmp__us{background:#fff7e6;font-weight:700}
 .examples__more{display:block;margin-top:6px;font-size:.88rem}
 .hdr__about{display:none}@media (min-width:760px){.hdr__about{display:inline}}
-.ftr__grid{display:grid;gap:14px}.ftr__name{font-weight:700;color:#fff;margin:0 0 4px}.ftr p{margin:0 0 4px}.ftr nav{display:flex;flex-wrap:wrap;gap:6px 16px}.ftr__trades a{font-size:.88rem;color:#aeb7c8}
 .chips a{color:var(--navy);text-decoration:none}.chips a:hover{text-decoration:underline}
 .sec--dark .btn{background:var(--gold)}
+.work{list-style:none;padding:0;margin:24px 0 0;display:grid;grid-template-columns:repeat(2,1fr);gap:18px}@media (min-width:760px){.work{grid-template-columns:repeat(4,1fr)}}
+.work img{display:block;width:100%;height:auto;aspect-ratio:1/1.4;object-fit:cover;object-position:top;border-radius:14px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(20,33,61,.1);background:#fff}
+.work span{display:block;margin-top:8px;font-size:.9rem}.work strong{display:block;color:var(--ink)}.work span a{color:var(--blue);text-decoration:none}.work span a:hover{text-decoration:underline}
+.work__more{margin:18px 0 0;color:var(--muted)}.work__more span{font-weight:700;color:var(--ink)}.work__more a{white-space:nowrap}
+.xline{margin:18px 0 0;color:var(--muted)}.paynote{margin:16px 0 0;color:var(--muted);font-size:.95rem}
+.cols{list-style:none;padding:0;margin:0;display:grid;gap:8px 24px;grid-template-columns:repeat(2,1fr)}@media (min-width:760px){.cols{grid-template-columns:repeat(3,1fr)}}.cols a{color:var(--navy);font-weight:700;text-decoration:none}.cols a:hover{text-decoration:underline}
+.ftr nav{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0}.ftr__name{color:#fff;margin:0}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}`;
