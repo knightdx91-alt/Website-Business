@@ -63,7 +63,7 @@ fun PlaybookScreen(state: AppState, nav: NavHostController) {
         try {
             content = AppContent.load(state.api)
             options = state.api.planOptions(null)
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { error = e.message ?: "Couldn't load" }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "Couldn't load" }
     }
 
     Scaffold(topBar = {

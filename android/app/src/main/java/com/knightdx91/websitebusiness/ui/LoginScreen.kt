@@ -90,7 +90,7 @@ fun LoginScreen(state: AppState, onDone: () -> Unit) {
                 error = "No Google account on this phone yet. Add your @${c.domain} account in Android Settings → Accounts, then try again."
             } catch (e: GetCredentialException) {
                 error = e.message ?: "Google sign-in failed"
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                 error = e.message ?: "Sign-in failed"
             } finally {
                 busy = false
@@ -107,7 +107,7 @@ fun LoginScreen(state: AppState, onDone: () -> Unit) {
                 state.api.prefs.token = token
                 val meta = state.api.meta()
                 finish(meta.meName, meta.meRole, meta.meId, token, "")
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                 state.api.prefs.signOut()
                 error = e.message ?: "Couldn't log in"
             } finally {

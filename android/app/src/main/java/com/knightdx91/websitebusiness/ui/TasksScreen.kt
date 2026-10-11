@@ -63,7 +63,7 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
         try {
             open = state.api.tasks("open")
             if (showDone) done = state.api.tasks("done")
-        } catch (e: com.knightdx91.websitebusiness.net.Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't load tasks") }
+        } catch (e: com.knightdx91.websitebusiness.net.Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't load tasks") }
     }
     LaunchedEffect(showDone) { load() }
 
@@ -76,7 +76,7 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
                 title = ""; notes = ""; due = null
                 load()
                 context.toast("Added")
-            } catch (e: Exception) { context.toast(e.message ?: "Couldn't add") } finally { busy = false }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't add") } finally { busy = false }
         }
     }
 

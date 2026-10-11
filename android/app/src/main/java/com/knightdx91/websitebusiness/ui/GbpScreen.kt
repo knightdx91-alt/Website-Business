@@ -145,7 +145,7 @@ fun GbpScreen(state: AppState, nav: NavHostController, leadId: String) {
             g = st
             notes = st.notes
             loadError = null
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { loadError = e.message ?: "Couldn't load the Google profile tools" } finally { loading = false }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { loadError = e.message ?: "Couldn't load the Google profile tools" } finally { loading = false }
     }
 
     /** Runs one call that answers with the new state and merges it in (keeps website / gbpEmail from the first GET). */
@@ -155,7 +155,7 @@ fun GbpScreen(state: AppState, nav: NavHostController, leadId: String) {
                 val res = call()
                 g = g?.merged(res) ?: GbpState.from(res)
                 after?.invoke()
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Something went wrong"); onError?.invoke() }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Something went wrong"); onError?.invoke() }
         }
     }
 
@@ -310,7 +310,7 @@ fun GbpScreen(state: AppState, nav: NavHostController, leadId: String) {
                         scope.launch {
                             try {
                                 reply = state.api.gbpWriteReply(leadId, text, stars, reviewer.trim().ifBlank { null })
-                            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't write a reply") } finally { busyReply = false }
+                            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't write a reply") } finally { busyReply = false }
                         }
                     }
                     Button(enabled = !busyReply, onClick = { writeReply() }, modifier = Modifier.padding(top = 6.dp)) { Text(if (busyReply) "Writing…" else if (reply != null) "Write another version" else "Write reply") }

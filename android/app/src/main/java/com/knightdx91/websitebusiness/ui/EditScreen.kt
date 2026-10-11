@@ -177,7 +177,7 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String) {
             }
             for (c in cs) if (!open.containsKey(c.id)) open[c.id] = !c.collapsed
             error = null
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { error = e.message }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message }
         loading = false
     }
     LaunchedEffect(id) { load(false) }
@@ -191,7 +191,7 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String) {
                 state.api.uploadPhoto(id, "photo", jpeg, w, h, photoAlt.ifBlank { name })
                 context.toast("Photo saved")
                 load(true)
-            } catch (e: Exception) { context.toast(e.message ?: "Upload failed") } finally { busy = null }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Upload failed") } finally { busy = null }
         }
     }
     val galleryPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
@@ -205,14 +205,14 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String) {
                 }
                 context.toast(if (uris.size == 1) "Photo added" else "${uris.size} photos added")
                 load(true)
-            } catch (e: Exception) { context.toast(e.message ?: "Upload failed") } finally { busy = null }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Upload failed") } finally { busy = null }
         }
     }
 
     fun act(label: String, block: suspend () -> Unit) {
         scope.launch {
             busy = label
-            try { block(); load(true) } catch (e: Exception) { context.toast(e.message ?: "That didn't work") } finally { busy = null }
+            try { block(); load(true) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "That didn't work") } finally { busy = null }
         }
     }
 
@@ -224,7 +224,7 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String) {
                 dirty = false
                 context.toast(if (warnings.isEmpty()) "Saved. Preview updated." else warnings.joinToString("\n"))
                 nav.popBackStack()
-            } catch (e: Exception) { context.toast(e.message ?: "Couldn't save") } finally { saving = false }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't save") } finally { saving = false }
         }
     }
 

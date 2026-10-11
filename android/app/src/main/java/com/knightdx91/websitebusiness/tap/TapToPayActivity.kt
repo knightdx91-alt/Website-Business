@@ -173,7 +173,7 @@ class TapToPayActivity : Activity() {
                         initTerminal()
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                 runOnUiThread { fail(e.message ?: getString(R.string.tapServerError), null, retryable = true) }
             }
         }
@@ -193,7 +193,7 @@ class TapToPayActivity : Activity() {
                             thread {
                                 try {
                                     callback.onSuccess(a.connectionToken())
-                                } catch (e: Exception) {
+                                } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                                     callback.onFailure(ConnectionTokenException(e.message ?: "Couldn't get a connection token", e))
                                 }
                             }
@@ -361,7 +361,7 @@ class TapToPayActivity : Activity() {
                     if (!saved) lines.add(getString(R.string.tapCardNotSaved))
                     done(getString(R.string.tapPaid, money(r.optLong("amountCents", pi.amount))), lines.joinToString("\n"))
                 }
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                 runOnUiThread {
                     // The card was charged; the Worker's webhook and daily check finish the bookkeeping even if this fails.
                     done(getString(R.string.tapPaid, money(pi.amount)), getString(R.string.tapReportFailed, e.message ?: ""))

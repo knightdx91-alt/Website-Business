@@ -79,7 +79,7 @@ fun WalkinScreen(state: AppState, nav: NavHostController, leadId: String?) {
             }
             content = AppContent.load(state.api)
             options = state.api.planOptions(leadId)
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { error = e.message ?: "Couldn't load the guide" }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "Couldn't load the guide" }
     }
 
     /** Every link made here goes in the call log by itself, like the web's share buttons. */
@@ -91,7 +91,7 @@ fun WalkinScreen(state: AppState, nav: NavHostController, leadId: String?) {
                 val url = state.api.shareLink(l.lead.id)
                 runCatching { state.api.logCall(l.lead.id, "link_sent", logNote, null) }
                 context.sms(l.lead.phone, body(url))
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't make the link") } finally { busy = false }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't make the link") } finally { busy = false }
         }
     }
 
@@ -104,7 +104,7 @@ fun WalkinScreen(state: AppState, nav: NavHostController, leadId: String?) {
                 runCatching { state.api.logCall(l.lead.id, "link_sent", "Copy message + link", null) }
                 context.copyText("Preview link", c.shareText.fill("greeting" to greetingFor(meta), "name" to l.name, "url" to url))
                 context.toast("Message with the preview link copied. Paste it anywhere.")
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't make the link") } finally { busy = false }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't make the link") } finally { busy = false }
         }
     }
 

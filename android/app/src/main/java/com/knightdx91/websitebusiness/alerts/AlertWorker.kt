@@ -55,7 +55,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             Result.success()
         } catch (e: Api.Unauthorized) {
             Result.success()
-        } catch (e: Exception) {
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
             Result.retry()
         }
     }

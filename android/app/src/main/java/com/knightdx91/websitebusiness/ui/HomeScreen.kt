@@ -87,7 +87,7 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
             state.unread = runCatching { state.api.unreadCount() }.getOrDefault(state.unread)
         } catch (e: com.knightdx91.websitebusiness.net.Api.Unauthorized) {
             state.signOut()
-        } catch (e: Exception) {
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
             error = e.message
         }
         loading = false

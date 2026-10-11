@@ -117,7 +117,7 @@ fun PdfScreen(state: AppState, nav: NavHostController, path: String, title: Stri
             pageCount = opened.second.pageCount
         } catch (e: Api.Unauthorized) {
             state.signOut()
-        } catch (e: Exception) {
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
             error = e.message ?: "Couldn't load the PDF"
         }
     }
@@ -258,7 +258,7 @@ private class PdfPrintAdapter(private val file: File, private val name: String, 
         try {
             FileInputStream(file).use { input -> FileOutputStream(destination.fileDescriptor).use { output -> input.copyTo(output) } }
             if (cancellationSignal?.isCanceled == true) callback?.onWriteCancelled() else callback?.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
-        } catch (e: Exception) {
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
             callback?.onWriteFailed(e.message)
         }
     }

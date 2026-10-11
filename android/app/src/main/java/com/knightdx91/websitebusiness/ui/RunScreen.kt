@@ -81,7 +81,7 @@ fun RunScreen(state: AppState, nav: NavHostController) {
                 state.api.startRun(picked.toList(), capN.coerceIn(1, 500), wider, badSites)
                 context.toast("Run started. It keeps going in the cloud.")
                 loadRuns()
-            } catch (e: Exception) { context.toast(e.message ?: "Couldn't start") } finally { busy = false }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't start") } finally { busy = false }
         }
     }
 

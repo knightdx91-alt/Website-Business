@@ -58,7 +58,7 @@ fun PitchScreen(state: AppState, nav: NavHostController, id: String) {
                 pitch = state.api.pitch(id, true)
             }
             status = ""
-        } catch (e: Exception) {
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
             status = e.message ?: "Couldn't load the call guide"
         }
     }

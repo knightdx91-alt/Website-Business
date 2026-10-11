@@ -98,7 +98,7 @@ fun AddBusinessScreen(state: AppState, nav: NavHostController) {
                 picks = r.mapIndexedNotNull { i, x -> x.category?.let { i to it } }.toMap()
                 phones = emptyMap()
                 searched = true
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Search failed") } finally { searching = false }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Search failed") } finally { searching = false }
         }
     }
 
@@ -113,7 +113,7 @@ fun AddBusinessScreen(state: AppState, nav: NavHostController) {
                 val res = state.api.addLead(x.placeId, category, typed)
                 context.toast(if (res.existed) "It's already in your leads" else "Added! Building the site now (about a minute).")
                 nav.navigate("lead/${res.id}")
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't add it") } finally { adding = null }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't add it") } finally { adding = null }
         }
     }
 

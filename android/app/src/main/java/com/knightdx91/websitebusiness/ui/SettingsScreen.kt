@@ -332,11 +332,11 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
             if (prevPlan !in planIds) prevPlan = if ("plus" in planIds) "plus" else planIds.firstOrNull() ?: "plus"
             callers = state.api.callers()
             usage = runCatching { state.api.usage() }.getOrNull()
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { loadError = e.message ?: "Couldn't load settings" }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { loadError = e.message ?: "Couldn't load settings" }
     }
 
     suspend fun reloadCallers() {
-        try { callers = state.api.callers() } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't load the team") }
+        try { callers = state.api.callers() } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't load the team") }
     }
 
     LaunchedEffect(Unit) {
@@ -356,7 +356,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                 updateMsg = "Downloading ${u.versionName}…"
                 Updater.downloadAndInstall(context, state.api, u) { p -> progress = p }
                 updateMsg = "Android will ask you to install it."
-            } catch (e: Exception) { updateMsg = e.message ?: "Update failed" } finally { progress = null }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { updateMsg = e.message ?: "Update failed" } finally { progress = null }
         }
     }
 
@@ -373,13 +373,13 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                 context.toast("Saved")
                 state.refreshMeta()
                 loadOwner()
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't save") } finally { saving = false }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't save") } finally { saving = false }
         }
     }
 
     fun callerAction(block: suspend () -> Unit) {
         scope.launch {
-            try { block(); reloadCallers() } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't change that") }
+            try { block(); reloadCallers() } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't change that") }
         }
     }
 
@@ -390,7 +390,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
             try {
                 val r = state.api.mailTest()
                 mailOut = if (r.ok) "Sent to ${r.to ?: ""} through ${if (r.provider == "resend") "Resend" else "MailerSend"}. Check your inbox (and spam) in a minute." else "Failed: ${r.error ?: "unknown error"}"
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { mailOut = e.message ?: "Couldn't send" } finally { mailBusy = false }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { mailOut = e.message ?: "Couldn't send" } finally { mailBusy = false }
         }
     }
 
@@ -406,7 +406,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                 .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
             (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
             context.toast("Downloading $name to Downloads")
-        } catch (e: Exception) { context.toast("Couldn't start the download. Try “Share backup” instead.") }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast("Couldn't start the download. Try “Share backup” instead.") }
     }
 
     fun shareBackup() {
@@ -421,7 +421,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                 val uri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.files", file)
                 val send = Intent(Intent.ACTION_SEND).setType("application/json").putExtra(Intent.EXTRA_STREAM, uri).putExtra(Intent.EXTRA_SUBJECT, file.name).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 context.startActivity(Intent.createChooser(send, "Save the backup").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't fetch the backup") } finally { backupBusy = false }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't fetch the backup") } finally { backupBusy = false }
         }
     }
 
@@ -523,7 +523,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                         t.ready -> Text("Ready · ${t.address ?: ""}", color = Good, modifier = Modifier.padding(top = 6.dp))
                         else -> {
                             Text("Not ready: ${t.why ?: "Stripe isn't connected."}", modifier = Modifier.padding(top = 6.dp))
-                            if (meta?.checkoutOnline == true) Button(onClick = { scope.launch { try { state.api.tapSetup(); tap = state.api.tapStatus(); state.refreshMeta(); context.toast("Tap to Pay is set up") } catch (e: Exception) { context.toast(e.message ?: "Couldn't set up") } } }, modifier = Modifier.padding(top = 6.dp)) { Text("Set up Tap to Pay") }
+                            if (meta?.checkoutOnline == true) Button(onClick = { scope.launch { try { state.api.tapSetup(); tap = state.api.tapStatus(); state.refreshMeta(); context.toast("Tap to Pay is set up") } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't set up") } } }, modifier = Modifier.padding(top = 6.dp)) { Text("Set up Tap to Pay") }
                         }
                     }
                     Text("Needs NFC and Location on, Developer options off, Android 13+. Fees 2.7% + 5¢ + 10¢ per tap; renewals on the saved card are online charges.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))

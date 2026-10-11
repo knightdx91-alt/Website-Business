@@ -228,7 +228,7 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
             business = d.lead.name
             if (o.plans.none { it.id == plan }) plan = (o.plans.firstOrNull { it.id == "plus" } ?: o.plans.firstOrNull())?.id ?: ""
             options = o
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { error = e.message ?: "Couldn't load the plans" }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "Couldn't load the plans" }
     }
 
     val pickList = picks.entries.sortedBy { it.key }.map { ExtraPick(it.key, it.value.coerceIn(1, MAX_QTY)) }
@@ -262,7 +262,7 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
                 val r = state.api.createSignup(leadId, p.id, billing, pickList, business.trim(), cleanName(name), title.trim(), email.trim(), sig)
                 signed = r
                 agreementOpen = false
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't save the sign-up") } finally { signing = false }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't save the sign-up") } finally { signing = false }
         }
     }
 
@@ -274,7 +274,7 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
             val paid = state.api.lead(leadId).signups.firstOrNull { it.id == s.signupId }?.paid == true
             if (paid) { paidText = "✅ Paid. The receipt goes to ${email.trim()}."; payNote = null }
             paid
-        } catch (e: Api.Unauthorized) { state.signOut(); false } catch (e: Exception) { false }
+        } catch (e: Api.Unauthorized) { state.signOut(); false } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { false }
     }
 
     fun tap() {
@@ -288,7 +288,7 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
                 tapUntil = System.currentTimeMillis() + 10 * 60_000L
                 payNote = "Tap the card on the back of the phone. This screen updates when it's paid."
                 context.startActivity(TapToPayActivity.intent(context, r.getString("token"), state.api.origin))
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { payNote = e.message ?: "Couldn't start the payment" } finally { payBusy = false }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { payNote = e.message ?: "Couldn't start the payment" } finally { payBusy = false }
         }
     }
     // Poll while a tap is in flight (up to 10 minutes) and once more whenever the screen comes back.
@@ -323,7 +323,7 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
                                     append(".")
                                 }
                                 if (d.ok) { paidText = line; payNote = null } else payNote = line
-                            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) {
+                            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                                 payNote = e.message ?: "The card was saved but the charge didn't finish; check the lead page."
                             } finally { payBusy = false }
                         }
@@ -345,7 +345,7 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
                 paySecret = p.clientSecret
                 payNote = null
                 paymentSheet.presentWithSetupIntent(p.clientSecret, PaymentSheet.Configuration.Builder(company).allowsDelayedPaymentMethods(false).build())
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { payNote = e.message ?: "Couldn't open the card form" } finally { payBusy = false }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { payNote = e.message ?: "Couldn't open the card form" } finally { payBusy = false }
         }
     }
 
@@ -584,7 +584,7 @@ private fun AgreementDialog(
     LaunchedEffect(key) {
         doc = null
         error = null
-        try { doc = state.api.contractJson(leadId, plan, billing, picks) } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { error = e.message ?: "Couldn't load the agreement" }
+        try { doc = state.api.contractJson(leadId, plan, billing, picks) } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "Couldn't load the agreement" }
     }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

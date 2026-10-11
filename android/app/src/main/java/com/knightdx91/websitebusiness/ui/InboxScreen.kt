@@ -64,7 +64,7 @@ fun InboxScreen(state: AppState, nav: NavHostController) {
         try {
             items = state.api.inbox()
             loaded = true
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't load the inbox") } finally { loading = false }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't load the inbox") } finally { loading = false }
     }
     LaunchedEffect(isOwner) { load() }
 
@@ -73,7 +73,7 @@ fun InboxScreen(state: AppState, nav: NavHostController) {
             try {
                 state.api.inboxMarkRead(item.id)
                 load()
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't mark it read") }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't mark it read") }
         }
     }
 

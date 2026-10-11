@@ -142,7 +142,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
     suspend fun load() {
-        try { d = state.api.leadFull(id); error = null } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { error = e.message }
+        try { d = state.api.leadFull(id); error = null } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message }
     }
     LaunchedEffect(id) { load() }
     LifecycleResumeEffect(id) { scope.launch { load() }; onPauseOrDispose {} }
@@ -155,8 +155,8 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
     val liveOwner = isOwner && d?.lead?.salesStatus == "live"
     LaunchedEffect(liveOwner) {
         if (!liveOwner) return@LaunchedEffect
-        try { stats = state.api.siteStats(id); statsError = null } catch (e: Exception) { statsError = e.message ?: "Couldn't load the visits" }
-        try { dom = state.api.domain(id); domError = null } catch (e: Exception) { domError = e.message ?: "Couldn't check the domain" }
+        try { stats = state.api.siteStats(id); statsError = null } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { statsError = e.message ?: "Couldn't load the visits" }
+        try { dom = state.api.domain(id); domError = null } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { domError = e.message ?: "Couldn't check the domain" }
     }
 
     suspend fun content(): Content = AppContent.load(state.api)
@@ -167,7 +167,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
         if (busy != null) return
         busy = key
         scope.launch {
-            try { block() } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Something went wrong") } finally { busy = null }
+            try { block() } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Something went wrong") } finally { busy = null }
         }
     }
 
@@ -794,7 +794,7 @@ private fun RefundDialog(state: AppState, signupId: String, onDone: () -> Unit, 
             chargeId = first?.id
             amount = first?.let { String.format(java.util.Locale.US, "%.2f", it.refundableCents / 100.0) } ?: ""
             cancelPlan = r.subscriptionId != null
-        } catch (e: Exception) { error = e.message ?: "Couldn't load the payments" }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "Couldn't load the payments" }
     }
 
     val cents = ((amount.toDoubleOrNull() ?: 0.0) * 100).toLong()
@@ -848,7 +848,7 @@ private fun RefundDialog(state: AppState, signupId: String, onDone: () -> Unit, 
                             val msg = state.api.refund(signupId, c.id, cents, cancelPlan, reason.trim())
                             context.toast(msg.ifBlank { "Refunded" })
                             onDone()
-                        } catch (e: Exception) { context.toast(e.message ?: "Refund failed") } finally { working = false }
+                        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Refund failed") } finally { working = false }
                     }
                 },
                 enabled = !working && charge != null && cents in 1..(charge?.refundableCents ?: 0),

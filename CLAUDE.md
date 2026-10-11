@@ -184,6 +184,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   /api/signups/:id/refund {chargeId, amountCents, cancelPlan, reason}` (`refundSignup`: Stripe refund, optional subscription
   delete, sign-up unpaid on a full refund with the plan ended, call-log note, alert). The dialog restates the agreement's refund
   rules. Card-sheet payments now also store `stripe_payment_intent`.
+- Android 2.8 (Oct 2026): every `catch (e: Exception)` in the app is preceded by `catch (e: kotlinx.coroutines.CancellationException)
+  { throw e }`. Leaving a screen (or switching a Home tab) while it loads cancels the coroutine; before this the cancellation was shown
+  as the error "The coroutine scope left the composition". Keep the pair when adding new catch-alls.
 - App name (Oct 2026, 2.7): the app is called **Underground Associates** everywhere (Android `appName`, login screen, web `<title>`,
   top bar "Underground Associates" / "UA", manifest name + short_name "Underground", push titles). Android alerts use the UA seal as
   the status-bar icon (`res/drawable/ic_notification.xml`: ring + UA + bar as a white silhouette, same paths as the launcher

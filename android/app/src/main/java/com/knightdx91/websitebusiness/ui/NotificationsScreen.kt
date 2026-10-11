@@ -49,7 +49,7 @@ fun NotificationsScreen(state: AppState, nav: NavHostController) {
             state.api.notificationsSeen()
             state.unread = 0
             state.api.prefs.lastAlertAt = maxOf(state.api.prefs.lastAlertAt, n.items.maxOfOrNull { it.at } ?: 0L)
-        } catch (e: com.knightdx91.websitebusiness.net.Api.Unauthorized) { state.signOut() } catch (e: Exception) { error = e.message }
+        } catch (e: com.knightdx91.websitebusiness.net.Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message }
     }
     LaunchedEffect(Unit) { load() }
 

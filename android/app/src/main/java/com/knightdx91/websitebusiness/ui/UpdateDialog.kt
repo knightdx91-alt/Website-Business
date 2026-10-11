@@ -43,7 +43,7 @@ fun UpdateDialog(api: Api, update: Updater.Check, onDone: () -> Unit) {
                 Updater.downloadAndInstall(context, api, update) { p -> progress = p }
                 message = "Android will ask you to install it."
                 onDone()
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                 message = e.message ?: "Update failed"
             } finally {
                 progress = null

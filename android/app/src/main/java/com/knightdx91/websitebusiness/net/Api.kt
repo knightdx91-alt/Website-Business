@@ -47,7 +47,7 @@ class Api(context: Context) {
             val cookies = conn.headerFields.entries.firstOrNull { it.key?.equals("set-cookie", true) == true }?.value ?: emptyList()
             if (status == 401 && auth) throw Unauthorized()
             if (status >= 400) {
-                val msg = try { JSONObject(text).optString("error", "") } catch (e: Exception) { "" }
+                val msg = try { JSONObject(text).optString("error", "") } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { "" }
                 throw ApiException(msg.ifBlank { "Server error $status" }, status)
             }
             Response(text, cookies)

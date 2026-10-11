@@ -88,7 +88,7 @@ fun ShowPlansScreen(state: AppState, nav: NavHostController, leadId: String?) {
             content = AppContent.load(state.api)
             if (leadId != null) business = runCatching { state.api.lead(leadId).lead.name }.getOrDefault("")
             options = state.api.planOptions(leadId)
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { error = e.message ?: "Couldn't load the plans" }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "Couldn't load the plans" }
     }
 
     // "Choose <plan>" opens the native sign-up screen, which makes the lead's sign-up link and lets them sign and pay here.

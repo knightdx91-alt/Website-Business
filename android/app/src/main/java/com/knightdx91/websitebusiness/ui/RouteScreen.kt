@@ -106,7 +106,7 @@ fun RouteScreen(state: AppState, nav: NavHostController) {
                 val l = r.lead
                 l.lat != null && l.lng != null && l.ready && (l.salesStatus == "new" || l.salesStatus == "shown")
             }
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't load leads") } finally { loading = false }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't load leads") } finally { loading = false }
     }
 
     fun locate() {

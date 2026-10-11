@@ -69,7 +69,7 @@ fun SalesScreen(state: AppState, nav: NavHostController) {
         loading = true
         try {
             d = state.api.sales()
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "Couldn't load sales") } finally { loading = false }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't load sales") } finally { loading = false }
     }
     LaunchedEffect(isOwner) { load() }
 
@@ -78,7 +78,7 @@ fun SalesScreen(state: AppState, nav: NavHostController) {
         scope.launch {
             try {
                 context.openUrl(state.api.portalUrl(leadId))
-            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: Exception) { context.toast(e.message ?: "No Stripe customer on file for this client yet.") } finally { portalBusy = null }
+            } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "No Stripe customer on file for this client yet.") } finally { portalBusy = null }
         }
     }
 

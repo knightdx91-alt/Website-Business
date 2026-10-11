@@ -38,7 +38,7 @@ class TapApi(private val origin: String, private val token: String) {
             val status = conn.responseCode
             val stream = if (status < 400) conn.inputStream else conn.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-            val json = try { JSONObject(text) } catch (e: Exception) { JSONObject() }
+            val json = try { JSONObject(text) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { JSONObject() }
             if (status >= 400) throw ApiException(json.optString("error", "Server error $status"), status)
             return json
         } finally {

@@ -94,7 +94,7 @@ class AppState(val api: Api) {
             unread = runCatching { api.unreadCount() }.getOrDefault(unread)
         } catch (e: Api.Unauthorized) {
             signOut()
-        } catch (e: Exception) {
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
             // Offline: keep what we had.
         }
     }

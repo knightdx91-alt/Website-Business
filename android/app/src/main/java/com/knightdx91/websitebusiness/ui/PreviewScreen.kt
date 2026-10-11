@@ -77,7 +77,7 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
                     (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Preview link", msg))
                     context.toast("Message with the preview link copied")
                 } else context.sms(detail?.lead?.phone, msg)
-            } catch (e: Exception) { context.toast(e.message ?: "Couldn't make the link") }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't make the link") }
         }
     }
 
