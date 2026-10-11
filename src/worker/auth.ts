@@ -244,6 +244,17 @@ export async function verifyShare(env: Env, leadId: string, exp: string, sig: st
   return safeEqual(sig, await hmac(env.APP_SECRET, `share.${leadId}.${exp}`));
 }
 
+/** "Show them the Tank board" page texted to a shop: `/b/<leadId>.<exp>.<sig>`, 30 days. */
+export async function boardPitchToken(env: Env, leadId: string, days = 30): Promise<string> {
+  const exp = Date.now() + days * 86_400_000;
+  return `${leadId}.${exp}.${await hmac(env.APP_SECRET, `board.${leadId}.${exp}`)}`;
+}
+
+export async function verifyBoardPitch(env: Env, leadId: string, exp: string, sig: string): Promise<boolean> {
+  if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
+  return safeEqual(sig, await hmac(env.APP_SECRET, `board.${leadId}.${exp}`));
+}
+
 /** Sign-up link for one business and plan. Expires; rotating APP_SECRET revokes every link. */
 export async function signupToken(env: Env, leadId: string, planId: string, days = 30): Promise<string> {
   const exp = Date.now() + days * 86_400_000;

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_ADDONS, DEFAULT_LIST_PLAN, type AppSettings } from "../../src/worker/db.ts";
-import { customerBoardPitch, displayGuide, guideById, priceTagsGuide, tankBoardGuide } from "../../src/worker/guides.ts";
+import { customerBoardPitch, customerPitchPage, displayGuide, guideById, priceTagsGuide, tankBoardGuide } from "../../src/worker/guides.ts";
 
 const settings = (over: Partial<AppSettings> = {}) => ({ plans: [{ id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "" }, DEFAULT_LIST_PLAN], addons: DEFAULT_ADDONS, companyName: "Underground Associates", ...over }) as unknown as AppSettings;
 
-test("the Tank board guide covers setup, the board, QR tags, the tablet and selling, with prices from Settings", () => {
+test("the Tank board guide covers setup, the board, QR tags, the tablet and selling, with prices from Settings", async () => {
   const g = tankBoardGuide(settings());
   assert.ok(g.sections.length >= 9);
   const titles = g.sections.map((s) => s.title.toLowerCase());
@@ -34,6 +34,12 @@ test("the Tank board guide covers setup, the board, QR tags, the tablet and sell
   assert.match(pitch.price[1]!, /from \$89 a month/);
   assert.match(pitch.fine, /isn't live yet/);
   assert.match(customerBoardPitch(settings(), { business: "X", live: true }).fine, /live now/);
+  assert.match(pitch.sections[1]!.steps[0]!, /tap "\+ Add to this tank" under that tank, and fill in the two boxes/);
+  const html = await customerPitchPage(pitch, { business: "King Fish Aquatics", company: "Underground Associates", phone: "(256) 555-0100", boardUrl: "https://app.test/c/x.sig/", displayUrl: "https://app.test/d/x/", pricingUrl: "https://undergroundassociates.com/pricing#price-list" }).text();
+  assert.match(html, /King Fish Aquatics changes what/);
+  assert.match(html, /href="https:\/\/app.test\/c\/x.sig\/"/);
+  assert.match(html, /sms:\+12565550100/);
+  assert.match(html, /name="robots" content="noindex/);
   const noList = tankBoardGuide(settings({ plans: [{ id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "" }] }));
   assert.match(JSON.stringify(noList), /turn it on in Settings/);
 });

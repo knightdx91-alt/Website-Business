@@ -340,7 +340,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   "Show them the plans" on retail leads (owner + callers). `GET /api/leads/:id/showboard` = `customerBoardPitch(s, {business,
   live})` in guides.ts (How it works / What you do / What your customers get / What <company> does, price lines from Settings,
   a live-or-not closing line) + `displayUrl`. Buttons: "Try the board on this phone" (POST /clientlink → opens it), "See the
-  tablet view" (`/d/<id>/`), "See the plans".
+  tablet view" (`/d/<id>/`), "See the plans", and "💬 Text them this page" (also on the lead's Tank board card, Android 2.32):
+  `POST /api/leads/:id/boardlink` (owner + callers) → `/b/<leadId>.<exp>.<hmac>` (`boardPitchToken` / `verifyBoardPitch` in
+  auth.ts, 30 days, 410 after) = `customerPitchPage()`: the same words as a public, noindex page with "Open your Tank board"
+  (their `clientLink`, made on first use), the tablet view, undergroundassociates.com/pricing#price-list and "Text us a question".
 - 🎓 Training (Oct 2026, `src/worker/training.ts`, migration 0017 `training_done`; web `#/training` `viewTraining`, Android
   `ui/TrainingScreen.kt`, 2.10): an in-app course for owner and callers, Home → "🎓 Training" (also Settings). 10 lessons (what
   we sell, where leads come from, before you call, showing the preview, logging calls, signing up, taking payment, finish &

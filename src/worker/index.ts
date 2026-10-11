@@ -18,10 +18,10 @@ import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/cl
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
-import { customerBoardPitch, guideById } from "./guides.ts";
+import { customerBoardPitch, customerPitchPage, guideById } from "./guides.ts";
 import { LAST_ANNOUNCE_KEY, TICK_KEY, announceUpdate, fcmClientConfig, serviceAccount, serviceAccountProblem } from "./fcm.ts";
 import { clientLink, republishDirty, serveDisplay, servePhoto, servePricesFeed, serveTankBoard } from "./tankboard.ts";
-import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
+import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session, boardPitchToken, verifyBoardPitch } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf, priceTagsPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
@@ -886,7 +886,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const action = leadMatch[2] ?? "";
     const sub = leadMatch[3];
     const lead: LeadRow = await requireLead(env, id);
-    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/signups", "/flyer", "/extraslink", "/contact"].includes(action) || (action === "/clientlink" && m === "POST") || (action === "/showboard" && m === "GET") || (action === "/flyer.pdf" && m === "GET");
+    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/signups", "/flyer", "/extraslink", "/contact"].includes(action) || (action === "/clientlink" && m === "POST") || (action === "/showboard" && m === "GET") || (action === "/boardlink" && m === "POST") || (action === "/flyer.pdf" && m === "GET");
     if (!callerSafe) ownerOnly();
 
     if (action === "" && m === "GET") {
@@ -1386,7 +1386,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       // Customer-facing "Show them the Tank board" page (owner + callers): the pitch for this shop, the tablet view address.
       if (lead.category !== "retail") throw new HttpError(409, "The tank board is for shops with a price list");
       const live = !!lead.live_url;
-      return json({ ...customerBoardPitch(await getSettings(env), { business: lead.name ?? "", live }), displayUrl: `${url.origin}/d/${lead.id}/`, live });
+      return json({ ...customerBoardPitch(await getSettings(env), { business: lead.name ?? "", live }), displayUrl: `${url.origin}/d/${lead.id}/`, live, phone: lead.phone });
+    }
+    if (action === "/boardlink" && m === "POST") {
+      // Text the shop the customer-facing Tank board page (public, signed, 30 days).
+      if (lead.category !== "retail") throw new HttpError(409, "The tank board is for shops with a price list");
+      const link = `${url.origin}/b/${await boardPitchToken(env, lead.id)}`;
+      const text = `Hi! Here's how the Tank board would work for ${lead.name}: what you'd do, what your customers see, and what it costs. ${link}`;
+      await notify(env, { kind: "status", actor: session, leadId: lead.id, text: `${session.name} sent ${lead.name} the Tank board page` });
+      return json({ url: link, text });
     }
     if (action === "/clientlink" && m === "DELETE") {
       // Revoke: a new key means every tank board link sent so far stops working; the next "Text them" makes a fresh one.
@@ -1624,6 +1632,15 @@ export default {
       }
       const client = /^\/c\/([a-z0-9]+)\.([A-Za-z0-9_-]+)(\/.*)?$/.exec(url.pathname);
       if (client) return await serveTankBoard(env, req, client[1]!, client[2]!, client[3] ?? "", url.origin);
+      const pitchLink = /^\/b\/([a-z0-9]+)\.(\d+)\.([A-Za-z0-9_-]+)\/?$/.exec(url.pathname);
+      if (pitchLink && req.method === "GET") {
+        const [, leadId, exp, sig] = pitchLink as unknown as [string, string, string, string];
+        const lead = (await verifyBoardPitch(env, leadId, exp, sig)) ? await getLead(env, leadId) : null;
+        if (!lead || lead.status === "expired") return new Response("This link has expired. Ask us for a new one.", { status: 410, headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex" } });
+        const s = await getSettings(env);
+        const pitch = customerBoardPitch(s, { business: lead.name ?? "", live: !!lead.live_url });
+        return customerPitchPage(pitch, { business: lead.name ?? "your shop", company: s.companyName || "Underground Associates", phone: s.companyPhone, boardUrl: await clientLink(env, lead, url.origin), displayUrl: `${url.origin}/d/${lead.id}/`, pricingUrl: "https://undergroundassociates.com/pricing#price-list" });
+      }
       const display = /^\/d\/([a-z0-9]+)(?:\/([a-z0-9-]*))?$/.exec(url.pathname);
       if (display && req.method === "GET") return await serveDisplay(env, display[1]!, display[2] ?? "", url.origin);
       const live = /^\/l\/([a-z0-9]+)\/(prices\.json|photo\/([A-Za-z0-9_.-]+))$/.exec(url.pathname);

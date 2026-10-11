@@ -1,4 +1,5 @@
 import { addonPrice, type AppSettings } from "./db.ts";
+import { escHtml, page } from "./page.ts";
 import { APP_ORIGIN } from "./tankboard.ts";
 
 /**
@@ -372,7 +373,7 @@ export function customerBoardPitch(s: AppSettings, o: { business: string; live: 
       {
         title: "What you do",
         steps: [
-          "Something new comes in: open the board, tap the tank, type the name and price. Twenty seconds.",
+          "Something new comes in: open the board, tap \"+ Add to this tank\" under that tank, and fill in the two boxes: what it is and what it costs. Twenty seconds.",
           "Something sells out: tap \"Sold out\". It disappears from the page until you tap it back. Or just type how many are left; at 5 or fewer the page says \"3 left\".",
           "Want a picture? Tap the camera on the item and take one right there at the tank.",
           "Prices change: change the number. Nobody rewrites a tag, nobody reprints anything.",
@@ -407,4 +408,42 @@ export function customerBoardPitch(s: AppSettings, o: { business: string; live: 
       ? "Your price page is live now. Add a tank on the board and watch it change."
       : "Your website isn't live yet; the board and the preview work today, and the tags are printed once it's live (within 3 business days of your go-ahead).",
   };
+}
+
+
+const PITCH_CSS = `
+.pitch{max-width:760px;margin:0 auto;padding:8px 16px 40px;color:#16181d}
+.pitch h1{color:#14213d;font-size:clamp(1.5rem,6vw,2.2rem);line-height:1.15;margin:12px 0 8px}
+.pitch .lead{color:#4f5663;font-size:1.08rem;margin:0 0 18px}
+.pitch section{border:2px solid #e1e4ea;border-radius:16px;padding:16px 18px;margin:0 0 12px;background:#fff}
+.pitch h2{margin:0 0 6px;color:#14213d;font-size:1.2rem}
+.pitch ul,.pitch ol{margin:0;padding-left:22px}.pitch li{padding:5px 0}
+.pitch .box{background:#f4f5f8;border:0}
+.pitch .btns{display:grid;gap:10px}.pitch .btn{display:block;text-align:center;padding:14px;border-radius:12px;font-weight:800;text-decoration:none;background:#eef1f6;color:#14213d}
+.pitch .btn--go{background:#14213d;color:#fff}
+.pitch .fine{color:#4f5663;font-size:.95rem;margin:14px 0 0}
+.pitch .co{color:#4f5663;font-size:.9rem;margin-top:18px}
+`;
+
+/**
+ * The public, texted version of "Show them the Tank board" (`/b/<leadId>.<exp>.<sig>`): the same words, with buttons to open
+ * their own board (their private link), the tablet view, and our pricing page.
+ */
+export function customerPitchPage(p: CustomerPitch, o: { business: string; company: string; phone?: string; boardUrl: string; displayUrl: string; pricingUrl: string }): Response {
+  const e = escHtml;
+  const sec = (x: GuideSection) => `<section><h2>${e(x.title)}</h2><${x.numbered ? "ol" : "ul"}>${x.steps.map((t) => `<li>${e(t)}</li>`).join("")}</${x.numbered ? "ol" : "ul"}></section>`;
+  const body = `<main class="pitch">
+<h1>${e(p.title)}</h1><p class="lead">${e(p.lead)}</p>
+${p.sections.map(sec).join("")}
+<section class="box"><h2>What it costs</h2><ul>${p.price.map((t) => `<li>${e(t)}</li>`).join("")}</ul></section>
+<section class="box"><h2>Try it</h2><div class="btns">
+<a class="btn btn--go" href="${e(o.boardUrl)}">🐠 Open your Tank board</a>
+<a class="btn" href="${e(o.displayUrl)}" target="_blank" rel="noopener">📺 See the tablet view</a>
+<a class="btn" href="${e(o.pricingUrl)}" target="_blank" rel="noopener">📋 Plans and prices</a>
+${o.phone ? `<a class="btn" href="sms:+1${e(o.phone.replace(/\D/g, "").replace(/^1/, ""))}">💬 Text us a question</a>` : ""}</div>
+<p class="fine">Your Tank board link is private: anyone with it can change your prices, so share it only with your staff. Bookmark it or add it to your home screen.</p></section>
+<p class="fine">${e(p.fine)}</p>
+<p class="co">${e(o.company)} · Websites and price pages for ${e(o.business)} and other Cullman-area businesses.</p>
+</main>`;
+  return page(`${o.business}: your Tank board`, body, { brand: o.company, css: PITCH_CSS });
 }

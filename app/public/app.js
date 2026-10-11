@@ -872,7 +872,7 @@
         </div></section>` : ""}
       ${ready && l.category === "retail" ? `<section class="card"><h2>🐠 Tank board</h2>
         <p class="muted small">Their own page for what's in each tank (or on each shelf): name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it.</p>
-        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their tank board link</button><button class="btn" type="button" data-clientlink="open">Open it here</button>${owner ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
+        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their tank board link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the Tank board page</button>${owner ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
         <p class="muted small">A tablet by a tank can show that tank live: the 📺 link on each tank in the board. Sell it as the <strong>Price list</strong> plan when they don't want a whole website.</p></section>` : ""}
       ${owner ? `<section class="card"><h2>More</h2><div class="btns">
         ${ready ? `<button class="btn btn--small" data-act="rewrite">Rewrite text with AI</button>` : ""}
@@ -1636,9 +1636,15 @@
         <${s.numbered ? "ol class=\"show__steps\"" : "ul"}>${s.steps.map((x) => `<li>${esc(x)}</li>`).join("")}</${s.numbered ? "ol" : "ul"}></section>`).join("")}</div>
       <section class="show__box"><h2>What it costs</h2><ul class="show__every">${p.price.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>
       <section class="show__box"><h2>See it</h2>
-        <div class="btns btns--full"><button class="show__choose" type="button" data-tryboard>🐠 Try the board on this phone</button><a class="btn" href="${esc(p.displayUrl)}" target="_blank" rel="noopener">📺 See the tablet view</a><a class="btn" href="#/plans/${leadId}">📋 See the plans</a></div></section>
+        <div class="btns btns--full"><button class="show__choose" type="button" data-tryboard>🐠 Try the board on this phone</button><button class="btn" type="button" data-textpitch>💬 Text them this page</button><a class="btn" href="${esc(p.displayUrl)}" target="_blank" rel="noopener">📺 See the tablet view</a><a class="btn" href="#/plans/${leadId}">📋 See the plans</a></div></section>
       <p class="show__fine">${esc(p.fine)}</p>
     </div>`;
+    const tp = $app.querySelector("[data-textpitch]");
+    tp.addEventListener("click", async () => {
+      tp.disabled = true;
+      try { const { text } = await api(`/leads/${leadId}/boardlink`, { method: "POST" }); const d = ((p.phone || "").match(/\d/g) || []).join("").replace(/^1/, ""); location.href = `sms:${d ? "+1" + d : ""}?body=${encodeURIComponent(text)}`; }
+      catch (err) { toast(err.message); } finally { tp.disabled = false; }
+    });
     const tb = $app.querySelector("[data-tryboard]");
     tb.addEventListener("click", async () => {
       tb.disabled = true;
@@ -2751,6 +2757,12 @@
         else location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(text)}`;
       } catch (err) { toast(err.message); } finally { cb.disabled = false; }
     }));
+    const tpl = $app.querySelector("[data-textpitch-lead]");
+    if (tpl) tpl.addEventListener("click", async () => {
+      tpl.disabled = true;
+      try { const { text } = await api(`/leads/${l.id}/boardlink`, { method: "POST" }); location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(text)}`; }
+      catch (err) { toast(err.message); } finally { tpl.disabled = false; }
+    });
     const rv = $app.querySelector("[data-clientrevoke]");
     if (rv) rv.addEventListener("click", async () => {
       if (!confirm("Stop every tank board link sent so far? You'll text them a new one.")) return;

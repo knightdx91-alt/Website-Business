@@ -77,6 +77,7 @@ import com.knightdx91.websitebusiness.net.deleteNote
 import com.knightdx91.websitebusiness.net.domain
 import com.knightdx91.websitebusiness.net.extrasLink
 import com.knightdx91.websitebusiness.net.clientLink
+import com.knightdx91.websitebusiness.net.boardLink
 import com.knightdx91.websitebusiness.net.revokeClientLink
 import com.knightdx91.websitebusiness.net.forgetSiteImport
 import com.knightdx91.websitebusiness.net.fill
@@ -627,6 +628,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
                             OutlinedButton(onClick = { act("clientlink") { val (_, text) = state.api.clientLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them their tank board link") }
                             OutlinedButton(onClick = { act("clientopen") { val (url, _) = state.api.clientLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open it here") }
+                            OutlinedButton(onClick = { act("boardpitch") { val (_, text) = state.api.boardLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them the Tank board page") }
                             if (isOwner) OutlinedButton(onClick = {
                                 ask = Ask("Revoke tank board links", "Stop every tank board link sent so far? You'll text them a new one.", "Revoke", danger = true) {
                                     act("clientrevoke") { state.api.revokeClientLink(id); context.toast("Old links no longer work. Text them a new one.") }

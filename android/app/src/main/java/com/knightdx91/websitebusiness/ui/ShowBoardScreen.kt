@@ -36,6 +36,7 @@ import androidx.navigation.NavHostController
 import com.knightdx91.websitebusiness.AppState
 import com.knightdx91.websitebusiness.net.Api
 import com.knightdx91.websitebusiness.net.CustomerPitch
+import com.knightdx91.websitebusiness.net.boardLink
 import com.knightdx91.websitebusiness.net.clientLink
 import com.knightdx91.websitebusiness.net.showBoard
 import kotlinx.coroutines.launch
@@ -89,6 +90,11 @@ fun ShowBoardScreen(state: AppState, nav: NavHostController, leadId: String) {
                                 try { val (url, _) = state.api.clientLink(leadId); context.openUrl(url) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't open the board") } finally { opening = false }
                             }
                         }, enabled = !opening, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) { Text("🐠 Try the board on this phone") }
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                try { val (_, text) = state.api.boardLink(leadId); context.sms(p.phone, text) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't make the link") }
+                            }
+                        }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) { Text("💬 Text them this page") }
                         OutlinedButton(onClick = { context.openUrl(p.displayUrl) }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) { Text("📺 See the tablet view") }
                         OutlinedButton(onClick = { nav.navigate("plans/$leadId") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) { Text("📋 See the plans") }
                     }
