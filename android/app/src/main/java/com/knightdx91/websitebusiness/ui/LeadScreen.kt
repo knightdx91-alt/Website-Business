@@ -83,6 +83,7 @@ import com.knightdx91.websitebusiness.net.portalUrl
 import com.knightdx91.websitebusiness.net.publish
 import com.knightdx91.websitebusiness.net.removeDomain
 import com.knightdx91.websitebusiness.net.restyle
+import com.knightdx91.websitebusiness.net.webcheck
 import com.knightdx91.websitebusiness.net.retryBuild
 import com.knightdx91.websitebusiness.net.rewrite
 import com.knightdx91.websitebusiness.net.setLook
@@ -300,6 +301,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                         Row { StatusChip(l); Spacer(Modifier.weight(1f)); Text(SALES_LABEL[l.salesStatus] ?: l.salesStatus, fontWeight = FontWeight.SemiBold) }
                         Text(listOfNotNull(detail.detail.variantLabel ?: categoryLabel(l.category), l.reason).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
                         l.foundUrl?.let { url -> Text("🔗 Found page: ${l.foundHost ?: url} (not linked from their Google listing)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }) }
+                        if (isOwner && l.salesStatus != "live") TextButton(onClick = { act("webcheck") { val r = state.api.webcheck(id); context.toast(if (r.optBoolean("found")) "Found: ${r.optString("label")}" else "Nothing found beyond their Google listing"); load() } }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text(if (busy == "webcheck") "Searching the web…" else "🔎 Re-check website") }
                         l.address?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                         (detail.phoneDisplay ?: l.phone)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                         l.rating?.let { Text("★ ${"%.1f".format(it)} · ${l.reviewCount} Google reviews", style = MaterialTheme.typography.bodySmall) }

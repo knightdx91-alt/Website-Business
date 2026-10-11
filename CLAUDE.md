@@ -295,7 +295,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `websiteProblem()`: broken = presence `outdated` "(site not linked from Google)", working = `has_site` (runs skip it, hand-adds
   keep it); parent page → new presence **`elsewhere`** ("Page on <host>, not linked from Google", +5 score). The URL is stored
   in `found_url` / `foundUrl` and shown on cards and lead screens ("🔗 Found page"); the walk-in opener and the call guide
-  prompt have wording for it (the reason text carries it). `test/web-presence.test.ts`.
+  prompt have wording for it (the reason text carries it). `test/web-presence.test.ts`. "🔎 Re-check website" (owner, lead header
+  on web and Android 2.12; `POST /api/leads/:id/webcheck`) runs the search for one lead on demand and updates presence / reason /
+  found_url / score (409 when the secret is missing).
 - Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS; `/meta.categories` serves them A to Z by label, Oct 2026). Several groups share one
   template, and the variant comes from the Google type + business name: food trucks/bakeries/coffee →
   restaurant pack; nails, pet groomers, massage (`massage`, needs the AL license # before publish) → salon

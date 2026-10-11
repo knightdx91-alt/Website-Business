@@ -800,7 +800,7 @@
       <div class="split"><div>
       <section class="card">
         <h1>${esc(r ? r.name : l.name)}</h1>
-        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}</p>${foundLine(l)}
+        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}${owner && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="webcheck" title="Search the web for a page Google doesn't show">🔎 Re-check website</button>` : ""}</p>${foundLine(l)}
         ${l.rating ? `<p><span class="stars">★ ${l.rating.toFixed(1)}</span> on Google</p>` : ""}
         <p>${esc(l.address || "")}</p>
         <div id="askbox"></div>
@@ -919,6 +919,7 @@
     });
     act("portal", () => openPortal(id));
     act("restyle", async () => { await api(`/leads/${id}/restyle`, { method: "POST" }); toast("New design ready"); viewLead(id); });
+    act("webcheck", async () => { const r = await api(`/leads/${id}/webcheck`, { method: "POST" }); toast(r.found ? `Found: ${r.label}` : "Nothing found beyond their Google listing"); viewLead(id); });
     act("restructure", async () => { await api(`/leads/${id}/restyle`, { method: "POST", json: { structureOnly: true } }); toast("New structure ready"); viewLead(id); });
     $app.querySelectorAll("[data-recipe]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;

@@ -186,3 +186,6 @@ suspend fun Api.refundable(signupId: String): RefundInfo {
 
 suspend fun Api.refund(signupId: String, chargeId: String, amountCents: Long, cancelPlan: Boolean, reason: String): String =
     postJson("/signups/$signupId/refund", JSONObject().put("chargeId", chargeId).put("amountCents", amountCents).put("cancelPlan", cancelPlan).put("reason", reason)).optString("message")
+
+/** "Re-check website" (owner): one web search for a page Google's listing doesn't show. {found, label, foundUrl}. */
+suspend fun Api.webcheck(id: String): JSONObject = postJson("/leads/$id/webcheck")

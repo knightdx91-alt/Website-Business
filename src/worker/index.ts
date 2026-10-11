@@ -1180,6 +1180,17 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       }
       return json({ ok: true });
     }
+    // "Re-check website": run the web-presence search for this lead now (owner). Updates the card when a page is found.
+    if (action === "/webcheck" && m === "POST") {
+      if (!env.BRAVE_SEARCH_API_KEY) throw new HttpError(409, "The Brave Search key isn't set yet (Worker secret BRAVE_SEARCH_API_KEY)");
+      const place = (lead.place_json ? JSON.parse(lead.place_json) : { displayName: { text: lead.name ?? "" }, formattedAddress: lead.address ?? "", id: lead.place_id }) as Parameters<typeof scorePlace>[0];
+      const found = await resolvePresence(env.BRAVE_SEARCH_API_KEY, place);
+      if (!found) return json({ found: false, presence: lead.presence, reason: lead.reason, foundUrl: lead.found_url ?? null });
+      const suffix = / · added by .+$/.exec(lead.reason ?? "")?.[0] ?? "";
+      const reason = `${found.label} · ${lead.review_count ?? 0} Google reviews${suffix}`;
+      await updateLead(env, id, { presence: found.presence, reason, found_url: found.url, score: scorePlace(place, found.presence), pitch_json: null });
+      return json({ found: true, presence: found.presence, label: found.label, reason, foundUrl: found.url });
+    }
     if (action === "/restyle" && m === "POST") {
       if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");
       if (lead.sales_status === "live") throw new HttpError(409, "This site is already live. Change its design from Edit.");
