@@ -14,6 +14,7 @@ import { profileTextProblems, socialTextProblems, writeMonthlyPosts, writeProfil
 import { reviewTexts } from "../places/to-record.ts";
 import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
+import { resolvePresence } from "../places/web-presence.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
@@ -87,6 +88,9 @@ async function body<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
 }
 
 /** `latest_signup_paid` comes from the list query (the newest sign-up's paid flag); lead GET passes it from signupsFor. */
+/** Card wording per web presence (see src/places/qualify.ts and web-presence.ts). */
+const PRESENCE_LABEL: Record<WebPresence, string> = { none: "No website", social: "Only a social page", free_builder: "Free-builder site", has_site: "Has a website", outdated: "Outdated website", elsewhere: "Page on another site" };
+
 /** Extra columns the Activity list (`/leads?activity=1`) selects: the newest note and how many there are. */
 interface ActivityCols {
   last_note_json?: string | null;
@@ -117,6 +121,8 @@ function summary(l: LeadRow & { latest_signup_paid?: number | null } & ActivityC
     reviewCount: l.review_count,
     presence: l.presence,
     reason: l.reason,
+    /** A page the web-presence check found: their unlinked site or a page on a parent site (null when none). */
+    foundUrl: l.found_url ?? null,
     score: l.score,
     status: l.status,
     salesStatus: l.sales_status,
@@ -693,12 +699,30 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         rating: p.rating ?? null,
         reviews: p.userRatingCount ?? 0,
         website: p.websiteUri ?? null,
-        presence: webPresence(p.websiteUri),
+        presence: webPresence(p.websiteUri) as string,
+        foundUrl: null as string | null,
         open: p.businessStatus === "OPERATIONAL",
         chain: isChain(p.displayName?.text ?? ""),
         category: guessCategory(p),
         existing: existing && existing.status !== "expired" ? { id: existing.id, status: existing.status, salesStatus: existing.sales_status } : null,
       });
+    }
+    // Before Fox adds one: the same web search the run does, for the first few "no website" results (one at a time,
+    // Brave's free plan allows one request a second), so the list already says "Page on …" or "Has a website at …".
+    if (env.BRAVE_SEARCH_API_KEY) {
+      let checks = 0;
+      for (const r of results) {
+        if (checks >= 4) break;
+        if (!r.open || r.existing || (r.presence !== "none" && r.presence !== "social")) continue;
+        checks++;
+        const place = places.find((p) => p.id === r.placeId);
+        const found = place ? await resolvePresence(env.BRAVE_SEARCH_API_KEY, place) : null;
+        if (found) {
+          r.presence = found.presence;
+          r.foundUrl = found.url;
+          r.website = r.website ?? found.url;
+        }
+      }
     }
     return json({ results });
   }
@@ -717,26 +741,32 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       p.nationalPhoneNumber = typed.display;
       typedPhone = true;
     }
-    const presence = webPresence(p.websiteUri) as WebPresence;
+    let presence = webPresence(p.websiteUri) as WebPresence;
     const count = p.userRatingCount ?? 0;
-    const label = { none: "No website", social: "Only a social page", free_builder: "Free-builder site", has_site: "Has a website", outdated: "Outdated website" }[presence];
+    let label: string = PRESENCE_LABEL[presence];
+    let foundUrl: string | null = null;
+    // Google shows no website: one web search may still find their page (own domain or a parent company's site).
+    if (presence === "none" || presence === "social") {
+      const found = await resolvePresence(env.BRAVE_SEARCH_API_KEY, p);
+      if (found) ({ presence, label, url: foundUrl } = found);
+    }
     const reason = `${label} · ${count} Google reviews · added by ${session.name}`;
     const fields = [p.displayName?.text ?? "", p.nationalPhoneNumber, p.formattedAddress ?? "", p.rating ?? null, p.userRatingCount ?? null, presence, reason, scorePlace(p, presence), JSON.stringify(p), p.location?.latitude ?? null, p.location?.longitude ?? null, now(), now()];
     let id = existing?.id;
     if (id) {
       // An expired lead (old Google data was cleared): bring it back with fresh data.
       await env.DB.prepare(
-        "UPDATE leads SET category = ?, name = ?, phone = ?, address = ?, rating = ?, review_count = ?, presence = ?, reason = ?, score = ?, place_json = ?, lat = ?, lng = ?, fetched_at = ?, updated_at = ?, status = 'queued', sales_status = 'new', record_json = NULL, copy_json = NULL, lint_json = NULL, pitch_json = NULL, look = NULL, created_at = ? WHERE id = ?",
+        "UPDATE leads SET category = ?, name = ?, phone = ?, address = ?, rating = ?, review_count = ?, presence = ?, reason = ?, score = ?, place_json = ?, lat = ?, lng = ?, fetched_at = ?, updated_at = ?, found_url = ?, status = 'queued', sales_status = 'new', record_json = NULL, copy_json = NULL, lint_json = NULL, pitch_json = NULL, look = NULL, created_at = ? WHERE id = ?",
       )
-        .bind(input.category, ...fields, now(), id)
+        .bind(input.category, ...fields, foundUrl, now(), id)
         .run();
     } else {
       id = newId();
       await env.DB.prepare(
-        `INSERT INTO leads (id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, score, status, place_json, lat, lng, fetched_at, created_at, updated_at)
-         VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO leads (id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, score, status, place_json, lat, lng, fetched_at, created_at, updated_at, found_url)
+         VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)`,
       )
-        .bind(id, p.id, input.category, ...fields, now())
+        .bind(id, p.id, input.category, ...fields, now(), foundUrl)
         .run();
     }
     await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")

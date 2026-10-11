@@ -14,6 +14,8 @@ export interface Env {
   STRIPE_WEBHOOK_SECRET?: string;
   /** Stripe secret or restricted key (Checkout Sessions: write). Optional: without it, sign-ups use the payment links. */
   STRIPE_SECRET_KEY?: string;
+  /** Brave Search API key: the "page elsewhere" check in src/places/web-presence.ts. Optional. */
+  BRAVE_SEARCH_API_KEY?: string;
   /** Email provider for messages clients ask for (e.g. their Buy extras link): MailerSend or Resend. Optional. */
   MAILERSEND_API_KEY?: string;
   RESEND_API_KEY?: string;

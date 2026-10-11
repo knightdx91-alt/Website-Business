@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -298,6 +299,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                     Column(Modifier.padding(14.dp)) {
                         Row { StatusChip(l); Spacer(Modifier.weight(1f)); Text(SALES_LABEL[l.salesStatus] ?: l.salesStatus, fontWeight = FontWeight.SemiBold) }
                         Text(listOfNotNull(detail.detail.variantLabel ?: categoryLabel(l.category), l.reason).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
+                        l.foundUrl?.let { url -> Text("🔗 Found page: ${l.foundHost ?: url} (not linked from their Google listing)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }) }
                         l.address?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                         (detail.phoneDisplay ?: l.phone)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                         l.rating?.let { Text("★ ${"%.1f".format(it)} · ${l.reviewCount} Google reviews", style = MaterialTheme.typography.bodySmall) }

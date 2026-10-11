@@ -67,6 +67,7 @@ private val ADD_PACKS = listOf(
 private val ADD_PRESENCE = mapOf(
     "none" to ("No website" to true),
     "social" to ("Only a social page" to true),
+    "elsewhere" to ("Page on another site" to true),
     "free_builder" to ("Free-builder site" to false),
     "outdated" to ("Outdated website" to false),
     "has_site" to ("Has a website" to false),

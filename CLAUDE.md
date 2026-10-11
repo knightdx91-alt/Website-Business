@@ -273,6 +273,17 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Done Oct 2026 (Cloud project 322487745515): Web client `…-39uoftmq9b43htr4k6thsebt0k7pded6` is in Settings (`googleClientId`);
   Android client `…-aku343iill2rs8jjtodi8orsq5d7fs5k` exists and is used by nothing in code (Credential Manager only takes the
   Web ID). Which is which was checked by sending Google a custom-scheme redirect: only the Web client is refused.
+- Pages elsewhere (Oct 2026, `src/places/web-presence.ts`, migration 0016 `leads.found_url`): Google only reports the website linked
+  on the profile, so "No website" can be wrong (Luna's BBQ has a page on stonebridgewedding.com). With Worker secret
+  `BRAVE_SEARCH_API_KEY` (Brave Search API, free 2,000 queries/month, ~$3/1,000 after; without it nothing changes) the app runs one
+  web search, `"<name>" <town> AL`, for every "none"/"social" lead: in search runs (`MAX_WEB_CHECKS` 15 per job), when a lead is
+  added by hand, and for the first 4 open results of the Add-a-business lookup (sequential: the free plan is 1 request/second).
+  `pickPage()` skips directories / social / delivery / news / .gov hosts (`IGNORED_HOSTS`) and takes a domain carrying the name
+  (own) or a page whose title starts with the name or carries the whole name in title + path (parent page). Own domain →
+  `websiteProblem()`: broken = presence `outdated` "(site not linked from Google)", working = `has_site` (runs skip it, hand-adds
+  keep it); parent page → new presence **`elsewhere`** ("Page on <host>, not linked from Google", +5 score). The URL is stored
+  in `found_url` / `foundUrl` and shown on cards and lead screens ("🔗 Found page"); the walk-in opener and the call guide
+  prompt have wording for it (the reason text carries it). `test/web-presence.test.ts`.
 - Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS; `/meta.categories` serves them A to Z by label, Oct 2026). Several groups share one
   template, and the variant comes from the Google type + business name: food trucks/bakeries/coffee →
   restaurant pack; nails, pet groomers, massage (`massage`, needs the AL license # before publish) → salon

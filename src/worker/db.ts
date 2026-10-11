@@ -13,6 +13,8 @@ export interface LeadRow {
   review_count: number | null;
   presence: string | null;
   reason: string | null;
+  /** A page the web-presence check found (their unlinked site, or a page on a parent site). */
+  found_url?: string | null;
   score: number;
   status: "queued" | "building" | "ready" | "failed" | "expired";
   sales_status: "new" | "shown" | "sold" | "live" | "not_interested";

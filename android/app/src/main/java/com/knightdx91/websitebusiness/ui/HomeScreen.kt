@@ -202,6 +202,7 @@ fun LeadCard(l: Lead, onOpen: () -> Unit, onCall: () -> Unit, onPreview: () -> U
             val meta = listOfNotNull(categoryLabel(l.category), l.reason, l.rating?.let { "★ ${"%.1f".format(it)}${if (l.reviewCount > 0) " (${l.reviewCount})" else ""}" }).joinToString(" · ")
             Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             l.address?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            l.foundHost?.let { Text("🔗 Found page on $it (not linked from Google)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (l.contact != null || l.bestTime != null) Text("👤 ${listOfNotNull(l.contact?.let { "Ask for: $it" }, l.bestTime).joinToString(" · ")}", style = MaterialTheme.typography.bodySmall)
             if (l.lastActivity != null) {
                 // Activity tab: the newest log entry on the card, so the list reads like a log.

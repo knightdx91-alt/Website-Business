@@ -305,6 +305,14 @@
     return `<span class="chip chip--good">Site ready</span>`;
   }
 
+  /** "stonebridgewedding.com" from a lead's foundUrl (a page the web-presence check found). */
+  function foundHost(l) {
+    try { return new URL(l.foundUrl).hostname.replace(/^www\./, ""); } catch { return "another site"; }
+  }
+  function foundLine(l) {
+    return l && l.foundUrl ? `<div class="lead__meta small">🔗 Found page: <a href="${esc(l.foundUrl)}" target="_blank" rel="noopener">${esc(foundHost(l))}</a> (not linked from their Google listing)</div>` : "";
+  }
+
   /** Activity tab: the newest call-log entry on the card, so the list reads like a log. */
   function lastNoteLine(l) {
     if (l.lastNote === undefined) return "";
@@ -320,6 +328,7 @@
       <div class="lead__top"><a class="lead__name" href="#/lead/${l.id}">${esc(l.name)}</a>${statusChip(l)}</div>
       <div class="lead__meta">${esc(CATEGORY_LABEL[l.category] || l.category)} · ${esc(l.reason || "")} ${rating ? "· " + rating : ""}</div>
       <div class="lead__meta">${esc(l.address || "")}</div>
+      ${foundLine(l)}
       ${contactLine(l) ? `<div class="lead__meta">${contactLine(l)}</div>` : ""}
       ${lastNoteLine(l)}
       ${l.followUp && (l.salesStatus === "new" || l.salesStatus === "shown") ? `<div>${followChip(l.followUp)}</div>` : ""}
@@ -791,7 +800,7 @@
       <div class="split"><div>
       <section class="card">
         <h1>${esc(r ? r.name : l.name)}</h1>
-        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}</p>
+        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}</p>${foundLine(l)}
         ${l.rating ? `<p><span class="stars">★ ${l.rating.toFixed(1)}</span> on Google</p>` : ""}
         <p>${esc(l.address || "")}</p>
         <div id="askbox"></div>
@@ -2392,6 +2401,7 @@
     // Why we're there, in their words.
     const why = !l ? `I noticed ${biz} doesn't have a website`
       : l.presence === "social" ? `I noticed ${biz} is on Facebook but doesn't have its own website`
+      : l.presence === "elsewhere" ? `I looked ${biz} up on Google and there's no website on your listing; the only page I found is on ${foundHost(l)}, so it isn't really yours`
       : l.presence === "outdated" || l.presence === "free_builder" ? `I pulled up your website on my phone and it was hard to use`
       : `I noticed ${biz} doesn't have a website`;
     const mid = plans.find((p) => p.id === "plus") || plans[Math.floor(plans.length / 2)] || plans[0];
@@ -2703,7 +2713,7 @@
 
   /* ---------- add a business by hand ---------- */
   const PACKS = [["restaurant", "Restaurant, cafe, bakery or food truck"], ["contractor", "Contractor or home service (plumbing, HVAC, painting, concrete, tree, pest…)"], ["salon", "Salon, barber, nails, massage or pet grooming"], ["auto", "Auto repair, body shop, detailing, towing or small engine"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning or pressure washing"], ["finance", "Tax preparer, accountant, insurance agency or financial advisor"], ["church", "Church, VFW/Legion/Lions/lodge, food pantry or community center"], ["print", "Print shop, sign shop, screen printing or embroidery"], ["retail", "Shop: boutique, gifts, florist, antiques, thrift, feed or furniture"]];
-  const PRESENCE = { none: ["No website", "chip--good"], social: ["Only a social page", "chip--good"], free_builder: ["Free-builder site", "chip--warn"], outdated: ["Outdated website", "chip--warn"], has_site: ["Has a website", "chip--warn"] };
+  const PRESENCE = { none: ["No website", "chip--good"], social: ["Only a social page", "chip--good"], elsewhere: ["Page on another site", "chip--good"], free_builder: ["Free-builder site", "chip--warn"], outdated: ["Outdated website", "chip--warn"], has_site: ["Has a website", "chip--warn"] };
 
   async function viewAdd() {
     setNav("home");

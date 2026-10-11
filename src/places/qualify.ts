@@ -1,7 +1,8 @@
 import type { CategoryId } from "../generator/types.ts";
 import type { Place } from "./client.ts";
 
-export type WebPresence = "none" | "social" | "free_builder" | "has_site" | "outdated";
+/** `elsewhere`: no website on the Google profile, but a web search found their page on someone else's site (web-presence.ts). */
+export type WebPresence = "none" | "social" | "free_builder" | "has_site" | "outdated" | "elsewhere";
 
 const SOCIAL = /(^|\.)(facebook\.com|fb\.com|fb\.me|instagram\.com|linktr\.ee|tiktok\.com|twitter\.com|x\.com|yelp\.com|nextdoor\.com|business\.site|g\.page|youtube\.com|linkedin\.com)$/i;
 /** A booking, ordering or delivery page on someone else's platform: counts as "no website" (presence `social`). */
@@ -138,6 +139,7 @@ function kmBetween(a: { lat: number; lng: number }, b: { lat: number; lng: numbe
 export function scorePlace(p: Place, presence: WebPresence): number {
   let score = Math.log10(1 + (p.userRatingCount ?? 0)) * 20 + (p.rating ?? 0) * 3;
   if (presence === "social") score += 8;
+  if (presence === "elsewhere") score += 5;
   if (p.regularOpeningHours?.periods?.length) score += 4;
   if (p.photos?.length) score += 3;
   return Math.round(score * 10) / 10;

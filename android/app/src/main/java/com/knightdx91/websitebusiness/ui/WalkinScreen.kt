@@ -144,6 +144,7 @@ fun WalkinScreen(state: AppState, nav: NavHostController, leadId: String?) {
         val why = when {
             l == null -> "I noticed $biz doesn't have a website"
             l.lead.presence == "social" -> "I noticed $biz is on Facebook but doesn't have its own website"
+            l.lead.presence == "elsewhere" -> "I looked $biz up on Google and there's no website on your listing; the only page I found is on ${l.lead.foundHost ?: "another site"}, so it isn't really yours"
             l.lead.presence == "outdated" || l.lead.presence == "free_builder" -> "I pulled up your website on my phone and it was hard to use"
             else -> "I noticed $biz doesn't have a website"
         }

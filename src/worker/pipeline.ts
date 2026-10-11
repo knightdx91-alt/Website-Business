@@ -9,7 +9,8 @@ import { buildSite } from "../generator/render.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { groupById, MARKET } from "../places/queries.ts";
-import { qualify } from "../places/qualify.ts";
+import { qualify, scorePlace } from "../places/qualify.ts";
+import { resolvePresence } from "../places/web-presence.ts";
 import { websiteProblem } from "../places/site-check.ts";
 import { placeToRecord, reviewTexts } from "../places/to-record.ts";
 import { addUsage, getLead, getSettings, MODEL_PRICES, updateLead, type LeadRow } from "./db.ts";
@@ -18,6 +19,8 @@ import { newId, now, type Env, type Job } from "./env.ts";
 const SEARCH_PAGES = 2;
 /** Website checks per search job (each is one outbound request). */
 const MAX_SITE_CHECKS = 15;
+/** Web searches per search job for "no website" leads (Brave free tier is 2,000 a month). */
+const MAX_WEB_CHECKS = 15;
 
 export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>): Promise<void> {
   const run = await env.DB.prepare("SELECT status, cap, categories FROM runs WHERE id = ?").bind(job.runId).first<{ status: string; cap: number; categories: string }>();
@@ -38,6 +41,7 @@ export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>)
 
     const builds: Job[] = [];
     let checks = 0;
+    let webChecks = 0;
     for (const lead of qualify(places, { includeSites: job.badSites, category, center: job.center ?? MARKET.center })) {
       if (category === "church" && !churchVariant(lead.place.primaryType, lead.place.types ?? [], lead.place.displayName?.text ?? "")) continue;
       if (category === "finance" && !financeVariant(lead.place.primaryType, lead.place.types ?? [], lead.place.displayName?.text ?? "")) continue;
@@ -51,6 +55,20 @@ export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>)
         lead.presence = "outdated";
         lead.reason = `${problem} · ${lead.place.userRatingCount ?? 0} Google reviews`;
       }
+      // "No website" on Google isn't always true: one web search may find their own unlinked site (a working one is
+      // skipped like any other site; a broken one becomes an outdated-site lead) or a page on a parent company's site.
+      let foundUrl: string | null = null;
+      if ((lead.presence === "none" || lead.presence === "social") && env.BRAVE_SEARCH_API_KEY && webChecks < MAX_WEB_CHECKS) {
+        webChecks++;
+        const found = await resolvePresence(env.BRAVE_SEARCH_API_KEY, lead.place);
+        if (found?.presence === "has_site") continue;
+        if (found) {
+          lead.presence = found.presence;
+          lead.reason = `${found.label} · ${lead.place.userRatingCount ?? 0} Google reviews`;
+          lead.score = scorePlace(lead.place, found.presence);
+          foundUrl = found.url;
+        }
+      }
       const slot = await env.DB.prepare(
         "UPDATE runs SET queued = queued + 1 WHERE id = ? AND queued < cap AND (SELECT COUNT(*) FROM leads WHERE run_id = ? AND category = ?) < ? RETURNING queued",
       )
@@ -60,10 +78,10 @@ export async function runSearch(env: Env, job: Extract<Job, { type: "search" }>)
       const p = lead.place;
       const id = newId();
       const inserted = await env.DB.prepare(
-        `INSERT OR IGNORE INTO leads (id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, score, status, place_json, lat, lng, fetched_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR IGNORE INTO leads (id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, score, status, place_json, lat, lng, fetched_at, created_at, updated_at, found_url)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)`,
       )
-        .bind(id, p.id, job.runId, category, p.displayName?.text ?? "", p.nationalPhoneNumber ?? "", p.formattedAddress ?? "", p.rating ?? null, p.userRatingCount ?? null, lead.presence, lead.reason, lead.score, JSON.stringify(p), p.location?.latitude ?? null, p.location?.longitude ?? null, now(), now(), now())
+        .bind(id, p.id, job.runId, category, p.displayName?.text ?? "", p.nationalPhoneNumber ?? "", p.formattedAddress ?? "", p.rating ?? null, p.userRatingCount ?? null, lead.presence, lead.reason, lead.score, JSON.stringify(p), p.location?.latitude ?? null, p.location?.longitude ?? null, now(), now(), now(), foundUrl)
         .run();
       if (!inserted.meta.changes) {
         await env.DB.prepare("UPDATE runs SET queued = queued - 1 WHERE id = ?").bind(job.runId).run();

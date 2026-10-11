@@ -230,6 +230,7 @@ Rules:
 - Use only the facts given. Prices only if given; if no plans are given, the close should offer to send pricing after the call.
 - If there are several plans, lead with the middle one and mention the others briefly. If the owner balks at a minimum term, mention the month-to-month option; if they like saving money, mention paying yearly. Mention optional extras only if they ask about email, reviews or Google. The caller can send a sign-up link by text, where the owner reads the plan, accepts and sets up automatic monthly payment.
 - If why_they_are_a_lead says they already have a website, don't claim they have none: the angle is that their current site is outdated, down, or hard to use on a phone, and the preview is a modern rebuild.
+- If why_they_are_a_lead says "Page on <some site>, not linked from Google": they have a page on someone else's website (a parent company, a landlord, a venue) and their Google listing has no website button. Don't say they have no website. The angle: people who look them up on Google see no site at all, and the page they do have isn't theirs, so they can't change it or own the address.
 - Describe the preview using only preview_features. Don't add features it doesn't have.
 - Be upfront that the preview was built from their public Google listing, and that they'd swap in their own photos and check every detail before it goes live.
 - If they're not interested, thank them, offer to delete the preview, and respect it.

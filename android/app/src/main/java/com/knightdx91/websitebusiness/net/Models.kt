@@ -85,8 +85,11 @@ data class Lead(
     val lastNote: Note? = null,
     val notes: Int = 0,
     val lastActivity: Long? = null,
+    /** A page the web-presence check found: their unlinked site or a page on a parent company's site. */
+    val foundUrl: String? = null,
 ) {
     val ready get() = status == "ready"
+    val foundHost: String? get() = foundUrl?.let { runCatching { java.net.URI(it).host?.removePrefix("www.") }.getOrNull() }
 
     companion object {
         fun from(j: JSONObject) = Lead(
@@ -118,6 +121,7 @@ data class Lead(
             lastNote = j.optJSONObject("lastNote")?.let { n -> Note(id = "", author = n.optString("author"), outcome = n.str("outcome"), body = n.optString("body"), createdAt = n.optLong("at")) },
             notes = j.optInt("notes", 0),
             lastActivity = if (j.isNull("lastActivity")) null else j.optLong("lastActivity"),
+            foundUrl = j.str("foundUrl"),
         )
     }
 }
