@@ -179,7 +179,7 @@ export const EditsSchema = z.object({
         .optional(),
       /** The live price list for any business (stored at ext.retail.priceList whatever the category; generator/pricelist.ts). */
       priceList: z
-        .object({ text: z.string().max(20_000), title: z.string().trim().max(40), public: z.boolean(), kind: z.enum(["fish", "plants", "pets", "food", "goods"]) })
+        .object({ text: z.string().max(20_000), title: z.string().trim().max(40), public: z.boolean(), kind: z.enum(["fish", "plants", "pets", "food", "parts", "vehicles", "goods"]) })
         .partial()
         .optional(),
       /** Search-engine hookups: Google Search Console's HTML-tag code for this site (published pages only). */
@@ -239,7 +239,7 @@ export const EditsSchema = z.object({
           /** Price list: same text form as a menu (`# Section`, `Name | $Price | Note`); empty clears it. */
           priceListText: z.string().max(20_000),
           priceListTitle: z.string().trim().max(40),
-          priceKind: z.enum(["fish", "plants", "pets", "food", "goods"]),
+          priceKind: z.enum(["fish", "plants", "pets", "food", "parts", "vehicles", "goods"]),
           pricesPublic: z.boolean(),
           /** Per-item photo (a gallery file) matched by item name; "" clears. */
           priceItems: z.array(z.object({ name: z.string().trim().min(1).max(120), image: z.string().trim().max(200).optional() })).max(300),
@@ -451,7 +451,7 @@ function applyFsrpEdits(r: BusinessRecord, e: NonNullable<Edits["record"]>): voi
  * The live price list, for any category. Retyping the list loses nothing: counts, sold-out flags, info cards and photos follow
  * items of the same name; unmatched items try the gallery's captions. Stored at ext.retail.priceList (historical name).
  */
-export function applyPriceListEdit(r: BusinessRecord, e: { text?: string; title?: string; public?: boolean; kind?: "fish" | "plants" | "pets" | "food" | "goods" }): void {
+export function applyPriceListEdit(r: BusinessRecord, e: { text?: string; title?: string; public?: boolean; kind?: "fish" | "plants" | "pets" | "food" | "parts" | "vehicles" | "goods" }): void {
   const x = (r.ext.retail = r.ext.retail ?? {});
   const prev = x.priceList;
   const sections = e.text !== undefined ? parseMenuText(e.text) : (prev?.sections ?? []);

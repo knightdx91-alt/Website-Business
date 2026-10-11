@@ -2435,7 +2435,7 @@
     return fsClean(out);
   }
 
-  const PRICE_KINDS = [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["goods", "Other goods"]];
+  const PRICE_KINDS = [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["parts", "Auto parts & tires"], ["vehicles", "Vehicles & equipment"], ["goods", "Other goods"]];
   /** The live price list for any business other than a shop (shops have it inside Shop details). */
   function priceListEditCard(r) {
     const pl = (r.ext.retail && r.ext.retail.priceList) || {};

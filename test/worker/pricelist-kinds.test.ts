@@ -21,6 +21,14 @@ test("every kind has words and care-card fields; the kind is guessed from the bu
   assert.equal(listKind(shop), shop.variant === "pet" ? "fish" : "goods");
   shop.ext.retail = { ...(shop.ext.retail ?? {}), priceList: { sections: [], lastUpdated: "", kind: "fish" } };
   assert.equal(listKind(shop), "fish");
+  const auto = categoryRecord("auto");
+  assert.equal(listKind(auto), "parts");
+  const lot = categoryRecord("general");
+  lot.name = "Cullman Motors";
+  lot.typeLabel = "Used car dealer";
+  assert.equal(listKind(lot), "vehicles");
+  assert.equal(KINDS.parts.board, "Parts board");
+  assert.equal(KINDS.vehicles.section, "Row");
 });
 
 test("a business of any type gets the /prices/ page and nav link, with a kind-specific info card", async () => {

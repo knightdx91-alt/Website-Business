@@ -1112,7 +1112,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const record = lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null;
       const pl = record?.ext.retail?.priceList;
       if (!pl?.sections.length) throw new HttpError(409, "Add a price list first (Edit → Shop details → Price list)");
-      return pdfResponse(priceTagsPdf({ business: lead.name ?? "Us", siteUrl, title: pl.title?.trim() || "Prices", sections: pl.sections.map((x) => ({ name: x.name, slug: sectionSlug(x.name) })) }), `price-tags-${id}.pdf`);
+      return pdfResponse(priceTagsPdf({ business: lead.name ?? "Us", siteUrl, title: pl.title?.trim() || kindWords(record!).title, sections: pl.sections.map((x) => ({ name: x.name, slug: sectionSlug(x.name) })) }), `price-tags-${id}.pdf`);
     }
     if (action === "/reviewcard" && m === "GET") {
       if (lead.category === "finance" && lead.record_json && (JSON.parse(lead.record_json) as BusinessRecord).variant === "financial_advisor") throw new HttpError(409, "Financial advisors can't use review cards");

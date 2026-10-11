@@ -117,7 +117,7 @@ export interface MenuItem {
 }
 
 /** What a live price list holds: sets the words (tank / bench / case / shelf) and the care-card fields. See generator/pricelist.ts. */
-export type ListKind = "fish" | "plants" | "pets" | "food" | "goods";
+export type ListKind = "fish" | "plants" | "pets" | "food" | "parts" | "vehicles" | "goods";
 
 /** What a customer sees when they tap a fish (or plant, reptile…) on the price page or the tablet. */
 export interface ItemInfo {

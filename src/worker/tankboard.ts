@@ -63,7 +63,7 @@ export function pricesFeed(lead: LeadRow, record: BusinessRecord, origin: string
   const words = kindWords(record);
   return {
     name: record.name,
-    title: pl.title?.trim() || "Prices",
+    title: pl.title?.trim() || words.title,
     kind: listKind(record),
     words: { section: words.section, item: words.item, emoji: words.emoji, board: words.board, empty: words.empty, fields: words.fields },
     public: pl.public !== false,

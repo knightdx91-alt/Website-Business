@@ -582,9 +582,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Live price list for every business (Oct 2026, `src/generator/pricelist.ts`): the page, its nav link and the care card moved out
   of the retail pack; render.ts wraps every pack (`nav` + `pages`) with `priceListNav` / `pricesPage`, so any category builds
   `/prices/` when `ext.retail.priceList` has sections (the storage path kept its historical name). `priceList.kind`
-  (`ListKind` fish / plants / pets / food / goods; `listKind(r)` guesses from category, variant, name and `typeLabel` when unset)
-  → `KINDS[kind]` words (section "Tank" / "Bench" / "Enclosure" / "Case" / "Shelf", item, emoji, board name "Tank board" /
-  "Bench board" / … / "Stock board", empty text) and info-card fields; `ItemInfo.facts` [{label, value}] carries non-fish rows,
+  (`ListKind` fish / plants / pets / food / parts / vehicles / goods; `listKind(r)` guesses from category, variant, name and
+  `typeLabel` when unset: category `auto` or parts/tire/wheel names → `parts`; dealer / motors / auto sales / trailer / equipment /
+  tractor / RV / boat / golf cart / powersports → `vehicles`) → `KINDS[kind]` words (section "Tank" / "Bench" / "Enclosure" /
+  "Case" / "Bin" / "Row" / "Shelf", item, emoji, board name "Tank board" / "Bench board" / … / "Parts board" / "Lot board" /
+  "Stock board", a default page `title` per kind: "In stock" for parts, "On the lot" for vehicles, used wherever
+  `priceList.title` is blank: page, nav, feed, QR tags; empty text) and info-card fields (parts: part # / size, fits, brand,
+  condition, warranty, where; vehicles: year/make/model, mileage, VIN, condition, drivetrain, warranty, financing); `ItemInfo.facts` [{label, value}] carries non-fish rows,
   `infoRows(info, kind)` shows the kind's fields, then any other kind's named fields, then facts. `draftItemInfo(…, {kind})`
   uses a facts schema with the kind's labels for non-fish kinds. Feed carries `kind` + `words`; the board and tablet pages word
   themselves from them (+ New case, "Sold out for today. Fresh again tomorrow."). Edits: top-level `edits.priceList {text,

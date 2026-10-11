@@ -24,29 +24,39 @@ export interface KindWords {
   board: string;
   /** What a customer sees in an empty section. */
   empty: string;
+  /** The page title when the shop hasn't typed one. */
+  title: string;
   /** Care-card fields in order: [key, label, placeholder]. */
   fields: Array<[string, string, string]>;
 }
 
 export const KINDS: Record<ListKind, KindWords> = {
   fish: {
-    label: "Fish & aquarium", section: "Tank", item: "fish", emoji: "🐟", board: "Tank board", empty: "Sold out for now. Ask us what's coming.",
+    label: "Fish & aquarium", title: "Prices", section: "Tank", item: "fish", emoji: "🐟", board: "Tank board", empty: "Sold out for now. Ask us what's coming.",
     fields: [["maxSize", "Adult size", "1.5 in"], ["diet", "Eats", "Flake, frozen brine shrimp"], ["temperament", "Temperament", "Peaceful, schooling (6+)"], ["minTank", "Minimum tank", "10 gal"], ["care", "Care level", "Beginner"], ["water", "Water", "Freshwater, 72–78 °F"], ["origin", "From", "South America"]],
   },
   plants: {
-    label: "Plants & nursery", section: "Bench", item: "plant", emoji: "🌱", board: "Bench board", empty: "Sold out for now. New stock comes in weekly.",
+    label: "Plants & nursery", title: "Plants & prices", section: "Bench", item: "plant", emoji: "🌱", board: "Bench board", empty: "Sold out for now. New stock comes in weekly.",
     fields: [["maxSize", "Mature size", "3–4 ft"], ["light", "Light", "Full sun"], ["water", "Water", "Weekly; let it dry between"], ["zone", "Hardiness zone", "Zone 7–9"], ["bloom", "Blooms", "Spring, pink"], ["petSafe", "Pets", "Safe for cats and dogs"], ["origin", "Type", "Perennial"]],
   },
   pets: {
-    label: "Pets & reptiles", section: "Enclosure", item: "animal", emoji: "🦎", board: "Enclosure board", empty: "None right now. Ask us what's coming.",
+    label: "Pets & reptiles", title: "Available now", section: "Enclosure", item: "animal", emoji: "🦎", board: "Enclosure board", empty: "None right now. Ask us what's coming.",
     fields: [["maxSize", "Adult size", "18 in"], ["diet", "Eats", "Crickets, greens"], ["temperament", "Temperament", "Calm, handles well"], ["minTank", "Enclosure", "40 gal"], ["temp", "Temperature", "Basking 95 °F, cool side 75 °F"], ["lifespan", "Lifespan", "10–15 years"], ["care", "Care level", "Beginner"]],
   },
   food: {
-    label: "Food & baked goods", section: "Case", item: "item", emoji: "🥐", board: "Case board", empty: "Sold out for today. Fresh again tomorrow.",
+    label: "Food & baked goods", title: "Today's case", section: "Case", item: "item", emoji: "🥐", board: "Case board", empty: "Sold out for today. Fresh again tomorrow.",
     fields: [["ingredients", "Made with", "Butter, flour, eggs, sugar"], ["allergens", "Allergens", "Wheat, dairy, egg"], ["serves", "Serves", "8–10"], ["made", "Made", "Baked this morning"], ["keeps", "Keeps", "3 days at room temp"], ["heating", "To serve", "Warm 10 min at 350 °F"]],
   },
+  parts: {
+    label: "Auto parts & tires", title: "In stock", section: "Bin", item: "part", emoji: "🔧", board: "Parts board", empty: "Out right now. We can order it; call us.",
+    fields: [["partNumber", "Part # / size", "265/70R17 or 51515"], ["fits", "Fits", "2015–2020 F-150"], ["brand", "Brand", "Motorcraft"], ["condition", "Condition", "New / Remanufactured / Used"], ["warranty", "Warranty", "12 months"], ["location", "Where", "Rack B, shelf 3"]],
+  },
+  vehicles: {
+    label: "Vehicles & equipment", title: "On the lot", section: "Row", item: "unit", emoji: "🚗", board: "Lot board", empty: "Nothing in this row right now. New units come in weekly.",
+    fields: [["year", "Year / make / model", "2018 Ford F-150 XLT"], ["mileage", "Mileage / hours", "84,200 mi"], ["vin", "VIN / serial", "1FTEW1E…"], ["condition", "Condition", "Clean title, one owner"], ["drivetrain", "Drivetrain / engine", "4×4, 5.0 V8"], ["warranty", "Warranty", "30-day powertrain"], ["financing", "Financing", "Buy here pay here available"]],
+  },
   goods: {
-    label: "Other goods", section: "Shelf", item: "item", emoji: "🏷️", board: "Stock board", empty: "Sold out for now. Ask us what's coming.",
+    label: "Other goods", title: "In stock", section: "Shelf", item: "item", emoji: "🏷️", board: "Stock board", empty: "Sold out for now. Ask us what's coming.",
     fields: [["brand", "Brand", "Carhartt"], ["condition", "Condition", "New / Like new / Used"], ["size", "Size", "32 × 24 in"], ["material", "Material", "Oak"], ["fits", "Fits / works with", "2015–2020 F-150"], ["details", "Details", "Made in USA"]],
   },
 };
@@ -61,8 +71,11 @@ export function priceListOf(r: BusinessRecord) {
 export function listKind(r: BusinessRecord): ListKind {
   const k = priceListOf(r)?.kind;
   if (k && KINDS[k]) return k;
+  const text = `${r.name} ${r.typeLabel ?? ""}`;
   if (r.category === "retail" && r.variant === "pet") return "fish";
   if (r.category === "restaurant") return "food";
+  if (/dealer|motors\b|auto sales|car sales|trailer|equipment|tractor|rv\b|boat|golf cart|powersports/i.test(text)) return "vehicles";
+  if (r.category === "auto" || /parts|tire|wheel/i.test(text)) return "parts";
   if (r.category === "landscaping" || /nursery|garden|greenhouse|plant/i.test(`${r.name} ${r.typeLabel ?? ""}`)) return "plants";
   if (/aquar|fish|reptile|pet/i.test(`${r.name} ${r.typeLabel ?? ""}`)) return "fish";
   if (/bak|donut|cafe|deli|butcher|meat|produce|farm stand|market/i.test(`${r.name} ${r.typeLabel ?? ""}`)) return "food";
@@ -99,7 +112,7 @@ export function infoCard(info: ItemInfo | undefined, kind: ListKind): ReturnType
 /** The nav link, when the list is public. */
 export function priceListNav(ctx: Ctx): NavItem[] {
   const pl = priceListOf(ctx.r);
-  return pl?.sections.length && pl.public !== false ? [{ label: pl.title?.trim() || "Prices", href: "/prices/" }] : [];
+  return pl?.sections.length && pl.public !== false ? [{ label: pl.title?.trim() || KINDS[listKind(ctx.r)].title, href: "/prices/" }] : [];
 }
 
 /** The price list page, sections with anchors the QR labels point at. Private lists are noindex and unlinked. */
@@ -108,7 +121,7 @@ export function pricesPage(ctx: Ctx): PageSpec | null {
   const pl = priceListOf(r);
   if (!pl?.sections.length) return null;
   const kind = listKind(r);
-  const title = pl.title?.trim() || "Prices";
+  const title = pl.title?.trim() || KINDS[kind].title;
   const call = action(r, "call")!;
   const shown = pl.sections.map((s) => ({ ...s, items: s.items.filter((it) => !it.soldOut && it.qty !== 0) })).filter((s) => s.items.length);
   const qtyNote = (it: { qty?: number }) => (it.qty !== undefined && it.qty > 0 && it.qty <= 5 ? `${it.qty} left` : "");

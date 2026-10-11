@@ -228,7 +228,7 @@ export function editForm(l: EditDetail): EditForm {
     card("pricelist", "Live price list & QR labels", [
       ta("plText", "Price list", pl.sections ? menuToText(pl.sections) : "", 8, { placeholder: "# Case\nSourdough loaf | $8 | Baked daily\nCinnamon rolls (6) | $14\n\n# Shelf\nLocal honey, 16 oz | $12" }),
       txt("plTitle", "Page title", pl.title || "", { max: 40, placeholder: "Today's prices" }),
-      sel("plKind", "What's on it (sets the wording and the info-card fields)", pl.kind || "", [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["goods", "Other goods"]]),
+      sel("plKind", "What's on it (sets the wording and the info-card fields)", pl.kind || "", [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["parts", "Auto parts & tires"], ["vehicles", "Vehicles & equipment"], ["goods", "Other goods"]]),
       cb("plPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", pl.public !== false),
       note("Optional. One item per line: Name | $Price | Note; start a section with # Section name (one per case, shelf, bench or bin). The owner keeps it current from the Stock board on their phone or the tablet; each section gets a QR label (QR price tags)."),
     ], { collapsed: true });
@@ -359,7 +359,7 @@ export function editForm(l: EditDetail): EditForm {
       h3("Price list & QR labels"),
       ta("rtPriceList", "Price list", pl.sections ? menuToText(pl.sections) : "", 8, { placeholder: "# Freshwater community\nNeon tetra | $2.99 | Schooling fish, keep 6+\nCorydoras | $6.99\n\n# Saltwater\nOcellaris clownfish | $24.99" }),
       txt("rtPriceTitle", "Page title", pl.title || "", { max: 40, placeholder: "Fish & prices" }),
-      sel("rtPriceKind", "What's on it (sets the wording and the info-card fields)", pl.kind || "", [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["goods", "Other goods"]]),
+      sel("rtPriceKind", "What's on it (sets the wording and the info-card fields)", pl.kind || "", [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["parts", "Auto parts & tires"], ["vehicles", "Vehicles & equipment"], ["goods", "Other goods"]]),
       cb("rtPricesPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", pl.public !== false),
       note("One item per line: Name | $Price | Note. Start a section with # Section name (one per tank, shelf or rack). Each section gets a QR label on the printable sheet (Live lead → QR price tags). A price change here is a price change on the shelf."),
     );

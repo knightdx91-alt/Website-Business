@@ -761,7 +761,7 @@ function priceListHtml(s: AppSettings): string {
   if (!p) return "";
   const lines = p.includes.split(/\n/).map((x) => x.trim()).filter(Boolean).slice(0, 4);
   return `<section class="sec" id="price-list"><div class="wrap narrow"><h2>Just need a live price list?</h2>
-<p class="lead">For shops whose stock changes every day: fish stores, plant nurseries, produce stands, resale. A price page with a section for every tank or shelf, QR tags, and a board you update from your phone. ${money(p.monthly)} a month, no minimum.</p>
+<p class="lead">For any business whose stock changes: fish stores, nurseries, bakeries, resale, auto parts and tire shops, car lots. A price page with a section for every tank or shelf, QR tags, and a board you update from your phone. ${money(p.monthly)} a month, no minimum.</p>
 <ul>${lines.map((x) => `<li>${e(x)}</li>`).join("")}</ul>
 <p><a class="btn btn--small" href="/price-list">How it works</a> <a class="btn btn--small btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a></p></div></section>`;
 }
@@ -1000,7 +1000,7 @@ function priceListTeaser(s: AppSettings): string {
   const p = listPlan(s);
   return `<section class="sec" id="price-list-teaser"><div class="wrap narrow"><div class="card"><p class="eyebrow">New for shops</p>
 <h2 style="margin-top:6px">A price list that changes when you change it</h2>
-<p>Fish store, plant nursery, produce stand, resale: change what's in a tank or on a shelf from your phone, and the price page, the QR tag on the shelf and the screen by the tank all follow within a minute.${p ? ` Included with every website plan, or on its own for ${money(p.monthly)} a month with no minimum.` : ""}</p>
+<p>Fish store, nursery, bakery, parts counter, tire shop, car lot, resale: change what's in a tank, case, bin or row from your phone, and the price page, the QR tag on the shelf and the screen by the tank all follow within a minute.${p ? ` Included with every website plan, or on its own for ${money(p.monthly)} a month with no minimum.` : ""}</p>
 <p><a class="btn btn--small" href="/price-list">See how it works</a></p></div></div></section>`;
 }
 
@@ -1025,7 +1025,7 @@ async function priceListPage(env: Env): Promise<Response> {
     ["You change it from your phone", "New fish in, price change, sold out: open the board, tap, done. Twenty seconds, no computer."],
     ["Everything follows", "The page updates within about a minute. The QR tag on the shelf and the tablet by the tank show the same thing, because they read the same page."],
   ];
-  const who = ["Fish, reptile and pet stores", "Plant nurseries and garden centers", "Produce stands and farm stores", "Antique malls and resale shops", "Feed and hardware stores with bulk bins", "Bakery cases and butcher counters"];
+  const who = ["Fish, reptile and pet stores", "Plant nurseries and garden centers", "Produce stands and farm stores", "Bakery cases and butcher counters", "Auto parts counters and tire shops (part number, fits, brand, warranty on the card)", "Used car, trailer and equipment lots (year, miles, VIN, condition)", "Antique malls, resale and consignment", "Feed and hardware stores with bulk bins"];
   const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Live price list</p>
 <h1>A price list that changes when you change it</h1>
 <p class="lead">Built for shops whose stock changes every day. You change what's in a tank or on a shelf from your phone; your website's price page, the QR tag on the shelf and the screen by the tank all follow within a minute.</p>
