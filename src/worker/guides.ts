@@ -1,6 +1,8 @@
 import { addonPrice, type AppSettings } from "./db.ts";
 import { escHtml, page } from "./page.ts";
 import { APP_ORIGIN } from "./tankboard.ts";
+import { KINDS } from "../generator/pricelist.ts";
+import type { ListKind } from "../generator/types.ts";
 
 /**
  * In-app how-to guides (Settings → Guides; owner and callers), one source for the web app and the Android app
@@ -38,7 +40,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
     id: "tankboard",
     title: "🐠 Tank board, price page & QR tags",
     intro:
-      "The inventory system for shops whose stock changes every day: fish stores, plant nurseries, produce stands, resale. The shop keeps a board on their phone (what's in each tank or on each shelf, prices, counts, photos, sold out). Every change goes to a price page on their website within about a minute. QR tags on the tanks open that tank's live prices, and a cheap tablet by a tank can show them with no QR at all. Built for King Fish Aquatics in October 2026.",
+      "The inventory system for any business whose stock changes every day: fish stores, plant nurseries, bakeries and produce stands, resale, feed stores. Every lead has it (Edit → Live price list; shops: Shop details). \"What's on it\" (fish / plants / pets / food / other goods) sets the words (tank, bench, case, shelf) and the info-card fields; the board is called Tank board, Bench board, Case board or Stock board to match. The shop keeps a board on their phone (what's in each tank or on each shelf, prices, counts, photos, sold out). Every change goes to a price page on their website within about a minute. QR tags on the tanks open that tank's live prices, and a cheap tablet by a tank can show them with no QR at all. Built for King Fish Aquatics in October 2026.",
     sections: [
       {
         title: "The four pieces",
@@ -353,7 +355,10 @@ export interface CustomerPitch {
   fine: string;
 }
 
-export function customerBoardPitch(s: AppSettings, o: { business: string; live: boolean }): CustomerPitch {
+export function customerBoardPitch(s: AppSettings, o: { business: string; live: boolean; kind?: ListKind }): CustomerPitch {
+  const W = KINDS[o.kind ?? "fish"];
+  const sec = W.section.toLowerCase();
+  const item = W.item;
   const list = s.plans.find((p) => p.id === "list" && p.monthly);
   const site = s.plans.filter((p) => p.id !== "list" && p.monthly);
   const cheapest = site.length ? site.reduce((a, p) => (p.monthly < a.monthly ? p : a)) : null;
@@ -361,27 +366,27 @@ export function customerBoardPitch(s: AppSettings, o: { business: string; live: 
   const company = s.companyName || "Underground Associates";
   const you = o.business || "your shop";
   return {
-    title: `What's in the tank, on your phone and on the tank`,
-    lead: `${you} changes what's in its tanks every day. Here's how the price on the tank keeps up by itself: you change it on your phone, and the tag on the tank, the screen by the tank and your website all change with it.`,
+    title: `What's in the ${sec}, on your phone and on the ${sec}`,
+    lead: `${you} changes what's on its ${sec}s every day. Here's how the price on the ${sec} keeps up by itself: you change it on your phone or the tablet, and the tag on the ${sec}, the screen beside it and your website all change with it.`,
     sections: [
       {
         title: "How it works",
         numbered: true,
         steps: [
-          "We text you a private link: your Tank board. It opens on any phone. No app to install, no password to remember.",
-          "The board lists your tanks (or shelves). For each one you type what's in it, the price, how many, and snap a photo if you like.",
+          `We text you a private link: your ${W.board}. It opens on any phone. No app to install, no password to remember.`,
+          `The board lists your ${sec}s. For each one you type what's in it, the price, how many, and snap a photo if you like.`,
           "Every change saves by itself and shows on your website's price page within about a minute.",
-          "A small QR tag on each tank opens that tank's live prices on a customer's phone. A cheap tablet by the tank can show them too, no scanning.",
+          `A small QR tag on each ${sec} opens its live prices on a customer's phone. A cheap tablet beside it can show them too, no scanning.`,
         ],
       },
       {
         title: "What you do",
         steps: [
-          "Something new comes in: on the tablet by the tank, tap Staff, enter your PIN (or tap your staff tag), tap \"+ Add\", tap the fish in the list (or type a new name) and tap how many. Twenty seconds. The same works on the board on your phone.",
-          "New fish nobody has stocked before: type its name, tap how many, and the tablet asks for a photo and writes its care card (size, food, temperament, tank size) for you to check.",
-          "Customers tap a fish on the tablet or the website to read its care card. Nothing they tap can change your stock: that takes your PIN, your staff tag, or your phone.",
+          `Something new comes in: on the tablet, tap Staff, enter your PIN (or tap your staff tag), tap "+ Add", tap the ${item} in the list (or type a new name) and tap how many. Twenty seconds. The same works on the board on your phone.`,
+          `A new ${item} nobody has stocked before: type its name, tap how many, and the tablet asks for a photo and writes its info card (${W.fields.slice(0, 3).map((f) => f[1].toLowerCase()).join(", ")}…) for you to check.`,
+          `Customers tap a ${item} on the tablet or the website to read its info card. Nothing they tap can change your stock: that takes your PIN, your staff tag, or your phone.`,
           "Something sells out: tap \"Sold out\". It disappears from the page until you tap it back. Or just type how many are left; at 5 or fewer the page says \"3 left\".",
-          "Want a picture? Tap the camera on the item and take one right there at the tank.",
+          `Want a picture? Tap the camera on the item and take one right there at the ${sec}.`,
           "Prices change: change the number. Nobody rewrites a tag, nobody reprints anything.",
           "That's all. You never touch the website, and anyone on your staff with the link can do it.",
         ],
@@ -389,17 +394,17 @@ export function customerBoardPitch(s: AppSettings, o: { business: string; live: 
       {
         title: "What your customers get",
         steps: [
-          "At the tank: scan the tag or glance at the screen and see exactly what's in it today, with prices and photos.",
-          "At home: your price page shows up with your website on Google, so people check what you have before they drive over, and call about the fish they want.",
+          `At the ${sec}: scan the tag or glance at the screen and see exactly what's on it today, with prices and photos.`,
+          `At home: your price page shows up with your website on Google, so people check what you have before they drive over, and call about the ${item} they want.`,
           "Fewer \"how much is this one?\" questions, and no arguing about a price on an old tag.",
         ],
       },
       {
         title: `What ${company} does`,
         steps: [
-          "Set up your price page and your board, and load your first tanks with you if you want.",
-          "Print your QR tags (one per tank), and set up a tablet for you if you'd like one.",
-          "Keep it all running: hosting, security, backups, and reprints when you rename or add a tank.",
+          `Set up your price page and your board, and load your first ${sec}s with you if you want.`,
+          `Print your QR tags (one per ${sec}), and set up a tablet for you if you'd like one.`,
+          `Keep it all running: hosting, security, backups, and reprints when you rename or add a ${sec}.`,
           "Answer by text. Anything odd, you text us and we fix it.",
         ],
       },
@@ -408,10 +413,10 @@ export function customerBoardPitch(s: AppSettings, o: { business: string; live: 
       list ? `Just the price page, board and tags: ${list.name}, $${list.monthly} a month. No minimum; cancel any time.${tags ? ` Your first sheet of QR tags is included.` : ""}` : "Ask us about the Price list plan.",
       cheapest ? `With a full website: included in every website plan, from $${cheapest.monthly} a month.` : "Included with every website plan.",
       tags ? `More QR tag sheets (8 tags each): ${addonPrice(tags)}.` : "QR tags are an extra.",
-      "A tablet by the tank: any $40 to $80 tablet works; we'll set it up.",
+      `A tablet by the ${sec}: any $40 to $80 tablet works; we'll set it up.`,
     ],
     fine: o.live
-      ? "Your price page is live now. Add a tank on the board and watch it change."
+      ? `Your price page is live now. Add a ${sec} on the board and watch it change.`
       : "Your website isn't live yet; the board and the preview work today, and the tags are printed once it's live (within 3 business days of your go-ahead).",
   };
 }

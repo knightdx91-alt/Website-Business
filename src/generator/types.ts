@@ -116,6 +116,9 @@ export interface MenuItem {
   info?: ItemInfo;
 }
 
+/** What a live price list holds: sets the words (tank / bench / case / shelf) and the care-card fields. See generator/pricelist.ts. */
+export type ListKind = "fish" | "plants" | "pets" | "food" | "goods";
+
 /** What a customer sees when they tap a fish (or plant, reptile…) on the price page or the tablet. */
 export interface ItemInfo {
   kind?: "fish" | "invertebrate" | "plant" | "reptile" | "bird" | "small_animal" | "other";
@@ -127,6 +130,8 @@ export interface ItemInfo {
   water?: string;
   origin?: string;
   notes?: string;
+  /** Free rows for kinds other than fish (label + value, in order); the kind's named fields come first when both exist. */
+  facts?: Array<{ label: string; value: string }>;
   /** Drafted by Claude from the name; the shop should read it once. */
   aiDrafted?: boolean;
   /** The model wasn't sure what the name meant. */
@@ -353,6 +358,8 @@ export interface RetailExt {
     catalog?: CatalogEntry[];
     /** Tablet staff mode: the PIN that unlocks editing on the shop's tablet (4–8 digits). */
     staffPin?: string;
+    /** Fish, plants, pets, food or other goods: wording and care-card fields. Guessed from the business when unset. */
+    kind?: ListKind;
   };
 }
 

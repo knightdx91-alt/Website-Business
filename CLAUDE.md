@@ -579,6 +579,20 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   catalog search and a new-name path (count → photo prompt → AI card), locks after 3 idle minutes or "Done". Board: "Tablet &
   staff" section (Save PIN `PUT /c/…/staffpin`, approve code, NFC text; `/data` carries `staffPinSet`, `nfcText`).
   `test/worker/tablet.test.ts`. Guides and the customer pitch describe it.
+- Live price list for every business (Oct 2026, `src/generator/pricelist.ts`): the page, its nav link and the care card moved out
+  of the retail pack; render.ts wraps every pack (`nav` + `pages`) with `priceListNav` / `pricesPage`, so any category builds
+  `/prices/` when `ext.retail.priceList` has sections (the storage path kept its historical name). `priceList.kind`
+  (`ListKind` fish / plants / pets / food / goods; `listKind(r)` guesses from category, variant, name and `typeLabel` when unset)
+  → `KINDS[kind]` words (section "Tank" / "Bench" / "Enclosure" / "Case" / "Shelf", item, emoji, board name "Tank board" /
+  "Bench board" / … / "Stock board", empty text) and info-card fields; `ItemInfo.facts` [{label, value}] carries non-fish rows,
+  `infoRows(info, kind)` shows the kind's fields, then any other kind's named fields, then facts. `draftItemInfo(…, {kind})`
+  uses a facts schema with the kind's labels for non-fish kinds. Feed carries `kind` + `words`; the board and tablet pages word
+  themselves from them (+ New case, "Sold out for today. Fresh again tomorrow."). Edits: top-level `edits.priceList {text,
+  title, public, kind}` for any category (`applyPriceListEdit`, keeps qty / soldOut / info / photos by name when the list is
+  retyped), retail's fields gained `priceKind`; editform card `pricelist` ("Live price list & QR labels", every non-shop
+  category, fields `plText/plTitle/plKind/plPublic`), web Edit `priceListEditCard`. The board, QR tags, Show-them-the-board
+  and texted page buttons show on every ready lead; `detail().boardName` / `listKind` name them (Android 2.34 `LeadDetail.
+  boardName`). `test/worker/pricelist-kinds.test.ts`.
 - Price list plan (Oct 2026, `PlanId` "list" in db.ts; `DEFAULT_LIST_PLAN` $29/mo is appended to saved Settings that lack it,
   blank its monthly price to hide it): a live price page + Tank board + QR tags + display page, NOT a website, for shops whose
   stock changes daily. `billingOptions` gives it only Monthly (no minimum, no setup) and yearly; the agreement adds

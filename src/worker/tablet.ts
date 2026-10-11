@@ -2,7 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { hmac, safeEqual } from "./auth.ts";
 import { draftItemInfo, infoRows } from "../copy/iteminfo.ts";
-import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
+import { autoMatchPhotos } from "../generator/packs/retail.ts";
+import { KINDS, kindWords, listKind } from "../generator/pricelist.ts";
 import type { BusinessRecord, CatalogEntry, Image, ItemInfo, MenuItem } from "../generator/types.ts";
 import { getLead, getSetting, setSetting, updateLead, type LeadRow } from "./db.ts";
 import { HttpError, newId, type Env } from "./env.ts";
@@ -168,11 +169,15 @@ const InfoSchema = z.object({
   water: z.string().trim().max(80).optional(),
   origin: z.string().trim().max(60).optional(),
   notes: z.string().trim().max(300).optional(),
+  facts: z.array(z.object({ label: z.string().trim().min(1).max(40), value: z.string().trim().max(120) })).max(12).optional(),
 });
 
 const cleanInfo = (i: z.infer<typeof InfoSchema>): ItemInfo | undefined => {
   const out: ItemInfo = {};
-  for (const [k, v] of Object.entries(i)) if (v) (out as Record<string, unknown>)[k] = v;
+  for (const [k, v] of Object.entries(i)) {
+    if (k === "facts") { const f = (v as Array<{ label: string; value: string }>).filter((x) => x.value); if (f.length) out.facts = f; }
+    else if (v) (out as Record<string, unknown>)[k] = v;
+  }
   return Object.keys(out).length ? out : undefined;
 };
 
@@ -271,10 +276,10 @@ export async function serveStation(env: Env, req: Request, leadId: string, rest:
   if (rest === "/staff/info" && req.method === "POST") {
     const b = z.object({ name: z.string().trim().min(1).max(120), section: z.string().max(60).optional(), note: z.string().max(200).optional() }).parse(await req.json());
     if (!env.ANTHROPIC_API_KEY) throw new HttpError(409, "The care-card writer isn't set up");
-    const info = await draftItemInfo(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }), b.name, { shop: record.name, section: b.section, note: b.note });
+    const info = await draftItemInfo(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }), b.name, { shop: record.name, section: b.section, note: b.note, kind: listKind(record) });
     setInfoEverywhere(record, b.name, info);
     await saveAndRefresh(env, lead, record, { quick: true });
-    return Response.json({ info, rows: infoRows(info) }, { headers: noStore });
+    return Response.json({ info, rows: infoRows(info, listKind(record)) }, { headers: noStore });
   }
   if (rest === "/staff/info" && req.method === "PUT") {
     const b = z.object({ name: z.string().trim().min(1).max(120), info: InfoSchema }).parse(await req.json());
@@ -294,6 +299,9 @@ export async function serveDisplay(env: Env, leadId: string, slug: string, origi
   const tank = slug ? feed.sections.find((x) => x.slug === slug) : null;
   const title = tank ? `${tank.name} · ${record.name}` : `${feed.title} · ${record.name}`;
   const hasPin = !!priceList(record).staffPin;
+  const W = kindWords(record);
+  const sec = W.section.toLowerCase();
+  const FIELDS = JSON.stringify(W.fields.map(([k, l, ex]) => [k, l, ex]));
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow"><title>${escHtml(title)}</title>
 <style>
@@ -367,13 +375,15 @@ body.staff .staffbar{display:flex}
 <script>
 (function(){
 var LEAD=${JSON.stringify(leadId)},BASE="/l/"+LEAD,FEED=BASE+"/prices.json",SLUG=${JSON.stringify(slug)},data=null,i=0,ROTATE=10000,staffTok=null,staff=false,cur=null,idle=null,pollT=null,pin="";
+var SEC=${JSON.stringify(sec)},SECT=${JSON.stringify(W.section)},EMOJI=${JSON.stringify(W.emoji)},EMPTY=${JSON.stringify(W.empty)},FIELDS=${FIELDS},KIND=${JSON.stringify(listKind(record))};
 try{staffTok=localStorage.getItem("staff."+LEAD)||null}catch(e){}
 var $=function(id){return document.getElementById(id)};
 function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function api(path,opts){opts=opts||{};opts.headers=Object.assign({"content-type":"application/json"},opts.headers||{});if(staffTok)opts.headers["x-staff"]=staffTok;return fetch(BASE+path,opts).then(function(r){return r.json().then(function(j){if(!r.ok){if(r.status===401)lock();throw new Error(j.error||("Failed ("+r.status+")"))}return j})})}
 function tankName(){if(cur)return cur;if(SLUG&&data){for(var k=0;k<data.sections.length;k++)if(data.sections[k].slug===SLUG)return data.sections[k].name}return data&&data.sections.length?data.sections[i%data.sections.length].name:""}
 function pick(){if(!data)return null;var n=tankName();for(var k=0;k<data.sections.length;k++)if(data.sections[k].name===n)return data.sections[k];return SLUG?{name:"",items:[]}:(data.sections[0]||null)}
-function rows(info){if(!info)return[];var r=[["Adult size",info.maxSize],["Eats",info.diet],["Temperament",info.temperament],["Minimum tank",info.minTank],["Care level",info.care],["Water",info.water],["From",info.origin]];return r.filter(function(x){return x[1]})}
+var ALLF=${JSON.stringify(Object.values(KINDS).flatMap((k) => k.fields.map(([key, label]) => [key, label])))};
+function rows(info){if(!info)return[];var out=[],seen={};FIELDS.concat(ALLF).forEach(function(f){if(seen[f[0]])return;var v=info[f[0]];if(typeof v==="string"&&v.trim()){out.push([f[1],v.trim()]);seen[f[0]]=1;seen["l:"+f[1].toLowerCase()]=1}});(info.facts||[]).forEach(function(f){if(f.label&&f.value&&!seen["l:"+f.label.toLowerCase()])out.push([f.label,f.value])});return out}
 function render(){var s=pick();var m=$("m"),h=$("h"),d=$("dots");
   if(!s){m.innerHTML='<p class="empty">Nothing on the board yet.'+(staff?' Tap + Add.':'')+'</p>';return}
   if(s.name)h.textContent=s.name;
@@ -381,10 +391,10 @@ function render(){var s=pick();var m=$("m"),h=$("h"),d=$("dots");
   m.innerHTML=items.length?'<div class="grid">'+items.map(function(it,k){var left=it.qty!=null&&it.qty<=5&&it.qty>0?'<span class="left">'+it.qty+' left</span>':'';
     var right=staff?'<div class="qty"><button class="btn small" data-adj="-1" data-k="'+k+'">−</button><b>'+(it.qty==null?"–":it.qty)+'</b><button class="btn small go" data-adj="1" data-k="'+k+'">+</button><button class="btn small ghost" data-more="'+k+'">⋯</button></div>':'<div class="pr">'+esc(it.price||"Ask")+left+'</div>';
     var tag=staff&&(it.soldOut||it.qty===0)?'<span class="chip">hidden</span>':'';
-    return '<div class="it'+(staff?'':' tap')+'" data-k="'+k+'">'+(it.image?'<img class="ph" src="'+esc(it.image)+'" alt="">':'<div class="ph ph--none">🐟</div>')+'<div><div class="nm">'+esc(it.name)+tag+'</div>'+(it.note||(staff&&it.price)?'<div class="nt">'+esc(staff?(it.price||"no price")+(it.note?" · "+it.note:""):it.note)+'</div>':'')+'</div>'+right+'</div>'}).join("")+'</div>':'<p class="empty">'+(staff?'Nothing in this tank. Tap + Add.':'Sold out for now. Ask us what\\'s coming.')+'</p>';
+    return '<div class="it'+(staff?'':' tap')+'" data-k="'+k+'">'+(it.image?'<img class="ph" src="'+esc(it.image)+'" alt="">':'<div class="ph ph--none">'+EMOJI+'</div>')+'<div><div class="nm">'+esc(it.name)+tag+'</div>'+(it.note||(staff&&it.price)?'<div class="nt">'+esc(staff?(it.price||"no price")+(it.note?" · "+it.note:""):it.note)+'</div>':'')+'</div>'+right+'</div>'}).join("")+'</div>':'<p class="empty">'+(staff?'Nothing in this '+SEC+'. Tap + Add.':esc(EMPTY))+'</p>';
   d.innerHTML=SLUG||staff||data.sections.length<2?"":data.sections.map(function(_,k){return '<i'+(k===i%data.sections.length?' class="on"':'')+'></i>'}).join("");
   $("u").textContent=data.updatedAt?"Updated "+data.updatedAt:"";
-  if(staff){$("tanks").innerHTML=data.sections.map(function(t){return '<button class="btn small'+(t.name===s.name?' go':' ghost')+'" data-tank="'+esc(t.name)+'">'+esc(t.name)+'</button>'}).join("")+'<button class="btn small ghost" data-tank="__new">+ New tank</button>'}
+  if(staff){$("tanks").innerHTML=data.sections.map(function(t){return '<button class="btn small'+(t.name===s.name?' go':' ghost')+'" data-tank="'+esc(t.name)+'">'+esc(t.name)+'</button>'}).join("")+'<button class="btn small ghost" data-tank="__new">+ New '+SEC+'</button>'}
   else fit();
   $("m").dataset.items=JSON.stringify(items)}
 function fit(){var m=$("m"),b=document.body;b.style.fontSize="";var px=parseFloat(getComputedStyle(b).fontSize);var n=0;while(m.scrollHeight>m.clientHeight+2&&px>11&&n<40){px=px*0.92;b.style.fontSize=px+"px";n++}}
@@ -416,15 +426,15 @@ function lock(){staff=false;cur=null;document.body.classList.add("customer");doc
 $("lock").onclick=lock;
 function touch(){clearTimeout(idle);idle=setTimeout(function(){if(staff)lock()},180000)}
 document.addEventListener("pointerdown",function(){if(staff)touch()});
-$("tanks").addEventListener("click",function(e){var b=e.target.closest("[data-tank]");if(!b)return;if(b.dataset.tank==="__new"){var n=prompt("Name the new tank or shelf");if(!n||!n.trim())return;cur=n.trim();openAdd();return}cur=b.dataset.tank;render()});
+$("tanks").addEventListener("click",function(e){var b=e.target.closest("[data-tank]");if(!b)return;if(b.dataset.tank==="__new"){var n=prompt("Name the new "+SEC);if(!n||!n.trim())return;cur=n.trim();openAdd();return}cur=b.dataset.tank;render()});
 // ---- add ----
 var addName="",addIsNew=false;
 function openAdd(){$("addTank").textContent=cur||"";$("addSearch").value="";$("addNew").hidden=true;$("addQty").hidden=true;addName="";listCatalog("");$("add").classList.add("on");setTimeout(function(){$("addSearch").focus()},50)}
-$("addbtn").onclick=function(){if(!cur){var n=prompt("Name the first tank or shelf");if(!n||!n.trim())return;cur=n.trim()}openAdd()};
+$("addbtn").onclick=function(){if(!cur){var n=prompt("Name the first "+SEC);if(!n||!n.trim())return;cur=n.trim()}openAdd()};
 $("addCancel").onclick=function(){$("add").classList.remove("on")};
 $("addSearch").addEventListener("input",function(){listCatalog(this.value)});
 function listCatalog(q){var cat=(data&&data.catalog)||[];q=(q||"").trim().toLowerCase();var hits=cat.filter(function(c){return !q||c.name.toLowerCase().indexOf(q)>=0});
-  var html=hits.map(function(c){return '<div class="it" data-pick="'+esc(c.name)+'">'+(c.image?'<img class="ph" src="'+esc(c.image)+'" alt="">':'<div class="ph ph--none">🐟</div>')+'<div><div class="nm">'+esc(c.name)+(c.hasInfo?'<span class="chip">info</span>':'')+'</div><div class="nt">'+esc(c.price||"")+'</div></div><div></div></div>'}).join("");
+  var html=hits.map(function(c){return '<div class="it" data-pick="'+esc(c.name)+'">'+(c.image?'<img class="ph" src="'+esc(c.image)+'" alt="">':'<div class="ph ph--none">'+EMOJI+'</div>')+'<div><div class="nm">'+esc(c.name)+(c.hasInfo?'<span class="chip">info</span>':'')+'</div><div class="nt">'+esc(c.price||"")+'</div></div><div></div></div>'}).join("");
   if(q&&!hits.some(function(c){return c.name.toLowerCase()===q}))html='<div class="it" data-new="'+esc(q)+'"><div class="ph ph--none">✚</div><div><div class="nm">New: '+esc(q)+'</div><div class="nt">Add it with a photo and a care card</div></div><div></div></div>'+html;
   $("addList").innerHTML=html||'<p class="nt">Nothing yet. Type a name to add a new one.</p>'}
 $("addList").addEventListener("click",function(e){var p=e.target.closest("[data-pick]"),n=e.target.closest("[data-new]");if(p){addName=p.dataset.pick;addIsNew=false}else if(n){addName=$("addSearch").value.trim();addIsNew=true;$("addNewName").textContent=addName;$("addPrice").value=""}else return;$("addNew").hidden=!addIsNew;$("addQtyName").textContent=addName;$("addQty").hidden=false;$("qtyPicks").innerHTML=[1,2,3,5,10,20].map(function(n){return '<button class="btn go" data-q="'+n+'" type="button">'+n+'</button>'}).join("");$("addQty").scrollIntoView({block:"nearest"})});
@@ -433,7 +443,7 @@ $("qtyGo").onclick=function(){var n=parseInt($("qtyCustom").value,10);if(n>0)doA
 function doAdd(n){var body={section:cur,name:addName,qty:n};var pr=$("addPrice").value.trim();if(addIsNew&&pr)body.price=pr;$("qtyGo").disabled=true;
   api("/staff/add",{method:"POST",body:JSON.stringify(body)}).then(function(j){data=j;$("add").classList.remove("on");render();touch();if(j.isNew){afterNew(j.added)}}).catch(function(e){alert(e.message)}).then(function(){$("qtyGo").disabled=false})}
 function afterNew(name){var s=pick();var k=-1;for(var x=0;x<s.items.length;x++)if(s.items[x].name===name)k=x;
-  var b=$("moreBody");b.innerHTML='<h2>'+esc(name)+' is in</h2><p>Take a photo so customers see it, and we\\'ll draft its care card.</p><div class="row"><button class="btn go" id="newPhoto" type="button">📷 Take a photo</button><button class="btn ghost" id="newSkip" type="button">Skip</button></div><p class="msg" id="newMsg"></p>';
+  var b=$("moreBody");b.innerHTML='<h2>'+esc(name)+' is in</h2><p>Take a photo so customers see it, and we\\'ll draft its info card.</p><div class="row"><button class="btn go" id="newPhoto" type="button">📷 Take a photo</button><button class="btn ghost" id="newSkip" type="button">Skip</button></div><p class="msg" id="newMsg"></p>';
   $("more").classList.add("on");
   $("newPhoto").onclick=function(){takePhoto(s.name,name,function(){$("newMsg").className="msg ok";$("newMsg").textContent="Photo saved ✓"})};
   $("newSkip").onclick=function(){$("more").classList.remove("on")};
@@ -443,8 +453,8 @@ function moreSheet(k){var s=pick(),it=s.items[k];if(!it)return;var r=rows(it.inf
   b.innerHTML='<h2>'+esc(it.name)+'</h2><div class="row"><span>Count:</span><input id="mQty" inputmode="numeric" value="'+(it.qty==null?"":it.qty)+'" style="max-width:6em"><button class="btn small" id="mQtyGo" type="button">Set</button><button class="btn small ghost" id="mSold" type="button">'+(it.soldOut?"Back in stock":"Sold out")+'</button></div>'+
     '<div class="row"><span>Price:</span><input id="mPrice" value="'+esc(it.price||"")+'" style="max-width:8em"><button class="btn small" id="mPriceGo" type="button">Set</button></div>'+
     '<div class="row"><button class="btn small" id="mPhoto" type="button">📷 '+(it.image?"New photo":"Add a photo")+'</button><button class="btn small" id="mAi" type="button">✨ '+(it.info?"Redo the care card":"Write a care card")+'</button></div>'+
-    (r.length||it.info&&it.info.notes?'<div class="rows">'+r.map(function(x){return '<b>'+esc(x[0])+'</b><span>'+esc(x[1])+'</span>'}).join("")+'</div>'+(it.info.notes?'<p>'+esc(it.info.notes)+'</p>':'')+(it.info.aiDrafted?'<p class="nt"><span class="chip ai">AI draft</span> Read it once; fix anything below.</p>':''):'<p class="nt">No care card yet.</p>')+
-    '<details><summary>Edit the care card</summary><div class="rows" style="grid-template-columns:1fr">'+["maxSize|Adult size","diet|Eats","temperament|Temperament","minTank|Minimum tank","care|Care level","water|Water","origin|From","notes|Notes"].map(function(f){var p=f.split("|");return '<input data-f="'+p[0]+'" placeholder="'+p[1]+'" value="'+esc(it.info&&it.info[p[0]]||"")+'">'}).join("")+'</div><div class="row"><button class="btn small go" id="mInfoSave" type="button">Save card</button></div></details>'+
+    (r.length||it.info&&it.info.notes?'<div class="rows">'+r.map(function(x){return '<b>'+esc(x[0])+'</b><span>'+esc(x[1])+'</span>'}).join("")+'</div>'+(it.info.notes?'<p>'+esc(it.info.notes)+'</p>':'')+(it.info.aiDrafted?'<p class="nt"><span class="chip ai">AI draft</span> Read it once; fix anything below.</p>':''):'<p class="nt">No info card yet.</p>')+
+    '<details><summary>Edit the info card</summary><div class="rows" style="grid-template-columns:1fr">'+FIELDS.concat([["notes","Notes",""]]).map(function(f){return '<input data-f="'+f[0]+'" placeholder="'+esc(f[1])+(f[2]?" (e.g. "+esc(f[2])+")":"")+'" value="'+esc(it.info&&it.info[f[0]]||"")+'">'}).join("")+'</div><div class="row"><button class="btn small go" id="mInfoSave" type="button">Save card</button></div></details>'+
     '<p class="msg" id="mMsg"></p><div class="row"><button class="btn ghost" id="mClose" type="button">Close</button></div>';
   $("more").classList.add("on");
   var done=function(j){data=j;render();$("more").classList.remove("on");touch()};
@@ -454,7 +464,7 @@ function moreSheet(k){var s=pick(),it=s.items[k];if(!it)return;var r=rows(it.inf
   $("mPriceGo").onclick=function(){api("/staff/set",{method:"POST",body:JSON.stringify({section:s.name,item:it.name,price:$("mPrice").value})}).then(done).catch(function(e){alert(e.message)})};
   $("mPhoto").onclick=function(){takePhoto(s.name,it.name,function(){load();$("mMsg").className="msg ok";$("mMsg").textContent="Photo saved ✓"})};
   $("mAi").onclick=function(){$("mMsg").className="msg";$("mMsg").textContent="Writing…";api("/staff/info",{method:"POST",body:JSON.stringify({name:it.name,section:s.name,note:it.note})}).then(function(){load().then(function(){moreSheet(k)})}).catch(function(e){$("mMsg").className="msg bad";$("mMsg").textContent=e.message})};
-  $("mInfoSave").onclick=function(){var info={};b.querySelectorAll("[data-f]").forEach(function(inp){if(inp.value.trim())info[inp.dataset.f]=inp.value.trim()});api("/staff/info",{method:"PUT",body:JSON.stringify({name:it.name,info:info})}).then(done).catch(function(e){alert(e.message)})}}
+  $("mInfoSave").onclick=function(){var info={},facts=[];b.querySelectorAll("[data-f]").forEach(function(inp){var v=inp.value.trim();if(!v)return;var k=inp.dataset.f;if(k==="notes"||KIND==="fish")info[k]=v;else{var lab="";FIELDS.forEach(function(f){if(f[0]===k)lab=f[1]});facts.push({label:lab||k,value:v})}});if(facts.length)info.facts=facts;api("/staff/info",{method:"PUT",body:JSON.stringify({name:it.name,info:info})}).then(done).catch(function(e){alert(e.message)})}}
 function takePhoto(section,name,cb){var cam=$("cam");cam.value="";cam.onchange=function(){var f=cam.files&&cam.files[0];if(!f)return;var img=new Image();var url=URL.createObjectURL(f);img.onload=function(){var max=1600,w=img.width,h=img.height,k=Math.min(1,max/Math.max(w,h));var c=document.createElement("canvas");c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
     c.toBlob(function(blob){fetch(BASE+"/staff/photo?section="+encodeURIComponent(section)+"&item="+encodeURIComponent(name)+"&w="+c.width+"&h="+c.height,{method:"POST",headers:{"content-type":"image/jpeg","x-staff":staffTok||""},body:blob}).then(function(r){if(!r.ok)throw new Error("Photo failed ("+r.status+")");return r.json()}).then(function(){cb&&cb()}).catch(function(e){alert(e.message)})},"image/jpeg",0.85)};img.src=url};cam.click()}
 })();

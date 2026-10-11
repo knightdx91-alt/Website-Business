@@ -177,6 +177,11 @@ export const EditsSchema = z.object({
         .object({ order: url, reserve: url, booking: url, facebook: url, instagram: url, shop: url, giftCards: url })
         .partial()
         .optional(),
+      /** The live price list for any business (stored at ext.retail.priceList whatever the category; generator/pricelist.ts). */
+      priceList: z
+        .object({ text: z.string().max(20_000), title: z.string().trim().max(40), public: z.boolean(), kind: z.enum(["fish", "plants", "pets", "food", "goods"]) })
+        .partial()
+        .optional(),
       /** Search-engine hookups: Google Search Console's HTML-tag code for this site (published pages only). */
       seo: z
         .object({ googleSiteVerification: z.string().trim().max(120).regex(/^[A-Za-z0-9_-]*$/, "Just the code from content=\"…\" in Google's tag") })
@@ -234,6 +239,7 @@ export const EditsSchema = z.object({
           /** Price list: same text form as a menu (`# Section`, `Name | $Price | Note`); empty clears it. */
           priceListText: z.string().max(20_000),
           priceListTitle: z.string().trim().max(40),
+          priceKind: z.enum(["fish", "plants", "pets", "food", "goods"]),
           pricesPublic: z.boolean(),
           /** Per-item photo (a gallery file) matched by item name; "" clears. */
           priceItems: z.array(z.object({ name: z.string().trim().min(1).max(120), image: z.string().trim().max(200).optional() })).max(300),
@@ -407,28 +413,11 @@ function applyFsrpEdits(r: BusinessRecord, e: NonNullable<Edits["record"]>): voi
       x.pet = Object.keys(p).length ? (p as typeof x.pet) : undefined;
     }
   }
+  if (e.priceList) applyPriceListEdit(r, e.priceList);
   if (r.category === "retail" && e.retail) {
     const x = (r.ext.retail = r.ext.retail ?? {});
-    const { florist, vendors, financing, priceListText, priceListTitle, pricesPublic, priceItems, ...rest } = e.retail;
-    if (priceListText !== undefined || priceListTitle !== undefined || pricesPublic !== undefined) {
-      const prev = x.priceList;
-      const sections = priceListText !== undefined ? parseMenuText(priceListText) : (prev?.sections ?? []);
-      const changed = priceListText !== undefined && priceListText.trim() !== menuToText(prev?.sections ?? []).trim();
-      x.priceList = sections.length
-        ? {
-            sections,
-            lastUpdated: changed || !prev ? new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" }) : prev.lastUpdated,
-            title: (priceListTitle ?? prev?.title)?.trim() || undefined,
-            public: pricesPublic ?? prev?.public ?? true,
-          }
-        : undefined;
-      // Retyping the list loses nothing: photos follow items of the same name, then unmatched items try the gallery's alt text.
-      if (x.priceList && prev) {
-        const before = new Map(prev.sections.flatMap((sc) => sc.items).filter((i) => i.image).map((i) => [i.name.toLowerCase(), i.image!]));
-        for (const sc of x.priceList.sections) for (const it of sc.items) if (!it.image && before.has(it.name.toLowerCase())) it.image = before.get(it.name.toLowerCase());
-      }
-      if (x.priceList) autoMatchPhotos(x.priceList.sections, r.media.gallery);
-    }
+    const { florist, vendors, financing, priceListText, priceListTitle, pricesPublic, priceKind, priceItems, ...rest } = e.retail;
+    if (priceListText !== undefined || priceListTitle !== undefined || pricesPublic !== undefined || priceKind !== undefined) applyPriceListEdit(r, { text: priceListText, title: priceListTitle, public: pricesPublic, kind: priceKind });
     if (priceItems && x.priceList) {
       const gallery = new Map(r.media.gallery.filter((g) => g.source !== "google").map((g) => [g.src, g]));
       const wanted = new Map(priceItems.map((m) => [m.name.toLowerCase(), m]));
@@ -456,6 +445,40 @@ function applyFsrpEdits(r: BusinessRecord, e: NonNullable<Edits["record"]>): voi
     for (const [k, v] of Object.entries(rest)) (x as unknown as Record<string, unknown>)[k] = v === "" ? undefined : v;
     if (quantityTiers !== undefined) x.quantityTiers = quantityTiers.length ? quantityTiers.map((t) => ({ from: t.from, note: t.note || undefined })) : undefined;
   }
+}
+
+/**
+ * The live price list, for any category. Retyping the list loses nothing: counts, sold-out flags, info cards and photos follow
+ * items of the same name; unmatched items try the gallery's captions. Stored at ext.retail.priceList (historical name).
+ */
+export function applyPriceListEdit(r: BusinessRecord, e: { text?: string; title?: string; public?: boolean; kind?: "fish" | "plants" | "pets" | "food" | "goods" }): void {
+  const x = (r.ext.retail = r.ext.retail ?? {});
+  const prev = x.priceList;
+  const sections = e.text !== undefined ? parseMenuText(e.text) : (prev?.sections ?? []);
+  const changed = e.text !== undefined && e.text.trim() !== menuToText(prev?.sections ?? []).trim();
+  if (prev && e.text !== undefined) {
+    const before = new Map(prev.sections.flatMap((sc) => sc.items).map((i) => [i.name.toLowerCase(), i]));
+    for (const sc of sections) for (const it of sc.items) {
+      const b = before.get(it.name.toLowerCase());
+      if (!b) continue;
+      if (!it.image && b.image) it.image = b.image;
+      if (it.qty === undefined && b.qty !== undefined) it.qty = b.qty;
+      if (b.soldOut) it.soldOut = true;
+      if (b.info) it.info = b.info;
+    }
+  }
+  x.priceList = sections.length || prev
+    ? {
+        ...(prev ?? { lastUpdated: "" }),
+        sections,
+        lastUpdated: changed || !prev ? new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" }) : prev.lastUpdated,
+        title: (e.title ?? prev?.title)?.trim() || undefined,
+        public: e.public ?? prev?.public ?? true,
+        kind: e.kind ?? prev?.kind,
+      }
+    : undefined;
+  if (x.priceList && !x.priceList.sections.length && !x.priceList.catalog?.length && !x.priceList.staffPin) x.priceList = undefined;
+  if (x.priceList) autoMatchPhotos(x.priceList.sections, r.media.gallery);
 }
 
 export function applyEdits(record: BusinessRecord, copy: Copy, edits: Edits): { record: BusinessRecord; copy: Copy; look?: string } {

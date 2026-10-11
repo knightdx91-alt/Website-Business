@@ -551,7 +551,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             Text(if (signups.isNotEmpty()) "Send a new link to change plans." else "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs.", style = MaterialTheme.typography.bodySmall, color = muted)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
                                 OutlinedButton(onClick = { nav.navigate("plans/${l.id}") }) { Text("📋 Show them the plans") }
-                                if (l.category == "retail") OutlinedButton(onClick = { nav.navigate("showboard/${l.id}") }) { Text("🐠 Show them the Tank board") }
+                                if (ready) OutlinedButton(onClick = { nav.navigate("showboard/${l.id}") }) { Text("📋 Show them the ${detail.boardName}") }
                                 OutlinedButton(onClick = { nav.navigate(pdfNav("/api/contract.pdf?lead=${l.id}", "Agreement")) }) { Text("📄 Agreement") }
                                 OutlinedButton(onClick = { nav.navigate(pdfNav("/api/ach.pdf?lead=${l.id}", "Payment authorization form")) }) { Text("🏦 Payment authorization form") }
                             }
@@ -582,7 +582,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             if (!detail.noReviews) OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/reviewcard.pdf", "Review cards")) }) { Text("Review cards (QR)") }
                             OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/tents.pdf", "Table tents")) }) { Text("QR table tents") }
                             OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/window.pdf", "Window sign")) }) { Text("Window sign (QR)") }
-                            if (l.category == "retail") OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/pricetags.pdf", "QR price tags")) }) { Text("QR price tags") }
+                            OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/pricetags.pdf", "QR price tags")) }) { Text("QR price tags") }
                         }
                         Text("Their own domain", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
                         val info = dom
@@ -620,22 +620,22 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- tank board (retail) ----
-            if (ready && l.category == "retail") item {
+            if (ready) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
-                        Text("🐠 Tank board", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Their own page for what's in each tank (or on each shelf): name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it.", style = MaterialTheme.typography.bodySmall, color = muted)
+                        Text("📋 ${detail.boardName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Their own page for what's in each tank, case, bench or shelf: name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it. Set \"What's on it\" in Edit → Live price list.", style = MaterialTheme.typography.bodySmall, color = muted)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
-                            OutlinedButton(onClick = { act("clientlink") { val (_, text) = state.api.clientLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them their tank board link") }
+                            OutlinedButton(onClick = { act("clientlink") { val (_, text) = state.api.clientLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them their ${detail.boardName.lowercase()} link") }
                             OutlinedButton(onClick = { act("clientopen") { val (url, _) = state.api.clientLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open it here") }
-                            OutlinedButton(onClick = { act("boardpitch") { val (_, text) = state.api.boardLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them the Tank board page") }
+                            OutlinedButton(onClick = { act("boardpitch") { val (_, text) = state.api.boardLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them the ${detail.boardName} page") }
                             if (isOwner) OutlinedButton(onClick = {
                                 ask = Ask("Revoke tank board links", "Stop every tank board link sent so far? You'll text them a new one.", "Revoke", danger = true) {
                                     act("clientrevoke") { state.api.revokeClientLink(id); context.toast("Old links no longer work. Text them a new one.") }
                                 }
                             }, enabled = busy == null) { Text("Revoke old links") }
                         }
-                        Text("A tablet by a tank can show that tank live: the 📺 link on each tank in the board. Sell it as the Price list plan when they don't want a whole website.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 6.dp))
+                        Text("A tablet beside a tank, case or shelf shows it live and lets staff update it (the 📺 link on each one in the board). Sell it as the Price list plan when they don't want a whole website.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
             }

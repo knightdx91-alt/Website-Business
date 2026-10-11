@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
-import type { ItemInfo } from "../generator/types.ts";
+import { KINDS } from "../generator/pricelist.ts";
+import type { ItemInfo, ListKind } from "../generator/types.ts";
 
 /**
  * A short care card for something a shop sells (built for fish: max size, diet, temperament, tank size, care level, water).
@@ -26,7 +27,33 @@ export const INFO_MODEL = "claude-sonnet-5-5";
 
 const SYSTEM = `You write short care cards for a small pet and aquarium shop's price tags. Facts only, in plain words a customer reads standing at the tank. If the name could mean several species or you aren't sure, say so with sure=false and keep fields blank rather than guessing. Never mention prices, stock, the shop, or that you are an AI.`;
 
-export async function draftItemInfo(client: Anthropic, name: string, context: { shop?: string; section?: string; note?: string } = {}, model = INFO_MODEL): Promise<ItemInfo> {
+const FactsSchema = z.object({
+  facts: z.array(z.object({ label: z.string().max(40), value: z.string().max(80) })).max(8).describe("One row per label from the list given, in that order; leave out any you don't know."),
+  notes: z.string().max(220).describe("One or two plain sentences a customer standing at the shelf would want. No sales talk."),
+  sure: z.boolean().describe("False when the name is ambiguous or you are guessing."),
+});
+
+/** Non-fish kinds: a card with the kind's own rows (plants: light, water, zone…; food: made with, allergens…; goods: brand, size…). */
+async function draftFacts(client: Anthropic, name: string, kind: ListKind, context: { shop?: string; section?: string; note?: string }, model: string): Promise<ItemInfo> {
+  const labels = KINDS[kind].fields.map(([, label, ex]) => `${label} (e.g. ${ex})`).join("; ");
+  const res = await client.beta.messages.parse({
+    model,
+    max_tokens: 1000,
+    system: `You write short info cards for a small shop's price tags (${KINDS[kind].label}). Facts only, in plain words a customer reads standing at the shelf. Use only these row labels, in this order, and leave out any you can't fill honestly: ${labels}. If the name could mean several things or you aren't sure, say so with sure=false and keep the rows few rather than guessing. Never mention prices, stock, the shop, or that you are an AI.`,
+    messages: [{ role: "user", content: `Item: ${name}\nSection: ${context.section ?? "unknown"}\nShop: ${context.shop ?? "a local shop"}\nShop's note: ${context.note ?? "none"}` }],
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    output_config: { effort: "low", format: betaZodOutputFormat(FactsSchema) },
+  });
+  if (res.stop_reason === "refusal" || !res.parsed_output) throw new Error(`No info card for ${name}`);
+  const o = res.parsed_output;
+  const allowed = new Set(KINDS[kind].fields.map(([, label]) => label.toLowerCase()));
+  const facts = o.facts.filter((f) => f.value.trim() && allowed.has(f.label.trim().toLowerCase())).map((f) => ({ label: f.label.trim(), value: f.value.trim() }));
+  return { kind: kind === "plants" ? "plant" : kind === "pets" ? "reptile" : "other", facts, notes: o.notes.trim() || undefined, aiDrafted: true, unsure: !o.sure || undefined };
+}
+
+export async function draftItemInfo(client: Anthropic, name: string, context: { shop?: string; section?: string; note?: string; kind?: ListKind } = {}, model = INFO_MODEL): Promise<ItemInfo> {
+  if (context.kind && context.kind !== "fish") return draftFacts(client, name, context.kind, context, model);
   const res = await client.beta.messages.parse({
     model,
     max_tokens: 1200,
@@ -42,9 +69,4 @@ export async function draftItemInfo(client: Anthropic, name: string, context: { 
   return { kind: o.kind, maxSize: clean(o.maxSize), diet: clean(o.diet), temperament: clean(o.temperament), minTank: clean(o.minTank), care: clean(o.care), water: clean(o.water), origin: clean(o.origin), notes: clean(o.notes), aiDrafted: true, unsure: !o.sure || undefined };
 }
 
-/** Rows a customer sees, in order, from whatever the card has. */
-export function infoRows(info: ItemInfo | undefined): Array<[string, string]> {
-  if (!info) return [];
-  const rows: Array<[string, string | undefined]> = [["Adult size", info.maxSize], ["Eats", info.diet], ["Temperament", info.temperament], ["Minimum tank", info.minTank], ["Care level", info.care], ["Water", info.water], ["From", info.origin]];
-  return rows.filter((r): r is [string, string] => !!r[1]);
-}
+export { infoRows } from "../generator/pricelist.ts";

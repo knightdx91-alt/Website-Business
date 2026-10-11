@@ -52,6 +52,8 @@ data class LeadFull(
     val siteImportError: String? = null,
     /** "Read from kingfishaquatics.co on 2026-10-11 (phone): 9 photos, 7 paragraphs", once read. */
     val existingSiteLine: String? = null,
+    /** "Tank board" / "Bench board" / "Case board" / "Stock board": the live price list's name for this business. */
+    val boardName: String = "Stock board",
 ) {
     val lead get() = detail.lead
 
@@ -108,6 +110,7 @@ data class LeadFull(
                 },
                 website = j.str("website"),
                 siteImportError = j.optJSONObject("siteImport")?.str("error"),
+                boardName = j.optString("boardName").ifBlank { "Stock board" },
                 existingSiteLine = j.optJSONObject("existingSite")?.let { x ->
                     val host = runCatching { java.net.URI(x.optString("url")).host?.removePrefix("www.") }.getOrNull() ?: x.optString("url")
                     "Read from $host on ${x.optString("fetchedAt")}${if (x.optString("via") == "app") " (phone)" else ""}: ${x.optInt("images")} photos, ${x.optInt("paragraphs")} paragraphs"

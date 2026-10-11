@@ -1,4 +1,5 @@
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
+import { kindWords, listKind } from "../generator/pricelist.ts";
 import { applySiteFacts, cleanImages, extractSiteFacts, isDirectoryPage } from "../places/site-import.ts";
 import { layoutOf } from "../generator/design.ts";
 import { LAYOUT_IDS, LAYOUTS } from "../generator/layouts.ts";
@@ -223,6 +224,9 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
     lint,
     menuText: record?.ext.restaurant?.menu ? menuToText(record.ext.restaurant.menu.sections) : "",
     variantLabel: record ? pack.variantLabel(record) : null,
+    /** The live price list's words for this business (Tank board / Bench board / Case board / Stock board). */
+    boardName: record ? kindWords(record).board : "Stock board",
+    listKind: record ? listKind(record) : null,
     /** Their current website: the page our web check found, else the one Google links (never a social page). */
     website: l.found_url || (() => { const w = l.place_json ? ((JSON.parse(l.place_json) as { websiteUri?: string }).websiteUri ?? null) : null; return w && !/facebook\.|instagram\.|linktr\.ee|tiktok\./i.test(w) && !isDirectoryPage(w) ? w : null; })(),
     siteImport: record?.siteImport ?? null,
@@ -1381,7 +1385,6 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     }
     if (action === "/clientlink" && m === "POST") {
       // Tank board: the client's own live price-list editor (retail only; see tankboard.ts).
-      if (lead.category !== "retail") throw new HttpError(409, "The tank board is for shops with a price list");
       const link = await clientLink(env, lead, url.origin);
       const text = `Hi! Here's your ${lead.name} tank board: ${link}  Open it on your phone, bookmark it, and change what's in each tank any time. Prices and "sold out" show on your website within a minute.`;
       await notify(env, { kind: "status", actor: session, leadId: lead.id, text: `${session.name} sent ${lead.name} their tank board link` });
@@ -1389,13 +1392,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     }
     if (action === "/showboard" && m === "GET") {
       // Customer-facing "Show them the Tank board" page (owner + callers): the pitch for this shop, the tablet view address.
-      if (lead.category !== "retail") throw new HttpError(409, "The tank board is for shops with a price list");
       const live = !!lead.live_url;
-      return json({ ...customerBoardPitch(await getSettings(env), { business: lead.name ?? "", live }), displayUrl: `${url.origin}/d/${lead.id}/`, live, phone: lead.phone });
+      const rec = lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null;
+      return json({ ...customerBoardPitch(await getSettings(env), { business: lead.name ?? "", live, kind: rec ? listKind(rec) : undefined }), displayUrl: `${url.origin}/d/${lead.id}/`, live, phone: lead.phone });
     }
     if (action === "/boardlink" && m === "POST") {
       // Text the shop the customer-facing Tank board page (public, signed, 30 days).
-      if (lead.category !== "retail") throw new HttpError(409, "The tank board is for shops with a price list");
       const link = `${url.origin}/b/${await boardPitchToken(env, lead.id)}`;
       const text = `Hi! Here's how the Tank board would work for ${lead.name}: what you'd do, what your customers see, and what it costs. ${link}`;
       await notify(env, { kind: "status", actor: session, leadId: lead.id, text: `${session.name} sent ${lead.name} the Tank board page` });
@@ -1643,7 +1645,8 @@ export default {
         const lead = (await verifyBoardPitch(env, leadId, exp, sig)) ? await getLead(env, leadId) : null;
         if (!lead || lead.status === "expired") return new Response("This link has expired. Ask us for a new one.", { status: 410, headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex" } });
         const s = await getSettings(env);
-        const pitch = customerBoardPitch(s, { business: lead.name ?? "", live: !!lead.live_url });
+        const rec = lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null;
+        const pitch = customerBoardPitch(s, { business: lead.name ?? "", live: !!lead.live_url, kind: rec ? listKind(rec) : undefined });
         return customerPitchPage(pitch, { business: lead.name ?? "your shop", company: s.companyName || "Underground Associates", phone: s.companyPhone, boardUrl: await clientLink(env, lead, url.origin), displayUrl: `${url.origin}/d/${lead.id}/`, pricingUrl: "https://undergroundassociates.com/pricing#price-list" });
       }
       const display = /^\/d\/([a-z0-9]+)(?:\/([a-z0-9-]*))?$/.exec(url.pathname);

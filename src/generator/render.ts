@@ -1,4 +1,5 @@
 import { CLIENT_SCRIPT } from "./client-script.ts";
+import { priceListNav, pricesPage } from "./pricelist.ts";
 import { actionBar, announcements, footer, gallery, header, hiring, sectionHead, type Ctx, todo } from "./components.ts";
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
@@ -6,7 +7,7 @@ import { html, jsonForScript, raw, type Raw } from "./html.ts";
 import { dnaAttrs } from "./dna.ts";
 import { lintSite, type LintResult } from "./lint.ts";
 import { packFor } from "./packs/index.ts";
-import type { CategoryPack } from "./packs/types.ts";
+import type { CategoryPack, PageSpec } from "./packs/types.ts";
 import { businessNode, faqNode, graph, originFor, webPageNode, websiteNode } from "./schema.ts";
 import { spanishNav, spanishPage } from "./spanish.ts";
 import { resolveTheme } from "./themes.ts";
@@ -126,7 +127,9 @@ function privacyBody(ctx: Ctx): Raw {
 }
 
 export async function buildSite(input: BuildInput): Promise<BuildOutput> {
-  const pack = packFor(input.record.category);
+  const basePack = packFor(input.record.category);
+  // Every business can run a live price list (generator/pricelist.ts): the page and its nav link ride on top of the pack.
+  const pack: CategoryPack = { ...basePack, nav: (c) => [...priceListNav(c), ...basePack.nav(c)], pages: (c) => [...basePack.pages(c), ...[pricesPage(c)].filter((p): p is PageSpec => !!p)] };
   const look = input.site.look || pack.defaultLook(input.record);
   const theme = resolveTheme(look);
   const ctx: Ctx = {

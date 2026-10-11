@@ -625,7 +625,7 @@
       ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)} · <a href="/api/agreements/p/${p.id}" target="_blank" rel="noopener">📄 agreement</a> · <a href="/api/agreements/p/${p.id}.pdf">⬇ PDF</a></li>`).join("")}</ul>` : ""}
       ${plans.length
         ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
-          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> ${l.category === "retail" ? `<a class="btn btn--small" href="#/showboard/${l.id}">🐠 Show them the Tank board</a> ` : ""}<a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="/api/contract.pdf?lead=${l.id}">⬇ Agreement PDF</a> <a class="btn btn--small" href="/api/ach.pdf?lead=${l.id}">🏦 Payment authorization form</a></p>
+          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> ${ready ? `<a class="btn btn--small" href="#/showboard/${l.id}">📋 Show them the ${esc(l.boardName || "Stock board")}</a> ` : ""}<a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="/api/contract.pdf?lead=${l.id}">⬇ Agreement PDF</a> <a class="btn btn--small" href="/api/ach.pdf?lead=${l.id}">🏦 Payment authorization form</a></p>
           <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div>
           <div id="signuplink"></div>`
         : isOwner() ? `<p class="small muted">Add your plans and prices in <a href="#/settings">Settings</a> first.</p>` : `<p class="small muted">The owner hasn't set up plans yet.</p>`}
@@ -689,7 +689,7 @@
         ${noReviews(l) ? "" : `<a class="btn" href="/api/leads/${l.id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a>`}
         <a class="btn" href="/api/leads/${l.id}/tents" target="_blank" rel="noopener">QR table tents</a>
         <a class="btn" href="/api/leads/${l.id}/window" target="_blank" rel="noopener">Window sign (QR)</a>
-        ${l.category === "retail" ? `<a class="btn" href="/api/leads/${l.id}/pricetags.pdf" target="_blank" rel="noopener">QR price tags</a>` : ""}</div>
+        <a class="btn" href="/api/leads/${l.id}/pricetags.pdf" target="_blank" rel="noopener">QR price tags</a></div>
       <h3 style="margin-top:16px">Their own domain</h3>
       <div id="domain"><p class="muted small">Checking…</p></div></section>`;
   }
@@ -873,10 +873,10 @@
           <button class="btn btn--good" data-act="publish"${blockers.length ? " disabled" : ""}>${l.liveUrl ? "Republish changes" : "Publish to Cloudflare"}</button>
           <button class="btn" data-act="zip"${blockers.length ? " disabled" : ""}>Download zip</button>
         </div></section>` : ""}
-      ${ready && l.category === "retail" ? `<section class="card"><h2>🐠 Tank board</h2>
-        <p class="muted small">Their own page for what's in each tank (or on each shelf): name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it.</p>
-        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their tank board link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the Tank board page</button>${owner ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
-        <p class="muted small">A tablet by a tank can show that tank live: the 📺 link on each tank in the board. Sell it as the <strong>Price list</strong> plan when they don't want a whole website.</p></section>` : ""}
+      ${ready ? `<section class="card"><h2>📋 ${esc(l.boardName || "Stock board")}</h2>
+        <p class="muted small">Their own page for what's in each tank, case, bench or shelf: name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it. Set "What's on it" in Edit → Live price list.</p>
+        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their ${esc((l.boardName || "Stock board").toLowerCase())} link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the ${esc(l.boardName || "Stock board")} page</button>${owner ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
+        <p class="muted small">A tablet beside a tank, case or shelf shows it live and lets staff update it (the 📺 link on each one in the board). Sell it as the <strong>Price list</strong> plan when they don't want a whole website.</p></section>` : ""}
       ${owner ? `<section class="card"><h2>More</h2><div class="btns">
         ${ready ? `<button class="btn btn--small" data-act="rewrite">Rewrite text with AI</button>` : ""}
         ${l.salesStatus !== "live" ? `<button class="btn btn--small btn--danger" data-act="delete">Delete lead</button>` : ""}
@@ -1206,7 +1206,7 @@
       ${visitEditCard(r)}
       ${isR ? restaurantEditCard(r, ext, cb) : ""}
       ${isS ? salonEditCard(r, ext, cb) : ""}
-      ${isRt ? retailEditCard(r, ext, cb) : ""}
+      ${isRt ? retailEditCard(r, ext, cb) : priceListEditCard(r)}
       ${isP ? printEditCard(r, ext) : ""}
       ${isParts ? partsEditCard(r, ext, cb, serviceLines) : ""}
       ${isA && !isParts ? autoEditCard(r, ext, cb) : ""}
@@ -1370,7 +1370,7 @@
           ...visitEditValues(f),
           ...(isR ? { restaurant: restaurantEditValues(f), menuItems: menuItemsEditValues(f) } : {}),
           ...(isS ? { salon: salonEditValues(f, r) } : {}),
-          ...(isRt ? { retail: retailEditValues(f, r) } : {}),
+          ...(isRt ? { retail: retailEditValues(f, r) } : { priceList: priceListEditValues(f) }),
           ...(isP ? { print: printEditValues(f) } : {}),
           hiring: (() => { const roles = (val("hiringRoles") || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 8); return roles.length ? { roles, how: val("hiringHow") || "" } : null; })(),
           events: parseEventLines(val("events") || ""),
@@ -2435,6 +2435,23 @@
     return fsClean(out);
   }
 
+  const PRICE_KINDS = [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["goods", "Other goods"]];
+  /** The live price list for any business other than a shop (shops have it inside Shop details). */
+  function priceListEditCard(r) {
+    const pl = (r.ext.retail && r.ext.retail.priceList) || {};
+    return `<section class="card"><h2>Live price list & QR labels</h2>
+      <p class="small muted">Optional. A page with a section per case, shelf, bench or bin that the owner keeps current from their phone or a tablet; each section gets a QR label.</p>
+      <label class="field">Price list <span class="hint">One item per line: Name | $Price | Note. Start a section with # Section name.</span><textarea name="plText" rows="6" placeholder="# Case&#10;Sourdough loaf | $8 | Baked daily&#10;Cinnamon rolls (6) | $14&#10;&#10;# Shelf&#10;Local honey, 16 oz | $12">${esc(pl.sections ? priceListText(pl.sections) : "")}</textarea></label>
+      <div class="row"><label class="field">Page title<input name="plTitle" maxlength="40" value="${esc(pl.title || "")}" placeholder="Today's prices"></label>
+      <label class="field">What's on it<select name="plKind">${PRICE_KINDS.map(([k, t]) => `<option value="${k}"${pl.kind === k ? " selected" : ""}>${t}</option>`).join("")}</select></label></div>
+      <label class="check"><input type="checkbox" name="plPublic"${pl.public !== false ? " checked" : ""}> Show the price list to Google and in the site menu (off = only reachable from the QR labels)</label></section>`;
+  }
+  function priceListEditValues(f) {
+    if (!f.elements.plText) return undefined;
+    const kind = fsVal(f, "plKind");
+    return { text: fsVal(f, "plText") || "", title: fsVal(f, "plTitle") || "", public: !!fsOn(f, "plPublic"), ...(kind ? { kind } : {}) };
+  }
+
   function retailEditCard(r, x, cb) {
     const v = r.variant;
     const fl = x.florist || {};
@@ -2466,7 +2483,8 @@
       ${booths || v === "furniture" ? `<label class="field">Hold line<input name="rtHold" maxlength="160" value="${esc(x.holdNote || "")}" placeholder="Call to hold an item for 24 hours."></label>` : ""}
       <h3>Price list &amp; QR labels</h3>
       <label class="field">Price list <span class="hint">One item per line: Name | $Price | Note. Start a section with # Section name (one per tank, shelf or rack).</span><textarea name="rtPriceList" rows="8" placeholder="# Freshwater community&#10;Neon tetra | $2.99 | Schooling fish, keep 6+&#10;Corydoras | $6.99&#10;&#10;# Saltwater&#10;Ocellaris clownfish | $24.99">${esc(x.priceList && x.priceList.sections ? priceListText(x.priceList.sections) : "")}</textarea></label>
-      <div class="row"><label class="field">Page title<input name="rtPriceTitle" maxlength="40" value="${esc((x.priceList && x.priceList.title) || "")}" placeholder="Fish & prices"></label></div>
+      <div class="row"><label class="field">Page title<input name="rtPriceTitle" maxlength="40" value="${esc((x.priceList && x.priceList.title) || "")}" placeholder="Fish & prices"></label>
+      <label class="field">What's on it<select name="rtPriceKind">${PRICE_KINDS.map(([k, t]) => `<option value="${k}"${(x.priceList && x.priceList.kind) === k ? " selected" : ""}>${t}</option>`).join("")}</select></label></div>
       ${cb("rtPricesPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", !x.priceList || x.priceList.public !== false)}
       <p class="small muted">Each section gets a QR label on the printable sheet (Live lead → QR price tags). A price change here is a price change on the shelf.</p>
       ${priceItemsEditHtml(r, x)}
@@ -2503,7 +2521,7 @@
     if (f.elements.rtDeliveryNote) { out.deliveryNote = fsVal(f, "rtDeliveryNote"); out.financing = { lender: fsVal(f, "rtLender") || "", url: fsVal(f, "rtLenderUrl") || "" }; }
     if (f.elements.rtDropDay) { out.dropDay = fsVal(f, "rtDropDay"); out.occasions = fsLines(f, "rtOcc2"); }
     if (f.elements.rtHold) out.holdNote = fsVal(f, "rtHold");
-    if (f.elements.rtPriceList) { out.priceListText = fsVal(f, "rtPriceList") || ""; out.priceListTitle = fsVal(f, "rtPriceTitle") || ""; out.pricesPublic = !!fsOn(f, "rtPricesPublic"); }
+    if (f.elements.rtPriceList) { out.priceListText = fsVal(f, "rtPriceList") || ""; out.priceListTitle = fsVal(f, "rtPriceTitle") || ""; out.pricesPublic = !!fsOn(f, "rtPricesPublic"); if (fsVal(f, "rtPriceKind")) out.priceKind = fsVal(f, "rtPriceKind"); }
     const pi = priceItemsEditValues(f);
     if (pi.length) out.priceItems = pi;
     return fsClean(out);

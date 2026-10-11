@@ -3,6 +3,7 @@ import { hmac, safeEqual } from "./auth.ts";
 import { getLead, updateLead, type LeadRow } from "./db.ts";
 import { HttpError, newId, type Env } from "./env.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
+import { kindWords, listKind } from "../generator/pricelist.ts";
 import type { BusinessRecord, Copy, Image, ItemInfo, MenuSection } from "../generator/types.ts";
 import { escHtml } from "./page.ts";
 import { renderPreview } from "./pipeline.ts";
@@ -59,9 +60,12 @@ export function photoUrl(lead: LeadRow, origin: string, img?: Image): string | n
 export function pricesFeed(lead: LeadRow, record: BusinessRecord, origin: string, all = false) {
   const pl = priceList(record);
   const photo = (img?: Image) => photoUrl(lead, origin, img) ?? undefined;
+  const words = kindWords(record);
   return {
     name: record.name,
     title: pl.title?.trim() || "Prices",
+    kind: listKind(record),
+    words: { section: words.section, item: words.item, emoji: words.emoji, board: words.board, empty: words.empty, fields: words.fields },
     public: pl.public !== false,
     updatedAt: pl.lastUpdated,
     siteUrl: lead.custom_domain ? `https://${lead.custom_domain}/prices/` : lead.live_url ? `${lead.live_url.replace(/\/$/, "")}/prices/` : null,
@@ -222,8 +226,10 @@ export async function serveTankBoard(env: Env, req: Request, leadId: string, sig
 
 export function boardPage(record: BusinessRecord, base: string, leadId = ""): Response {
   const name = escHtml(record.name);
+  const W = kindWords(record);
+  const sec = W.section.toLowerCase();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#14213d"><title>Tank board · ${name}</title>
+<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#14213d"><title>${escHtml(W.board)} · ${name}</title>
 <link rel="icon" href="/brand/logo-192.png"><link rel="apple-touch-icon" href="/brand/logo-192.png">
 <style>
 :root{--navy:#14213d;--gold:#fca311;--ink:#16181d;--muted:#5b6270;--line:#e1e4ea;--bg:#f4f5f8;--ok:#0f7b3b;--warn:#8a5300}
@@ -253,29 +259,29 @@ main{max-width:720px;margin:0 auto;padding:12px}
 .empty{padding:24px 12px;text-align:center;color:var(--muted)}
 footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 </style></head><body>
-<header><div><h1>${name} · Tank board</h1><div class="st" id="st">Loading…</div></div><a id="open" class="small" style="color:#fff" hidden target="_blank" rel="noopener">Open price page ↗</a></header>
+<header><div><h1>${name} · ${escHtml(W.board)}</h1><div class="st" id="st">Loading…</div></div><a id="open" class="small" style="color:#fff" hidden target="_blank" rel="noopener">Open price page ↗</a></header>
 <main id="m"><p class="empty">Loading your tanks…</p></main>
-<div class="bar"><button class="btn btn--line" id="addTank" type="button">+ Add a tank</button><span class="small muted">Changes save by themselves.</span></div>
+<div class="bar"><button class="btn btn--line" id="addTank" type="button">+ Add a ${escHtml(sec)}</button><span class="small muted">Changes save by themselves.</span></div>
 <section class="tank" id="staffbox"><div class="tank__h"><span>📺</span><b>Tablet &amp; staff</b></div><div style="padding:10px 12px" class="small">
-<p style="margin:0 0 8px">A tablet by a tank shows that tank live (the 📺 on each tank). On the tablet, <b>Staff</b> unlocks adding fish, counts and photos. Three ways in:</p>
+<p style="margin:0 0 8px">A tablet beside a ${escHtml(sec)} shows it live (the 📺 on each one). On the tablet, <b>Staff</b> unlocks adding ${escHtml(W.item)}s, counts and photos. Three ways in:</p>
 <div class="row" style="margin-bottom:8px"><label style="flex:1 1 160px">Staff PIN (4–8 digits)<input id="pinIn" inputmode="numeric" placeholder="not set" style="width:100%;margin-top:4px"></label><button class="btn btn--line" id="pinSave" type="button" style="padding:10px 12px">Save PIN</button></div>
 <div class="row" style="margin-bottom:8px"><label style="flex:1 1 160px">Tablet showing a code? Type it here<input id="codeIn" inputmode="numeric" placeholder="123 456" style="width:100%;margin-top:4px"></label><button class="btn btn--line" id="codeGo" type="button" style="padding:10px 12px">Approve</button></div>
 <p style="margin:0 0 4px">Staff NFC tag: write this text on any NFC sticker or fob with a free "NFC Tools" app, then tap it on the tablet: <code id="nfcText" style="user-select:all"></code></p>
 <p class="muted" id="staffMsg" style="margin:4px 0 0"></p></div></section>
-<footer>📺 means "show this tank on a screen": open that link on a tablet by the tank and it shows what's in it, live. <a href="/d/${escHtml(leadId)}/" target="_blank" rel="noopener">All tanks, rotating</a>.<br>Tank board by Underground Associates · Anything odd? Text us.</footer>
+<footer>📺 means "show this ${escHtml(sec)} on a screen": open that link on a tablet beside it and it shows what's in it, live. <a href="/d/${escHtml(leadId)}/" target="_blank" rel="noopener">Everything, rotating</a>.<br>${escHtml(W.board)} by Underground Associates · Anything odd? Text us.</footer>
 <script>
 (function(){
 var BASE=${JSON.stringify(base)};var LEAD=${JSON.stringify(leadId)};var data=null;var timer=null;var st=document.getElementById("st");var m=document.getElementById("m");
 function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function status(t,cls){st.textContent=t;st.className="st "+(cls||"")}
 function render(){
-  if(!data.sections.length){m.innerHTML='<p class="empty">No tanks yet. Tap <b>+ Add a tank</b> below, then add what\\'s in it.</p>';return}
-  m.innerHTML=data.sections.map(function(s,si){return '<section class="tank" data-s="'+si+'"><div class="tank__h"><span>🐟</span><input value="'+esc(s.name)+'" data-f="sname" aria-label="Tank name"><button class="ic" data-a="up" title="Move up">▲</button><button class="ic" data-a="down" title="Move down">▼</button><button class="ic" data-a="deltank" title="Remove tank">🗑</button><a class="ic" href="/d/'+LEAD+'/'+esc(s.slug||'')+'" target="_blank" rel="noopener" title="Show this tank on a tablet or TV">📺</a></div>'+
+  if(!data.sections.length){m.innerHTML='<p class="empty">Nothing yet. Tap <b>+ Add a ${escHtml(sec)}</b> below, then add what\\'s in it.</p>';return}
+  m.innerHTML=data.sections.map(function(s,si){return '<section class="tank" data-s="'+si+'"><div class="tank__h"><span>${W.emoji}</span><input value="'+esc(s.name)+'" data-f="sname" aria-label="Section name"><button class="ic" data-a="up" title="Move up">▲</button><button class="ic" data-a="down" title="Move down">▼</button><button class="ic" data-a="deltank" title="Remove this ${escHtml(sec)}">🗑</button><a class="ic" href="/d/'+LEAD+'/'+esc(s.slug||'')+'" target="_blank" rel="noopener" title="Show this ${escHtml(sec)} on a tablet or TV">📺</a></div>'+
     s.items.map(function(it,ii){return '<div class="item'+(it.soldOut?' out':'')+'" data-i="'+ii+'"><label class="ph" title="Take or pick a photo">'+(it.image?'<img src="'+esc(it.image)+'" alt="">':'📷')+'<input type="file" accept="image/*" capture="environment" data-a="photo"></label><div>'+
       '<div class="row"><input class="nm" value="'+esc(it.name)+'" data-f="name" placeholder="What is it?" aria-label="Name"><input class="pr" value="'+esc(it.price)+'" data-f="price" placeholder="$" inputmode="decimal" aria-label="Price"><input class="qt" value="'+(it.qty==null?"":it.qty)+'" data-f="qty" placeholder="how many" inputmode="numeric" aria-label="How many"></div>'+
       '<div class="row"><input class="nt" value="'+esc(it.note)+'" data-f="note" placeholder="Note (size, pairs only, feeding…)" aria-label="Note"></div>'+
       '<div class="row"><button class="chip'+(it.soldOut?' on':'')+'" data-a="sold" type="button">'+(it.soldOut?'Sold out · tap when back':'In stock · tap if sold out')+'</button><button class="ic" data-a="delitem" title="Remove">🗑</button></div></div></div>'}).join("")+
-    '<button class="add" data-a="additem" type="button">+ Add to this tank</button></section>'}).join("");
+    '<button class="add" data-a="additem" type="button">+ Add to this ${escHtml(sec)}</button></section>'}).join("");
 }
 function collect(){return{sections:data.sections.map(function(s){return{name:s.name,note:s.note||"",items:s.items.map(function(it){return{name:it.name,price:it.price||"",note:it.note||"",qty:(it.qty===""||it.qty==null)?null:Number(it.qty),soldOut:!!it.soldOut,imageSrc:it.imageSrc||""}})}})}}
 function save(now){clearTimeout(timer);status("Saving…");timer=setTimeout(function(){
@@ -292,14 +298,14 @@ m.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b|
   var row=b.closest("[data-i]");var it=row?s.items[+row.dataset.i]:null;
   if(a==="sold"&&it){it.soldOut=!it.soldOut;render();save(true)}
   if(a==="delitem"&&it&&confirm("Remove "+(it.name||"this item")+" from the board?")){s.items.splice(+row.dataset.i,1);render();save(true)}
-  if(a==="deltank"&&confirm("Remove the whole tank "+s.name+" and everything in it?")){data.sections.splice(si,1);render();save(true)}
+  if(a==="deltank"&&confirm("Remove "+s.name+" and everything in it?")){data.sections.splice(si,1);render();save(true)}
   if(a==="up"&&si>0){data.sections.splice(si-1,0,data.sections.splice(si,1)[0]);render();save(true)}
   if(a==="down"&&si<data.sections.length-1){data.sections.splice(si+1,0,data.sections.splice(si,1)[0]);render();save(true)}
 });
 m.addEventListener("change",function(e){var t=e.target;if(t.dataset.a!=="photo"||!t.files||!t.files[0])return;var sec=t.closest("[data-s]");var s=data.sections[+sec.dataset.s];var it=s.items[+t.closest("[data-i]").dataset.i];if(!it.name.trim()){alert("Give it a name first, then add the photo.");return}
   status("Sending photo…");var f=t.files[0];var img=new Image();var url=URL.createObjectURL(f);img.onload=function(){var max=1600,w=img.width,h=img.height,k=Math.min(1,max/Math.max(w,h));var c=document.createElement("canvas");c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
     c.toBlob(function(blob){fetch(BASE+"/photo?section="+encodeURIComponent(s.name)+"&item="+encodeURIComponent(it.name)+"&w="+c.width+"&h="+c.height,{method:"POST",headers:{"content-type":"image/jpeg"},body:blob}).then(function(r){if(!r.ok)throw new Error("Photo failed ("+r.status+")");return r.json()}).then(function(j){it.image=j.image;it.imageSrc=j.imageSrc;render();status("Photo saved ✓","saved")}).catch(function(e){status(e.message,"err")})},"image/jpeg",0.85)};img.src=url});
-document.getElementById("addTank").addEventListener("click",function(){var n=prompt("Tank or section name (e.g. Tank 12, Saltwater, Plants)");if(!n||!n.trim())return;data.sections.push({name:n.trim(),slug:"",note:"",items:[]});render();save(true);window.scrollTo(0,document.body.scrollHeight)});
+document.getElementById("addTank").addEventListener("click",function(){var n=prompt("${escHtml(W.section)} or section name (e.g. ${escHtml(W.section)} 12, New arrivals)");if(!n||!n.trim())return;data.sections.push({name:n.trim(),slug:"",note:"",items:[]});render();save(true);window.scrollTo(0,document.body.scrollHeight)});
 load();
 })();
 </script></body></html>`;

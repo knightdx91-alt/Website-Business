@@ -222,6 +222,17 @@ export function editForm(l: EditDetail): EditForm {
     designFields.push(sel("dna_" + k.id, k.label, (l.dna || {})[k.id] || k.values[0]!.id, k.values.map((v): [string, string] => [v.id, v.name])));
   }
   card("design", "Design", designFields, { kind: "design", collapsed: true });
+  if (r.category !== "retail") {
+    // The live price list for any business (the shops card carries its own copy of these fields).
+    const pl = (r.ext.retail?.priceList ?? {}) as AnyRecord;
+    card("pricelist", "Live price list & QR labels", [
+      ta("plText", "Price list", pl.sections ? menuToText(pl.sections) : "", 8, { placeholder: "# Case\nSourdough loaf | $8 | Baked daily\nCinnamon rolls (6) | $14\n\n# Shelf\nLocal honey, 16 oz | $12" }),
+      txt("plTitle", "Page title", pl.title || "", { max: 40, placeholder: "Today's prices" }),
+      sel("plKind", "What's on it (sets the wording and the info-card fields)", pl.kind || "", [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["goods", "Other goods"]]),
+      cb("plPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", pl.public !== false),
+      note("Optional. One item per line: Name | $Price | Note; start a section with # Section name (one per case, shelf, bench or bin). The owner keeps it current from the Stock board on their phone or the tablet; each section gets a QR label (QR price tags)."),
+    ], { collapsed: true });
+  }
 
   const facts: Field[] = [
     txt("foundedYear", "Year they started", r.foundedYear || "", { type: "number", placeholder: "1998" }),
@@ -348,6 +359,7 @@ export function editForm(l: EditDetail): EditForm {
       h3("Price list & QR labels"),
       ta("rtPriceList", "Price list", pl.sections ? menuToText(pl.sections) : "", 8, { placeholder: "# Freshwater community\nNeon tetra | $2.99 | Schooling fish, keep 6+\nCorydoras | $6.99\n\n# Saltwater\nOcellaris clownfish | $24.99" }),
       txt("rtPriceTitle", "Page title", pl.title || "", { max: 40, placeholder: "Fish & prices" }),
+      sel("rtPriceKind", "What's on it (sets the wording and the info-card fields)", pl.kind || "", [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["goods", "Other goods"]]),
       cb("rtPricesPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", pl.public !== false),
       note("One item per line: Name | $Price | Note. Start a section with # Section name (one per tank, shelf or rack). Each section gets a QR label on the printable sheet (Live lead → QR price tags). A price change here is a price change on the shelf."),
     );
@@ -781,7 +793,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
     if (has("rtDeliveryNote")) { out.deliveryNote = v("rtDeliveryNote"); out.financing = { lender: v("rtLender") || "", url: v("rtLenderUrl") || "" }; }
     if (has("rtDropDay")) { out.dropDay = v("rtDropDay"); out.occasions = lines("rtOcc2"); }
     if (has("rtHold")) out.holdNote = v("rtHold");
-    if (has("rtPriceList")) { out.priceListText = v("rtPriceList") || ""; out.priceListTitle = v("rtPriceTitle") || ""; out.pricesPublic = !!on("rtPricesPublic"); }
+    if (has("rtPriceList")) { out.priceListText = v("rtPriceList") || ""; out.priceListTitle = v("rtPriceTitle") || ""; out.pricesPublic = !!on("rtPricesPublic"); if (v("rtPriceKind")) out.priceKind = v("rtPriceKind"); }
     const pi: AnyRecord[] = [];
     for (let i = 0; i < 120; i++) { const name = v(`pi_name_${i}`); if (!name) break; pi.push({ name, image: v(`pi_img_${i}`) ?? "" }); }
     if (pi.length) out.priceItems = pi;
@@ -940,6 +952,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
 
   const edits: AnyRecord = { record, copy };
   if (has("lookBase") && has("layout")) edits.look = `${v("lookBase")}~${v("layout") || "classic"}${dnaCode(values, l.dnaOrder)}`;
+  if (has("plText")) record.priceList = clean({ text: v("plText") || "", title: v("plTitle") || "", public: !!on("plPublic"), ...(v("plKind") ? { kind: v("plKind") } : {}) });
   return { edits: edits as Edits, warnings };
 }
 

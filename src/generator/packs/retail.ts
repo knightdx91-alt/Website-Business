@@ -4,7 +4,7 @@ import type { PageSpec } from "./types.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html, raw, type Raw } from "../html.ts";
 import { icon } from "../icons.ts";
-import type { BusinessRecord, Faq, Image, MenuSection, RetailDonations, RetailExt, Service, ItemInfo } from "../types.ts";
+import type { BusinessRecord, Faq, Image, MenuSection, RetailDonations, RetailExt, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 /** research/retail-shops.md §10, checked in order; Google has no antique or feed-store type, so names decide those. */
@@ -246,50 +246,6 @@ export function autoMatchPhotos(sections: MenuSection[], photos: Image[]): numbe
   return n;
 }
 
-/** The price list page, sections with anchors the QR labels point at. Private lists are noindex and unlinked. */
-/** "About this fish": the care card as a fold-out under the item (also rendered live by the client script). */
-function infoCard(info: ItemInfo | undefined): ReturnType<typeof html> {
-  if (!info) return raw("");
-  const rows: Array<[string, string | undefined]> = [["Adult size", info.maxSize], ["Eats", info.diet], ["Temperament", info.temperament], ["Minimum tank", info.minTank], ["Care level", info.care], ["Water", info.water], ["From", info.origin]];
-  const have = rows.filter((r) => r[1]);
-  if (!have.length && !info.notes) return raw("");
-  return html`<details class="menu-item__more"><summary>About this one</summary><dl>${have.map(([k, v]) => html`<dt>${k}</dt><dd>${v}</dd>`)}</dl>${info.notes ? html`<p>${info.notes}</p>` : ""}</details>`;
-}
-
-export function pricesPage(ctx: Ctx): PageSpec | null {
-  const r = ctx.r;
-  const pl = ext(r).priceList;
-  if (!pl?.sections.length) return null;
-  const title = pl.title?.trim() || "Prices";
-  const call = action(r, "call")!;
-  const shown = pl.sections.map((s) => ({ ...s, items: s.items.filter((it) => !it.soldOut && it.qty !== 0) })).filter((s) => s.items.length);
-  const qtyNote = (it: { qty?: number }) => (it.qty !== undefined && it.qty > 0 && it.qty <= 5 ? `${it.qty} left` : "");
-  const body = html`<div id="prices-live"${ctx.liveData ? raw(` data-live="${ctx.liveData}"`) : ""}><nav class="menu-nav" aria-label="${title} sections">${shown.map((s) => html`<a href="#sec-${sectionSlug(s.name)}">${s.name}</a>`)}</nav>
-${shown.map(
-    (s) => html`<section class="menu-sec" id="sec-${sectionSlug(s.name)}" aria-labelledby="sec-${sectionSlug(s.name)}-t"><h2 id="sec-${sectionSlug(s.name)}-t">${s.name}</h2>${s.note ? html`<p class="muted">${s.note}</p>` : ""}
-<ul class="menu-items">${s.items.map((it) => {
-      const img = it.image && (ctx.mode === "preview" || it.image.source !== "google") ? it.image : undefined;
-      const note = [it.description, qtyNote(it)].filter(Boolean).join(" · ");
-      const card = infoCard(it.info);
-      const row = html`<div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${note ? html`<p>${note}</p>` : ""}${card}`;
-      return img ? html`<li class="menu-item menu-item--photo">${imageTag(img, { cls: "menu-item__img" })}<div>${row}</div></li>` : html`<li class="menu-item">${row}</li>`;
-    })}</ul></section>`,
-  )}</div>
-<p class="muted">Updated <span data-live-updated>${pl.lastUpdated}</span>. Stock and prices change with new arrivals; call to check before you drive over.</p>`;
-  return {
-    path: "/prices/",
-    title: fitTitle([`${title} | ${r.name}, ${r.address.city} ${r.address.state}`, `${title} | ${r.name}`]),
-    description: `${title} at ${r.name} in ${r.address.city}, ${r.address.state}: ${pl.sections.map((s) => s.name).slice(0, 4).join(", ")}. Call ${r.phone.display} to check stock.`,
-    crumb: title,
-    noindex: pl.public === false,
-    body: html`<section class="section"><div class="wrap narrow">
-<span class="section__label">${r.name}</span><h1>${title}</h1>
-${body}
-<div class="btns" style="margin-top:28px">${button(call, "primary")}</div>
-</div></section>`,
-  };
-}
-
 export const retailPack: CategoryPack = {
   id: "retail",
   label: "Shops & boutiques",
@@ -307,7 +263,6 @@ export const retailPack: CategoryPack = {
     return fitTitle([`${r.name} | ${l} in ${r.address.city}, ${r.address.state}`, `${r.name} | ${l} in ${r.address.city}`, `${r.name} | ${r.address.city}, ${r.address.state}`, r.name]);
   },
   nav: (ctx) => [
-    ...(ext(ctx.r).priceList?.sections.length && ext(ctx.r).priceList?.public !== false ? [{ label: ext(ctx.r).priceList?.title?.trim() || "Prices", href: "/prices/" }] : []),
     ...(ctx.r.variant === "florist" ? [{ label: "Occasions", href: "/#occasions" }] : []),
     { label: "What we carry", href: "/#carry" },
     { label: "What's new", href: "/#new" },
@@ -365,7 +320,7 @@ ${faq(dataFaq(r), true)}
 ${ctaBand(ctx, actions(r, first(r)))}
 </main>`;
   },
-  pages: (ctx) => [pricesPage(ctx)].filter((p): p is PageSpec => !!p),
+  pages: () => [],
   bannedPhrases: retailBannedPhrases,
   copyBrief: (r) => ({
     voice: `Friendly and local, a little personality for a ${(LABEL[r.variant] ?? "shop").toLowerCase()} (${
