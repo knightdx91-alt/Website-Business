@@ -407,7 +407,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: mailReady(env), publishableKey: settings.stripePublishableKey ?? null, cardReady: await cardReady(env, settings) },
       tap: isOwner ? await tapStatus(env, settings) : { ready: false },
       extraTerms: isOwner ? settings.addons.map((a) => extraTerms(a)) : [],
-      categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })),
+      // A to Z by label: the home filter, Find new leads picker and run summaries all show this list.
+      categories: SEARCH_GROUPS.map((g) => ({ id: g.id, label: g.label, category: g.category, searches: searchesFor(g, false).length, widerSearches: searchesFor(g, true).length })).sort((a, b) =>
+        a.label.localeCompare(b.label, "en", { sensitivity: "base" }),
+      ),
       defaultTerms: isOwner ? defaultTerms(settings) : "",
       models: Object.entries(MODEL_PRICES).map(([id, p]) => ({ id, label: p.label })),
       settings: isOwner ? settings : forCaller,

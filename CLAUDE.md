@@ -262,7 +262,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Done Oct 2026 (Cloud project 322487745515): Web client `…-39uoftmq9b43htr4k6thsebt0k7pded6` is in Settings (`googleClientId`);
   Android client `…-aku343iill2rs8jjtodi8orsq5d7fs5k` exists and is used by nothing in code (Credential Manager only takes the
   Web ID). Which is which was checked by sending Google a custom-scheme redirect: only the Web client is refused.
-- Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS). Several groups share one
+- Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS; `/meta.categories` serves them A to Z by label, Oct 2026). Several groups share one
   template, and the variant comes from the Google type + business name: food trucks/bakeries/coffee →
   restaurant pack; nails, pet groomers, massage (`massage`, needs the AL license # before publish) → salon
   pack; painters/concrete/handymen/fencing/remodeling/appliance/tree/pest → contractor pack trades;

@@ -156,7 +156,7 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
             if (meta != null) item(span = { GridItemSpan(maxLineSpan) }) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     item { FilterChip(selected = category.isEmpty(), onClick = { category = "" }, label = { Text("All types") }) }
-                    val groups = meta.categories.map { it.category }.distinct()
+                    val groups = meta.categories.map { it.category }.distinct().sortedBy { categoryLabel(it).lowercase() }
                     items(groups) { c -> FilterChip(selected = category == c, onClick = { category = if (category == c) "" else c }, label = { Text(categoryLabel(c)) }) }
                 }
             }
