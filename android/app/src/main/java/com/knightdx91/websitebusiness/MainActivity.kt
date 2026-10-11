@@ -71,6 +71,7 @@ import com.knightdx91.websitebusiness.ui.LocalWindowInfo
 import com.knightdx91.websitebusiness.ui.rememberWindowInfo
 import androidx.compose.runtime.CompositionLocalProvider
 import com.knightdx91.websitebusiness.update.Updater
+import com.knightdx91.websitebusiness.push.Push
 
 /** Everything the app shows lives in one Compose activity; the Tap to Pay screen is the only other activity. */
 class MainActivity : ComponentActivity() {
@@ -114,6 +115,7 @@ class AppState(val api: Api) {
     }
 
     fun signOut() {
+        runCatching { Push.unsubscribe(api.app) }
         api.prefs.signOut()
         meta = null
         unread = 0
@@ -133,6 +135,7 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
         if (state.loggedIn) {
             Updater.clearNotification(context)
             state.refreshMeta()
+            Push.configure(context, state.meta?.fcm)
             if (startLead != null) nav.navigate("lead/$startLead")
             state.update = Updater.newerBuild(state.api)
             // While the app stays open, keep looking: a new build shows up within 15 minutes without closing the app.
@@ -140,6 +143,13 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
                 delay(Updater.IN_APP_CHECK_MS)
                 if (state.update == null) state.update = Updater.newerBuild(state.api)
             }
+        }
+    }
+    // A push arrived while the app is open: show the update pop-up at once, or refresh the alert badge.
+    LaunchedEffect(state.loggedIn) {
+        if (state.loggedIn) Push.events.collect { kind ->
+            if (kind == "update" && state.update == null) state.update = Updater.newerBuild(state.api, ignoreSnooze = true)
+            if (kind == "alerts") state.unread = runCatching { state.api.unreadCount() }.getOrDefault(state.unread)
         }
     }
     // The "Update available" notification was tapped (at launch, or while the app was already open).

@@ -184,6 +184,20 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   /api/signups/:id/refund {chargeId, amountCents, cancelPlan, reason}` (`refundSignup`: Stripe refund, optional subscription
   delete, sign-up unpaid on a full refund with the plan ended, call-log note, alert). The dialog restates the agreement's refund
   rules. Card-sheet payments now also store `stripe_payment_intent`.
+- Instant pushes (Oct 2026, 2.15, `src/worker/fcm.ts`, `android/.../push/`): Firebase Cloud Messaging data messages to topic
+  `team`. Worker secret `FCM_SERVICE_ACCOUNT` (the Firebase service-account JSON; `fcmJwt` signs RS256 → OAuth token, cached) +
+  Settings → "Phone alerts (Firebase)" (`fcmAppId`, `fcmApiKey`, `fcmProjectId`, `fcmSenderId`, public; `/meta.fcm.client`, and
+  `/meta.fcm.server` = secret present). Sends: `announceUpdate()` on the minute cron (`* * * * *`, compares R2
+  `_build/website-business.json` versionCode with settings key `android_announced_code`) → {kind:"update"}; `notify()` → {kind:"alerts"}
+  after Web Push. Android: `Push.init()` in App.onCreate initialises Firebase from Prefs (no google-services.json; `FirebaseOptions`),
+  `Push.configure()` after `/meta` stores the values + subscribes to the topic, sign-out unsubscribes; `PushService`
+  (FirebaseMessagingService, manifest) runs `Updater.notifyIfNewer` / `Alerts.deliver` (the AlertWorker body, now shared) and emits
+  `Push.events` so an open app shows the update pop-up / refreshes the badge at once. Without the secret or the four values the
+  15-minute AlertWorker polling still covers everything. Deps: firebase-bom 33.7.0 + firebase-messaging. `test/worker/fcm.test.ts`.
+  Owner setup: console.firebase.google.com → Add project (Analytics off) → Add app → Android, package
+  `com.knightdx91.websitebusiness` (skip google-services.json) → Project settings → General: App ID, Web API key, Project ID;
+  Cloud Messaging: Sender ID → paste the four into Settings; Project settings → Service accounts → Generate new private key →
+  the JSON file's content as Cloudflare Worker secret FCM_SERVICE_ACCOUNT.
 - Android 2.14 (Oct 2026): updates announce themselves. `AlertWorker` (every 15 min in the background) calls
   `Updater.notifyIfNewer()`: one "Update available: X" notification per new versionCode (`Prefs.updateNotifiedCode`,
   id `UPDATE_NOTIFICATION_ID`), whose tap opens MainActivity with extra `update=true` (onCreate or `onNewIntent`, launchMode

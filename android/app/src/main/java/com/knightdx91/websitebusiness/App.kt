@@ -19,5 +19,6 @@ class App : Application() {
             description = getString(R.string.alertsChannelAbout)
         })
         AlertWorker.schedule(this)
+        com.knightdx91.websitebusiness.push.Push.init(this)
     }
 }

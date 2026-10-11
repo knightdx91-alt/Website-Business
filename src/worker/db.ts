@@ -292,6 +292,11 @@ export interface AppSettings {
   returnedPaymentFee?: number;
   /** Stripe publishable key (pk_live_…; not a secret) for the Android app's native card entry. */
   stripePublishableKey?: string;
+  /** Firebase (Phone alerts): the public client values the Android app initialises with. All four or nothing. */
+  fcmAppId?: string;
+  fcmApiKey?: string;
+  fcmProjectId?: string;
+  fcmSenderId?: string;
   /** Offer "Pay by check or bank transfer (we'll send an invoice)" on every sign-up page, not only churches. */
   invoiceForAll?: boolean;
   /** Daily call goal per person, shown in the app only. 0 = no goal. */

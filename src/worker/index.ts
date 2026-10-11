@@ -16,6 +16,7 @@ import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/cl
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
+import { announceUpdate, fcmClientConfig, serviceAccount } from "./fcm.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
@@ -71,6 +72,7 @@ const STUCK_BUILD_MS = 20 * 60_000;
 const STALLED_RUN_MS = 90 * 60_000;
 /** Which scheduled trigger fired (wrangler.jsonc): the daily housekeeping run and the weekly backup. */
 const CRON_WEEKLY_BACKUP = "0 9 * * SUN";
+const CRON_MINUTE = "* * * * *";
 
 
 /** Only web addresses: zod's url() alone would let a javascript: link through. */
@@ -424,6 +426,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       me: { role: session.role, name: session.name, id: session.userId },
       team,
       checkout: { online: !!env.STRIPE_SECRET_KEY, webhook: !!env.STRIPE_WEBHOOK_SECRET, email: mailReady(env), publishableKey: settings.stripePublishableKey ?? null, cardReady: await cardReady(env, settings) },
+      /** Firebase client values for the Android app's instant pushes; `server` says whether the Worker can send. */
+      fcm: { client: fcmClientConfig(settings), server: !!serviceAccount(env) },
       tap: isOwner ? await tapStatus(env, settings) : { ready: false },
       extraTerms: isOwner ? settings.addons.map((a) => extraTerms(a)) : [],
       // A to Z by label: the home filter, Find new leads picker and run summaries all show this list.
@@ -499,6 +503,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         ownerEmail: z.string().trim().toLowerCase().email().max(120).optional(),
         requireGoogle: z.boolean().optional(),
         stripePublishableKey: z.string().trim().regex(/^pk_(live|test)_[A-Za-z0-9]+$/, "A Stripe publishable key starts with pk_live_ or pk_test_").optional(),
+        fcmAppId: z.string().trim().regex(/^1:\d+:android:[a-f0-9]+$/, "A Firebase App ID looks like 1:123456:android:abc123").optional(),
+        fcmApiKey: z.string().trim().regex(/^AIza[A-Za-z0-9_-]{20,}$/, "A Firebase API key starts with AIza").optional(),
+        fcmProjectId: z.string().trim().regex(/^[a-z0-9-]{4,40}$/, "The Firebase project ID is lower-case letters, digits and dashes").optional(),
+        fcmSenderId: z.string().trim().regex(/^\d{6,}$/, "The sender ID is a number").optional(),
         companyStreet: z.string().trim().max(120).optional(),
         companyCity: z.string().trim().max(60).optional(),
         companyState: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Two-letter state").optional(),
@@ -1565,6 +1573,11 @@ export default {
   },
 
   async scheduled(event: ScheduledController, env: Env): Promise<void> {
+    if (event.cron === CRON_MINUTE) {
+      // A new Android build in R2 → one push to every phone (no-op without the Firebase secret).
+      await announceUpdate(env);
+      return;
+    }
     if (event.cron === CRON_WEEKLY_BACKUP) {
       await writeBackup(env);
       return;

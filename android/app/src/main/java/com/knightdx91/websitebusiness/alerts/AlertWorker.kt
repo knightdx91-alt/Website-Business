@@ -27,32 +27,10 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     override suspend fun doWork(): Result {
         val api = Api(applicationContext)
         if (!api.prefs.loggedIn) return Result.success()
-        if (Build.VERSION.SDK_INT >= 33 && applicationContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return Result.success()
         return try {
-            val n = api.notifications()
-            val since = api.prefs.lastAlertAt
-            val fresh = n.items.filter { it.unread && it.at > since }.sortedBy { it.at }
-            val nm = applicationContext.getSystemService(NotificationManager::class.java)
-            fresh.takeLast(5).forEach { e ->
-                val open = Intent(applicationContext, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    e.leadId?.let { putExtra("lead", it) }
-                }
-                val pi = PendingIntent.getActivity(applicationContext, e.id.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                val notification = Notification.Builder(applicationContext, CHANNEL)
-                    .setSmallIcon(R.drawable.ic_notification)
-                    .setLargeIcon(Icon.createWithResource(applicationContext, R.mipmap.ic_launcher))
-                    .setColor(0xFFFCA311.toInt())
-                    .setContentTitle(e.leadName ?: applicationContext.getString(R.string.appName))
-                    .setContentText(e.text)
-                    .setStyle(Notification.BigTextStyle().bigText(e.text))
-                    .setContentIntent(pi)
-                    .setAutoCancel(true)
-                    .build()
-                nm.notify(e.id.hashCode(), notification)
-            }
-            if (fresh.isNotEmpty()) api.prefs.lastAlertAt = fresh.last().at
-            // A newer build on the server gets its own notification, once per version.
+            Alerts.deliver(applicationContext, api)
+            // A newer build on the server gets its own notification, once per version (instant via Firebase when set up;
+            // this is the fallback).
             com.knightdx91.websitebusiness.update.Updater.notifyIfNewer(applicationContext, api)
             Result.success()
         } catch (e: Api.Unauthorized) {
@@ -69,5 +47,35 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             val req = PeriodicWorkRequestBuilder<AlertWorker>(15, TimeUnit.MINUTES).build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork("alerts", ExistingPeriodicWorkPolicy.KEEP, req)
         }
+    }
+}
+
+/** Fetches the team events this person hasn't been shown and posts them (used by the 15-minute worker and by a push). */
+object Alerts {
+    suspend fun deliver(context: Context, api: Api) {
+        if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val n = api.notifications()
+        val since = api.prefs.lastAlertAt
+        val fresh = n.items.filter { it.unread && it.at > since }.sortedBy { it.at }
+        val nm = context.getSystemService(NotificationManager::class.java)
+        fresh.takeLast(5).forEach { e ->
+            val open = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                e.leadId?.let { putExtra("lead", it) }
+            }
+            val pi = PendingIntent.getActivity(context, e.id.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val notification = Notification.Builder(context, AlertWorker.CHANNEL)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setLargeIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
+                .setColor(0xFFFCA311.toInt())
+                .setContentTitle(e.leadName ?: context.getString(R.string.appName))
+                .setContentText(e.text)
+                .setStyle(Notification.BigTextStyle().bigText(e.text))
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .build()
+            nm.notify(e.id.hashCode(), notification)
+        }
+        if (fresh.isNotEmpty()) api.prefs.lastAlertAt = fresh.last().at
     }
 }

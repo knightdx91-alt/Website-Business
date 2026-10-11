@@ -1,6 +1,7 @@
 import { newId, now, type Env } from "./env.ts";
 import type { Session } from "./auth.ts";
 import { getSetting, setSetting } from "./db.ts";
+import { fcmSend } from "./fcm.ts";
 
 /**
  * Notifications: what other people did (notes, call outcomes, sales, sign-ups, publishes, website messages).
@@ -43,6 +44,8 @@ export async function notify(env: Env, e: EventInput): Promise<void> {
       .bind(newId(), now(), e.actor?.userId ?? null, e.actor?.name ?? e.actorName ?? null, e.kind, e.leadId ?? null, e.text.slice(0, 500))
       .run();
     await pushAll(env, e.actor?.userId ?? null, e.kind);
+    // Android phones: an instant "something's new" ping; each phone fetches its own filtered list.
+    await fcmSend(env, { kind: "alerts" });
   } catch (err) {
     console.error("notify failed", err);
   }

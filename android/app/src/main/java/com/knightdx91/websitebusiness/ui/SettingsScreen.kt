@@ -172,6 +172,10 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
     var googleDomain by mutableStateOf(s.str("googleDomain") ?: "undergroundassociates.com")
     var ownerEmail by mutableStateOf(s.txt("ownerEmail"))
     var requireGoogle by mutableStateOf(s.optBoolean("requireGoogle"))
+    var fcmAppId by mutableStateOf(s.txt("fcmAppId"))
+    var fcmApiKey by mutableStateOf(s.txt("fcmApiKey"))
+    var fcmProjectId by mutableStateOf(s.txt("fcmProjectId"))
+    var fcmSenderId by mutableStateOf(s.txt("fcmSenderId"))
     val plans: List<PlanForm>
     var shortMonths by mutableStateOf(numText(s, "shortMonths", "6"))
     var minMonths by mutableStateOf(numText(s, "minMonths", "12"))
@@ -227,6 +231,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         putStr("googleDomain", googleDomain) { it.lowercase(Locale.US) }
         putStr("ownerEmail", ownerEmail) { it.lowercase(Locale.US) }
         b.put("requireGoogle", requireGoogle)
+        putStr("fcmAppId", fcmAppId); putStr("fcmApiKey", fcmApiKey); putStr("fcmProjectId", fcmProjectId); putStr("fcmSenderId", fcmSenderId)
         putStr("companyStreet", companyStreet)
         putStr("companyCity", companyCity)
         putStr("companyState", companyState) { it.uppercase(Locale.US) }
@@ -457,6 +462,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                 } else {
                     item { BusinessCard(f, showsCallerName) }
                     item { SignInCard(f) }
+                    item { PushCard(f, m.fcmServer) }
                     item { PlansCard(f, m, mailOut, mailBusy) { sendTestMail() } }
                     item { WaysToPayCard(f) }
                     item { FeesCard(f) }
@@ -655,6 +661,18 @@ private fun BusinessCard(f: SettingsForm, showsCallerName: Boolean) {
         Field(f.directEmail, { f.directEmail = it }, "Owner's direct email", hint = "Shown on your website as \"Need the owner directly?\"", placeholder = "post@undergroundassociates.com", keyboard = KeyboardType.Email)
         Field(f.gbpEmail, { f.gbpEmail = it }, "Google account for client profiles", hint = "Clients add this email as a Manager on their Google listing", placeholder = "yourbusiness@gmail.com", keyboard = KeyboardType.Email)
         if (showsCallerName) Field(f.callerName, { f.callerName = it }, "Your name", hint = "Your texts say \"Hi, this is ___ with ${f.companyName.ifBlank { "your company" }}\". Everyone else's texts use their own login names.", placeholder = "e.g. Post", caps = KeyboardCapitalization.Words)
+    }
+}
+
+@Composable
+private fun PushCard(f: SettingsForm, serverReady: Boolean) {
+    CollapsibleCard("Phone alerts (Firebase)") {
+        Hint("Instant pushes to every phone: a new app build and team alerts arrive within seconds instead of up to 15 minutes. One-time Firebase setup, then paste the four public values from Project settings → General (and Cloud Messaging for the sender ID). The service-account JSON goes in Cloudflare as the Worker secret FCM_SERVICE_ACCOUNT, never here.")
+        Text(if (serverReady) "✅ Worker secret FCM_SERVICE_ACCOUNT is set" else "⚠️ Worker secret FCM_SERVICE_ACCOUNT not set yet: the server can't send pushes", style = MaterialTheme.typography.bodySmall, color = if (serverReady) Good else Warn)
+        Field(f.fcmAppId, { f.fcmAppId = it }, "App ID", hint = "Looks like 1:123456789:android:0a1b2c…", placeholder = "1:…:android:…")
+        Field(f.fcmApiKey, { f.fcmApiKey = it }, "Web API key", hint = "Starts with AIza. Public, not a secret.", placeholder = "AIza…")
+        Field(f.fcmProjectId, { f.fcmProjectId = it }, "Project ID", placeholder = "underground-associates-1a2b3")
+        Field(f.fcmSenderId, { f.fcmSenderId = it }, "Sender ID", hint = "Cloud Messaging tab: Sender ID (a number)", keyboard = KeyboardType.Number)
     }
 }
 

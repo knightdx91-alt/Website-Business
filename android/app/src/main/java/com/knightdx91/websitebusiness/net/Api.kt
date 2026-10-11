@@ -13,6 +13,7 @@ import java.net.URLEncoder
 
 /** The Worker's JSON API, same routes the web app uses, with the session as a Bearer token. */
 class Api(context: Context) {
+    val app: Context = context.applicationContext
     val prefs = Prefs(context)
     val origin: String = BuildConfig.BASE_URL
 

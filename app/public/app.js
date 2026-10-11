@@ -3207,6 +3207,14 @@
         <div class="row"><label class="field">Company domain<input name="googleDomain" value="${esc(s.googleDomain || "undergroundassociates.com")}"></label>
         <label class="field">Owner's Google address <span class="hint">This address signs in as the owner</span><input name="ownerEmail" type="email" value="${esc(s.ownerEmail || "")}" placeholder="post@undergroundassociates.com"></label></div>
         <label class="check"><input type="checkbox" name="requireGoogle"${s.requireGoogle ? " checked" : ""}> Turn passwords off (Google only). Turn this on once your own Google sign-in works.</label>
+      </section>
+      <section class="card"><h2>Phone alerts (Firebase)</h2>
+        <p class="small muted">Instant pushes to every phone with the Android app: a new app build and team alerts arrive within seconds instead of up to 15 minutes. One-time Firebase setup, then paste the four public values from Project settings → General (Sender ID is under Cloud Messaging). The service-account JSON goes in Cloudflare as the Worker secret <code>FCM_SERVICE_ACCOUNT</code>, never here.</p>
+        <p class="small">${meta.fcm && meta.fcm.server ? `<span class="chip chip--good">Worker secret set</span>` : `<span class="chip chip--warn">Worker secret FCM_SERVICE_ACCOUNT not set yet: the server can't send pushes</span>`}</p>
+        <label class="field">App ID <span class="hint">Looks like 1:123456789:android:0a1b2c…</span><input name="fcmAppId" value="${esc(s.fcmAppId || "")}" placeholder="1:…:android:…" autocomplete="off"></label>
+        <label class="field">Web API key <span class="hint">Starts with AIza. Public, not a secret.</span><input name="fcmApiKey" value="${esc(s.fcmApiKey || "")}" placeholder="AIza…" autocomplete="off"></label>
+        <div class="row"><label class="field">Project ID<input name="fcmProjectId" value="${esc(s.fcmProjectId || "")}" placeholder="underground-associates-1a2b3"></label>
+        <label class="field">Sender ID<input name="fcmSenderId" value="${esc(s.fcmSenderId || "")}" inputmode="numeric" placeholder="123456789012"></label></div>
         <h2 style="margin-top:18px">Plans &amp; prices</h2>
         <div class="card small" style="margin:8px 0">${meta.checkout && meta.checkout.online
           ? `✅ <strong>Online checkout is on.</strong> Sign-up links, “Buy now” on your website and “Buy extras” links all go to a Stripe checkout with exactly what the client picked. The payment links below aren't needed.`
@@ -3303,6 +3311,10 @@
             googleDomain: v("googleDomain").toLowerCase() || undefined,
             ownerEmail: v("ownerEmail").toLowerCase() || undefined,
             requireGoogle: f.requireGoogle.checked,
+            fcmAppId: v("fcmAppId") || undefined,
+            fcmApiKey: v("fcmApiKey") || undefined,
+            fcmProjectId: v("fcmProjectId") || undefined,
+            fcmSenderId: v("fcmSenderId") || undefined,
             stripePublishableKey: v("stripePublishableKey") || undefined,
             companyStreet: v("companyStreet") || undefined,
             companyCity: v("companyCity") || undefined,

@@ -14,6 +14,9 @@ data class Category(val id: String, val label: String, val category: String, val
 
 data class TeamMember(val id: String, val name: String)
 
+/** Firebase client values (public) for instant pushes; see push/Push.kt. */
+data class FcmConfig(val appId: String, val apiKey: String, val projectId: String, val senderId: String)
+
 data class Meta(
     val meName: String,
     val meRole: String,
@@ -28,6 +31,8 @@ data class Meta(
     val tapReady: Boolean,
     val tapWhy: String?,
     val checkoutOnline: Boolean,
+    val fcm: FcmConfig? = null,
+    val fcmServer: Boolean = false,
 ) {
     val isOwner get() = meRole == "owner"
 
@@ -50,6 +55,8 @@ data class Meta(
                 tapReady = tap.optBoolean("ready"),
                 tapWhy = tap.str("why"),
                 checkoutOnline = j.optJSONObject("checkout")?.optBoolean("online") ?: false,
+                fcm = j.optJSONObject("fcm")?.optJSONObject("client")?.let { c -> FcmConfig(c.optString("appId"), c.optString("apiKey"), c.optString("projectId"), c.optString("senderId")) },
+                fcmServer = j.optJSONObject("fcm")?.optBoolean("server") ?: false,
             )
         }
     }

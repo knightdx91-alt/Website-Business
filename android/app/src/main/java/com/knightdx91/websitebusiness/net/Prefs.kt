@@ -37,6 +37,19 @@ class Prefs(context: Context) {
         get() = p.getLong("updateSnoozedAt", 0L)
         set(v) = p.edit().putLong("updateSnoozedAt", v).apply()
     /** The versionCode the background worker already posted an "Update available" notification for. */
+    /** Firebase client values from Settings (Phone alerts), so the push service can initialise with the app closed. */
+    var fcmAppId: String
+        get() = p.getString("fcmAppId", "") ?: ""
+        set(v) = p.edit().putString("fcmAppId", v).apply()
+    var fcmApiKey: String
+        get() = p.getString("fcmApiKey", "") ?: ""
+        set(v) = p.edit().putString("fcmApiKey", v).apply()
+    var fcmProjectId: String
+        get() = p.getString("fcmProjectId", "") ?: ""
+        set(v) = p.edit().putString("fcmProjectId", v).apply()
+    var fcmSenderId: String
+        get() = p.getString("fcmSenderId", "") ?: ""
+        set(v) = p.edit().putString("fcmSenderId", v).apply()
     var updateNotifiedCode: Int
         get() = p.getInt("updateNotifiedCode", 0)
         set(v) = p.edit().putInt("updateNotifiedCode", v).apply()

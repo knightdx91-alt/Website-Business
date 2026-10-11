@@ -11,6 +11,8 @@ class SettingsMeta(
     val extraTerms: List<String>,
     val defaultTerms: String,
     val checkout: CheckoutInfo,
+    /** Worker secret FCM_SERVICE_ACCOUNT is set (the server can push). */
+    val fcmServer: Boolean = false,
 ) {
     companion object {
         fun from(j: JSONObject): SettingsMeta {
@@ -22,6 +24,7 @@ class SettingsMeta(
                 extraTerms = j.optJSONArray("extraTerms").strings(),
                 defaultTerms = j.optString("defaultTerms", ""),
                 checkout = CheckoutInfo(c.optBoolean("online"), c.optBoolean("webhook"), c.optBoolean("email")),
+                fcmServer = j.optJSONObject("fcm")?.optBoolean("server") ?: false,
             )
         }
     }
