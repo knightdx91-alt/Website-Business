@@ -15,8 +15,8 @@ import java.net.URL
 
 /**
  * In-app updates for a sideloaded build: the Worker publishes the newest version next to the APK (`GET /api/android/version`,
- * written by android/build.sh). The app checks once a day, downloads the APK into its cache and hands it to Android's package
- * installer, which asks the owner to confirm. (A Google Play listing would make this silent; see CLAUDE.md.)
+ * written by android/build.sh). The app checks on every launch and pops up "Update available" (ui/UpdateDialog.kt); Download
+ * fetches the APK into the app's cache and hands it to Android's package installer, which asks the owner to confirm. (A Google Play listing would make this silent; see CLAUDE.md.)
  */
 object Updater {
     data class Check(val versionCode: Int, val versionName: String, val url: String)
@@ -26,12 +26,25 @@ object Updater {
         return Check(j.optInt("versionCode", 0), j.optString("versionName", "?"), j.optString("url", api.origin + "/api/android.apk"))
     }
 
-    /** Once a day: remember a newer build so Settings can show it (no download without a tap). */
-    suspend fun checkDaily(context: Context, api: Api) {
+    /** True when the published build is newer than this one. */
+    fun isNewer(c: Check): Boolean = c.versionCode > BuildConfig.VERSION_CODE
+
+    /**
+     * On every launch (after sign-in): the newer build to offer, or null. Quiet when offline. The owner can put a version off
+     * with "Later", which hides that one version until the next day so the pop-up doesn't nag on every open.
+     */
+    suspend fun newerBuild(api: Api): Check? {
         val prefs = api.prefs
-        if (System.currentTimeMillis() - prefs.lastUpdateCheck < 24 * 3600_000L) return
         prefs.lastUpdateCheck = System.currentTimeMillis()
-        runCatching { check(api) }
+        val c = runCatching { check(api) }.getOrNull() ?: return null
+        if (!isNewer(c)) return null
+        if (prefs.updateSnoozedCode == c.versionCode && System.currentTimeMillis() - prefs.updateSnoozedAt < 24 * 3600_000L) return null
+        return c
+    }
+
+    fun snooze(api: Api, c: Check) {
+        api.prefs.updateSnoozedCode = c.versionCode
+        api.prefs.updateSnoozedAt = System.currentTimeMillis()
     }
 
     suspend fun downloadAndInstall(context: Context, api: Api, c: Check, onProgress: (Float) -> Unit) {

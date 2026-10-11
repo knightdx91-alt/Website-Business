@@ -46,6 +46,7 @@ import com.knightdx91.websitebusiness.ui.InboxScreen
 import com.knightdx91.websitebusiness.ui.RouteScreen
 import com.knightdx91.websitebusiness.ui.SalesScreen
 import com.knightdx91.websitebusiness.ui.HomeScreen
+import com.knightdx91.websitebusiness.ui.UpdateDialog
 import com.knightdx91.websitebusiness.ui.PreviewScreen
 import com.knightdx91.websitebusiness.ui.LeadScreen
 import com.knightdx91.websitebusiness.ui.LoginScreen
@@ -84,6 +85,8 @@ class AppState(val api: Api) {
     var meta by mutableStateOf<Meta?>(null)
     var unread by mutableIntStateOf(0)
     var loggedIn by mutableStateOf(api.prefs.loggedIn)
+    /** A newer build found at launch; the pop-up clears it. */
+    var update by mutableStateOf<Updater.Check?>(null)
 
     suspend fun refreshMeta() {
         try {
@@ -115,9 +118,10 @@ fun AppRoot(startLead: String?) {
         if (state.loggedIn) {
             state.refreshMeta()
             if (startLead != null) nav.navigate("lead/$startLead")
-            Updater.checkDaily(context, state.api)
+            state.update = Updater.newerBuild(state.api)
         }
     }
+    state.update?.let { u -> UpdateDialog(state.api, u) { state.update = null } }
     LifecycleResumeEffect(state.loggedIn) {
         if (state.loggedIn) state.unread = state.unread // refreshed by screens on resume
         onPauseOrDispose {}

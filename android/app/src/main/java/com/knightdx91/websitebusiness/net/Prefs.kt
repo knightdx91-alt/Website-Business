@@ -29,6 +29,13 @@ class Prefs(context: Context) {
     var lastUpdateCheck: Long
         get() = p.getLong("lastUpdateCheck", 0L)
         set(v) = p.edit().putLong("lastUpdateCheck", v).apply()
+    /** "Later" on the update pop-up: this versionCode stays quiet until updateSnoozedAt + 1 day. */
+    var updateSnoozedCode: Int
+        get() = p.getInt("updateSnoozedCode", 0)
+        set(v) = p.edit().putInt("updateSnoozedCode", v).apply()
+    var updateSnoozedAt: Long
+        get() = p.getLong("updateSnoozedAt", 0L)
+        set(v) = p.edit().putLong("updateSnoozedAt", v).apply()
 
     val isOwner: Boolean get() = role == "owner"
     val loggedIn: Boolean get() = !token.isNullOrBlank()

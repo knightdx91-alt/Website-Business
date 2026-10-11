@@ -184,7 +184,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   /api/signups/:id/refund {chargeId, amountCents, cancelPlan, reason}` (`refundSignup`: Stripe refund, optional subscription
   delete, sign-up unpaid on a full refund with the plan ended, call-log note, alert). The dialog restates the agreement's refund
   rules. Card-sheet payments now also store `stripe_payment_intent`.
-- Android app 2.4 (Oct 2026): Activity tab on Home; caller alerts cover every lead change (see Preview opened). 2.3 added refunds.
+- Android app 2.6 (Oct 2026): update pop-up at launch. After sign-in `AppRoot` calls `Updater.newerBuild()` (every open; compares
+  `/api/android/version` with `BuildConfig.VERSION_CODE`) and shows `ui/UpdateDialog.kt` ("Update available", Download and install
+  with progress → package installer; Later snoozes that version for a day, `Prefs.updateSnoozed*`). Settings → Android app still
+  offers the download any time. 2.5 sorted categories A to Z. 2.4: Activity tab on Home; caller alerts cover every lead change
+  (see Preview opened). 2.3 added refunds.
 - Android app 2.2 (Oct 2026): fully native, no web views. `SignupScreen` (in-person sign-up: plan / way to pay / extras picker,
   agreement sections from `/api/contract.json`, Canvas signature pad → PNG data URL, `POST /api/leads/:id/signups`; then Tap to
   Pay, Stripe's payment sheet (`com.stripe:stripe-android` 22.8.1, SetupIntent via `/api/signups/:id/pay/start|complete`), or
