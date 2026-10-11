@@ -15,6 +15,7 @@ import { reviewTexts } from "../places/to-record.ts";
 import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
+import { LESSON_IDS, trainingCourse } from "./training.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
@@ -388,6 +389,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/tap/setup" && m === "POST") {
     ownerOnly();
     return json(await setupTap(env));
+  }
+  // 🎓 Training (owner and callers): the course from src/worker/training.ts plus this person's finished lessons.
+  if (path === "/training" && m === "GET") {
+    const done = await env.DB.prepare("SELECT lesson_id FROM training_done WHERE user_id = ?").bind(session.userId).all<{ lesson_id: string }>();
+    return json({ ...trainingCourse(await getSettings(env)), done: done.results.map((r) => r.lesson_id) });
+  }
+  if (path === "/training/progress" && m === "PUT") {
+    const input = await body(req, z.object({ lesson: z.enum(LESSON_IDS as [string, ...string[]]), done: z.boolean() }));
+    if (input.done) await env.DB.prepare("INSERT OR REPLACE INTO training_done (user_id, lesson_id, done_at) VALUES (?, ?, ?)").bind(session.userId, input.lesson, now()).run();
+    else await env.DB.prepare("DELETE FROM training_done WHERE user_id = ? AND lesson_id = ?").bind(session.userId, input.lesson).run();
+    const done = await env.DB.prepare("SELECT lesson_id FROM training_done WHERE user_id = ?").bind(session.userId).all<{ lesson_id: string }>();
+    return json({ done: done.results.map((r) => r.lesson_id) });
   }
   // Android app: the sales copy (Plans & answers, In-person guide, follow-up texts) and the per-plan ways to pay
   // with what is due today, so the native screens never carry their own copy or billing math. Owner and callers.

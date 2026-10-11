@@ -46,6 +46,7 @@ import com.knightdx91.websitebusiness.ui.InboxScreen
 import com.knightdx91.websitebusiness.ui.RouteScreen
 import com.knightdx91.websitebusiness.ui.SalesScreen
 import com.knightdx91.websitebusiness.ui.HomeScreen
+import com.knightdx91.websitebusiness.ui.TrainingScreen
 import com.knightdx91.websitebusiness.ui.UpdateDialog
 import com.knightdx91.websitebusiness.ui.PreviewScreen
 import com.knightdx91.websitebusiness.ui.LeadScreen
@@ -143,6 +144,7 @@ fun AppRoot(startLead: String?) {
             composable("pitch/{id}") { e -> PitchScreen(state, nav, e.arguments?.getString("id") ?: "") }
             composable("edit/{id}") { e -> EditScreen(state, nav, e.arguments?.getString("id") ?: "") }
             composable("playbook") { PlaybookScreen(state, nav) }
+            composable("training") { TrainingScreen(state, nav) }
             composable("walkin") { WalkinScreen(state, nav, null) }
             composable("walkin/{lead}") { e -> WalkinScreen(state, nav, e.arguments?.getString("lead")) }
             composable("plans") { ShowPlansScreen(state, nav, null) }

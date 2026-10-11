@@ -273,6 +273,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Done Oct 2026 (Cloud project 322487745515): Web client `…-39uoftmq9b43htr4k6thsebt0k7pded6` is in Settings (`googleClientId`);
   Android client `…-aku343iill2rs8jjtodi8orsq5d7fs5k` exists and is used by nothing in code (Credential Manager only takes the
   Web ID). Which is which was checked by sending Google a custom-scheme redirect: only the Web client is refused.
+- 🎓 Training (Oct 2026, `src/worker/training.ts`, migration 0017 `training_done`; web `#/training` `viewTraining`, Android
+  `ui/TrainingScreen.kt`, 2.10): an in-app course for owner and callers, Home → "🎓 Training" (also Settings). 10 lessons (what
+  we sell, where leads come from, before you call, showing the preview, logging calls, signing up, taking payment, finish &
+  publish [owner], their domain & email [owner], after the sale), each with the exact buttons to tap, a "Try it now" exercise
+  (on the Payment test lead where money is involved), 1–2 quick-check questions and Mark done. `GET /api/training` returns the
+  lessons with {company}/{plan} placeholders filled from Settings plus this person's `done` ids; `PUT /api/training/progress
+  {lesson, done}`. Progress is per `session.userId` ('owner' or users.id). When a button or screen is renamed, update the
+  lesson text here.
 - Pages elsewhere (Oct 2026, `src/places/web-presence.ts`, migration 0016 `leads.found_url`): Google only reports the website linked
   on the profile, so "No website" can be wrong (Luna's BBQ has a page on stonebridgewedding.com). With Worker secret
   `BRAVE_SEARCH_API_KEY` (Brave Search API, free 2,000 queries/month, ~$3/1,000 after; without it nothing changes) the app runs one

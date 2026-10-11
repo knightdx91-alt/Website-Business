@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,7 +60,7 @@ import kotlinx.coroutines.launch
 
 private val TABS = listOf("new" to "New", "callbacks" to "Callbacks", "activity" to "Activity", "shown" to "Shown", "sold" to "Sold", "live" to "Live")
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(state: AppState, nav: NavHostController) {
     val context = LocalContext.current
@@ -122,9 +124,10 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
         // Lead cards flow into two or three columns on the open Fold or a tablet; the header rows always span the width.
         LazyVerticalGrid(columns = GridCells.Adaptive(360.dp), modifier = Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp, 8.dp, 12.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { nav.navigate("add") }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Add a business") }
                     OutlinedButton(onClick = { nav.navigate("route") }) { Text("🗺️ Walk-in route") }
+                    OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
                 }
             }
             if (today.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {

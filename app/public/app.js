@@ -346,7 +346,7 @@
     if (stale(my)) return;
     if (!document.getElementById("leads")) {
       $app.innerHTML = `<div class="split"><div>${isOwner() ? "" : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="today"></div><div id="tasks"></div><div id="unpaid"></div><div id="runs"></div></div><div><section>
-        <div class="btns btns--full" style="margin-bottom:12px">${isOwner() ? `<a class="btn btn--primary" href="#/run">🔎 Find new leads</a>` : ""}<a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a></div>
+        <div class="btns btns--full" style="margin-bottom:12px">${isOwner() ? `<a class="btn btn--primary" href="#/run">🔎 Find new leads</a>` : ""}<a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a><a class="btn" href="#/training">🎓 Training</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
@@ -1685,6 +1685,66 @@
       ["“I'm not interested.”",
         `No problem at all. I built this one for you either way, so can I text you the link in case you change your mind? (If they say no, thank them and log “Not interested”. Never push past a second no.)`],
     ];
+  }
+
+  /** 🎓 Training: the course from /api/training (one source with the Android app), progress saved per person. */
+  async function viewTraining() {
+    setNav("home");
+    const my = renderSeq;
+    $app.innerHTML = `<section class="card"><h2>🎓 Training</h2><p class="muted">Loading…</p></section>`;
+    let course;
+    try { course = await api("/training"); } catch (err) { if (stale(my)) return; $app.innerHTML = `<section class="card"><p class="bad">${esc(err.message || NO_CONNECTION)}</p></section>`; return; }
+    if (stale(my)) return;
+    let done = new Set(course.done || []);
+    const lessons = course.lessons;
+    const total = lessons.reduce((n, l) => n + l.minutes, 0);
+    const render = () => {
+      const n = lessons.filter((l) => done.has(l.id)).length;
+      const pct = Math.round((n / lessons.length) * 100);
+      $app.innerHTML = `<section class="card"><h2>🎓 Training</h2>
+        <p class="muted small">The whole job, from a lead appearing to a live site on the client's own domain. ${lessons.length} short lessons, about ${total} minutes in all. Each one has the exact buttons to tap, something to try, and a quick check. Your progress is saved.</p>
+        <p><strong>${n === lessons.length ? "🎉 All done. Come back any time." : `${n} of ${lessons.length} done`}</strong></p>
+        <div style="height:8px;border-radius:4px;background:var(--line,#ddd);overflow:hidden"><div style="width:${pct}%;height:100%;background:var(--primary,#fca311)"></div></div>
+        <p class="small muted" style="margin-top:8px">Practice on the lead called <strong>Payment test (not a real business)</strong>: it only ever charges $1 and starts no plan.</p></section>
+        ${lessons.map((l, i) => lessonHtml(l, i)).join("")}`;
+      bind();
+    };
+    const lessonHtml = (l, i) => {
+      const isDone = done.has(l.id);
+      const ownerStep = l.who === "owner";
+      return `<details class="card" data-lesson="${esc(l.id)}"${isDone ? "" : ""}>
+        <summary style="cursor:pointer"><strong>${isDone ? "✅ " : `${i + 1}. `}${esc(l.title)}</strong> <span class="muted small">· ${l.minutes} min${ownerStep ? ` · <span class="chip">${isOwner() ? "Owner step" : "Owner does this; know what happens"}</span>` : ""}</span></summary>
+        <p class="muted" style="margin-top:8px">${esc(l.why)}</p>
+        <ol>${l.steps.map((s) => `<li style="margin-bottom:6px">${esc(s)}</li>`).join("")}</ol>
+        ${l.tryIt ? `<div class="due" style="padding:10px;border-radius:8px;margin:8px 0"><strong>Try it now:</strong> ${esc(l.tryIt)}</div>` : ""}
+        ${l.check.map((c, qi) => `<div class="small" style="margin:10px 0" data-q="${qi}"><strong>Quick check:</strong> ${esc(c.q)}
+          ${c.options.map((o, oi) => `<label class="field" style="display:block;margin:4px 0"><input type="radio" name="q_${esc(l.id)}_${qi}" value="${oi}"> ${esc(o)}</label>`).join("")}
+          <div class="small" data-result></div></div>`).join("")}
+        <div class="btns"><button type="button" class="btn ${isDone ? "" : "btn--primary"}" data-done="${esc(l.id)}">${isDone ? "Mark not done" : "✓ Mark done"}</button></div>
+      </details>`;
+    };
+    const bind = () => {
+      $app.querySelectorAll("input[type=radio]").forEach((r) => r.addEventListener("change", () => {
+        const [, id, qi] = /^q_(.+)_(\d+)$/.exec(r.name) || [];
+        const lesson = lessons.find((l) => l.id === id);
+        const c = lesson && lesson.check[Number(qi)];
+        const out = r.closest("[data-q]").querySelector("[data-result]");
+        if (c && out) out.innerHTML = Number(r.value) === c.answer ? `<span class="chip chip--good">Correct</span> ${esc(c.why)}` : `<span class="chip chip--bad">Not quite</span> ${esc(c.why)}`;
+      }));
+      $app.querySelectorAll("[data-done]").forEach((b) => b.addEventListener("click", async () => {
+        const id = b.dataset.done;
+        const open = [...$app.querySelectorAll("details[open]")].map((d) => d.dataset.lesson);
+        try {
+          const res = await api("/training/progress", { method: "PUT", body: JSON.stringify({ lesson: id, done: !done.has(id) }) });
+          done = new Set(res.done || []);
+        } catch (err) { toast(err.message || NO_CONNECTION); return; }
+        render();
+        open.forEach((o) => { const d = $app.querySelector(`details[data-lesson="${o}"]`); if (d && o !== id) d.open = true; });
+        const next = lessons.find((l) => !done.has(l.id));
+        if (next) { const d = $app.querySelector(`details[data-lesson="${next.id}"]`); if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } }
+      }));
+    };
+    render();
   }
 
   async function viewPlaybook() {
@@ -3534,6 +3594,7 @@
       if ((m = /^#\/full\/([a-z0-9]+)(?:\/(es))?$/.exec(h))) return viewFull(m[1], m[2]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/playbook") return await viewPlaybook();
+      if (h === "#/training") return await viewTraining();
       if ((m = /^#\/walkin(?:\/([a-z0-9]+))?$/.exec(h))) return await viewWalkin(m[1]);
       if ((m = /^#\/plans(?:\/([a-z0-9]+))?$/.exec(h))) return await viewShowPlans(m[1]);
       if (h === "#/route") return await viewRoute();
