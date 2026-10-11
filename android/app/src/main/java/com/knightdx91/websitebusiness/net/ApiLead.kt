@@ -46,6 +46,12 @@ data class LeadFull(
     val lookBase: String?,
     val cadence: Cadence?,
     val purchases: List<Purchase>,
+    /** Their current website (the page our web check found, else Google's link; never a social page). */
+    val website: String? = null,
+    /** Why the server couldn't read their site last time, if it couldn't. */
+    val siteImportError: String? = null,
+    /** "Read from kingfishaquatics.co on 2026-10-11 (phone): 9 photos, 7 paragraphs", once read. */
+    val existingSiteLine: String? = null,
 ) {
     val lead get() = detail.lead
 
@@ -100,6 +106,12 @@ data class LeadFull(
                     p.optJSONArray("quotes").strings().forEach { items.add("$it (quote)") }
                     Purchase(p.optString("id"), items, p.optLong("dueCents", 0L), p.optBoolean("paid"), p.optLong("createdAt"))
                 },
+                website = j.str("website"),
+                siteImportError = j.optJSONObject("siteImport")?.str("error"),
+                existingSiteLine = j.optJSONObject("existingSite")?.let { x ->
+                    val host = runCatching { java.net.URI(x.optString("url")).host?.removePrefix("www.") }.getOrNull() ?: x.optString("url")
+                    "Read from $host on ${x.optString("fetchedAt")}${if (x.optString("via") == "app") " (phone)" else ""}: ${x.optInt("images")} photos, ${x.optInt("paragraphs")} paragraphs"
+                },
             )
         }
     }
@@ -151,6 +163,10 @@ suspend fun Api.setLook(id: String, look: String): JSONObject = putJson("/leads/
 
 suspend fun Api.retryBuild(id: String): JSONObject = postJson("/leads/$id/retry")
 suspend fun Api.rewrite(id: String): JSONObject = postJson("/leads/$id/rewrite")
+
+/** The page and photo addresses this phone read from their current website (SiteImportDialog); the server extracts and rebuilds. */
+suspend fun Api.siteImport(id: String, url: String, html: String, images: org.json.JSONArray?): JSONObject =
+    postJson("/leads/$id/siteimport", JSONObject().put("url", url).put("html", html).put("images", images ?: org.json.JSONArray()))
 suspend fun Api.deleteLead(id: String) { deleteJson("/leads/$id") }
 
 /** Publishes (or republishes) the site; answers with the live `url`. */

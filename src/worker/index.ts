@@ -1,4 +1,5 @@
-import { sectionSlug } from "../generator/packs/retail.ts";
+import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
+import { applySiteFacts, cleanImages, extractSiteFacts } from "../places/site-import.ts";
 import { layoutOf } from "../generator/design.ts";
 import { LAYOUT_IDS, LAYOUTS } from "../generator/layouts.ts";
 import { z } from "zod";
@@ -43,7 +44,7 @@ import { plansOptions } from "./plan-options.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
 import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
-import { chooseLook, dnaHints, renderPreview, runBuild, runSearch } from "./pipeline.ts";
+import { chooseLook, dnaHints, renderPreview, runBuild, runSearch, importSitePhotos } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
 import { publishLead, zipLead } from "./publish.ts";
 
@@ -218,6 +219,10 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
     lint,
     menuText: record?.ext.restaurant?.menu ? menuToText(record.ext.restaurant.menu.sections) : "",
     variantLabel: record ? pack.variantLabel(record) : null,
+    /** Their current website: the page our web check found, else the one Google links (never a social page). */
+    website: l.found_url || (() => { const w = l.place_json ? ((JSON.parse(l.place_json) as { websiteUri?: string }).websiteUri ?? null) : null; return w && !/facebook\.|instagram\.|linktr\.ee|tiktok\./i.test(w) ? w : null; })(),
+    siteImport: record?.siteImport ?? null,
+    existingSite: record?.existingSite ? { url: record.existingSite.url, fetchedAt: record.existingSite.fetchedAt, via: record.existingSite.via ?? "server", images: record.existingSite.images.length, paragraphs: record.existingSite.paragraphs.length } : null,
     looks: pack.looks.map((id) => ({ id, name: LOOKS[id]?.name ?? id })),
     layouts: LAYOUT_IDS.map((id) => ({ id, name: LAYOUTS[id].name, about: LAYOUTS[id].about })),
     dnaOrder: DNA_ORDER,
@@ -1330,6 +1335,34 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await renderPreview(env, lead, record, copy, lead.look ?? "");
       await siteUpdated(env, session, lead, [m === "DELETE" ? "Spanish page removed" : "Spanish page"]);
       return json(detail((await getLead(env, id))!));
+    }
+    // The owner's phone read their current website in a real browser view (scripts run, lazy photos loaded) and sends the page
+    // + image addresses here: the server extracts the facts, downloads the photos, and rebuilds the text with them.
+    if (action === "/siteimport" && m === "POST") {
+      if (!lead.record_json) throw new HttpError(409, "This site hasn't finished building yet");
+      const input = await body(
+        req,
+        z.object({
+          url: WEB_URL(2000),
+          html: z.string().min(200).max(3_000_000),
+          images: z.array(z.object({ src: z.string().max(2000), alt: z.string().max(300).optional() })).max(80).default([]),
+        }),
+      );
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      const facts = extractSiteFacts(input.url, input.html);
+      const fromPage = cleanImages(input.images, input.url, 40);
+      facts.images = [...fromPage, ...facts.images.filter((i) => !fromPage.some((f) => f.src === i.src))].slice(0, 40);
+      facts.via = "app";
+      if (!facts.paragraphs.length && !facts.headings.length && !facts.images.length) throw new HttpError(422, "That page had nothing we could use (no text or photos)");
+      record.existingSite = facts;
+      record.siteImport = undefined;
+      applySiteFacts(record, facts);
+      const photos = await importSitePhotos(env, id, record, facts.images);
+      if (photos && record.ext.retail?.priceList) autoMatchPhotos(record.ext.retail.priceList.sections, record.media.gallery);
+      await updateLead(env, id, { record_json: JSON.stringify(record), rewrite: 1, status: "queued" });
+      await env.JOBS.send({ type: "build", leadId: id });
+      await siteUpdated(env, session, lead, ["details from their website"]);
+      return json({ ok: true, paragraphs: facts.paragraphs.length, headings: facts.headings.length, images: facts.images.length, photos, notices: facts.notices, foundedYear: facts.foundedYear ?? null, email: facts.emails[0] ?? null });
     }
     if (action === "/rewrite" && m === "POST") {
       await updateLead(env, id, { rewrite: 1, status: "queued" });

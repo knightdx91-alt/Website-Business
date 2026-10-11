@@ -205,7 +205,9 @@ export async function runBuild(env: Env, job: Extract<Job, { type: "build" }>): 
     heroFromPlace(record, place);
     // Their current website, if they have one: read once (again after 7 days or on a rewrite) and used as facts for the copy.
     const siteUrl = lead.found_url || (place.websiteUri && !/facebook\.|instagram\.|linktr\.ee|tiktok\./i.test(place.websiteUri) ? place.websiteUri : null);
-    const stale = !record.existingSite || record.existingSite.url !== siteUrl || Date.now() - Date.parse(record.existingSite.fetchedAt) > 7 * 86_400_000 || !!lead.rewrite;
+    const fresh = !!record.existingSite && Date.now() - Date.parse(record.existingSite.fetchedAt) <= 7 * 86_400_000;
+    // The phone's read wins while fresh: it ran the page's scripts and reached hosts the server can't.
+    const stale = record.existingSite?.via === "app" ? !fresh : !record.existingSite || record.existingSite.url !== siteUrl || !fresh || !!lead.rewrite;
     if (siteUrl && stale) {
       const got = await importSiteDetailed(siteUrl);
       if (got.facts) {

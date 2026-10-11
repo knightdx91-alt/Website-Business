@@ -130,6 +130,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
     /** The action in flight, so its button (and the others that would clash) wait. */
     var busy by remember { mutableStateOf<String?>(null) }
     var ask by remember { mutableStateOf<Ask?>(null) }
+    var importSite by remember { mutableStateOf(false) }
     var editingContact by remember { mutableStateOf(false) }
     var contactDraft by remember { mutableStateOf("") }
     var bestTimeDraft by remember { mutableStateOf("") }
@@ -283,6 +284,9 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
         val open = l.salesStatus == "new" || l.salesStatus == "shown"
         val live = l.salesStatus == "live"
 
+        if (importSite) detail?.website?.let { site ->
+            SiteImportDialog(state.api, id, site) { changed -> importSite = false; if (changed) scope.launch { load() } }
+        }
         ask?.let { a ->
             AlertDialog(
                 onDismissRequest = { ask = null },
@@ -302,6 +306,9 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                         Text(listOfNotNull(detail.detail.variantLabel ?: categoryLabel(l.category), l.reason).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
                         l.foundUrl?.let { url -> Text("🔗 Found page: ${l.foundHost ?: url} (not linked from their Google listing)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }) }
                         if (isOwner && l.salesStatus != "live") TextButton(onClick = { act("webcheck") { val r = state.api.webcheck(id); context.toast(if (r.optBoolean("found")) "Found: ${r.optString("label")}" else "Nothing found beyond their Google listing"); load() } }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text(if (busy == "webcheck") "Searching the web…" else "🔎 Re-check website") }
+                        if (isOwner && detail.website != null && l.salesStatus != "live") TextButton(onClick = { importSite = true }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text("⬇️ Import their website (text + photos)") }
+                        detail.existingSiteLine?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = muted) }
+                        if (detail.existingSiteLine == null) detail.siteImportError?.let { Text("Couldn't read their site from the server: $it. Use Import their website.", style = MaterialTheme.typography.bodySmall, color = Warn) }
                         l.address?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                         (detail.phoneDisplay ?: l.phone)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                         l.rating?.let { Text("★ ${"%.1f".format(it)} · ${l.reviewCount} Google reviews", style = MaterialTheme.typography.bodySmall) }

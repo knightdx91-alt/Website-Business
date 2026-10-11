@@ -30,6 +30,24 @@ function imageUrl(src: string, base: string): string | null {
   }
 }
 
+/** The same filter for image addresses the phone collected from the rendered page (lazy-loaded ones included). */
+export function cleanImages(list: Array<{ src: string; alt?: string }>, base: string, max = 40): Array<{ src: string; alt?: string }> {
+  const out: Array<{ src: string; alt?: string }> = [];
+  const seen = new Set<string>();
+  for (const it of list) {
+    const alt = (it.alt ?? "").trim() || undefined;
+    if (!it.src || NOT_A_PHOTO.test(it.src) || NOT_A_PHOTO.test(alt ?? "") || STOCK.test(it.src)) continue;
+    const abs = imageUrl(it.src, base);
+    if (!abs) continue;
+    const key = abs.replace(/\?.*$/, "");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ src: abs, alt });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 /** Their photos from <img> tags (src, data-src, the largest srcset entry), in page order, deduped, at most 12. */
 export function extractImages(html: string, base: string): Array<{ src: string; alt?: string }> {
   const out: Array<{ src: string; alt?: string }> = [];

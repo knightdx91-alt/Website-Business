@@ -492,6 +492,8 @@ export interface ExistingSite {
   /** Their own photos (builder stock, logos and icons filtered out), largest version first. Downloaded by the build. */
   images: Array<{ src: string; alt?: string }>;
   fetchedAt: string;
+  /** "app" when the owner's phone read the rendered page (slow hosts, script-built pages); the server doesn't refetch those. */
+  via?: "server" | "app";
 }
 
 export interface BusinessRecord {

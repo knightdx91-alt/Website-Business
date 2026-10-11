@@ -347,6 +347,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   fill the gallery to 24; re-imported on rewrite or when none are left, owner uploads untouched, never for churches.
   Publishing needs `confirmed` **`site_photos`** ("Photos from their old website are theirs (not the site builder's stock)",
   Confirm card on web + editform) or the preview shows a REQUIRED to-do (render.ts `withExtras`).
+  When the server can't read the site (King Fish Aquatics' GoDaddy host never answered within 15 s, and its photos are filled
+  in by scripts anyway): `record.siteImport {url, triedAt, error}` is kept and shown (Edit card, Android lead header), and the
+  Android app (2.22) has **"⬇️ Import their website (text + photos)"** on the lead header: `ui/SiteImportDialog.kt` loads the
+  page in a WebView (scripts run), scrolls it so lazy photos load, collects `outerHTML` + every `<img>` / srcset / CSS
+  background image ≥ 200 px, and POSTs to `POST /api/leads/:id/siteimport {url, html, images}` (owner): `extractSiteFacts` +
+  `cleanImages`, `via: "app"`, `importSitePhotos`, auto-match, then `rewrite=1` + a build job. `runBuild` never refetches an
+  `app` read while it's under 7 days old. `detail()` carries `website`, `siteImport`, `existingSite` {url, fetchedAt, via,
+  images, paragraphs}. Web Push / browser can't do this (cross-origin), so it's Android-only.
 - Pages elsewhere (Oct 2026, `src/places/web-presence.ts`, migration 0016 `leads.found_url`): Google only reports the website linked
   on the profile, so "No website" can be wrong (Luna's BBQ has a page on stonebridgewedding.com). With Worker secret
   `BRAVE_SEARCH_API_KEY` (Brave Search API, free 2,000 queries/month, ~$3/1,000 after; without it nothing changes) the app runs one
