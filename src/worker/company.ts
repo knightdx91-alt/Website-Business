@@ -590,12 +590,12 @@ const TRADES: Trade[] = [
     name: "boutiques, gift shops, fish and pet stores, plant nurseries, antique malls, thrift stores, florists, feed and furniture stores",
     h1: "Websites for shops and boutiques in Cullman, AL",
     intro: "People drive past you every day and still don't know what you carry or when you're open. Your site fixes that and gives your Facebook posts somewhere to point.",
-    includes: ["Hours, address and the street line up top, with open or closed right now", "What you carry, by department or brand, so Google matches the search", "What's new this week, in your words, with a photo", "Shop-online or order-flowers buttons that go to your Square or Shopify store", "Florists: occasions, delivery area and cut-off times; vendor booths and donations for antique malls and thrift stores", "Gift cards and events when you have them", "Stock that changes daily? A live price list with a section per tank or shelf, QR price tags, a board you update from your phone and a tablet display by the tank"],
+    includes: ["Hours, address and the street line up top, with open or closed right now", "What you carry, by department or brand, so Google matches the search", "What's new this week, in your words, with a photo", "Shop-online or order-flowers buttons that go to your Square or Shopify store", "Florists: occasions, delivery area and cut-off times; vendor booths and donations for antique malls and thrift stores", "Gift cards and events when you have them", "Stock that changes daily? A live price list with a section per tank or shelf, QR price tags, a board you update from your phone, a tablet display by the tank and barcode scanning for packaged stock"],
     faq: [
       ["I post everything on Facebook already.", "Keep posting. The site gives those posts a link, and it's the page Google shows the person who doesn't use Facebook."],
       ["Can customers buy on the site?", "The site sends them to your online store if you have one. We don't build a separate checkout; one store is enough to run."],
       ["How often can I change 'what's new'?", "As often as you like. Text us the line and a photo."],
-      ["My prices change every day. Can the site keep up?", "Yes. The live price list has a section for every tank, shelf or bin, and you change names, prices, counts and photos from your phone; the page follows within a minute, and a QR tag on the shelf opens that section. It comes with every plan, or on its own as the Price list plan."],
+      ["My prices change every day. Can the site keep up?", "Yes. The live price list has a section for every tank, shelf or bin, and you change names, prices, counts and photos from your phone; the page follows within a minute, and a QR tag on the shelf opens that section. Packaged goods scan in and out by barcode on the tablet. It comes with every plan, or on its own as the Price list plan."],
     ],
   },
   {
@@ -1012,17 +1012,18 @@ async function priceListPage(env: Env): Promise<Response> {
   const lowest = lowestOf(s);
   const tags = s.addons.find((a) => /price tag|shelf label/i.test(a.name));
   const title = `Live price list, QR price tags and Tank board for shops | ${name}`;
-  const description = `For Cullman-area shops whose stock changes daily: a price page with a section per tank or shelf, QR tags that open it, a board you update from your phone, and a tablet display by the tank.${p ? ` ${money(p.monthly)} a month, no minimum, or included with any website plan.` : ""}`;
+  const description = `For Cullman-area shops whose stock changes daily: a price page with a section per tank or shelf, QR tags that open it, a board you update from your phone, a tablet display by the tank, and barcode scanning for packaged stock.${p ? ` ${money(p.monthly)} a month, no minimum, or included with any website plan.` : ""}`;
   const serviceLd = { "@type": "Service", "@id": `${ORIGIN}/price-list#service`, name: "Live price list with QR price tags", serviceType: "Live price page, QR shelf labels and inventory board", provider: { "@id": `${ORIGIN}/#business` }, areaServed: townList(s).map((n) => ({ "@type": "City", name: n })), ...(p ? { offers: { "@type": "Offer", price: p.monthly, priceCurrency: "USD", description: `${p.name} plan, per month, no minimum term` } } : {}) };
   const pieces: Array<[string, string, string]> = [
     ["📄", "The price page", "A page on your website with a section for every tank, shelf or bin: each item with its name, price, a note and a photo. Sold-out items disappear; five or fewer shows “3 left”. Public, or hidden from Google if you'd rather competitors not read it."],
     ["📱", "The Tank board", "A private link we text you. It opens on any phone, no app and no password. Add a tank, add what's in it, type the price and how many, snap a photo, tap Sold out. Every change saves by itself."],
+    ["▦", "Barcode scanning", "Packaged goods (food, filters, parts, feed) go in and out by barcode: staff unlock the tablet, tap Scan, show the product to the camera or a cheap handheld scanner, type how many. A new code asks for a name once; many food and pet products fill it in by themselves."],
     ["🏷️", "QR price tags", "A printed sheet of labels, one per tank or shelf. Each QR opens that section of your price page, so a price change on your phone is a price change on the shelf. Nobody rewrites a tag."],
     ["📺", "The tablet display", "Put any cheap tablet by a tank and it shows that tank's stock and prices full-screen, live, all day. Or one screen by the register that rotates through every tank."],
   ];
   const steps: Array<[string, string]> = [
     ["We set it up", "Your price page goes on your website, your first tanks go on the board with you, and we print your first sheet of QR tags."],
-    ["You change it from your phone", "New fish in, price change, sold out: open the board, tap, done. Twenty seconds, no computer."],
+    ["You change it from your phone or the tablet", "New fish in, price change, sold out: open the board, tap, done. A delivery of packaged goods: scan each barcode on the tablet and type how many. Twenty seconds, no computer."],
     ["Everything follows", "The page updates within about a minute. The QR tag on the shelf and the tablet by the tank show the same thing, because they read the same page."],
   ];
   const who = ["Fish, reptile and pet stores", "Plant nurseries and garden centers", "Produce stands and farm stores", "Bakery cases and butcher counters", "Auto parts counters and tire shops (part number, fits, brand, warranty on the card)", "Used car, trailer and equipment lots (year, miles, VIN, condition)", "Antique malls, resale and consignment", "Feed and hardware stores with bulk bins"];
@@ -1031,7 +1032,7 @@ async function priceListPage(env: Env): Promise<Response> {
 <p class="lead">Built for shops whose stock changes every day. You change what's in a tank or on a shelf from your phone; your website's price page, the QR tag on the shelf and the screen by the tank all follow within a minute.</p>
 <div class="btns"><a class="btn" href="/#contact">Ask us about it</a>${p ? `<a class="btn btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a>` : ""}</div></div></section>
 <section class="sec sec--alt"><div class="wrap"><h2>How it works</h2><ol class="steps">${steps.map(([h, t]) => `<li><h3>${e(h)}</h3><p>${e(t)}</p></li>`).join("")}</ol></div></section>
-<section class="sec"><div class="wrap"><h2>The four pieces</h2><div class="grid">${pieces.map(([i, h, t]) => `<div class="card"><p style="font-size:2rem;margin:0">${i}</p><h3>${e(h)}</h3><p>${e(t)}</p></div>`).join("")}</div></div></section>
+<section class="sec"><div class="wrap"><h2>The pieces</h2><div class="grid">${pieces.map(([i, h, t]) => `<div class="card"><p style="font-size:2rem;margin:0">${i}</p><h3>${e(h)}</h3><p>${e(t)}</p></div>`).join("")}</div></div></section>
 <section class="sec sec--alt"><div class="wrap trade__grid"><div><h2>What your customers get</h2><ul class="ticks">
 <li>At the tank: scan the tag or glance at the screen and see exactly what's in it today, with prices and photos.</li>
 <li>At home: your price page shows up with your website on Google, so people check what you have before they drive over, and call about the one they want.</li>
@@ -1039,6 +1040,7 @@ async function priceListPage(env: Env): Promise<Response> {
 <h2 style="margin-top:28px">What you do</h2><ul class="ticks">
 <li>Keep the board honest: tap Sold out when the last one goes, change the number when the price does.</li>
 <li>Take a photo when something worth showing comes in. The board does it from the camera.</li>
+<li>Boxed and bagged stock: scan the barcode on the tablet, type the amount, Put in or Take out. No list to search.</li>
 <li>That's it. You never touch the website, and anyone on your staff with the link can do it.</li></ul></div>
 <div><h2>Who it's for</h2><ul class="ticks">${who.map((w) => `<li>${e(w)}</li>`).join("")}</ul>
 <p class="small muted" style="margin-top:14px">Anything with a section name you can stick a label on and stock that doesn't sit still.</p></div></div></section>
@@ -1055,6 +1057,7 @@ ${tags ? `<li><strong>More QR tag sheets</strong> (8 tags each): ${e(addonPrice(
     ["Can I keep my prices off Google?", "Yes. Mark the price list private and it stays out of your site's menu and out of search engines; the QR tags and the tablet still work."],
     ["Do I have to buy a whole website?", p ? `No. The ${p.name} plan is the price page, the board, the tags and the display on their own for ${money(p.monthly)} a month, with no minimum. If you add a website later, every month counts toward it.` : "No. Ask us about the Price list plan: the price page, the board, the tags and the display on their own."],
     ["What about photos?", "Take them on the board with your phone camera; they show on the page next to the item. We never use Google's photos of your store on the page or the tags."],
+    ["Can my staff scan barcodes?", "Yes. In staff mode the tablet reads a barcode with its camera, or with any $25 to $40 USB-C or Bluetooth scanner. A known product shows its name and count; type how many and tap Put in or Take out. A code it hasn't seen asks for a name once (food, drink and pet products are often filled in from the barcode), takes a photo and gets its info card. Only staff can scan: it takes the PIN, a staff tag or your phone to unlock."],
   ])}</div></section>
 ${contactSection(s)}`;
   return marketingPage(s, { path: "/price-list", title, description, body, ld: pageLd(s, "/price-list", title, description, [serviceLd]) });

@@ -44,3 +44,16 @@ test("the Tank board guide covers setup, the board, QR tags, the tablet and sell
   const noList = tankBoardGuide(settings({ plans: [{ id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "" }] }));
   assert.match(JSON.stringify(noList), /turn it on in Settings/);
 });
+
+test("barcode scanning is in the Tank board guide, the display guide, the customer pitch and the company price-list page", async () => {
+  const s = settings();
+  const tank = guideById("tankboard", s)!;
+  const bc = tank.sections.find((x) => /Barcode scanning/.test(x.title))!;
+  assert.ok(bc, "tank board guide has a barcode section");
+  assert.match(bc.steps.join("\n"), /▦ Scan/);
+  assert.match(bc.steps.join("\n"), /Put in/);
+  assert.match(bc.steps.join("\n"), /keyboard mode/);
+  assert.match(guideById("display", s)!.sections.map((x) => x.steps.join("\n")).join("\n"), /Scan.*barcode/);
+  const pitch = customerBoardPitch(s, { business: "King Fish Aquatics", live: true });
+  assert.match(pitch.sections[0]!.steps.join("\n"), /barcode/i);
+});

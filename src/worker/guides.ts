@@ -131,6 +131,21 @@ export function tankBoardGuide(s: AppSettings): Guide {
         ],
       },
       {
+        title: "Barcode scanning (packaged goods)",
+        numbered: true,
+        steps: [
+          "What it is: anything with a barcode (fish food, filters, medications, parts, feed bags, bottles) can be counted in and out by scanning it instead of finding it in a list. It lives in staff mode on the tablet; the phone board can scan too.",
+          "Unlock the tablet (Staff → PIN, staff tag or phone code), tap \"▦ Scan\" in the bottom bar and hold the product's barcode in front of the tablet's camera. Chrome on Android reads it in about a second. The first time, Chrome asks to use the camera: tap Allow.",
+          "No camera, or a lot of scanning? Any USB-C or Bluetooth barcode scanner ($25 to $40, set to \"keyboard mode\", which is the default) works on the same screen: it types the code into the box and presses Enter for you. Pair it once in the tablet's Bluetooth settings.",
+          "A product the shop has scanned before shows its name, which tank or shelf it is in, how many are in stock and the price. Tap − / + or type the amount, then \"➕ Put in\" (a delivery) or \"➖ Take out\" (a case sold, a return to the supplier). \"Scan the next one\" keeps going through a whole delivery.",
+          "A product that sold out earlier comes back from the catalog with its photo, price and info card; it goes into whichever tank or shelf the tablet is on.",
+          "A code nobody has scanned before: the tablet asks for a name, a price and the amount. For food, drink and pet products the name is often filled in from the barcode (a free product database); for parts and local goods the staff type it. It then asks for a photo and writes the info card, exactly like a new name typed by hand.",
+          "Something was added by name and later gets a barcode: tap ⋯ on the item → Barcode → \"▦ Scan it\" (Change and Clear once it has one). On the phone board every item has a Barcode field with a ▦ button beside it. One code belongs to one product; the catalog keeps it after the last one sells, so the next delivery scans straight in.",
+          "Scanning never changes a price unless staff type one, and customers can't reach it: the Scan button only exists in staff mode.",
+          "Trouble: \"can't read barcodes with its camera\" means the tablet's browser is not Chrome (or is very old); use Chrome, or a handheld scanner. A blurry camera needs the code 4 to 8 inches away under decent light. A code that reads but is \"not found\" is simply new; name it once.",
+        ],
+      },
+      {
         title: "Selling it",
         steps: [
           "The opener: \"You change what's in these tanks every day. What if the price on the tank changed itself when you changed it on your phone?\"",
@@ -309,6 +324,7 @@ export function displayGuide(s: AppSettings): Guide {
           "Renaming a tank on the board means that tank's screen needs the new 📺 link once. Adding items, prices, photos and sold out never need anything.",
           "The rotating page always shows every tank, so a new tank joins it on its own.",
           "A screen can be moved to another tank by opening that tank's 📺 link on it.",
+          "Packaged goods: in staff mode, \"▦ Scan\" counts them in and out by barcode (tablet camera in Chrome, or a $25 to $40 USB-C / Bluetooth scanner in keyboard mode). Scan, type the amount, Put in or Take out. New codes ask for a name once. The full steps are in the Tank board guide → Barcode scanning.",
         ],
       },
       {
@@ -377,6 +393,7 @@ export function customerBoardPitch(s: AppSettings, o: { business: string; live: 
           `The board lists your ${sec}s. For each one you type what's in it, the price, how many, and snap a photo if you like.`,
           "Every change saves by itself and shows on your website's price page within about a minute.",
           `A small QR tag on each ${sec} opens its live prices on a customer's phone. A cheap tablet beside it can show them too, no scanning.`,
+          "Packaged goods have a barcode? Scan it on the tablet (its camera, or a cheap handheld scanner), type how many came in, done. The same scan takes them out when they sell.",
         ],
       },
       {
@@ -403,7 +420,7 @@ export function customerBoardPitch(s: AppSettings, o: { business: string; live: 
         title: `What ${company} does`,
         steps: [
           `Set up your price page and your board, and load your first ${sec}s with you if you want.`,
-          `Print your QR tags (one per ${sec}), and set up a tablet for you if you'd like one.`,
+          `Print your QR tags (one per ${sec}), and set up a tablet for you if you'd like one, with a barcode scanner paired to it if you want one.`,
           `Keep it all running: hosting, security, backups, and reprints when you rename or add a ${sec}.`,
           "Answer by text. Anything odd, you text us and we fix it.",
         ],

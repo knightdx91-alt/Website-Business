@@ -590,7 +590,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Change / Clear" (`/staff/set {barcode}`; `setBarcodeEverywhere`: one code = one product, kept on the catalog after the last one
   sells; `addToTank(…, barcode)`). The phone board has a Barcode field per item + ▦ (camera scan when the browser can read
   barcodes, else focus the field); `ItemsBody.barcode`, `applyClientItems` carries codes by name when the board sends none;
-  the feed items carry `barcode`. Both pages' CSP got `media-src 'self' blob: mediastream:` for the camera preview.
+  the feed items carry `barcode`. Both pages' CSP got `media-src 'self' blob: mediastream:` for the camera preview. Written up
+  in the Tank board guide ("Barcode scanning (packaged goods)" section: camera, $25–40 keyboard-mode scanner, Put in / Take
+  out, new codes, linking, trouble), the display guide, the customer pitch (How it works), and the company site: /price-list
+  ("The pieces" card, step 2, What you do, FAQ "Can my staff scan barcodes?") and the shops trade page.
 - Live price list for every business (Oct 2026, `src/generator/pricelist.ts`): the page, its nav link and the care card moved out
   of the retail pack; render.ts wraps every pack (`nav` + `pages`) with `priceListNav` / `pricesPage`, so any category builds
   `/prices/` when `ext.retail.priceList` has sections (the storage path kept its historical name). `priceList.kind`
