@@ -1,5 +1,5 @@
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
-import { applySiteFacts, cleanImages, extractSiteFacts } from "../places/site-import.ts";
+import { applySiteFacts, cleanImages, extractSiteFacts, isDirectoryPage } from "../places/site-import.ts";
 import { layoutOf } from "../generator/design.ts";
 import { LAYOUT_IDS, LAYOUTS } from "../generator/layouts.ts";
 import { z } from "zod";
@@ -45,7 +45,7 @@ import { plansOptions } from "./plan-options.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
 import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
-import { chooseLook, dnaHints, renderPreview, runBuild, runSearch, importSitePhotos } from "./pipeline.ts";
+import { chooseLook, dnaHints, renderPreview, runBuild, runSearch, importSitePhotos, forgetSiteImport, requeueStuck } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
 import { publishLead, zipLead } from "./publish.ts";
 
@@ -1351,6 +1351,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       );
       const record = JSON.parse(lead.record_json) as BusinessRecord;
       const facts = extractSiteFacts(input.url, input.html);
+      if (isDirectoryPage(input.url, facts.title)) throw new HttpError(422, "That page is a directory's listing for them, not their own website. Nothing was imported.");
       const fromPage = cleanImages(input.images, input.url, 40);
       facts.images = [...fromPage, ...facts.images.filter((i) => !fromPage.some((f) => f.src === i.src))].slice(0, 40);
       facts.via = "app";
@@ -1377,6 +1378,14 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       // Revoke: a new key means every tank board link sent so far stops working; the next "Text them" makes a fresh one.
       await updateLead(env, id, { client_key: newId() });
       await notify(env, { kind: "status", actor: session, leadId: lead.id, text: `${session.name} revoked ${lead.name}'s tank board links` });
+      return json({ ok: true });
+    }
+    if (action === "/siteimport" && m === "DELETE") {
+      // "Not their website": undo the import (text, photos, found page) and rebuild with a fresh rewrite.
+      if (!lead.record_json) throw new HttpError(409, "This site hasn't finished building yet");
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      await forgetSiteImport(env, lead, record);
+      await siteUpdated(env, session, lead, ["imported website text and photos removed"]);
       return json({ ok: true });
     }
     if (action === "/rewrite" && m === "POST") {
@@ -1660,6 +1669,7 @@ export default {
       // A new Android build in R2 → one push to every phone (no-op without the Firebase secret).
       await announceUpdate(env);
       await republishDirty(env);
+      await requeueStuck(env);
       return;
     }
     if (event.cron === CRON_WEEKLY_BACKUP) {

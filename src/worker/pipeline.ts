@@ -151,6 +151,50 @@ export async function importSitePhotos(env: Env, leadId: string, record: Busines
   return n;
 }
 
+/**
+ * "Not their website": undo a site import. Drops the imported text and photos (R2 `owner/<id>/s*`), puts the Google
+ * photo back as the hero, forgets the found page (presence back to "none") so the next build doesn't read it again,
+ * and asks for a rewrite since the copy was written from that page.
+ */
+export async function forgetSiteImport(env: Env, lead: LeadRow, record: BusinessRecord): Promise<void> {
+  const list = await env.BUCKET.list({ prefix: `owner/${lead.id}/s` });
+  if (list.objects.length) await env.BUCKET.delete(list.objects.map((o) => o.key));
+  const gone = new Set<string>();
+  record.media.gallery = record.media.gallery.filter((g) => {
+    if (g.source === "site") gone.add(g.src);
+    return g.source !== "site";
+  });
+  if (record.media.hero?.source === "site") {
+    gone.add(record.media.hero.src);
+    record.media.hero = undefined;
+    if (lead.place_json) heroFromPlace(record, JSON.parse(lead.place_json) as Place);
+  }
+  for (const sec of record.ext.retail?.priceList?.sections ?? []) for (const it of sec.items) if (it.image && gone.has(it.image.src)) it.image = undefined;
+  record.existingSite = undefined;
+  record.siteImport = undefined;
+  record.confirmed = record.confirmed.filter((c) => c !== "site_photos");
+  const change: Partial<LeadRow> = { record_json: JSON.stringify(record), rewrite: 1, status: "queued", error: null };
+  if (lead.found_url) {
+    change.found_url = null;
+    if (lead.presence === "elsewhere") {
+      change.presence = "none";
+      change.reason = (lead.reason ?? "").replace(/^Page on [^·]+ not linked from Google/i, "No website").replace(/\s*·\s*$/, "");
+    }
+  }
+  await updateLead(env, lead.id, change);
+  await env.JOBS.send({ type: "build", leadId: lead.id });
+}
+
+/** Minute cron: a build that has sat in "queued" for 20 minutes lost its job (deploy mid-run, a dropped message); send it again. */
+export async function requeueStuck(env: Env): Promise<number> {
+  const rows = await env.DB.prepare("SELECT id FROM leads WHERE status = 'queued' AND updated_at < ? ORDER BY updated_at ASC LIMIT 5").bind(Date.now() - 20 * 60_000).all<{ id: string }>();
+  for (const r of rows.results) {
+    await updateLead(env, r.id, { status: "queued" });
+    await env.JOBS.send({ type: "build", leadId: r.id });
+  }
+  return rows.results.length;
+}
+
 export function heroFromPlace(record: BusinessRecord, place: Place): void {
   // Google photos of churches and groups are often of people, children included: never use them, even in previews.
   if (record.category === "church") return;

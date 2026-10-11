@@ -14,6 +14,29 @@ const NOISE = /\b(cookie|cookies|this website uses|privacy policy|terms of (use|
 const NOTICE = /\b(clos(ed|ing)|mov(ed|ing)|relocat\w*|re-?open\w*|new location|temporar\w*|under construction|coming soon|grand opening|retir\w*)\b/i;
 /** Images that are not the business's own photos: logos, icons, tracking pixels, and the stock libraries site builders bundle. */
 const NOT_A_PHOTO = /logo|icon|favicon|badge|pixel|tracking|spacer|placeholder|avatar|sprite|\.svg|\.gif|\.ico|data:|1x1|blank\./i;
+/**
+ * Google-hosted pictures (Maps photos, Street View, reviewer avatars) are never ours to copy: Places terms bar re-hosting
+ * them, and directory sites embed them for the business AND its neighbours (RPS Tire Shop's "site" gave us six other
+ * tire shops' Google photos). Treated like stock.
+ */
+const GOOGLE_HOSTED = /googleusercontent\.com|ggpht\.com|maps\.googleapis\.com|maps\.gstatic\.com|streetviewpixels|\/maps\/api\/place\/photo/i;
+/**
+ * Scraped business directories that give every listing its own page or subdomain (localtireshops.net, loc8nearme.com):
+ * their text is machine-written from Google data and their photos belong to Google. Never a business's own website.
+ */
+export const DIRECTORY_HOST =
+  /(^|\.)(local[a-z]*(shops?|stores?|services?|pros|repairs?|dealers?|contractors?|companies|salons?|restaurants?|clinics?|dentists?|lawyers?|plumbers?|roofers?|electricians?|mechanics?|garages?|cafes?|bakeries|florists?|groomers?|movers?|cleaners?|painters?|landscapers?)\.(net|com|org|co|us)|loc8nearme\.com|localtireshops\.net|nearme[a-z-]*\.(com|net)|[a-z-]*near-?me\.(com|net)|[a-z]+directory\.(com|net|org)|[a-z]+listings?\.(com|net))$/i;
+const DIRECTORY_TITLE = /\|\s*(local [a-z &]+(shops?|stores?|services?|pros|repair|dealers|contractors|companies|salons?|restaurants?)|[a-z ]*(directory|listings?|near me))\s*$/i;
+/** True when a page is a directory's listing for the business rather than the business's own site. */
+export function isDirectoryPage(url: string, title?: string): boolean {
+  let host = "";
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return false;
+  }
+  return DIRECTORY_HOST.test(host) || (!!title && DIRECTORY_TITLE.test(title));
+}
 const STOCK = /\/isteam\/stock\/|unsplash|pexels|pixabay|shutterstock|istockphoto|gettyimages|stock\.adobe|depositphotos|dreamstime|stocksy|\/stock\//i;
 
 /** Absolute, de-sized image URLs: GoDaddy's `/:/rs=w:600…` resize suffix is dropped so the original comes down. */
@@ -36,7 +59,7 @@ export function cleanImages(list: Array<{ src: string; alt?: string }>, base: st
   const seen = new Set<string>();
   for (const it of list) {
     const alt = (it.alt ?? "").trim() || undefined;
-    if (!it.src || NOT_A_PHOTO.test(it.src) || NOT_A_PHOTO.test(alt ?? "") || STOCK.test(it.src)) continue;
+    if (!it.src || NOT_A_PHOTO.test(it.src) || NOT_A_PHOTO.test(alt ?? "") || STOCK.test(it.src) || GOOGLE_HOSTED.test(it.src)) continue;
     const abs = imageUrl(it.src, base);
     if (!abs) continue;
     const key = variantKey(abs);
@@ -68,7 +91,7 @@ export function extractImages(html: string, base: string): Array<{ src: string; 
     }
     const alt = decode(attr("alt") ?? "").trim() || undefined;
     const w = parseInt(attr("width") ?? "", 10);
-    if (!src || NOT_A_PHOTO.test(src) || NOT_A_PHOTO.test(alt ?? "") || STOCK.test(src) || (w && w < 200)) continue;
+    if (!src || NOT_A_PHOTO.test(src) || NOT_A_PHOTO.test(alt ?? "") || STOCK.test(src) || GOOGLE_HOSTED.test(src) || (w && w < 200)) continue;
     const abs = imageUrl(src, base);
     if (!abs) continue;
     const key = variantKey(abs);
@@ -82,7 +105,7 @@ export function extractImages(html: string, base: string): Array<{ src: string; 
   const text = decode(html).replace(/\\\//g, "/");
   for (const m of text.matchAll(/https?:\/\/[^\s"'<>()\\]+?(?:\.(?:jpe?g|png|webp)(?=[\s"'<>()?\\/:]|$)|\/isteam\/ip\/[^\s"'<>()\\]+)/gi)) {
     const abs = imageUrl(m[0], base);
-    if (!abs || NOT_A_PHOTO.test(abs) || STOCK.test(abs)) continue;
+    if (!abs || NOT_A_PHOTO.test(abs) || STOCK.test(abs) || GOOGLE_HOSTED.test(abs)) continue;
     const key = variantKey(abs);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -262,12 +285,14 @@ export async function importSiteDetailed(url: string, fetchFn: typeof fetch = fe
     return { facts: null, error: "not a web address" };
   }
   if (/(^|\.)(facebook|instagram|linktr|tiktok|yelp|google|nextdoor)\./i.test(u.hostname)) return { facts: null, error: "a social page, not their own site" };
+  if (isDirectoryPage(url)) return { facts: null, error: "a directory's listing for them, not their own website" };
   const tries = u.protocol === "http:" ? [u.toString().replace(/^http:/, "https:"), u.toString()] : [u.toString()];
   let lastError = "unknown";
   for (const t of tries) {
     const r = await fetchPage(t, fetchFn, 15_000);
     if (r.html) {
       const facts = extractSiteFacts(r.finalUrl ?? t, r.html);
+      if (isDirectoryPage(r.finalUrl ?? t, facts.title)) return { facts: null, error: "a directory's listing for them, not their own website" };
       return facts.paragraphs.length || facts.headings.length || facts.images.length ? { facts } : { facts: null, error: "the page had no readable text (probably built by scripts)" };
     }
     lastError = r.error ?? lastError;

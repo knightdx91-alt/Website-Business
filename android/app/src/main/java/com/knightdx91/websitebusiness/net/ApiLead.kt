@@ -169,6 +169,9 @@ suspend fun Api.siteImport(id: String, url: String, html: String, images: org.js
     postJson("/leads/$id/siteimport", JSONObject().put("url", url).put("html", html).put("images", images ?: org.json.JSONArray()))
 suspend fun Api.deleteLead(id: String) { deleteJson("/leads/$id") }
 
+/** "Not their website": removes the imported text, photos and found page, then rebuilds with a rewrite. Owner only. */
+suspend fun Api.forgetSiteImport(id: String) { deleteJson("/leads/$id/siteimport") }
+
 /** Publishes (or republishes) the site; answers with the live `url`. */
 suspend fun Api.publish(id: String): String = postJson("/leads/$id/publish").optString("url")
 

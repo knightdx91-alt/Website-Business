@@ -77,3 +77,31 @@ test("image sizes come from the file header, banners and thumbnails are not phot
   assert.equal(cleanAlt("IMG_0246"), undefined);
   assert.equal(cleanAlt("Boyd and Regina Posey: Owners of King Fish Aquatics"), "Boyd and Regina Posey: Owners of King Fish Aquatics");
 });
+
+test("directory listings are never a business's website, and Google-hosted photos are never imported", async () => {
+  const { isDirectoryPage, cleanImages } = await import("../src/places/site-import.ts");
+  const { pickPage } = await import("../src/places/web-presence.ts");
+  assert.equal(isDirectoryPage("https://rps-tire-shop.localtireshops.net/"), true);
+  assert.equal(isDirectoryPage("https://www.loc8nearme.com/alabama/cullman/otto-mechanic/4557899/"), true);
+  assert.equal(isDirectoryPage("https://example.com/rps", "RPS Tire Shop – Tire Shop in Cullman, AL | Local Tire Shops"), true, "the title gives a directory away");
+  assert.equal(isDirectoryPage("https://kingfishaquatics.co/", "King Fish Aquatics | Cullman, AL"), false);
+  assert.equal(isDirectoryPage("https://www.stonebridgewedding.com/lunas-bbq", "Luna's BBQ"), false);
+  const picked = pickPage(
+    [
+      { url: "https://rps-tire-shop.localtireshops.net/", title: "RPS Tire Shop – Tire Shop in Cullman, AL | Local Tire Shops", description: "" },
+      { url: "https://www.loc8nearme.com/alabama/cullman/rps-tire-shop/1/", title: "RPS Tire Shop, Cullman AL", description: "" },
+    ],
+    "RPS Tire Shop",
+  );
+  assert.equal(picked, null, "no page elsewhere from directories");
+  const imgs = cleanImages(
+    [
+      { src: "https://lh3.googleusercontent.com/grass-cs/AABk=w800-h600-k-no", alt: "RPS Tire Shop" },
+      { src: "https://lh3.googleusercontent.com/a/ACg8oc=s72-c" },
+      { src: "https://maps.googleapis.com/maps/api/place/photo?photoreference=x" },
+      { src: "https://rpstire.example/photos/shop-front.jpg", alt: "Our shop" },
+    ],
+    "https://rpstire.example/",
+  );
+  assert.deepEqual(imgs.map((i) => i.src), ["https://rpstire.example/photos/shop-front.jpg"]);
+});

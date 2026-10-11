@@ -78,6 +78,7 @@ import com.knightdx91.websitebusiness.net.domain
 import com.knightdx91.websitebusiness.net.extrasLink
 import com.knightdx91.websitebusiness.net.clientLink
 import com.knightdx91.websitebusiness.net.revokeClientLink
+import com.knightdx91.websitebusiness.net.forgetSiteImport
 import com.knightdx91.websitebusiness.net.fill
 import com.knightdx91.websitebusiness.net.flyerLeft
 import com.knightdx91.websitebusiness.net.leadFull
@@ -309,6 +310,11 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                         l.foundUrl?.let { url -> Text("🔗 Found page: ${l.foundHost ?: url} (not linked from their Google listing)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }) }
                         if (isOwner && l.salesStatus != "live") TextButton(onClick = { act("webcheck") { val r = state.api.webcheck(id); context.toast(if (r.optBoolean("found")) "Found: ${r.optString("label")}" else "Nothing found beyond their Google listing"); load() } }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text(if (busy == "webcheck") "Searching the web…" else "🔎 Re-check website") }
                         if (isOwner && detail.website != null && l.salesStatus != "live") TextButton(onClick = { importSite = true }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text("⬇️ Import their website (text + photos)") }
+                        if (isOwner && detail.existingSiteLine != null && l.salesStatus != "live") TextButton(onClick = {
+                            ask = Ask("Not their website", "Remove the text and photos taken from that page, forget the page, and rewrite the site? The Google photo comes back as the main photo.", "Remove", danger = true) {
+                                act("forgetsite") { state.api.forgetSiteImport(id); context.toast("Removed. Rebuilding with fresh text…"); delay(1_500); load() }
+                            }
+                        }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text("✖ Not their website: remove the imported text and photos") }
                         detail.existingSiteLine?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = muted) }
                         if (detail.existingSiteLine == null) detail.siteImportError?.let { Text("Couldn't read their site from the server: $it. Use Import their website.", style = MaterialTheme.typography.bodySmall, color = Warn) }
                         l.address?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }

@@ -355,6 +355,19 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `cleanImages`, `via: "app"`, `importSitePhotos`, auto-match, then `rewrite=1` + a build job. `runBuild` never refetches an
   `app` read while it's under 7 days old. `detail()` carries `website`, `siteImport`, `existingSite` {url, fetchedAt, via,
   images, paragraphs}. Web Push / browser can't do this (cross-origin), so it's Android-only.
+- Directory pages are never "their website" (Oct 2026): RPS Tire Shop's "page elsewhere" was rps-tire-shop.localtireshops.net, a
+  scraped directory whose text is machine-written from Google data and whose photos are Google Maps photos of the business AND
+  its neighbours; the phone import copied six other tire shops' photos into the gallery. Now: `isDirectoryPage(url, title)`
+  in site-import.ts (`DIRECTORY_HOST`: local<trade>s.net/com, loc8nearme.com, *near-me, *directory, *listings; `DIRECTORY_TITLE`:
+  "| Local Tire Shops" / "directory" / "near me" title tails) is checked by `pickPage` (never a found page), `importSiteDetailed`
+  (error "a directory's listing") and `POST /siteimport` (422). `GOOGLE_HOSTED` (googleusercontent, ggpht, maps.googleapis,
+  gstatic, Street View) images are dropped everywhere like stock: Google photos are never re-hosted. Undo: Edit → "Their current
+  website" → "✖ Not their website: remove this text and its photos" (web; Android 2.27 lead header; owner) = `DELETE
+  /api/leads/:id/siteimport` → `forgetSiteImport()` in pipeline.ts: deletes R2 `owner/<id>/s*`, drops `source: "site"` gallery
+  photos and price-list item photos, restores the Google hero (`heroFromPlace`), clears `existingSite` / `siteImport` /
+  confirmed `site_photos`, sets `found_url` NULL (presence `elsewhere` → `none`, reason "No website …") so the next build
+  doesn't read the page again, `rewrite = 1`, queues a build. The minute cron also runs `requeueStuck()` (builds "queued" for
+  20+ min get their job sent again, 5 a minute). RPS Tire Shop and Otto Mechanic (loc8nearme.com) were reset this way by SQL.
 - Pages elsewhere (Oct 2026, `src/places/web-presence.ts`, migration 0016 `leads.found_url`): Google only reports the website linked
   on the profile, so "No website" can be wrong (Luna's BBQ has a page on stonebridgewedding.com). With Worker secret
   `BRAVE_SEARCH_API_KEY` (Brave Search API, free 2,000 queries/month, ~$3/1,000 after; without it nothing changes) the app runs one

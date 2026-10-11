@@ -1220,6 +1220,7 @@
         ${r.existingSite.notices.length ? `<p class="small"><strong>Notice on their site:</strong> ${esc(r.existingSite.notices.join(" / "))}</p>` : ""}
         ${r.existingSite.headings.length ? `<p class="small muted">Headings: ${esc(r.existingSite.headings.slice(0, 8).join(" · "))}</p>` : ""}
         ${r.existingSite.paragraphs.slice(0, 4).map((p) => `<p class="small">${esc(p.length > 240 ? p.slice(0, 240) + "…" : p)}</p>`).join("")}
+        <div class="btns"><button class="btn btn--small btn--danger" type="button" data-forgetsite>✖ Not their website: remove this text and its photos</button></div>
       </section>` : ""}
       <section class="card"><h2>Links</h2>
         ${isR ? `<label class="field">Online ordering link<input name="order" type="url" value="${esc(r.links.order || "")}" placeholder="https://"></label>
@@ -2685,6 +2686,18 @@
     return `<section class="card"><h2>⭐ Ask for a review</h2><p class="small muted">Once their site is live and they're happy, a quick Google review helps us win the next client.</p>
       <div class="btns btns--full"><button class="btn" type="button" data-askreview>💬 Text them our review link</button></div></section>`;
   }
+
+  // Edit → "Their current website" → Not their website (owner): undo the import and rebuild.
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest && e.target.closest("[data-forgetsite]");
+    if (!b) return;
+    const m = /#\/edit\/([a-z0-9]+)/.exec(location.hash);
+    if (!m) return;
+    if (!confirm("Remove the text and photos taken from that page, forget the page, and rewrite the site? The Google photo comes back as the main photo.")) return;
+    b.disabled = true;
+    try { await api(`/leads/${m[1]}/siteimport`, { method: "DELETE" }); toast("Removed. Rebuilding with fresh text…"); setTimeout(() => viewLead(m[1]), 1500); }
+    catch (err) { toast(err.message); b.disabled = false; }
+  });
 
   function bindReviewAsk(l) {
     $app.querySelectorAll("[data-clientlink]").forEach((cb) => cb.addEventListener("click", async () => {

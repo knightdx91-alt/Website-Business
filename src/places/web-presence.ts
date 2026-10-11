@@ -1,4 +1,5 @@
 import { websiteProblem } from "./site-check.ts";
+import { isDirectoryPage } from "./site-import.ts";
 import type { Place } from "./client.ts";
 import type { WebPresence } from "./qualify.ts";
 
@@ -62,7 +63,7 @@ export function pickPage(results: WebResult[], name: string): FoundPage | null {
       continue;
     }
     const host = u.hostname.replace(/^www\./, "");
-    if (IGNORED_HOSTS.test(host) || /\.(gov|edu|mil)$/.test(host)) continue;
+    if (IGNORED_HOSTS.test(host) || /\.(gov|edu|mil)$/.test(host) || isDirectoryPage(r.url, r.title)) continue;
     // Judge "their own domain" by the registrable domain only: pops-cafe-hanceville.res-pick.com is a page on an ordering
     // platform (a page elsewhere), not their website, even though the subdomain carries the name.
     const registrable = host.split(".").slice(-2).join(".");
