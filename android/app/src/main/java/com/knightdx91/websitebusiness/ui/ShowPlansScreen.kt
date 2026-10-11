@@ -50,7 +50,7 @@ import com.knightdx91.websitebusiness.net.planOptions
 import kotlinx.coroutines.launch
 
 /** Show plans is the one screen the customer reads, so it is always light, whatever the phone's theme. */
-private val ShowPlansLight = lightColorScheme(
+internal val ShowPlansLight = lightColorScheme(
     primary = Navy,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFDDE3F2),

@@ -336,3 +336,75 @@ export function guideById(id: string, s: AppSettings): Guide | null {
   if (id === "display") return displayGuide(s);
   return null;
 }
+
+
+/** A customer-facing page (Show them the Tank board): what it is for them, what they do, what we do, what it costs. */
+export interface CustomerPitch {
+  title: string;
+  lead: string;
+  sections: GuideSection[];
+  /** Price lines, already filled from Settings. */
+  price: string[];
+  fine: string;
+}
+
+export function customerBoardPitch(s: AppSettings, o: { business: string; live: boolean }): CustomerPitch {
+  const list = s.plans.find((p) => p.id === "list" && p.monthly);
+  const site = s.plans.filter((p) => p.id !== "list" && p.monthly);
+  const cheapest = site.length ? site.reduce((a, p) => (p.monthly < a.monthly ? p : a)) : null;
+  const tags = s.addons.find((a) => /price tag|shelf label/i.test(a.name));
+  const company = s.companyName || "Underground Associates";
+  const you = o.business || "your shop";
+  return {
+    title: `What's in the tank, on your phone and on the tank`,
+    lead: `${you} changes what's in its tanks every day. Here's how the price on the tank keeps up by itself: you change it on your phone, and the tag on the tank, the screen by the tank and your website all change with it.`,
+    sections: [
+      {
+        title: "How it works",
+        numbered: true,
+        steps: [
+          "We text you a private link: your Tank board. It opens on any phone. No app to install, no password to remember.",
+          "The board lists your tanks (or shelves). For each one you type what's in it, the price, how many, and snap a photo if you like.",
+          "Every change saves by itself and shows on your website's price page within about a minute.",
+          "A small QR tag on each tank opens that tank's live prices on a customer's phone. A cheap tablet by the tank can show them too, no scanning.",
+        ],
+      },
+      {
+        title: "What you do",
+        steps: [
+          "Something new comes in: open the board, tap the tank, type the name and price. Twenty seconds.",
+          "Something sells out: tap \"Sold out\". It disappears from the page until you tap it back. Or just type how many are left; at 5 or fewer the page says \"3 left\".",
+          "Want a picture? Tap the camera on the item and take one right there at the tank.",
+          "Prices change: change the number. Nobody rewrites a tag, nobody reprints anything.",
+          "That's all. You never touch the website, and anyone on your staff with the link can do it.",
+        ],
+      },
+      {
+        title: "What your customers get",
+        steps: [
+          "At the tank: scan the tag or glance at the screen and see exactly what's in it today, with prices and photos.",
+          "At home: your price page shows up with your website on Google, so people check what you have before they drive over, and call about the fish they want.",
+          "Fewer \"how much is this one?\" questions, and no arguing about a price on an old tag.",
+        ],
+      },
+      {
+        title: `What ${company} does`,
+        steps: [
+          "Set up your price page and your board, and load your first tanks with you if you want.",
+          "Print your QR tags (one per tank), and set up a tablet for you if you'd like one.",
+          "Keep it all running: hosting, security, backups, and reprints when you rename or add a tank.",
+          "Answer by text. Anything odd, you text us and we fix it.",
+        ],
+      },
+    ],
+    price: [
+      list ? `Just the price page, board and tags: ${list.name}, $${list.monthly} a month. No minimum; cancel any time.${tags ? ` Your first sheet of QR tags is included.` : ""}` : "Ask us about the Price list plan.",
+      cheapest ? `With a full website: included in every website plan, from $${cheapest.monthly} a month.` : "Included with every website plan.",
+      tags ? `More QR tag sheets (8 tags each): ${addonPrice(tags)}.` : "QR tags are an extra.",
+      "A tablet by the tank: any $40 to $80 tablet works; we'll set it up.",
+    ],
+    fine: o.live
+      ? "Your price page is live now. Add a tank on the board and watch it change."
+      : "Your website isn't live yet; the board and the preview work today, and the tags are printed once it's live (within 3 business days of your go-ahead).",
+  };
+}

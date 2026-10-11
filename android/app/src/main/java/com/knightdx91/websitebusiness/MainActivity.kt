@@ -54,6 +54,7 @@ import com.knightdx91.websitebusiness.ui.SalesScreen
 import com.knightdx91.websitebusiness.ui.HomeScreen
 import com.knightdx91.websitebusiness.ui.TrainingScreen
 import com.knightdx91.websitebusiness.ui.GuideScreen
+import com.knightdx91.websitebusiness.ui.ShowBoardScreen
 import com.knightdx91.websitebusiness.ui.UpdateDialog
 import com.knightdx91.websitebusiness.ui.PreviewScreen
 import com.knightdx91.websitebusiness.ui.LeadScreen
@@ -191,6 +192,7 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
             composable("playbook") { PlaybookScreen(state, nav) }
             composable("training") { TrainingScreen(state, nav) }
             composable("guide/{id}") { e -> GuideScreen(state, nav, e.arguments?.getString("id") ?: "tankboard") }
+            composable("showboard/{lead}") { e -> ShowBoardScreen(state, nav, e.arguments?.getString("lead") ?: "") }
             composable("walkin") { WalkinScreen(state, nav, null) }
             composable("walkin/{lead}") { e -> WalkinScreen(state, nav, e.arguments?.getString("lead")) }
             composable("plans") { ShowPlansScreen(state, nav, null) }

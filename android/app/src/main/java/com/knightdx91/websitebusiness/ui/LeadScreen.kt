@@ -550,6 +550,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             Text(if (signups.isNotEmpty()) "Send a new link to change plans." else "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs.", style = MaterialTheme.typography.bodySmall, color = muted)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
                                 OutlinedButton(onClick = { nav.navigate("plans/${l.id}") }) { Text("📋 Show them the plans") }
+                                if (l.category == "retail") OutlinedButton(onClick = { nav.navigate("showboard/${l.id}") }) { Text("🐠 Show them the Tank board") }
                                 OutlinedButton(onClick = { nav.navigate(pdfNav("/api/contract.pdf?lead=${l.id}", "Agreement")) }) { Text("📄 Agreement") }
                                 OutlinedButton(onClick = { nav.navigate(pdfNav("/api/ach.pdf?lead=${l.id}", "Payment authorization form")) }) { Text("🏦 Payment authorization form") }
                             }

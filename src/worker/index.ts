@@ -18,7 +18,7 @@ import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/cl
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
-import { guideById } from "./guides.ts";
+import { customerBoardPitch, guideById } from "./guides.ts";
 import { LAST_ANNOUNCE_KEY, TICK_KEY, announceUpdate, fcmClientConfig, serviceAccount, serviceAccountProblem } from "./fcm.ts";
 import { clientLink, republishDirty, serveDisplay, servePhoto, servePricesFeed, serveTankBoard } from "./tankboard.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
@@ -886,7 +886,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const action = leadMatch[2] ?? "";
     const sub = leadMatch[3];
     const lead: LeadRow = await requireLead(env, id);
-    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/signups", "/flyer", "/extraslink", "/contact"].includes(action) || (action === "/clientlink" && m === "POST") || (action === "/flyer.pdf" && m === "GET");
+    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/signups", "/flyer", "/extraslink", "/contact"].includes(action) || (action === "/clientlink" && m === "POST") || (action === "/showboard" && m === "GET") || (action === "/flyer.pdf" && m === "GET");
     if (!callerSafe) ownerOnly();
 
     if (action === "" && m === "GET") {
@@ -1381,6 +1381,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const text = `Hi! Here's your ${lead.name} tank board: ${link}  Open it on your phone, bookmark it, and change what's in each tank any time. Prices and "sold out" show on your website within a minute.`;
       await notify(env, { kind: "status", actor: session, leadId: lead.id, text: `${session.name} sent ${lead.name} their tank board link` });
       return json({ url: link, text });
+    }
+    if (action === "/showboard" && m === "GET") {
+      // Customer-facing "Show them the Tank board" page (owner + callers): the pitch for this shop, the tablet view address.
+      if (lead.category !== "retail") throw new HttpError(409, "The tank board is for shops with a price list");
+      const live = !!lead.live_url;
+      return json({ ...customerBoardPitch(await getSettings(env), { business: lead.name ?? "", live }), displayUrl: `${url.origin}/d/${lead.id}/`, live });
     }
     if (action === "/clientlink" && m === "DELETE") {
       // Revoke: a new key means every tank board link sent so far stops working; the next "Text them" makes a fresh one.

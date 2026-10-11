@@ -622,7 +622,7 @@
       ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)} · <a href="/api/agreements/p/${p.id}" target="_blank" rel="noopener">📄 agreement</a> · <a href="/api/agreements/p/${p.id}.pdf">⬇ PDF</a></li>`).join("")}</ul>` : ""}
       ${plans.length
         ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
-          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> <a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="/api/contract.pdf?lead=${l.id}">⬇ Agreement PDF</a> <a class="btn btn--small" href="/api/ach.pdf?lead=${l.id}">🏦 Payment authorization form</a></p>
+          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> ${l.category === "retail" ? `<a class="btn btn--small" href="#/showboard/${l.id}">🐠 Show them the Tank board</a> ` : ""}<a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="/api/contract.pdf?lead=${l.id}">⬇ Agreement PDF</a> <a class="btn btn--small" href="/api/ach.pdf?lead=${l.id}">🏦 Payment authorization form</a></p>
           <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div>
           <div id="signuplink"></div>`
         : isOwner() ? `<p class="small muted">Add your plans and prices in <a href="#/settings">Settings</a> first.</p>` : `<p class="small muted">The owner hasn't set up plans yet.</p>`}
@@ -1617,6 +1617,34 @@
         location.href = tapHref(res.url);
       } catch (err) { toast(err.message); b.disabled = false; b.textContent = "Try again"; }
     }));
+  }
+
+  /** 🐠 Show them the Tank board: a customer-facing page for a shop (owner and callers), from /api/leads/:id/showboard. */
+  async function viewShowBoard(leadId) {
+    stopPolling();
+    const my = renderSeq;
+    let p;
+    try { p = await api(`/leads/${leadId}/showboard`); } catch (err) { if (stale(my)) return; $app.innerHTML = `<section class="card"><p class="bad">${esc(err.message)}</p></section>`; return; }
+    if (stale(my)) return;
+    const company = meta.settings.companyName || "Underground Associates";
+    $nav.hidden = true;
+    document.body.classList.add("showing");
+    $app.innerHTML = `<div class="show">
+      <div class="show__top"><a href="#/lead/${leadId}" class="show__back">← Back</a><span class="show__co">${esc(company)}</span></div>
+      <header class="show__head"><h1>${esc(p.title)}</h1><p>${esc(p.lead)}</p></header>
+      <div class="show__plans">${p.sections.map((s) => `<section class="show__plan"><h2>${esc(s.title)}</h2>
+        <${s.numbered ? "ol class=\"show__steps\"" : "ul"}>${s.steps.map((x) => `<li>${esc(x)}</li>`).join("")}</${s.numbered ? "ol" : "ul"}></section>`).join("")}</div>
+      <section class="show__box"><h2>What it costs</h2><ul class="show__every">${p.price.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>
+      <section class="show__box"><h2>See it</h2>
+        <div class="btns btns--full"><button class="show__choose" type="button" data-tryboard>🐠 Try the board on this phone</button><a class="btn" href="${esc(p.displayUrl)}" target="_blank" rel="noopener">📺 See the tablet view</a><a class="btn" href="#/plans/${leadId}">📋 See the plans</a></div></section>
+      <p class="show__fine">${esc(p.fine)}</p>
+    </div>`;
+    const tb = $app.querySelector("[data-tryboard]");
+    tb.addEventListener("click", async () => {
+      tb.disabled = true;
+      try { const { url } = await api(`/leads/${leadId}/clientlink`, { method: "POST" }); window.open(url, "_blank", "noopener"); }
+      catch (err) { toast(err.message); } finally { tb.disabled = false; }
+    });
   }
 
   /* ---------- plans & answers (for callers) ---------- */
@@ -3761,6 +3789,7 @@
       if ((m = /^#\/guide\/([a-z0-9-]+)$/.exec(h))) return await viewGuide(m[1]);
       if ((m = /^#\/walkin(?:\/([a-z0-9]+))?$/.exec(h))) return await viewWalkin(m[1]);
       if ((m = /^#\/plans(?:\/([a-z0-9]+))?$/.exec(h))) return await viewShowPlans(m[1]);
+      if ((m = /^#\/showboard\/([a-z0-9]+)$/.exec(h))) return await viewShowBoard(m[1]);
       if (h === "#/route") return await viewRoute();
       if (h === "#/add") return await viewAdd();
       if (h === "#/run") return await viewRun();

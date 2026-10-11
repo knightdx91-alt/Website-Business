@@ -188,6 +188,7 @@ body.showing { background: #fff; }
 .show__price span { font-weight: 600; color: var(--sm); }
 .show__day { color: var(--sm); font-size: .95rem; margin: 4px 0 14px; }
 .show__plan ul, .show__every { list-style: none; padding: 0; margin: 0; }
+.show__steps { margin: 0; padding-left: 22px; } .show__steps li { padding: 6px 0; }
 .show__plan li, .show__every li { position: relative; padding: 6px 0 6px 28px; }
 .show__plan li::before, .show__every li::before { content: "✓"; position: absolute; left: 4px; color: #15803d; font-weight: 800; }
 .show__choose { display: block; width: 100%; margin-top: 16px; min-height: 52px; border: 0; border-radius: 12px; font-weight: 800; font-size: 1.05rem; background: #eef1f6; color: var(--sn); cursor: pointer; }

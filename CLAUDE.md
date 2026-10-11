@@ -335,6 +335,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   board's 📺 links, setting a tablet up (home screen, screen timeout, plugged in, app pinning), mounting, what the shop needs to
   know, selling it (free with the plan; $99 installed if we supply tablets), trouble. `test/worker/guides.test.ts`. Add a guide:
   a builder in guides.ts + `guideById` + a button.
+- 🐠 Show them the Tank board (Oct 2026): a customer-facing page for a shop, like Show plans (light, app bar hidden): web
+  `#/showboard/<leadId>` (`viewShowBoard`), Android `ui/ShowBoardScreen.kt` 2.31 (route `showboard/{lead}`), button next to
+  "Show them the plans" on retail leads (owner + callers). `GET /api/leads/:id/showboard` = `customerBoardPitch(s, {business,
+  live})` in guides.ts (How it works / What you do / What your customers get / What <company> does, price lines from Settings,
+  a live-or-not closing line) + `displayUrl`. Buttons: "Try the board on this phone" (POST /clientlink → opens it), "See the
+  tablet view" (`/d/<id>/`), "See the plans".
 - 🎓 Training (Oct 2026, `src/worker/training.ts`, migration 0017 `training_done`; web `#/training` `viewTraining`, Android
   `ui/TrainingScreen.kt`, 2.10): an in-app course for owner and callers, Home → "🎓 Training" (also Settings). 10 lessons (what
   we sell, where leads come from, before you call, showing the preview, logging calls, signing up, taking payment, finish &
