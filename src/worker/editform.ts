@@ -255,7 +255,7 @@ export function editForm(l: EditDetail): EditForm {
       note(`Read from ${x.url} on ${x.fetchedAt}. Used as background for the text (rewritten, never copied). Check it's really theirs.`),
       ...(x.notices.length ? [note(`Notice on their site: ${x.notices.join(" / ")}`)] : []),
       ...(x.headings.length ? [note(`Headings: ${x.headings.slice(0, 8).join(" · ")}`)] : []),
-      ...x.paragraphs.slice(0, 4).map((p) => note(p.length > 240 ? `${p.slice(0, 240)}…` : p)),
+      ...x.paragraphs.slice(0, 4).map((p: string) => note(p.length > 240 ? `${p.slice(0, 240)}…` : p)),
     ], { collapsed: true });
   }
   card("facts", "Facts (only if the owner says so)", facts);
