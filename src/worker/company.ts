@@ -771,7 +771,7 @@ function extrasHtml(s: AppSettings, o: { compact?: boolean } = {}): string {
   const groups = new Map<string, typeof s.addons>();
   for (const a of s.addons) groups.set(a.unit, [...(groups.get(a.unit) ?? []), a]);
   return `<section class="sec" id="extras"><div class="wrap"><h2>Extras</h2><p class="lead">Add any of these to any plan, at sign-up or later. Already a client? <a href="/extras">Add extras here</a>.</p>
-${[...groups.entries()].map(([unit, list]) => `<h3 class="xgroup">${e(UNIT_GROUP[unit] ?? unit)}</h3><div class="grid extras">${list.map((a) => `<div class="card"><h3>${e(a.name)}</h3><p class="xprice">${e(addonPrice(a))}</p>${a.about ? `<p>${e(a.about)}</p>` : ""}</div>`).join("")}</div>`).join("")}
+<div class="xcols">${[...groups.entries()].map(([unit, list]) => `<div><h3 class="xgroup">${e(UNIT_GROUP[unit] ?? unit)}</h3><ul class="xlist">${list.map((a) => `<li><div class="xlist__row"><b>${e(a.name)}</b><span>${e(addonPrice(a))}</span></div>${a.about ? `<p>${e(a.about)}</p>` : ""}</li>`).join("")}</ul></div>`).join("")}</div>
 </div></section>`;
 }
 
@@ -965,10 +965,10 @@ async function pricingPage(env: Env): Promise<Response> {
   const quotes = testimonials(s);
   const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Pricing</p><h1>Simple monthly pricing. No surprises.</h1>
 <p class="lead">You see your finished site first. If you want it live, pick a plan. The monthly price covers the site, hosting, security and the changes you ask for. ${e(GO_LIVE_TEXT)}</p></div></section>
-${s.plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap"><div class="grid plans">${s.plans.map((p) => planCard(p, s, { full: true })).join("")}</div>${badgesHtml(s)}
+${s.plans.length ? `<section class="sec sec--alt" id="plans"><div class="wrap"><div class="grid plans">${s.plans.map((p) => planCard(p, s)).join("")}</div>
+<p class="paynote">Every plan includes hosting, security and the changes you ask for. Rather see your site first? <a href="/#contact">Get the free preview</a> and decide after.</p>
 ${waysToPayHtml(s)}
 <h3 class="xgroup">Leaving early</h3><p>${earlyCancelText(s)}</p>
-${firstWeekHtml()}
 ${s.churchAnnualMonthsFree ? `<p class="small muted">Churches and nonprofits: 12 months for the price of ${12 - s.churchAnnualMonthsFree} on a yearly plan, and we can invoice instead of taking a card.</p>` : ""}
 </div></section>` : ""}
 ${extrasHtml(s)}
@@ -1028,7 +1028,8 @@ async function tradePage(env: Env, t: Trade): Promise<Response> {
 ${groups.length ? `<p class="small muted">Covers: ${e(groups.join(" · "))}.</p>` : ""}</div>
 ${x ? `<a class="trade__example" href="/examples/${x.slug}/"><img src="/examples/${x.slug}.jpg" alt="Phone screenshot of ${e(x.record.name)}, an example ${e(x.kind.toLowerCase())} website" width="390" height="780" loading="lazy" decoding="async"><span><strong>${e(x.record.name)}</strong>Example ${e(x.kind.toLowerCase())} site · tap to open</span></a>` : ""}
 </div></section>
-${s.plans.length ? `<section class="sec" id="plans"><div class="wrap"><h2>Plans</h2><p class="lead">${lowest ? `From ${money(lowest)} a month, ` : ""}hosting and changes included. ${(s.minMonths ?? 12) ? `No setup fee on ${commitText(s)} plans.` : ""}</p><div class="grid plans">${s.plans.map((p) => planCard(p, s)).join("")}</div>${payNote(s)}<p style="margin-top:14px"><a href="/pricing">Full pricing, extras and ways to pay</a></p></div></section>` : ""}
+${s.plans.length ? `<section class="sec" id="plans"><div class="wrap narrow"><h2>What it costs</h2><p class="lead">${lowest ? `From ${money(lowest)} a month` : "One monthly price"}, with hosting, security and changes included${(s.minMonths ?? 12) ? `, and no setup fee on ${commitText(s)} plans` : ""}. You see the finished site before you pay anything.</p><p><a class="btn btn--line" href="/pricing">See plans and pricing</a></p></div></section>
+` : ""}
 <section class="sec sec--alt" id="faq"><div class="wrap narrow"><h2>Questions ${e(t.name.split(",")[0]!.replace(/ and .*/, ""))} ask</h2>${faqHtml(t.faq)}<p class="small muted" style="margin-top:14px">Other trades: ${TRADES.filter((o) => o.slug !== t.slug).map((o) => `<a href="/websites-for/${o.slug}">${e(o.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a>`).join(" · ")}.</p></div></section>
 ${contactSection(s)}`;
   return marketingPage(s, { path: `/websites-for/${t.slug}`, title, description, body, ld: pageLd(s, `/websites-for/${t.slug}`, title, description, [serviceLd]) });
@@ -1315,6 +1316,8 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .badges{list-style:none;padding:0;margin:20px 0 0;display:flex;flex-wrap:wrap;gap:8px}.badges li{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:.92rem}.badges li::before{content:"✓";color:var(--goldtext);font-weight:800}
 .xrow{margin-top:28px}.xrow h3{font-size:1.2rem}.chips--x li{font-weight:400;display:inline-flex;gap:8px;align-items:baseline}.chips--x b{font-weight:700}.chips--x span{color:var(--goldtext);font-weight:700;font-size:.9rem}
 .xgroup{margin-top:28px;font-size:1.2rem}
+.xcols{display:grid;gap:0 32px}@media (min-width:860px){.xcols{grid-template-columns:1fr 1fr}}
+.xlist{list-style:none;padding:0;margin:0}.xlist li{padding:10px 0;border-bottom:1px solid var(--line)}.xlist__row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}.xlist__row span{color:var(--goldtext);font-weight:700;white-space:nowrap}.xlist p{margin:2px 0 0;color:var(--muted);font-size:.92rem}
 .sec--head{padding-bottom:28px}.sec--head h1{font-size:clamp(2rem,6vw,3.2rem)}.sec--head+.sec{padding-top:36px}
 .eyebrow--dark{color:var(--goldtext)}
 .about__photo--logo{border-color:var(--line);background:var(--navy);padding:18px;object-fit:contain}.about__facts{margin:10px 0 0;color:var(--muted);font-size:.95rem}
