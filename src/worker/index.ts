@@ -593,8 +593,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (path === "/android.apk" && m === "GET") {
     const apk = await env.BUCKET.get("_build/website-business.apk");
     if (!apk) throw new HttpError(404, "The Android app hasn't been uploaded yet");
+    // content-length lets the app show real progress (a streamed body is chunked otherwise and the phone sees no total).
     return new Response(apk.body, {
-      headers: { "content-type": "application/vnd.android.package-archive", "content-disposition": 'attachment; filename="website-business.apk"', "cache-control": "no-store" },
+      headers: { "content-type": "application/vnd.android.package-archive", "content-length": String(apk.size), "content-disposition": 'attachment; filename="website-business.apk"', "cache-control": "no-store", "accept-ranges": "none" },
     });
   }
 

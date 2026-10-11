@@ -31,17 +31,22 @@ import kotlinx.coroutines.launch
 fun UpdateDialog(api: Api, update: Updater.Check, onDone: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    /** null = idle; -1f = downloading with no total yet; 0..1 = fraction. */
     var progress by remember { mutableStateOf<Float?>(null) }
     var message by remember { mutableStateOf("") }
     val busy = progress != null
+    fun mb(b: Long) = "%.1f MB".format(b / 1_048_576.0)
 
     fun install() {
         scope.launch {
             try {
-                progress = 0f
+                progress = -1f
                 message = "Downloading ${update.versionName}…"
-                Updater.downloadAndInstall(context, api, update) { p -> progress = p }
-                message = "Android will ask you to install it."
+                Updater.downloadAndInstall(context, api, update) { read, total ->
+                    progress = if (total > 0) (read.toFloat() / total).coerceIn(0f, 1f) else -1f
+                    message = if (total > 0) "Downloading ${update.versionName}… ${mb(read)} of ${mb(total)}" else "Downloading ${update.versionName}… ${mb(read)}"
+                }
+                message = "Downloaded. Android will ask you to install it."
                 onDone()
             } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                 message = e.message ?: "Update failed"
@@ -58,7 +63,10 @@ fun UpdateDialog(api: Api, update: Updater.Check, onDone: () -> Unit) {
             Column {
                 Text("Version ${update.versionName} is ready. You have ${BuildConfig.VERSION_NAME}.")
                 Text("Download takes about a minute, then Android asks you to install it. The app reopens where you left off.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
-                progress?.let { p -> LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) }
+                progress?.let { p ->
+                    if (p < 0f) LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
+                    else LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
+                }
                 if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
             }
         },

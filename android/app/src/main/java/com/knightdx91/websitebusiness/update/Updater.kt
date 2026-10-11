@@ -10,8 +10,6 @@ import com.knightdx91.websitebusiness.net.Api
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * In-app updates for a sideloaded build: the Worker publishes the newest version next to the APK (`GET /api/android/version`,
@@ -82,23 +80,27 @@ object Updater {
         api.prefs.updateSnoozedAt = System.currentTimeMillis()
     }
 
-    suspend fun downloadAndInstall(context: Context, api: Api, c: Check, onProgress: (Float) -> Unit) {
+    /**
+     * Downloads the APK over the app's shared OkHttp client and hands it to Android's installer. `onProgress(read, total)`:
+     * total is -1 until the server says (it sends content-length since Oct 2026), so the dialog shows megabytes either way.
+     */
+    suspend fun downloadAndInstall(context: Context, api: Api, c: Check, onProgress: (Long, Long) -> Unit) {
         if (!context.packageManager.canRequestPackageInstalls()) {
             context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             throw IllegalStateException("Allow this app to install updates (the Settings page just opened), then tap Download again.")
         }
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+        dir.listFiles()?.forEach { it.delete() }
         val file = File(dir, "website-business-${c.versionCode}.apk")
         withContext(Dispatchers.IO) {
-            val conn = URL(c.url).openConnection() as HttpURLConnection
-            try {
-                api.prefs.token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
-                conn.connectTimeout = 15_000
-                conn.readTimeout = 120_000
-                if (conn.responseCode >= 400) throw IllegalStateException("Download failed (${conn.responseCode})")
-                val total = conn.contentLengthLong
+            val req = okhttp3.Request.Builder().url(c.url).apply { api.prefs.token?.let { header("Authorization", "Bearer $it") } }.build()
+            Api.http.newBuilder().readTimeout(120, java.util.concurrent.TimeUnit.SECONDS).build().newCall(req).execute().use { res ->
+                if (res.code >= 400) throw IllegalStateException("Download failed (${res.code})")
+                val body = res.body ?: throw IllegalStateException("Download failed (empty)")
+                val total = body.contentLength()
                 var read = 0L
-                conn.inputStream.use { input ->
+                var lastReport = 0L
+                body.byteStream().use { input ->
                     file.outputStream().use { out ->
                         val buf = ByteArray(64 * 1024)
                         while (true) {
@@ -106,12 +108,12 @@ object Updater {
                             if (n < 0) break
                             out.write(buf, 0, n)
                             read += n
-                            if (total > 0) onProgress(read.toFloat() / total)
+                            if (read - lastReport >= 256 * 1024) { lastReport = read; onProgress(read, total) }
                         }
                     }
                 }
-            } finally {
-                conn.disconnect()
+                onProgress(read, read)
+                if (read < 1_000_000) throw IllegalStateException("Download came back too small (${read / 1024} KB). Try again.")
             }
         }
         val uri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.files", file)

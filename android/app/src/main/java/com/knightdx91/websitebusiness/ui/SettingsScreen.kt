@@ -367,10 +367,13 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
         val u = update ?: return
         scope.launch {
             try {
-                progress = 0f
+                progress = -1f
                 updateMsg = "Downloading ${u.versionName}…"
-                Updater.downloadAndInstall(context, state.api, u) { p -> progress = p }
-                updateMsg = "Android will ask you to install it."
+                Updater.downloadAndInstall(context, state.api, u) { read, total ->
+                    progress = if (total > 0) (read.toFloat() / total).coerceIn(0f, 1f) else -1f
+                    updateMsg = "Downloading ${u.versionName}… %.1f MB%s".format(read / 1_048_576.0, if (total > 0) " of %.1f MB".format(total / 1_048_576.0) else "")
+                }
+                updateMsg = "Downloaded. Android will ask you to install it."
             } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { updateMsg = e.message ?: "Update failed" } finally { progress = null }
         }
     }
@@ -527,7 +530,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                         }
                         else -> Text("You're on the newest build. The app checks once a day and tells you when there's a new one.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    progress?.let { LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) }
+                    progress?.let { p -> if (p < 0f) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp)) else LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) }
                     if (updateMsg.isNotBlank()) Text(updateMsg, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                 }
             }

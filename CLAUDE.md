@@ -206,6 +206,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `com.knightdx91.websitebusiness` (skip google-services.json) → Project settings → General: App ID, Web API key, Project ID;
   Cloud Messaging: Sender ID → paste the four into Settings; Project settings → Service accounts → Generate new private key →
   the JSON file's content as Cloudflare Worker secret FCM_SERVICE_ACCOUNT.
+- Android 2.19 (Oct 2026): the update download showed a full-looking bar and "Downloading…" for a minute: `/api/android.apk`
+  streamed R2 without a content-length, so the phone had no total and reported nothing. The route now sends
+  `content-length` (R2 `size`); `Updater.downloadAndInstall` downloads over `Api.http`, reports `(read, total)` every 256 KB,
+  and the pop-up / Settings show "12.3 MB of 44.1 MB" (indeterminate bar until the total is known); a file under 1 MB is an
+  error, and old APKs in the cache dir are deleted first.
 - Android 2.17 (Oct 2026): cold starts took up to 30 s. `net/Api.kt` now uses one shared OkHttp client (`Api.http`, okhttp 5.1.0:
   pooled connections, HTTP/2, `fastFallback(true)` so a dead IPv6 route costs milliseconds instead of a 15-second connect wait
   per address, 10 s connect timeout); before, every call opened and closed its own HttpURLConnection. Home loads its four
