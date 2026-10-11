@@ -139,10 +139,50 @@ export function priceListTeaser(ctx: Ctx): ReturnType<typeof html> {
 <ul class="tiles">${picks.map(({ it, section }) => {
     const img = it.image && (ctx.mode === "preview" || it.image.source !== "google") ? it.image : undefined;
     const left = it.qty !== undefined && it.qty > 0 && it.qty <= 5 ? `${it.qty} left` : "";
-    return html`<li class="tile${img || it.sample ? "" : " tile--text"}">${img ? imageTag(img, { cls: "tile__img" }) : it.sample ? html`<div class="tile__img tile__img--ph" aria-hidden="true">${W.emoji}</div>` : ""}<div class="tile__body"><h3>${it.name}</h3>${it.price ? html`<p class="tile__price">${it.price}</p>` : ""}<p class="tile__note">${[section, left].filter(Boolean).join(" · ")}</p></div></li>`;
+    return html`<li class="tile${img || it.sample ? "" : " tile--text"}">${img ? imageTag(img, { cls: "tile__img" }) : it.sample ? html`<div class="tile__img tile__img--ph" aria-hidden="true">${itemEmoji(it.name, kind)}</div>` : ""}<div class="tile__body"><h3>${it.name}</h3>${it.price ? html`<p class="tile__price">${it.price}</p>` : ""}<p class="tile__note">${[section, left].filter(Boolean).join(" · ")}</p></div></li>`;
   })}</ul>
 <div class="btns" style="margin-top:20px"><a class="btn btn--primary" href="/prices/">See everything: ${title}</a></div>
 </div></section>`;
+}
+
+/** What a sample item looks like, from its name (placeholder tiles): the closest emoji, else the kind's. Order matters. */
+const ITEM_EMOJI: Array<[RegExp, string]> = [
+  // auto parts, tires, fluids
+  [/battery/i, "🔋"], [/bulb|headlight|lamp|light kit|heat lamp/i, "💡"], [/tire|all-season|all-terrain|mud-terrain|mount & balance|flat repair/i, "🛞"],
+  [/alignment/i, "📐"], [/spark|alternator|electrical/i, "⚡"], [/oil filter|synthetic|motor oil|\boil\b/i, "🛢️"], [/air filter|cabin/i, "🌬️"],
+  [/antifreeze|fluid|coolant/i, "🧴"], [/brake|rotor|pad/i, "⚙️"], [/wiper/i, "🌧️"],
+  // vehicles & equipment
+  [/f-150|silverado|tacoma|ram 1500|tundra|truck/i, "🛻"], [/cr-v|rav4|explorer|suv|tahoe/i, "🚙"], [/camry|altima|civic|accord|sedan|\bcar\b/i, "🚗"],
+  [/trailer/i, "🚛"], [/mower|tractor|zero-turn/i, "🚜"], [/boat/i, "🚤"], [/golf cart|atv|side-by-side/i, "🛺"],
+  // fish & aquarium
+  [/clownfish|gramma|tang|saltwater/i, "🐠"], [/shrimp/i, "🦐"], [/snail/i, "🐌"], [/crab/i, "🦀"], [/anubias|java|fern|moss|plant/i, "🌿"],
+  [/flake|pellet food|fish food/i, "🫙"], [/conditioner|test kit|medication/i, "🧪"], [/tetra|guppy|cory|pleco|lab|ram|angelfish|betta|molly|platy|barb|danio|cichlid|fish/i, "🐟"],
+  // plants & nursery
+  [/tomato/i, "🍅"], [/pepper|jalape/i, "🌶️"], [/strawberr/i, "🍓"], [/basil|rosemary|thyme|herb|hosta|fern/i, "🌿"], [/rose/i, "🌹"], [/azalea|hibiscus/i, "🌺"],
+  [/coneflower|susan|daisy|daylily|zinnia|marigold/i, "🌼"], [/maple|crape|oak|tree|magnolia/i, "🌳"], [/sunflower/i, "🌻"], [/shrub|boxwood|holly/i, "🌲"],
+  // pets
+  [/gecko|dragon|lizard|skink|iguana/i, "🦎"], [/python|snake|boa/i, "🐍"], [/turtle|tortoise/i, "🐢"], [/guinea|hamster|gerbil|mouse|rat\b/i, "🐹"], [/rabbit|lop|bunny/i, "🐰"],
+  [/parakeet|bird|finch|cockatiel/i, "🐦"], [/cricket|mealworm|dubia/i, "🦗"], [/hay/i, "🌾"], [/kitten|cat\b/i, "🐱"], [/puppy|dog\b/i, "🐶"],
+  // bakery, produce, butcher
+  [/croissant/i, "🥐"], [/muffin|cupcake/i, "🧁"], [/cookie/i, "🍪"], [/pie\b/i, "🥧"], [/cake/i, "🎂"], [/donut|doughnut/i, "🍩"], [/kolache|sausage|hot dog/i, "🌭"],
+  [/pretzel/i, "🥨"], [/bagel/i, "🥯"], [/cinnamon roll|sweet roll|bun/i, "🥐"], [/sourdough|loaf|bread|rolls|baguette/i, "🍞"],
+  [/corn\b|sweet corn/i, "🌽"], [/peach/i, "🍑"], [/apple/i, "🍎"], [/watermelon/i, "🍉"], [/okra|cucumber|pickle|squash|zucchini/i, "🥒"], [/honey/i, "🍯"],
+  [/preserve|jam|jelly|salsa|sauce/i, "🫙"], [/egg/i, "🥚"], [/ribeye|steak|roast|brisket|beef|jerky|ground/i, "🥩"], [/bacon/i, "🥓"], [/pork|chop|ham\b/i, "🍖"],
+  [/chicken|turkey/i, "🍗"], [/deer|venison|processing/i, "🦌"], [/fish fillet|catfish|shrimp/i, "🐟"],
+  // hardware, feed, resale, boutique
+  [/screw|bolt|nail|fastener|anchor/i, "🔩"], [/padlock|lock\b|key/i, "🔒"], [/pvc|pipe|fitting|faucet|hose bib/i, "🚰"], [/wax ring|toilet/i, "🚽"], [/water heater|element/i, "🔥"],
+  [/mulch|potting|soil|compost/i, "🪴"], [/hose|sprinkler/i, "🚿"], [/pruner|shear|clipper/i, "✂️"], [/paint|primer|stain/i, "🎨"], [/roller|brush/i, "🖌️"],
+  [/drill|saw|hammer|wrench|tool/i, "🔧"], [/tape|glue|caulk/i, "🧻"], [/feed|pellets|cracked corn|scratch/i, "🌾"], [/dog food|cat food|kibble/i, "🐕"],
+  [/t-post|fence|gate|wire/i, "🪵"], [/seed|fescue|bermuda|rye/i, "🌱"], [/fertilizer|13-13-13|lime\b/i, "🧂"], [/pullet|chick|hen|rooster/i, "🐥"], [/waterer|feeder/i, "💧"],
+  [/dresser|chest|cabinet|hutch/i, "🗄️"], [/table|desk/i, "🪵"], [/chair|rocker|stool|bench/i, "🪑"], [/sofa|couch|loveseat/i, "🛋️"], [/bookshelf|shelf/i, "📚"],
+  [/skillet|pan|pot\b|dutch oven/i, "🍳"], [/bowl|pyrex|dish|plate/i, "🥣"], [/jar|mason/i, "🫙"], [/lamp/i, "🪔"], [/jacket|coat|denim/i, "🧥"], [/record|vinyl|album/i, "💿"],
+  [/print|frame|art\b|picture|painting/i, "🖼️"], [/tee|t-shirt|shirt|blouse|top\b/i, "👕"], [/dress/i, "👗"], [/jean|pant|short/i, "👖"], [/boot|shoe|sandal|sneaker/i, "👟"],
+  [/scarf/i, "🧣"], [/hat|cap\b|beanie/i, "🧢"], [/tote|bag|purse|wallet/i, "👜"], [/candle/i, "🕯️"], [/towel|blanket|throw|linen/i, "🧺"], [/mug|cup|tumbler/i, "☕"],
+  [/soap|lotion|balm|bath/i, "🧼"], [/bracelet|necklace|earring|ring\b|jewel/i, "💍"], [/toy|game|puzzle/i, "🧸"], [/book/i, "📖"], [/card|stationery|notebook/i, "✉️"],
+];
+export function itemEmoji(name: string, kind: ListKind): string {
+  for (const [re, em] of ITEM_EMOJI) if (re.test(name)) return em;
+  return KINDS[kind].emoji;
 }
 
 /** The nav link, when the list is public. */
@@ -173,7 +213,7 @@ ${shown.map(
       const row = html`<div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${note ? html`<p>${note}</p>` : ""}${card}`;
       if (img) return html`<li class="menu-item menu-item--photo">${imageTag(img, { cls: "menu-item__img" })}<div>${row}</div></li>`;
       // Sample items get a placeholder tile, so the photo layout shows before the shop has taken any.
-      if (it.sample) return html`<li class="menu-item menu-item--photo"><div class="menu-item__img menu-item__img--ph" aria-hidden="true">${KINDS[kind].emoji}</div><div>${row}</div></li>`;
+      if (it.sample) return html`<li class="menu-item menu-item--photo"><div class="menu-item__img menu-item__img--ph" aria-hidden="true">${itemEmoji(it.name, kind)}</div><div>${row}</div></li>`;
       return html`<li class="menu-item">${row}</li>`;
     })}</ul></section>`,
   )}</div>

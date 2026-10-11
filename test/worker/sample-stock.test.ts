@@ -10,6 +10,7 @@ import {
   removeSampleStock,
   sampleSetFor,
 } from "../../src/worker/sample-stock.ts";
+import { itemEmoji } from "../../src/generator/pricelist.ts";
 import { categoryRecord, sampleCopy } from "../fixtures.ts";
 
 test("every kind of business gets believable sample stock, picked by what it is", () => {
@@ -167,4 +168,24 @@ test("retyping the list in Edit keeps sample items flagged, so they can still be
   assert.ok(items.filter((it) => it.sample).length > 10);
   removeSampleStock(r);
   assert.deepEqual(r.ext.retail!.priceList!.sections.flatMap((s) => s.items).map((it) => it.name), ["My own hammer"]);
+});
+
+test("placeholder pictures match the item, not just the kind of shop", () => {
+  assert.equal(itemEmoji("Battery, group 24F", "parts"), "🔋");
+  assert.equal(itemEmoji("Oil filter, spin-on", "parts"), "🛢️");
+  assert.equal(itemEmoji("265/70R17 all-terrain", "parts"), "🛞");
+  assert.equal(itemEmoji("2018 Ford F-150 XLT SuperCrew", "vehicles"), "🛻");
+  assert.equal(itemEmoji("Ocellaris clownfish", "fish"), "🐠");
+  assert.equal(itemEmoji("Neon tetra", "fish"), "🐟");
+  assert.equal(itemEmoji("Sourdough loaf", "food"), "🍞");
+  assert.equal(itemEmoji("Cinnamon roll", "food"), "🥐");
+  assert.equal(itemEmoji("Deck screws 3 in, 5 lb box", "goods"), "🔩");
+  assert.equal(itemEmoji("Layer pellets, 50 lb", "goods"), "🌾");
+  assert.equal(itemEmoji("Soy candle, 8 oz", "goods"), "🕯️");
+  assert.equal(itemEmoji("Zzyx widget", "goods"), "🏷️");
+  const r = categoryRecord("auto"); r.name = "Cullman Auto Parts"; r.variant = "parts";
+  addSampleStock(r);
+  const items = r.ext.retail!.priceList!.sections.flatMap((s) => s.items);
+  const distinct = new Set(items.map((it) => itemEmoji(it.name, "parts")));
+  assert.ok(distinct.size >= 6, `only ${distinct.size} different pictures across ${items.length} parts`);
 });

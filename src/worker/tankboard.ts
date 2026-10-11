@@ -3,7 +3,7 @@ import { hmac, safeEqual } from "./auth.ts";
 import { getLead, updateLead, type LeadRow } from "./db.ts";
 import { HttpError, newId, type Env } from "./env.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
-import { kindWords, listKind, scanningOn } from "../generator/pricelist.ts";
+import { itemEmoji, kindWords, listKind, scanningOn } from "../generator/pricelist.ts";
 import type {
   BusinessRecord,
   Copy,
@@ -170,6 +170,7 @@ export function pricesFeed(
             info: it.info ?? null,
             barcode: it.barcode ?? "",
             sample: !!it.sample,
+            emoji: it.sample ? itemEmoji(it.name, listKind(record)) : undefined,
           })),
       }))
       .filter((s) => all || s.items.length),
