@@ -558,6 +558,27 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `/d/<leadId>/<tank-slug>` (`serveDisplay`; no slug = every tank, rotating every 10 s): a full-screen dark page for a cheap
   tablet or TV by the tank (big name + price, photo, "n left", wake lock, re-reads the feed every 30 s; public like the feed,
   noindex). The board has a 📺 link per tank and an "All tanks, rotating" link in its footer.
+- Tablet station (Oct 2026, `src/worker/tablet.ts`; the `/d/` page moved here from tankboard.ts): the tablet by the tank is also
+  the shop's inventory station, built the way King Fish described it. Customer mode: tap a fish → care card overlay
+  (`MenuItem.info`: `ItemInfo` kind/maxSize/diet/temperament/minTank/care/water/origin/notes, `aiDrafted`, `unsure`; the price
+  page folds the same card under the item, `infoCard()` in retail.ts + the client script's live render, `.menu-item__more`).
+  Staff mode ("Staff" button): unlock by PIN (`priceList.staffPin`, 4–8 digits, 8 wrong tries = 15 min lock in settings key
+  `pinfail.<lead>`), a staff NFC tag (Web NFC `NDEFReader`, text `ua-staff:<nfcSecret>` = hmac(APP_SECRET, nfc.<id>.<client_key>)
+  [:16], shown on the board; only NFC tablets), or a 6-digit code the tablet shows (`POST /l/<id>/unlock/start`, polled at
+  `GET /l/<id>/unlock/<session>`; the board's `POST /c/…/unlock {code}` approves; pending codes in settings key `unlock.<lead>`,
+  10 min). All three return a staff token `<exp>.<hmac(staff.<id>.<client_key>.<exp>)>` (12 h, header `x-staff`, kept in
+  localStorage; "Revoke old links" ends it). Staff API `/l/<id>/staff/*`: `data` (feed with every item + `catalog`), `adjust`
+  {section,item,delta} (`adjustQty`: clamp 0–9999, >0 clears Sold out, 0 hides on the page), `set` {qty|soldOut|price|info}
+  (`setItem`), `add` {section,name,qty,price?} (`addToTank`: existing row += qty, a known catalog name brings its photo/price/
+  card, else new; new section allowed), `photo?section&item` (camera, R2 `owner/<id>/t….jpg`, caption = name, sets every row
+  of that name), `POST info {name}` (Claude care card, `src/copy/iteminfo.ts` `draftItemInfo` on claude-sonnet-5-5, `aiDrafted`),
+  `PUT info {name, info}`. `priceList.catalog` (`CatalogEntry` name/price/image/info) = everything ever stocked, rebuilt by
+  `catalogOf()` on each change so a fish removed from a tank comes back with its photo and card; `applyClientItems` keeps cards by
+  name. Staff writes use `saveAndRefresh(…, {quick: true})` (no preview rebuild; feed + `prices_dirty` carry it). Page: staff
+  rows get − / count / + and ⋯ (count, sold out, price, photo, care card read/redo/edit), tank chips + "+ New tank", "+ Add" with
+  catalog search and a new-name path (count → photo prompt → AI card), locks after 3 idle minutes or "Done". Board: "Tablet &
+  staff" section (Save PIN `PUT /c/…/staffpin`, approve code, NFC text; `/data` carries `staffPinSet`, `nfcText`).
+  `test/worker/tablet.test.ts`. Guides and the customer pitch describe it.
 - Price list plan (Oct 2026, `PlanId` "list" in db.ts; `DEFAULT_LIST_PLAN` $29/mo is appended to saved Settings that lack it,
   blank its monthly price to hide it): a live price page + Tank board + QR tags + display page, NOT a website, for shops whose
   stock changes daily. `billingOptions` gives it only Monthly (no minimum, no setup) and yearly; the agreement adds

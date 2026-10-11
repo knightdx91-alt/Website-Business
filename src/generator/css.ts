@@ -159,6 +159,7 @@ ${divider}
 .menu-item__row{display:flex;align-items:baseline;gap:10px;font-weight:700}
 .menu-item__row .dots{flex:1;border-bottom:${k.priceList === "leaders" ? `2px dotted ${withAlpha(c.text, 0.4)}` : "0"};transform:translateY(-4px)}
 .menu-item p{margin:.25em 0 0;color:var(--muted)}
+.menu-item__more{margin:.35em 0 0;font-size:.92em}.menu-item__more summary{cursor:pointer;color:var(--muted);font-weight:600}.menu-item__more dl{display:grid;grid-template-columns:auto 1fr;gap:.15em .8em;margin:.4em 0 0}.menu-item__more dt{color:var(--muted)}.menu-item__more dd{margin:0}
 /* steps */
 .steps{counter-reset:step;list-style:none;margin:28px 0 0;padding:0;display:grid;gap:16px}
 @media (min-width:900px){.steps{grid-template-columns:repeat(4,1fr)}}

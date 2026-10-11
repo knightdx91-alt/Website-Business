@@ -3,10 +3,11 @@ import { hmac, safeEqual } from "./auth.ts";
 import { getLead, updateLead, type LeadRow } from "./db.ts";
 import { HttpError, newId, type Env } from "./env.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
-import type { BusinessRecord, Copy, Image, MenuSection } from "../generator/types.ts";
+import type { BusinessRecord, Copy, Image, ItemInfo, MenuSection } from "../generator/types.ts";
 import { escHtml } from "./page.ts";
 import { renderPreview } from "./pipeline.ts";
 import { publishLead } from "./publish.ts";
+import { approveUnlock, nfcSecret, setStaffPin } from "./tablet.ts";
 
 /**
  * Tank board: the client's own live editor for their price list (built for King Fish Aquatics, whose tanks change several
@@ -41,18 +42,23 @@ async function leadFor(env: Env, leadId: string, sig: string): Promise<LeadRow> 
   return lead;
 }
 
-const recordOf = (lead: LeadRow): BusinessRecord | null => (lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null);
+export const recordOf = (lead: LeadRow): BusinessRecord | null => (lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null);
 
-function priceList(r: BusinessRecord) {
+export function priceList(r: BusinessRecord) {
   return (r.ext.retail ??= {}).priceList ?? { sections: [] as MenuSection[], lastUpdated: "", public: true };
 }
 
-const stamp = () => new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
+export const stamp = () => new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
 
 /** What the site and the board read: in-stock items only for the site; the board asks with `all=1`. */
+/** An owner photo's public address through `/l/<id>/photo/`; Google photos never. */
+export function photoUrl(lead: LeadRow, origin: string, img?: Image): string | null {
+  return img && img.source !== "google" ? (img.src.startsWith("/assets/owner/") ? `${origin}/l/${lead.id}/photo/${img.src.slice("/assets/owner/".length)}` : img.src) : null;
+}
+
 export function pricesFeed(lead: LeadRow, record: BusinessRecord, origin: string, all = false) {
   const pl = priceList(record);
-  const photo = (img?: Image) => (img && img.source !== "google" ? (img.src.startsWith("/assets/owner/") ? `${origin}/l/${lead.id}/photo/${img.src.slice("/assets/owner/".length)}` : img.src) : undefined);
+  const photo = (img?: Image) => photoUrl(lead, origin, img) ?? undefined;
   return {
     name: record.name,
     title: pl.title?.trim() || "Prices",
@@ -66,7 +72,7 @@ export function pricesFeed(lead: LeadRow, record: BusinessRecord, origin: string
         note: s.note ?? "",
         items: s.items
           .filter((it) => all || (!it.soldOut && it.qty !== 0))
-          .map((it) => ({ name: it.name, price: it.price ?? "", note: it.description ?? "", qty: it.qty ?? null, soldOut: !!it.soldOut, image: photo(it.image) ?? null, imageSrc: it.image?.src ?? null })),
+          .map((it) => ({ name: it.name, price: it.price ?? "", note: it.description ?? "", qty: it.qty ?? null, soldOut: !!it.soldOut, image: photo(it.image) ?? null, imageSrc: it.image?.src ?? null, info: it.info ?? null })),
       }))
       .filter((s) => all || s.items.length),
   };
@@ -102,6 +108,10 @@ export function applyClientItems(record: BusinessRecord, body: z.infer<typeof It
   const byFile = new Map<string, Image>();
   for (const g of record.media.gallery) byFile.set(g.src, g);
   for (const s of pl.sections) for (const it of s.items) if (it.image) byFile.set(it.image.src, it.image);
+  // Care cards ride along by name (the board doesn't edit them; the tablet and the catalog do).
+  const infoByName = new Map<string, ItemInfo | undefined>();
+  for (const c of pl.catalog ?? []) if (c.info) infoByName.set(c.name.toLowerCase(), c.info);
+  for (const s of pl.sections) for (const it of s.items) if (it.info) infoByName.set(it.name.toLowerCase(), it.info);
   const sections: MenuSection[] = body.sections.map((s) => ({
     name: s.name,
     note: s.note || undefined,
@@ -112,16 +122,18 @@ export function applyClientItems(record: BusinessRecord, body: z.infer<typeof It
       qty: it.qty === null || it.qty === undefined ? undefined : it.qty,
       soldOut: it.soldOut || undefined,
       image: it.imageSrc ? byFile.get(it.imageSrc) : undefined,
+      info: infoByName.get(it.name.toLowerCase()),
     })),
   }));
   autoMatchPhotos(sections, record.media.gallery);
   record.ext.retail!.priceList = { ...pl, sections, lastUpdated: stamp() };
 }
 
-async function saveAndRefresh(env: Env, lead: LeadRow, record: BusinessRecord): Promise<void> {
+export async function saveAndRefresh(env: Env, lead: LeadRow, record: BusinessRecord, o: { quick?: boolean } = {}): Promise<void> {
   const copy = lead.copy_json ? (JSON.parse(lead.copy_json) as Copy) : null;
   await updateLead(env, lead.id, { record_json: JSON.stringify(record), prices_dirty: lead.live_url ? 1 : 0, pitch_json: null });
-  if (copy) await renderPreview(env, lead, record, copy, lead.look ?? "");
+  // Tablet taps (+1, −1) skip the preview rebuild: the preview and the live site both read the live feed anyway.
+  if (copy && !o.quick) await renderPreview(env, lead, record, copy, lead.look ?? "");
 }
 
 /** Minute cron: republish live sites whose price list changed, two a minute, so the static copy follows the board. */
@@ -165,12 +177,23 @@ export async function serveTankBoard(env: Env, req: Request, leadId: string, sig
   const record = recordOf(lead);
   if (!record) throw new HttpError(409, "Your site isn't built yet. Try again in a few minutes.");
   const base = `/c/${leadId}.${sig}`;
-  if (rest === "/data" && req.method === "GET") return Response.json(pricesFeed(lead, record, origin, true), { headers: { "cache-control": "no-store" } });
+  if (rest === "/data" && req.method === "GET") return Response.json({ ...pricesFeed(lead, record, origin, true), staffPinSet: !!priceList(record).staffPin, nfcText: `ua-staff:${await nfcSecret(env, lead)}` }, { headers: { "cache-control": "no-store" } });
   if (rest === "/items" && req.method === "PUT") {
     const body = ItemsBody.parse(await req.json());
     applyClientItems(record, body);
     await saveAndRefresh(env, lead, record);
     return Response.json(pricesFeed(lead, record, origin, true), { headers: { "cache-control": "no-store" } });
+  }
+  if (rest === "/unlock" && req.method === "POST") {
+    // The shop approves a tablet's 6-digit code from their phone.
+    const { code } = (await req.json()) as { code?: string };
+    if (!(await approveUnlock(env, leadId, String(code ?? "")))) throw new HttpError(404, "No tablet is waiting with that code (codes last 10 minutes)");
+    return Response.json({ ok: true });
+  }
+  if (rest === "/staffpin" && req.method === "PUT") {
+    const { pin } = (await req.json()) as { pin?: string };
+    await setStaffPin(env, lead, record, String(pin ?? "").trim());
+    return Response.json({ ok: true, set: !!String(pin ?? "").trim() });
   }
   if (rest === "/photo" && req.method === "POST") {
     const url = new URL(req.url);
@@ -233,6 +256,12 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 <header><div><h1>${name} · Tank board</h1><div class="st" id="st">Loading…</div></div><a id="open" class="small" style="color:#fff" hidden target="_blank" rel="noopener">Open price page ↗</a></header>
 <main id="m"><p class="empty">Loading your tanks…</p></main>
 <div class="bar"><button class="btn btn--line" id="addTank" type="button">+ Add a tank</button><span class="small muted">Changes save by themselves.</span></div>
+<section class="tank" id="staffbox"><div class="tank__h"><span>📺</span><b>Tablet &amp; staff</b></div><div style="padding:10px 12px" class="small">
+<p style="margin:0 0 8px">A tablet by a tank shows that tank live (the 📺 on each tank). On the tablet, <b>Staff</b> unlocks adding fish, counts and photos. Three ways in:</p>
+<div class="row" style="margin-bottom:8px"><label style="flex:1 1 160px">Staff PIN (4–8 digits)<input id="pinIn" inputmode="numeric" placeholder="not set" style="width:100%;margin-top:4px"></label><button class="btn btn--line" id="pinSave" type="button" style="padding:10px 12px">Save PIN</button></div>
+<div class="row" style="margin-bottom:8px"><label style="flex:1 1 160px">Tablet showing a code? Type it here<input id="codeIn" inputmode="numeric" placeholder="123 456" style="width:100%;margin-top:4px"></label><button class="btn btn--line" id="codeGo" type="button" style="padding:10px 12px">Approve</button></div>
+<p style="margin:0 0 4px">Staff NFC tag: write this text on any NFC sticker or fob with a free "NFC Tools" app, then tap it on the tablet: <code id="nfcText" style="user-select:all"></code></p>
+<p class="muted" id="staffMsg" style="margin:4px 0 0"></p></div></section>
 <footer>📺 means "show this tank on a screen": open that link on a tablet by the tank and it shows what's in it, live. <a href="/d/${escHtml(leadId)}/" target="_blank" rel="noopener">All tanks, rotating</a>.<br>Tank board by Underground Associates · Anything odd? Text us.</footer>
 <script>
 (function(){
@@ -254,7 +283,9 @@ function save(now){clearTimeout(timer);status("Saving…");timer=setTimeout(func
   fetch(BASE+"/items",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error("Save failed ("+r.status+")");return r.json()}).then(function(j){
     var open=document.getElementById("open");if(j.siteUrl){open.href=j.siteUrl;open.hidden=false}
     status("Saved ✓ "+new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}),"saved")}).catch(function(e){status(e.message||"Couldn't save. Check your signal and try again.","err")})},now?0:700)}
-function load(){fetch(BASE+"/data",{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){data=j;var open=document.getElementById("open");if(j.siteUrl){open.href=j.siteUrl;open.hidden=false}render();status(j.updatedAt?"Last change "+j.updatedAt:"Ready")}).catch(function(){status("Couldn't load. Check your signal.","err")})}
+function load(){fetch(BASE+"/data",{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){data=j;var open=document.getElementById("open");if(j.siteUrl){open.href=j.siteUrl;open.hidden=false}render();status(j.updatedAt?"Last change "+j.updatedAt:"Ready");document.getElementById("nfcText").textContent=j.nfcText||"";document.getElementById("pinIn").placeholder=j.staffPinSet?"set (type a new one to change)":"not set"}).catch(function(){status("Couldn't load. Check your signal.","err")})}
+document.getElementById("pinSave").addEventListener("click",function(){var v=document.getElementById("pinIn").value.trim();var msg=document.getElementById("staffMsg");fetch(BASE+"/staffpin",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({pin:v})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Failed");return j})}).then(function(j){msg.textContent=j.set?"PIN saved ✓":"PIN removed";document.getElementById("pinIn").value="";load()}).catch(function(e){msg.textContent=e.message})});
+document.getElementById("codeGo").addEventListener("click",function(){var v=document.getElementById("codeIn").value.replace(/\D/g,"");var msg=document.getElementById("staffMsg");fetch(BASE+"/unlock",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code:v})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Failed");return j})}).then(function(){msg.textContent="Tablet unlocked ✓";document.getElementById("codeIn").value=""}).catch(function(e){msg.textContent=e.message})});
 m.addEventListener("input",function(e){var t=e.target;var sec=t.closest("[data-s]");if(!sec)return;var s=data.sections[+sec.dataset.s];var f=t.dataset.f;if(!f)return;if(f==="sname"){s.name=t.value;save();return}var it=s.items[+t.closest("[data-i]").dataset.i];if(f==="qty"){it.qty=t.value.trim()===""?null:Math.max(0,parseInt(t.value,10)||0)}else it[f]=t.value;save()});
 m.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b||b.tagName==="INPUT")return;var sec=b.closest("[data-s]");var si=+sec.dataset.s;var s=data.sections[si];var a=b.dataset.a;
   if(a==="additem"){s.items.push({name:"",price:"",note:"",qty:null,soldOut:false,image:null,imageSrc:null});render();var last=sec&&m.querySelector('[data-s="'+si+'"] .item:last-of-type .nm');if(last)last.focus();return}
@@ -273,64 +304,4 @@ load();
 })();
 </script></body></html>`;
   return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "referrer-policy": "no-referrer", "content-security-policy": "default-src 'self'; img-src 'self' blob: data: https:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
-}
-
-
-/**
- * `/d/<leadId>/<tank-slug>`: a full-screen, always-on page for a cheap tablet or TV by the tank. Reads the live feed every
- * 30 s (same data as the QR price page), keeps the screen awake, and with no slug rotates through every tank. Public like
- * the feed (no prices beyond what the QR label shows), noindex.
- */
-export async function serveDisplay(env: Env, leadId: string, slug: string, origin: string): Promise<Response> {
-  const lead = await getLead(env, leadId);
-  const record = lead && recordOf(lead);
-  if (!lead || !record || lead.status === "expired") return new Response("Not found", { status: 404 });
-  const feed = pricesFeed(lead, record, origin);
-  const tank = slug ? feed.sections.find((x) => x.slug === slug) : null;
-  const title = tank ? `${tank.name} · ${record.name}` : `${feed.title} · ${record.name}`;
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow"><title>${escHtml(title)}</title>
-<style>
-:root{--bg:#0b1324;--ink:#f6f7fb;--muted:#9aa6bf;--gold:#fca311;--card:#141f38}
-*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--ink);font:clamp(18px,2.6vw,30px)/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:none;overflow:hidden}
-header{display:flex;justify-content:space-between;align-items:baseline;padding:2vh 3vw 1vh;gap:2vw}
-h1{margin:0;font-size:clamp(28px,5vw,64px);line-height:1.1}
-.shop{color:var(--muted);font-size:.75em;white-space:nowrap}
-main{padding:0 3vw 3vh;height:calc(100% - 12vh);overflow:hidden}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,17em),1fr));gap:1.2vmin}
-.it{display:grid;grid-template-columns:auto 1fr auto;gap:1em;align-items:center;background:var(--card);border-radius:1em;padding:.7em 1em}
-.ph{width:3.4em;height:3.4em;border-radius:.7em;object-fit:cover;background:#1e2b4b}
-.ph--none{display:grid;place-items:center;font-size:1.6em;opacity:.5}
-.nm{font-weight:700;font-size:1.15em}.nt{color:var(--muted);font-size:.8em}
-.pr{font-weight:800;font-size:1.5em;color:var(--gold);white-space:nowrap;text-align:right}
-.left{display:block;font-size:.55em;color:var(--muted);font-weight:600}
-.empty{color:var(--muted);font-size:1.3em;padding:10vh 0;text-align:center}
-footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:1vh 3vw;color:var(--muted);font-size:.6em}
-.dots{display:flex;gap:.5em}.dots i{width:.6em;height:.6em;border-radius:50%;background:#2b3a5e}.dots i.on{background:var(--gold)}
-</style></head><body>
-<header><h1 id="h">${escHtml(tank ? tank.name : feed.title)}</h1><span class="shop">${escHtml(record.name)}</span></header>
-<main id="m"><p class="empty">Loading…</p></main>
-<footer><span id="u"></span><span class="dots" id="dots"></span></footer>
-<script>
-(function(){
-var FEED=${JSON.stringify(`/l/${leadId}/prices.json`)},SLUG=${JSON.stringify(slug)},data=null,i=0,ROTATE=10000;
-function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
-function pick(){if(!data)return null;if(SLUG){for(var k=0;k<data.sections.length;k++)if(data.sections[k].slug===SLUG)return data.sections[k];return{name:"",items:[]}}return data.sections.length?data.sections[i%data.sections.length]:null}
-function render(){var s=pick();var m=document.getElementById("m"),h=document.getElementById("h"),d=document.getElementById("dots");
-  if(!s){m.innerHTML='<p class="empty">Nothing on the board yet.</p>';return}
-  if(s.name)h.textContent=s.name;
-  m.innerHTML=s.items.length?'<div class="grid">'+s.items.map(function(it){var left=it.qty!=null&&it.qty<=5?'<span class="left">'+it.qty+' left</span>':'';
-    return '<div class="it">'+(it.image?'<img class="ph" src="'+esc(it.image)+'" alt="">':'<div class="ph ph--none">🐟</div>')+'<div><div class="nm">'+esc(it.name)+'</div>'+(it.note?'<div class="nt">'+esc(it.note)+'</div>':'')+'</div><div class="pr">'+esc(it.price||"Ask")+left+'</div></div>'}).join("")+'</div>':'<p class="empty">Sold out for now. Ask us what\\'s coming.</p>';
-  d.innerHTML=SLUG||data.sections.length<2?"":data.sections.map(function(_,k){return '<i'+(k===i%data.sections.length?' class="on"':'')+'></i>'}).join("");
-  document.getElementById("u").textContent=data.updatedAt?"Updated "+data.updatedAt:"";fit()}
-function fit(){var m=document.getElementById("m"),b=document.body,px=parseFloat(getComputedStyle(b).fontSize);b.style.fontSize="";px=parseFloat(getComputedStyle(b).fontSize);var n=0;while(m.scrollHeight>m.clientHeight+2&&px>11&&n<40){px=px*0.92;b.style.fontSize=px+"px";n++}}
-window.addEventListener("resize",fit);
-function load(){fetch(FEED,{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){data=j;render()}).catch(function(){})}
-load();setInterval(load,30000);
-if(!SLUG)setInterval(function(){i++;render()},ROTATE);
-function wake(){if(navigator.wakeLock)navigator.wakeLock.request("screen").catch(function(){})}
-wake();document.addEventListener("visibilitychange",function(){if(!document.hidden)wake()});
-})();
-</script></body></html>`;
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "content-security-policy": "default-src 'self'; img-src 'self' https: data:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
 }

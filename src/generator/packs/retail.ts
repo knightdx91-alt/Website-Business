@@ -4,7 +4,7 @@ import type { PageSpec } from "./types.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html, raw, type Raw } from "../html.ts";
 import { icon } from "../icons.ts";
-import type { BusinessRecord, Faq, Image, MenuSection, RetailDonations, RetailExt, Service } from "../types.ts";
+import type { BusinessRecord, Faq, Image, MenuSection, RetailDonations, RetailExt, Service, ItemInfo } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 /** research/retail-shops.md §10, checked in order; Google has no antique or feed-store type, so names decide those. */
@@ -247,6 +247,15 @@ export function autoMatchPhotos(sections: MenuSection[], photos: Image[]): numbe
 }
 
 /** The price list page, sections with anchors the QR labels point at. Private lists are noindex and unlinked. */
+/** "About this fish": the care card as a fold-out under the item (also rendered live by the client script). */
+function infoCard(info: ItemInfo | undefined): ReturnType<typeof html> {
+  if (!info) return raw("");
+  const rows: Array<[string, string | undefined]> = [["Adult size", info.maxSize], ["Eats", info.diet], ["Temperament", info.temperament], ["Minimum tank", info.minTank], ["Care level", info.care], ["Water", info.water], ["From", info.origin]];
+  const have = rows.filter((r) => r[1]);
+  if (!have.length && !info.notes) return raw("");
+  return html`<details class="menu-item__more"><summary>About this one</summary><dl>${have.map(([k, v]) => html`<dt>${k}</dt><dd>${v}</dd>`)}</dl>${info.notes ? html`<p>${info.notes}</p>` : ""}</details>`;
+}
+
 export function pricesPage(ctx: Ctx): PageSpec | null {
   const r = ctx.r;
   const pl = ext(r).priceList;
@@ -261,7 +270,8 @@ ${shown.map(
 <ul class="menu-items">${s.items.map((it) => {
       const img = it.image && (ctx.mode === "preview" || it.image.source !== "google") ? it.image : undefined;
       const note = [it.description, qtyNote(it)].filter(Boolean).join(" · ");
-      const row = html`<div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${note ? html`<p>${note}</p>` : ""}`;
+      const card = infoCard(it.info);
+      const row = html`<div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${note ? html`<p>${note}</p>` : ""}${card}`;
       return img ? html`<li class="menu-item menu-item--photo">${imageTag(img, { cls: "menu-item__img" })}<div>${row}</div></li>` : html`<li class="menu-item">${row}</li>`;
     })}</ul></section>`,
   )}</div>

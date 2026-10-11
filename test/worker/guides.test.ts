@@ -34,7 +34,8 @@ test("the Tank board guide covers setup, the board, QR tags, the tablet and sell
   assert.match(pitch.price[1]!, /from \$89 a month/);
   assert.match(pitch.fine, /isn't live yet/);
   assert.match(customerBoardPitch(settings(), { business: "X", live: true }).fine, /live now/);
-  assert.match(pitch.sections[1]!.steps[0]!, /tap "\+ Add to this tank" under that tank, and fill in the two boxes/);
+  assert.match(pitch.sections[1]!.steps[0]!, /tap Staff, enter your PIN \(or tap your staff tag\), tap "\+ Add"/);
+  assert.match(pitch.sections[1]!.steps[2]!, /Nothing they tap can change your stock/);
   const html = await customerPitchPage(pitch, { business: "King Fish Aquatics", company: "Underground Associates", phone: "(256) 555-0100", boardUrl: "https://app.test/c/x.sig/", displayUrl: "https://app.test/d/x/", pricingUrl: "https://undergroundassociates.com/pricing#price-list" }).text();
   assert.match(html, /King Fish Aquatics changes what/);
   assert.match(html, /href="https:\/\/app.test\/c\/x.sig\/"/);

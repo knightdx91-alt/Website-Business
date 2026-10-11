@@ -112,6 +112,33 @@ export interface MenuItem {
   soldOut?: boolean;
   /** An owner photo (one of the gallery files); Google photos never go on menu items. */
   image?: Image;
+  /** Care card for a living thing (fish shops): shown when a customer taps the item on the price page or the tablet. */
+  info?: ItemInfo;
+}
+
+/** What a customer sees when they tap a fish (or plant, reptile…) on the price page or the tablet. */
+export interface ItemInfo {
+  kind?: "fish" | "invertebrate" | "plant" | "reptile" | "bird" | "small_animal" | "other";
+  maxSize?: string;
+  diet?: string;
+  temperament?: string;
+  minTank?: string;
+  care?: string;
+  water?: string;
+  origin?: string;
+  notes?: string;
+  /** Drafted by Claude from the name; the shop should read it once. */
+  aiDrafted?: boolean;
+  /** The model wasn't sure what the name meant. */
+  unsure?: boolean;
+}
+
+/** A thing the shop has stocked at some point: the tablet's "Add" list, so a returning fish keeps its photo and care card. */
+export interface CatalogEntry {
+  name: string;
+  price?: string;
+  image?: Image;
+  info?: ItemInfo;
 }
 
 export type MenuTag = "spicy" | "vegetarian" | "vegan" | "gluten_free" | "house_favorite" | "new" | "popular";
@@ -317,7 +344,16 @@ export interface RetailExt {
    * Each section gets a printable QR label that opens it. `public` false keeps the page out of Google and off the nav (reachable
    * only from the labels) for shops that don't want competitors reading prices.
    */
-  priceList?: { sections: MenuSection[]; lastUpdated: string; title?: string; public?: boolean };
+  priceList?: {
+    sections: MenuSection[];
+    lastUpdated: string;
+    title?: string;
+    public?: boolean;
+    /** Everything ever stocked, by name (tablet "Add" list). */
+    catalog?: CatalogEntry[];
+    /** Tablet staff mode: the PIN that unlocks editing on the shop's tablet (4–8 digits). */
+    staffPin?: string;
+  };
 }
 
 /** Tax & finance (research/tax-finance.md §9). Every claim field is owner-entered and owner-confirmed. */

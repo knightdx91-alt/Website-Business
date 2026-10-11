@@ -20,7 +20,8 @@ import { resolvePresence } from "../places/web-presence.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
 import { customerBoardPitch, customerPitchPage, guideById } from "./guides.ts";
 import { LAST_ANNOUNCE_KEY, TICK_KEY, announceUpdate, fcmClientConfig, serviceAccount, serviceAccountProblem } from "./fcm.ts";
-import { clientLink, republishDirty, serveDisplay, servePhoto, servePricesFeed, serveTankBoard } from "./tankboard.ts";
+import { clientLink, republishDirty, servePhoto, servePricesFeed, serveTankBoard } from "./tankboard.ts";
+import { serveDisplay, serveStation } from "./tablet.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session, boardPitchToken, verifyBoardPitch } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf, priceTagsPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
@@ -1647,6 +1648,8 @@ export default {
       }
       const display = /^\/d\/([a-z0-9]+)(?:\/([a-z0-9-]*))?$/.exec(url.pathname);
       if (display && req.method === "GET") return await serveDisplay(env, display[1]!, display[2] ?? "", url.origin);
+      const station = /^\/l\/([a-z0-9]+)(\/(?:unlock|staff)\/[A-Za-z0-9_-]+)$/.exec(url.pathname);
+      if (station) return await serveStation(env, req, station[1]!, station[2]!, url.origin);
       const live = /^\/l\/([a-z0-9]+)\/(prices\.json|photo\/([A-Za-z0-9_.-]+))$/.exec(url.pathname);
       if (live) return live[2] === "prices.json" ? await servePricesFeed(env, live[1]!, url.origin) : await servePhoto(env, live[1]!, live[3]!);
       if (url.pathname === "/.well-known/assetlinks.json") return json(ASSET_LINKS, 200, { "cache-control": "public, max-age=3600" });

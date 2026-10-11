@@ -118,11 +118,13 @@ export function tankBoardGuide(s: AppSettings): Guide {
         title: "Tablet display",
         numbered: true,
         steps: [
+          "The tablet is also the shop's inventory station: staff unlock it (PIN, NFC tag or a code approved from the phone) and add fish, change counts, take photos and get AI care cards right at the tank. Customers tap a fish for its care card. The full tour is in the Tablet display guide.",
           `Open the shop's board, tap 📺 on a tank, and copy that address (it looks like ${APP_ORIGIN}/d/<lead>/<tank>). Without a tank name at the end it rotates through every tank, 10 seconds each.`,
           "On the tablet: open that address in Chrome, then ⋮ → Add to Home screen. Open it from the icon so it fills the screen.",
           "Settings → Display → Screen timeout → never (or as long as it allows), and keep it plugged in. The page also asks the tablet to stay awake.",
           "To stop customers tapping out of it: Settings → Security → App pinning (name varies by phone), then pin Chrome.",
-          "It refreshes by itself every 30 seconds and shrinks the text so a tank with 15 items still fits. Big price in orange, photo if there is one, \"3 left\" under the price.",
+          "It refreshes by itself every 30 seconds and shrinks the text so a tank with 15 items still fits. Big price in orange, photo if there is one, \"3 left\" under the price. A customer taps a fish to read its care card (adult size, what it eats, temperament, tank size, water).",
+          "Staff mode: the small \"Staff\" button in the corner asks for the staff PIN (set on the Tank board), a staff NFC tag held to the back of the tablet, or a 6-digit code the shop approves on the Tank board. Then every item gets − / count / + and ⋯ (set the count, sold out, price, photo, care card), and \"+ Add\" lists everything the shop has ever stocked, or a new name: count, photo from the tablet camera, and a care card drafted by AI for the shop to check. It locks itself after 3 idle minutes; \"Done\" locks it now.",
           "Mount it above the tank in a cheap stand or clamp, away from splash. One or two bigger tablets or a TV with a streaming stick near the register, rotating through all tanks, costs less than one tablet per tank.",
         ],
       },
@@ -259,7 +261,8 @@ export function displayGuide(s: AppSettings): Guide {
           "Sold-out and zero-count items are gone, exactly like the price page. A tank with nothing in stock says \"Sold out for now. Ask us what's coming.\"",
           "Every tank, rotating: the same card layout, a new tank every 10 seconds, with dots at the bottom showing which one is up.",
           "It shrinks the text so a tank with 15 items still fits with nothing cut off, and goes to two columns on a wide screen.",
-          "Bottom left: \"Updated\" with the time of the last change on the board. Dark background, no cursor, nothing to tap.",
+          "Bottom left: \"Updated\" with the time of the last change on the board. Bottom right: a small \"Staff\" button. Customers tap a fish for its care card; nothing else responds.",
+          "Staff mode (after PIN, NFC tag or phone code): − / + on every item, ⋯ for the exact count, sold out, price, a photo from the tablet camera and the care card (read, redo with AI, or edit by hand), tank chips across the bottom, \"+ New tank\", and \"+ Add\" with the shop's whole catalog and a search box. New names get a photo prompt and an AI-drafted care card. Done or 3 idle minutes locks it.",
         ],
       },
       {
@@ -298,7 +301,8 @@ export function displayGuide(s: AppSettings): Guide {
       {
         title: "What the shop needs to know",
         steps: [
-          "They never touch the display. Every change is made on the Tank board; the screen follows within about 30 seconds.",
+          "Changes can be made right on the tablet (Staff) or on the Tank board on a phone; the screen, the website and the QR tags all follow within about 30 seconds.",
+          "Three ways to unlock: the staff PIN (Tank board → Tablet & staff → Save PIN), a staff NFC tag (write the text shown on the board onto a $1 NFC sticker with the free NFC Tools app; only tablets with NFC can read it), or the 6-digit code the tablet shows, typed on the board. Revoke old links on the lead ends every tablet session too.",
           "If the screen looks stale, it has probably lost Wi-Fi. Tap it, swipe down to reload, or power it off and on. The page comes back by itself.",
           "Renaming a tank on the board means that tank's screen needs the new 📺 link once. Adding items, prices, photos and sold out never need anything.",
           "The rotating page always shows every tank, so a new tank joins it on its own.",
@@ -373,7 +377,9 @@ export function customerBoardPitch(s: AppSettings, o: { business: string; live: 
       {
         title: "What you do",
         steps: [
-          "Something new comes in: open the board, tap \"+ Add to this tank\" under that tank, and fill in the two boxes: what it is and what it costs. Twenty seconds.",
+          "Something new comes in: on the tablet by the tank, tap Staff, enter your PIN (or tap your staff tag), tap \"+ Add\", tap the fish in the list (or type a new name) and tap how many. Twenty seconds. The same works on the board on your phone.",
+          "New fish nobody has stocked before: type its name, tap how many, and the tablet asks for a photo and writes its care card (size, food, temperament, tank size) for you to check.",
+          "Customers tap a fish on the tablet or the website to read its care card. Nothing they tap can change your stock: that takes your PIN, your staff tag, or your phone.",
           "Something sells out: tap \"Sold out\". It disappears from the page until you tap it back. Or just type how many are left; at 5 or fewer the page says \"3 left\".",
           "Want a picture? Tap the camera on the item and take one right there at the tank.",
           "Prices change: change the number. Nobody rewrites a tag, nobody reprints anything.",
