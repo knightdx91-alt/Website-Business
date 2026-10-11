@@ -497,6 +497,20 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
+- 🐠 Tank board (Oct 2026, `src/worker/tankboard.ts`, migration 0018 `leads.client_key` / `prices_dirty`; built for King Fish Aquatics, whose
+  tanks change several times a day): the client's own live editor for `ext.retail.priceList`, no login. The team taps "💬 Text them their
+  tank board link" / "Open it here" on a ready retail lead (web lead page, Android `LeadScreen` 2.25; `POST /api/leads/:id/clientlink`,
+  owner + callers) → `/c/<leadId>.<hmac(APP_SECRET, client.<id>.<client_key>)>/` (key made on first use; a new key would revoke old links).
+  The page (`boardPage`, plain HTML/JS, phone-first) lists sections (tanks) and items: name, price, how many, note, a photo from the
+  camera (resized to 1600 px in the browser, `POST …/photo?section&item&w&h` → R2 `owner/<id>/c….jpg`, gallery cap 24), "Sold out"
+  chip, add/remove/move tanks; every change autosaves (`PUT …/items`, `ItemsBody` zod, `applyClientItems` keeps photos by file +
+  `autoMatchPhotos`, `lastUpdated` stamped) and re-renders the preview. `MenuItem.qty` / `soldOut`: the /prices/ page hides sold-out
+  and qty 0 items and shows "n left" at ≤5. Live feed `GET /l/<leadId>/prices.json` (public, CORS, 30 s cache; `pricesFeed`) and
+  `GET /l/<leadId>/photo/<file>`; every built copy of the site gets `liveData` (`BuildInput.liveData` → `<div id="prices-live"
+  data-live>`; previews point at `/l/…`, published sites at the app origin) and the client script refetches it on load, so the QR
+  label on a tank shows the change within about a minute. Live sites get `prices_dirty = 1` and the minute cron republishes them
+  (`republishDirty`, 2 a minute, after `announceUpdate`). `test/worker/tankboard.test.ts`. Not yet: a "revoke link" button, a
+  4th "Price list only" plan ($29/mo was the advice) for QR-only clients.
 - Thrift donations (retail pack, `ext.retail.donations`, Oct 2026): on by default for `thrift` (`donationsOn` in actions.ts), any shop can
   turn it on in Edit → "Donations" (`donationsEditCard`). Section #donations after What's new: intro `note`, "We gladly take" /
   "We can't take" chips (`accepts` / `doesNotAccept`), `dropOffHours`, nonprofit `receipts` line, and with `pickup` a "Request a furniture
