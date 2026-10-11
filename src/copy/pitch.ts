@@ -250,6 +250,9 @@ export async function writePitch(
     type: input.pack.variantLabel(r),
     town: `${r.address.city}, ${r.address.state}`,
     why_they_are_a_lead: input.reason,
+    their_current_website: input.record.existingSite
+      ? { url: input.record.existingSite.url, notices: input.record.existingSite.notices, headings: input.record.existingSite.headings.slice(0, 6), note: "We read their current site and used its facts in the preview. If notices say they're moving or closed, mention it on the call." }
+      : undefined,
     has_facebook_page: !!r.links.social.facebook,
     google_rating: r.reputation.rating,
     google_review_count: r.reputation.count,

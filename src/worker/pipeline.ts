@@ -11,6 +11,7 @@ import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { groupById, MARKET } from "../places/queries.ts";
 import { qualify, scorePlace } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
+import { applySiteFacts, importSite } from "../places/site-import.ts";
 import { websiteProblem } from "../places/site-check.ts";
 import { placeToRecord, reviewTexts } from "../places/to-record.ts";
 import { addUsage, getLead, getSettings, MODEL_PRICES, updateLead, type LeadRow } from "./db.ts";
@@ -174,6 +175,16 @@ export async function runBuild(env: Env, job: Extract<Job, { type: "build" }>): 
     const category = lead.category as CategoryId;
     const record: BusinessRecord = lead.record_json ? JSON.parse(lead.record_json) : placeToRecord(place, category);
     heroFromPlace(record, place);
+    // Their current website, if they have one: read once (again after 7 days or on a rewrite) and used as facts for the copy.
+    const siteUrl = lead.found_url || (place.websiteUri && !/facebook\.|instagram\.|linktr\.ee|tiktok\./i.test(place.websiteUri) ? place.websiteUri : null);
+    const stale = !record.existingSite || record.existingSite.url !== siteUrl || Date.now() - Date.parse(record.existingSite.fetchedAt) > 7 * 86_400_000 || !!lead.rewrite;
+    if (siteUrl && stale) {
+      const found = await importSite(siteUrl);
+      if (found) {
+        record.existingSite = found;
+        applySiteFacts(record, found);
+      }
+    }
 
     let copy: Copy | undefined = lead.copy_json && !lead.rewrite ? JSON.parse(lead.copy_json) : undefined;
     if (!copy) {
@@ -185,6 +196,7 @@ export async function runBuild(env: Env, job: Extract<Job, { type: "build" }>): 
         reviewContext: reviewTexts(place),
         editorialSummary: place.editorialSummary?.text,
         primaryTypeLabel: place.primaryTypeDisplayName?.text,
+        existingSite: record.existingSite,
         model: settings.copyModel,
       });
       const price = MODEL_PRICES[result.model] ?? MODEL_PRICES["claude-opus-5-5"]!;

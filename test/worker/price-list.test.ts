@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSite } from "../src/generator/render.ts";
-import { parseMenuText } from "../src/generator/menu.ts";
-import { pricesPage, sectionSlug } from "../src/generator/packs/retail.ts";
-import { priceTagsPdf } from "../src/worker/cards.ts";
-import { applyEdits } from "../src/worker/edits.ts";
-import { categoryRecord, sampleCopy } from "./fixtures.ts";
+import { buildSite } from "../../src/generator/render.ts";
+import { parseMenuText } from "../../src/generator/menu.ts";
+import { pricesPage, sectionSlug } from "../../src/generator/packs/retail.ts";
+import { priceTagsPdf } from "../../src/worker/cards.ts";
+import { applyEdits } from "../../src/worker/edits.ts";
+import { categoryRecord, sampleCopy } from "../fixtures.ts";
 
 const site = (look: string) => ({ slug: "shop", look, origin: "https://example.test" });
 /** A shop record that clears the publish gate, so the sitemap and robots output can be checked. */
@@ -15,6 +15,7 @@ function shop() {
   return r;
 }
 const approved = () => ({ ...sampleCopy(), approved: true });
+const file = (out: { files: Map<string, string | Uint8Array> }, path: string) => String(out.files.get(path) ?? "");
 
 const LIST = "# Freshwater community\nNeon tetra | $2.99 | Schooling fish, keep 6+\nCorydoras | $6.99\n\n# Saltwater\nOcellaris clownfish | $24.99";
 
@@ -22,25 +23,25 @@ test("a shop's price list becomes a /prices/ page with a section per tank, linke
   const record = shop();
   record.ext.retail = { ...(record.ext.retail ?? {}), priceList: { sections: parseMenuText(LIST), lastUpdated: "October 11, 2026", title: "Fish & prices", public: true } };
   const out = await buildSite({ record, copy: approved(), site: site("retail.mercantile~classic"), mode: "publish" });
-  const prices = out.files.get("prices/index.html")!;
+  const prices = file(out, "prices/index.html");
   assert.ok(prices, "prices page is built");
   assert.match(prices, /id="sec-freshwater-community"/);
   assert.match(prices, /id="sec-saltwater"/);
   assert.match(prices, /Neon tetra/);
   assert.match(prices, /\$24\.99/);
   assert.doesNotMatch(prices, /name="robots" content="noindex"/);
-  assert.match(out.files.get("index.html")!, /href="\/prices\/"[^>]*>Fish &amp; prices</);
-  assert.match(out.files.get("sitemap.xml")!, /\/prices\//);
+  assert.match(file(out, "index.html"), /href="\/prices\/"[^>]*>Fish &amp; prices</);
+  assert.match(file(out, "sitemap.xml"), /\/prices\//);
 });
 
 test("a private price list is built but kept out of Google, the sitemap and the menu", async () => {
   const record = shop();
   record.ext.retail = { ...(record.ext.retail ?? {}), priceList: { sections: parseMenuText(LIST), lastUpdated: "October 11, 2026", public: false } };
   const out = await buildSite({ record, copy: approved(), site: site("retail.mercantile~classic"), mode: "publish" });
-  const prices = out.files.get("prices/index.html")!;
+  const prices = file(out, "prices/index.html");
   assert.match(prices, /name="robots" content="noindex"/);
-  assert.doesNotMatch(out.files.get("sitemap.xml")!, /\/prices\//);
-  assert.doesNotMatch(out.files.get("index.html")!, /href="\/prices\/"/);
+  assert.doesNotMatch(file(out, "sitemap.xml"), /\/prices\//);
+  assert.doesNotMatch(file(out, "index.html"), /href="\/prices\/"/);
   assert.equal(pricesPage({ r: record } as never)?.noindex, true);
 });
 

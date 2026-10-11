@@ -1209,6 +1209,12 @@
       ${isL ? landscapingEditCard(r, ext, cb) : ""}
       ${isK ? cleaningEditCard(r, ext, cb) : ""}
       ${isC || isL || isK ? plansEditCard(r) + guaranteeEditCard(r, isK) + offersEditCard(r) : ""}
+      ${r.existingSite ? `<section class="card"><h2>Their current website</h2>
+        <p class="small muted">Read from <a href="${esc(r.existingSite.url)}" target="_blank" rel="noopener">${esc(r.existingSite.url.replace(/^https?:\/\//, ""))}</a> on ${esc(r.existingSite.fetchedAt)}. Used as background for the text (rewritten, never copied). Check it's really theirs.</p>
+        ${r.existingSite.notices.length ? `<p class="small"><strong>Notice on their site:</strong> ${esc(r.existingSite.notices.join(" / "))}</p>` : ""}
+        ${r.existingSite.headings.length ? `<p class="small muted">Headings: ${esc(r.existingSite.headings.slice(0, 8).join(" · "))}</p>` : ""}
+        ${r.existingSite.paragraphs.slice(0, 4).map((p) => `<p class="small">${esc(p.length > 240 ? p.slice(0, 240) + "…" : p)}</p>`).join("")}
+      </section>` : ""}
       <section class="card"><h2>Links</h2>
         ${isR ? `<label class="field">Online ordering link<input name="order" type="url" value="${esc(r.links.order || "")}" placeholder="https://"></label>
         <label class="field">Reservations link<input name="reserve" type="url" value="${esc(r.links.reserve || "")}" placeholder="https://"></label>` : ""}

@@ -473,6 +473,22 @@ export interface EventItem {
   url?: string;
 }
 
+/** What their current website says about them (src/places/site-import.ts). Background for the copy writer, shown in Edit. */
+export interface ExistingSite {
+  url: string;
+  title?: string;
+  description?: string;
+  headings: string[];
+  paragraphs: string[];
+  phones: string[];
+  emails: string[];
+  social: Partial<Record<"facebook" | "instagram" | "tiktok" | "youtube", string>>;
+  foundedYear?: number;
+  /** Lines about closing, moving, reopening: the caller should know before the visit. */
+  notices: string[];
+  fetchedAt: string;
+}
+
 export interface BusinessRecord {
   placeId: string;
   name: string;
@@ -480,6 +496,8 @@ export interface BusinessRecord {
   variant: string;
   /** Google's own name for the business type ("Pet Store", "Gym"): the label the general pack uses, and a fallback for others. */
   typeLabel?: string;
+  /** Facts read from their current website at build time, when they have one. */
+  existingSite?: ExistingSite;
   businessStatus: string;
   phone: { e164: string; display: string };
   smsEnabled: boolean;

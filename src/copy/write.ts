@@ -7,7 +7,7 @@ import { autoAmenityLabels, partsCounter } from "../generator/packs/auto.ts";
 import { carrierItems } from "../generator/packs/finance.ts";
 import { BANNED_PHRASES, bannedPhraseIn, quotesReview, SUPERLATIVE, unsupportedNumbers } from "../generator/lint.ts";
 import type { CategoryPack } from "../generator/packs/types.ts";
-import type { BusinessRecord, Copy } from "../generator/types.ts";
+import type { BusinessRecord, Copy, ExistingSite } from "../generator/types.ts";
 
 export const DEFAULT_COPY_MODEL = "claude-opus-5-5";
 /** Bump when the prompt changes so cached copy is regenerated. */
@@ -36,6 +36,7 @@ Rules that matter more than style:
 - Use only the facts in <facts>. Never invent years, history, family names, awards, licenses, certifications, warranties, prices, response times, "24/7", "emergency", "family-owned", menu items or specialties that aren't given. If a fact is missing, leave it out; don't hedge around it.
 - Google review text in <review_context> is private background so you understand what customers value. Never quote it, paraphrase a specific review, or mention reviews, ratings or star counts.
 - No superlatives or hype: no "best", "#1", "top", "premier", "finest", "unmatched", "world-class", "most trusted". Also avoid: ${BANNED_PHRASES.filter((p) => !["#1", "best in town"].includes(p)).join(", ")}.
+- <existing_site> is the business's OWN current website. Its facts count as given: what they carry or do, who runs it, how long they've been open, special orders, a notice that they're moving. Use them. But write everything fresh: never copy or lightly reword one of its sentences, ignore its template filler ("welcome to our official website", "make your dreams come true"), and ignore anything about cookies, newsletters or the website itself. If it says they're closed, moving or reopening, do not put that in the copy (the owner handles it); it's for your understanding only.
 - Write as the business itself, using "we" and "our" (never "they").
 - US English, 6th-8th grade reading level, short sentences, active voice. Plain and local, never corporate. No dialect caricature.
 - Don't restate hours, phone numbers, prices or the street address in prose. The page shows those from live data, and prose copies go stale.
@@ -49,6 +50,8 @@ export interface WriteCopyInput {
   reviewContext: string[];
   editorialSummary?: string;
   primaryTypeLabel?: string;
+  /** Their current website's facts, when they have one (site-import.ts). */
+  existingSite?: ExistingSite;
   model?: string;
 }
 
@@ -230,7 +233,7 @@ function brief(pack: CategoryPack, r: BusinessRecord): string {
   return `Voice: ${b.voice}\n\nFields to write:\n${lines.join("\n")}`;
 }
 
-function check(out: CopyOut, factsText: string, reviews: string[], banned: RegExp[] = []): string[] {
+function check(out: CopyOut, factsText: string, reviews: string[], banned: RegExp[] = [], siteParagraphs: string[] = []): string[] {
   const issues: string[] = [];
   const all = [out.cuisineLabel, out.heroTagline, out.heroSub, ...out.about, ...out.serviceBlurbs.map((s) => s.text), ...out.steps.flatMap((s) => [s.title, s.body]), ...out.faq.flatMap((f) => [f.q, f.a]), out.serviceAreaIntro, out.ctaTitle, out.ctaLine, out.metaDescription, out.heroQuestion, out.heroBenefit].join(" \n ");
   const hype = bannedPhraseIn(all);
@@ -244,6 +247,7 @@ function check(out: CopyOut, factsText: string, reviews: string[], banned: RegEx
   }
   for (const n of unsupportedNumbers(all, factsText)) issues.push(`mentions the number ${n}, which isn't in the facts`);
   for (const rv of reviews) if (quotesReview(all, rv)) issues.push("repeats wording from a Google review");
+  for (const p of siteParagraphs) if (quotesReview(all, p)) { issues.push("copies a sentence from their current website"); break; }
   return issues;
 }
 
@@ -267,6 +271,20 @@ function toCopy(out: CopyOut, issues: string[] = []): Copy {
   };
 }
 
+/** The parts of their current site worth the writer's attention, trimmed. */
+export function existingSiteText(x: ExistingSite): string {
+  const lines = [
+    `url: ${x.url}`,
+    x.title ? `title: ${x.title}` : "",
+    x.description ? `description: ${x.description}` : "",
+    x.headings.length ? `headings: ${x.headings.join(" | ")}` : "",
+    x.foundedYear ? `says founded/since: ${x.foundedYear}` : "",
+    x.notices.length ? `notices (background only, never for the copy): ${x.notices.join(" / ")}` : "",
+    ...x.paragraphs.slice(0, 12).map((p, i) => `[${i + 1}] ${p}`),
+  ].filter(Boolean);
+  return lines.join("\n").slice(0, 6000);
+}
+
 export async function writeCopy(client: Anthropic, input: WriteCopyInput): Promise<WriteCopyResult> {
   const model = input.model ?? DEFAULT_COPY_MODEL;
   const f = facts(input.record, input.pack, input.primaryTypeLabel);
@@ -278,6 +296,10 @@ export async function writeCopy(client: Anthropic, input: WriteCopyInput): Promi
 ${reviews.length ? reviews.map((r, i) => `[${i + 1}] ${r}`).join("\n") : "none"}
 ${input.editorialSummary ? `Google's own summary: ${input.editorialSummary}` : ""}
 </review_context>
+
+<existing_site>
+${input.existingSite ? existingSiteText(input.existingSite) : "none"}
+</existing_site>
 
 ${brief(input.pack, input.record)}`;
 
@@ -301,7 +323,7 @@ ${brief(input.pack, input.record)}`;
     if (res.stop_reason === "refusal") throw new Error(`Copy request for ${input.record.name} was declined`);
     if (!res.parsed_output) throw new Error(`Copy for ${input.record.name} didn't match the schema (stop: ${res.stop_reason})`);
     out = res.parsed_output;
-    issues = check(out, factsText, input.reviewContext, input.pack.bannedPhrases?.(input.record));
+    issues = check(out, factsText, input.reviewContext, input.pack.bannedPhrases?.(input.record), input.existingSite?.paragraphs ?? []);
     if (issues.length === 0) break;
     messages.push({ role: "assistant", content: res.content });
     messages.push({ role: "user", content: `Please fix these problems and return the full copy again:\n- ${issues.join("\n- ")}` });

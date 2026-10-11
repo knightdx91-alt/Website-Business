@@ -331,6 +331,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   lessons with {company}/{plan} placeholders filled from Settings plus this person's `done` ids; `PUT /api/training/progress
   {lesson, done}`. Progress is per `session.userId` ('owner' or users.id). When a button or screen is renamed, update the
   lesson text here.
+- Their current website as facts (Oct 2026, `src/places/site-import.ts`): when a lead has a site (`lead.found_url`, else the
+  Google `websiteUri` unless it's social), `runBuild` fetches it (8 s, HTML only, 400 KB) once per 7 days or on a rewrite,
+  `extractSiteFacts()` keeps title, description, h1–h3, deduped paragraphs ≥ 40 chars (cookie/copyright/newsletter filler
+  dropped), phones, emails, social links, a "since YEAR", and `notices` (closing / moving / reopening lines), stored as
+  `record.existingSite` (type `ExistingSite`). `applySiteFacts()` fills email, founded year and empty social links, never
+  overwriting. The copy writer gets it as `<existing_site>` (`existingSiteText()`), the SYSTEM prompt says use the facts but
+  write fresh and keep move/closure notices out of the copy; `check()` flags any copied sentence (`quotesReview` on the
+  paragraphs) so the writer retries. Edit shows a read-only "Their current website" card (web + editform, collapsed). The
+  container's proxy blocks many outside sites, so test the fetch from the Worker, not here. `test/site-import.test.ts`.
 - Pages elsewhere (Oct 2026, `src/places/web-presence.ts`, migration 0016 `leads.found_url`): Google only reports the website linked
   on the profile, so "No website" can be wrong (Luna's BBQ has a page on stonebridgewedding.com). With Worker secret
   `BRAVE_SEARCH_API_KEY` (Brave Search API, free 2,000 queries/month, ~$3/1,000 after; without it nothing changes) the app runs one
