@@ -314,7 +314,7 @@ export function editForm(l: EditDetail): EditForm {
     const v = r.variant as string;
     const fl = ext.florist || {}, vd = ext.vendors || {}, fin = ext.financing || {};
     const booths = v === "antique" || v === "thrift" || v === "boutique" || v === "gift";
-    const stock = v === "farm_feed" || v === "hardware" || v === "furniture";
+    const stock = v === "farm_feed" || v === "hardware" || v === "furniture" || v === "pet";
     const f: Field[] = [];
     if (v === "florist") {
       f.push(h3("Florist"), ta("rtOccasions", "Occasions (one per line; leave empty for the usual four)", (fl.occasions || []).join("\n"), 3, { placeholder: "Sympathy & funeral\nWeddings & events\nBirthdays & anniversaries\nJust because" }),

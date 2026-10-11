@@ -2364,7 +2364,7 @@
     const vd = x.vendors || {};
     const fin = x.financing || {};
     const booths = v === "antique" || v === "thrift" || v === "boutique" || v === "gift";
-    const stock = v === "farm_feed" || v === "hardware" || v === "furniture";
+    const stock = v === "farm_feed" || v === "hardware" || v === "furniture" || v === "pet";
     return `<section class="card"><h2>Shop details</h2>
       ${v === "florist" ? `<h3>Florist</h3>
       <label class="field">Occasions (one per line; leave empty for the usual four)<textarea name="rtOccasions" rows="3" placeholder="Sympathy &amp; funeral&#10;Weddings &amp; events&#10;Birthdays &amp; anniversaries&#10;Just because">${esc((fl.occasions || []).join("\n"))}</textarea></label>

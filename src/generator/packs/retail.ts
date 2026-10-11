@@ -11,6 +11,7 @@ export function retailVariant(primaryType: string | undefined, types: string[], 
   const all = [primaryType ?? "", ...types];
   const n = name.toLowerCase();
   if (all.includes("florist") || /\b(flowers?|floral|florist|blooms?|bouquets?|petals?|stems)\b/.test(n)) return "florist";
+  if (all.includes("pet_store") || /\b(aquatics?|aquariums?|reef|coral|fish (store|shop)|tropical fish|pet (shop|store|supply|supplies)|exotics?|reptiles?)\b/.test(n)) return "pet";
   if (all.includes("thrift_store") || /\b(thrift|consign\w*|resale|second ?hand|restore|rags)\b/.test(n)) return "thrift";
   if (all.includes("flea_market") || /\b(antiques?|vintage|pickers?|flea|salvage|collectibles)\b/.test(n)) return "antique";
   if (all.includes("hardware_store") || /\b(hardware|lumber|building supply|home center)\b/.test(n)) return "hardware";
@@ -29,6 +30,7 @@ const LABEL: Record<string, string> = {
   farm_feed: "Feed & Farm Supply",
   furniture: "Furniture",
   hardware: "Hardware Store",
+  pet: "Pet & Aquarium Store",
 };
 
 const CARRY: Record<string, string[]> = {
@@ -38,6 +40,7 @@ const CARRY: Record<string, string[]> = {
   thrift: ["Clothing for the family", "Shoes & handbags", "Furniture", "Housewares & kitchen", "Home decor", "Books & toys"],
   florist: ["Everyday arrangements", "Sympathy & funeral flowers", "Wedding & event flowers", "Plants", "Seasonal & holiday flowers", "Gifts & balloons"],
   farm_feed: ["Livestock & horse feed", "Pet food", "Poultry feed & supplies", "Seed, fertilizer & garden", "Fencing & farm supplies", "Deer & wildlife feed"],
+  pet: ["Freshwater & saltwater fish", "Aquariums, stands & lighting", "Filters, pumps & heaters", "Live plants, coral & decor", "Fish food & water care", "Reptile & small-pet supplies"],
   furniture: ["Living room", "Bedroom", "Dining", "Mattresses", "Home decor & lighting", "Outdoor furniture"],
   hardware: ["Tools & hardware", "Paint & stain", "Plumbing & electrical parts", "Lawn & garden", "Keys, screens & small repairs", "Propane, grills & outdoor"],
 };
@@ -48,7 +51,7 @@ export function seedRetailCarry(variant: string): Service[] {
 
 function first(r: BusinessRecord): ActionId[] {
   if (r.variant === "florist" && r.ext.retail?.shopUrl) return ["shop", "call"];
-  if (r.variant === "farm_feed" || r.variant === "hardware") return ["call", "directions"];
+  if (r.variant === "farm_feed" || r.variant === "hardware" || r.variant === "pet") return ["call", "directions"];
   return ["directions", "call"];
 }
 
@@ -228,9 +231,9 @@ export const retailPack: CategoryPack = {
   hasForm: (r) => (donationsOn(r) && !!donations(r).pickup) || r.variant === "florist" || !!ext(r).vendors?.boothsAvailable,
   looks: ["retail.shop_window", "retail.mercantile", "retail.bloom", "retail.salvage_yard"],
   defaultLook: (r) =>
-    ({ boutique: "retail.shop_window", gift: "retail.mercantile", antique: "retail.salvage_yard", thrift: "retail.salvage_yard", florist: "retail.bloom", farm_feed: "retail.mercantile", furniture: "retail.salvage_yard" } as Record<string, string>)[r.variant] ?? "retail.mercantile",
+    ({ boutique: "retail.shop_window", gift: "retail.mercantile", antique: "retail.salvage_yard", thrift: "retail.salvage_yard", florist: "retail.bloom", farm_feed: "retail.mercantile", pet: "retail.mercantile", furniture: "retail.salvage_yard" } as Record<string, string>)[r.variant] ?? "retail.mercantile",
   variantLabel: (r) => LABEL[r.variant] ?? "Shop",
-  schemaType: (r) => ({ boutique: "ClothingStore", florist: "Florist", furniture: "FurnitureStore", farm_feed: "GardenStore", hardware: "HardwareStore", gift: "Store", antique: "Store", thrift: "Store" } as Record<string, string>)[r.variant] ?? "Store",
+  schemaType: (r) => ({ boutique: "ClothingStore", florist: "Florist", furniture: "FurnitureStore", farm_feed: "GardenStore", hardware: "HardwareStore", pet: "PetStore", gift: "Store", antique: "Store", thrift: "Store" } as Record<string, string>)[r.variant] ?? "Store",
   schemaExtras: () => ({}),
   homeTitle(r) {
     const l = LABEL[r.variant] ?? "Shop";
@@ -266,17 +269,17 @@ ${infoStrip(ctx, [])}
 <main id="main">
 ${floristSection(ctx)}
 <section class="section" id="carry" aria-labelledby="carry-title"><div class="wrap">
-<span class="section__label">What we carry</span><h2 class="section__title" id="carry-title">${r.variant === "florist" ? "Flowers for every occasion" : r.variant === "farm_feed" || r.variant === "hardware" ? "What you'll find here" : "Come see what's in store"}</h2>
+<span class="section__label">What we carry</span><h2 class="section__title" id="carry-title">${r.variant === "florist" ? "Flowers for every occasion" : r.variant === "farm_feed" || r.variant === "hardware" ? "What you'll find here" : r.variant === "pet" ? "Fish, tanks and everything to keep them" : "Come see what's in store"}</h2>
 ${ctx.copy.heroSub ? html`<p class="lead">${ctx.copy.heroSub}</p>` : ""}
 ${serviceList(ctx, r.services.map((s) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id] })))}
 ${r.confirmed.includes("services") ? "" : todo(ctx, "Tick what you carry", "We guessed at what you sell. Tell us which of these to keep, what to add, and any brands you'd like listed.", true)}
 ${chipsBlock("Departments", (ext(r).departments ?? []).filter(Boolean))}
 ${chipsBlock("Brands we carry", (ext(r).brands ?? []).filter(Boolean))}
 </div></section>
-${r.variant === "farm_feed" || r.variant === "hardware" ? announcements(ctx, { label: "This season", title: "Coming up at the store" }) : ""}
+${r.variant === "farm_feed" || r.variant === "hardware" || r.variant === "pet" ? announcements(ctx, { label: "This season", title: "Coming up at the store" }) : ""}
 ${occasionTiles(ctx)}
 <section class="section section--band" id="new" aria-labelledby="new-title"><div class="wrap">
-${sectionHead("What's new", r.variant === "florist" ? "See our latest arrangements" : r.variant === "farm_feed" || r.variant === "hardware" ? "In stock now" : "New things come in all the time", ext(r).dropDay ? ext(r).dropDay : social.length ? "We post new arrivals on social media first. Follow along so you don't miss them." : `Stop by or give us a call at ${r.phone.display} to ask what just came in.`, "new-title")}
+${sectionHead("What's new", r.variant === "florist" ? "See our latest arrangements" : r.variant === "farm_feed" || r.variant === "hardware" || r.variant === "pet" ? "In stock now" : "New things come in all the time", ext(r).dropDay ? ext(r).dropDay : social.length ? "We post new arrivals on social media first. Follow along so you don't miss them." : `Stop by or give us a call at ${r.phone.display} to ask what just came in.`, "new-title")}
 ${ext(r).dropDay && social.length ? html`<p>We post new arrivals on social media first. Follow along so you don't miss them.</p>` : ""}
 ${ext(r).holdNote ? html`<p><strong>${ext(r).holdNote}</strong> <a href="${action(r, "call")!.href}">Call ${r.phone.display}</a>.</p>` : ""}
 <div class="btns">${social.map(([k, u]) => html`<a class="btn btn--secondary" href="${u}" target="_blank" rel="noopener"><span>Follow us on ${SOCIAL_LABEL[k] ?? k}</span><span class="sr"> (opens in new tab)</span></a>`)}${actions(r, ["shop", "giftcard"]).map((a) => html`<a class="btn btn--ghost" href="${a.href}" target="_blank" rel="noopener"><span>${a.label}</span><span class="sr"> (opens in new tab)</span></a>`)}</div>
@@ -298,7 +301,7 @@ ${ctaBand(ctx, actions(r, first(r)))}
   bannedPhrases: retailBannedPhrases,
   copyBrief: (r) => ({
     voice: `Friendly and local, a little personality for a ${(LABEL[r.variant] ?? "shop").toLowerCase()} (${
-      { boutique: "upbeat and stylish", gift: "warm", antique: "treasure-hunt fun", thrift: "treasure-hunt fun", florist: "graceful and calm", farm_feed: "plain-spoken and practical", furniture: "established and helpful" }[r.variant] ?? "warm"
+      { boutique: "upbeat and stylish", gift: "warm", antique: "treasure-hunt fun", thrift: "treasure-hunt fun", florist: "graceful and calm", farm_feed: "plain-spoken and practical", furniture: "established and helpful", pet: "knowledgeable and friendly, like someone who keeps tanks at home" }[r.variant] ?? "warm"
     }). Short sentences. Never name brands, products, prices, sales, discounts, delivery areas or fees, sizes, stock claims, return policies, years, awards, 'handmade' or 'locally made' claims.`,
     fields: {
       heroTagline: `6-14 words under the shop name saying what kind of shop it is and where, e.g. "Gifts, home decor and little treasures in downtown ${r.address.city}" in your own words.`,

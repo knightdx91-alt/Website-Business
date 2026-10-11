@@ -206,7 +206,7 @@ const TYPE_CATEGORY: Array<[RegExp, CategoryId]> = [
   [/hardware_store|home_improvement_store|lumber/, "retail"],
   [/^(accounting|insurance_agency)$/, "finance"],
   [/^(church|place_of_worship|community_center|non_profit_organization)$/, "church"],
-  [/florist|clothing_store|gift_shop|furniture_store|thrift_store|flea_market|home_goods_store|shoe_store|garden_center/, "retail"],
+  [/florist|clothing_store|gift_shop|furniture_store|thrift_store|flea_market|home_goods_store|shoe_store|garden_center|pet_store/, "retail"],
 ];
 
 /** Best-guess template for a Places result (the owner can change it before adding). */
@@ -217,7 +217,7 @@ export function guessCategory(p: Place): CategoryId | null {
   if (/\b(clean|maid|janitor|(pressure|power|soft) ?wash)/.test(n)) return "cleaning";
   if (/\b(massage|day spa|bodywork)/.test(n)) return "salon";
   if (/screen ?print|embroider|monogram|\bsigns?\b|banners?|vinyl|decals|t-?shirts|\bprint(ing|ers)?\b|graphics/.test(n)) return "print";
-  if (/\b(boutique|gifts?|antiques?|thrift|consign|flowers?|florist|floral|feed|seed|furniture|mercantile|vintage|hardware|lumber|building supply)\b/.test(n)) return "retail";
+  if (/\b(boutique|gifts?|antiques?|thrift|consign|flowers?|florist|floral|feed|seed|furniture|mercantile|vintage|hardware|lumber|building supply|aquatics?|aquariums?|pet (shop|store|supply|supplies)|reptiles?)\b/.test(n)) return "retail";
   if (/\b(paint|concrete|fenc|pest|termite|remodel|appliance|tree|stump|septic|excavat|dirt work|grading|dozer|backhoe|land clearing|garage door|gutter|weld|fabricat|flooring|floors?\b|carpet|drywall|sheetrock)/.test(n)) return "contractor";
   if (/\b(church|chapel|iglesia|tabernacle|parish|vfw|american legion|lions club|ruritan|masonic|food pantry|food bank|community center)\b/.test(n)) return "church";
   if (/\b(tax(es)?|impuestos|accounting|accountants?|bookkeep\w*|c\.?p\.?a\.?s?|insurance|seguros|financial (planning|advisors?|services))\b/.test(n)) return "finance";
