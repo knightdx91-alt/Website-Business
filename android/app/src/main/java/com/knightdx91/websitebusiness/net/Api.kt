@@ -6,10 +6,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.TimeUnit
 
 /** The Worker's JSON API, same routes the web app uses, with the session as a Bearer token. */
 class Api(context: Context) {
@@ -20,40 +23,46 @@ class Api(context: Context) {
     class ApiException(message: String, val status: Int) : IOException(message)
     class Unauthorized : IOException("Please sign in again")
 
+    companion object {
+        private val JSON = "application/json; charset=utf-8".toMediaType()
+
+        /**
+         * One client for the whole app. Connections are pooled and HTTP/2 carries parallel requests over one TLS handshake,
+         * and fast fallback (Happy Eyeballs) tries the server's addresses together, so a dead route costs milliseconds.
+         * Before this (2.16 and earlier) every call opened its own connection, closed it, and could wait 15 s per address
+         * in turn: a cold start of the app took up to half a minute on some networks.
+         */
+        val http: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .fastFallback(true)
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
+                .followRedirects(false)
+                .build()
+        }
+    }
+
     // ---- plumbing ----
 
     /** One JSON request to `/api<path>`. Screens use the typed helpers below or the getJson/postJson/putJson/deleteJson shortcuts. */
     suspend fun call(method: String, path: String, body: JSONObject? = null, auth: Boolean = true): Response = withContext(Dispatchers.IO) {
-        val conn = URL(origin + "/api" + path).openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = method
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 60_000
-            conn.instanceFollowRedirects = false
-            conn.setRequestProperty("Accept", "application/json")
-            conn.setRequestProperty("x-wb", "1")
-            if (auth) prefs.token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
-            if (body != null) {
-                conn.doOutput = true
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-            } else if (method != "GET") {
-                conn.doOutput = true
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                conn.outputStream.use { it.write("{}".toByteArray(Charsets.UTF_8)) }
-            }
-            val status = conn.responseCode
-            val stream = if (status < 400) conn.inputStream else conn.errorStream
-            val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-            val cookies = conn.headerFields.entries.firstOrNull { it.key?.equals("set-cookie", true) == true }?.value ?: emptyList()
+        val b = Request.Builder().url(origin + "/api" + path).header("Accept", "application/json").header("x-wb", "1")
+        if (auth) prefs.token?.let { b.header("Authorization", "Bearer $it") }
+        val reqBody = when {
+            body != null -> body.toString().toRequestBody(JSON)
+            method != "GET" -> "{}".toRequestBody(JSON)
+            else -> null
+        }
+        http.newCall(b.method(method, reqBody).build()).execute().use { res ->
+            val text = res.body?.string() ?: ""
+            val status = res.code
             if (status == 401 && auth) throw Unauthorized()
             if (status >= 400) {
                 val msg = try { JSONObject(text).optString("error", "") } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { "" }
                 throw ApiException(msg.ifBlank { "Server error $status" }, status)
             }
-            Response(text, cookies)
-        } finally {
-            conn.disconnect()
+            Response(text, res.headers("Set-Cookie"))
         }
     }
 
@@ -71,40 +80,30 @@ class Api(context: Context) {
     suspend fun putJson(path: String, body: JSONObject): JSONObject = put(path, body)
     suspend fun deleteJson(path: String): JSONObject = delete(path)
 
-    /** Raw bytes with the session (preview images, PDFs). */
+    /** Raw bytes with the session (preview images, PDFs). Follows redirects like a browser would. */
     suspend fun bytes(path: String): ByteArray = withContext(Dispatchers.IO) {
-        val conn = URL(if (path.startsWith("http")) path else origin + path).openConnection() as HttpURLConnection
-        try {
-            prefs.token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 60_000
-            if (conn.responseCode == 401) throw Unauthorized()
-            if (conn.responseCode >= 400) throw ApiException("Server error ${conn.responseCode}", conn.responseCode)
-            conn.inputStream.use { it.readBytes() }
-        } finally {
-            conn.disconnect()
+        val b = Request.Builder().url(if (path.startsWith("http")) path else origin + path)
+        prefs.token?.let { b.header("Authorization", "Bearer $it") }
+        http.newBuilder().followRedirects(true).build().newCall(b.build()).execute().use { res ->
+            if (res.code == 401) throw Unauthorized()
+            if (res.code >= 400) throw ApiException("Server error ${res.code}", res.code)
+            res.body?.bytes() ?: ByteArray(0)
         }
     }
 
     /** Uploads a photo (JPEG bytes) to a lead: `kind` is "photo" (main photo) or "gallery". */
     suspend fun uploadPhoto(leadId: String, kind: String, jpeg: ByteArray, w: Int, h: Int, alt: String): JSONObject = withContext(Dispatchers.IO) {
-        val conn = URL("$origin/api/leads/$leadId/$kind?w=$w&h=$h&alt=${URLEncoder.encode(alt, "UTF-8")}").openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = "POST"
-            conn.doOutput = true
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 120_000
-            conn.setRequestProperty("x-wb", "1")
-            conn.setRequestProperty("Content-Type", "image/jpeg")
-            prefs.token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
-            conn.outputStream.use { it.write(jpeg) }
-            val status = conn.responseCode
-            val text = (if (status < 400) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+        val b = Request.Builder()
+            .url("$origin/api/leads/$leadId/$kind?w=$w&h=$h&alt=${URLEncoder.encode(alt, "UTF-8")}")
+            .header("x-wb", "1")
+            .post(jpeg.toRequestBody("image/jpeg".toMediaType()))
+        prefs.token?.let { b.header("Authorization", "Bearer $it") }
+        http.newBuilder().readTimeout(120, TimeUnit.SECONDS).writeTimeout(120, TimeUnit.SECONDS).build().newCall(b.build()).execute().use { res ->
+            val status = res.code
+            val text = res.body?.string() ?: ""
             if (status == 401) throw Unauthorized()
             if (status >= 400) throw ApiException(runCatching { JSONObject(text).optString("error") }.getOrNull()?.ifBlank { null } ?: "Upload failed ($status)", status)
             if (text.isBlank()) JSONObject() else JSONObject(text)
-        } finally {
-            conn.disconnect()
         }
     }
 

@@ -204,6 +204,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `com.knightdx91.websitebusiness` (skip google-services.json) → Project settings → General: App ID, Web API key, Project ID;
   Cloud Messaging: Sender ID → paste the four into Settings; Project settings → Service accounts → Generate new private key →
   the JSON file's content as Cloudflare Worker secret FCM_SERVICE_ACCOUNT.
+- Android 2.17 (Oct 2026): cold starts took up to 30 s. `net/Api.kt` now uses one shared OkHttp client (`Api.http`, okhttp 5.1.0:
+  pooled connections, HTTP/2, `fastFallback(true)` so a dead IPv6 route costs milliseconds instead of a 15-second connect wait
+  per address, 10 s connect timeout); before, every call opened and closed its own HttpURLConnection. Home loads its four
+  requests with `async` at once and no longer loads twice at start (the resume effect skips the first resume); AppRoot fetches
+  /meta and the update check side by side. `bytes()` follows redirects; `uploadPhoto()` keeps 120 s timeouts. The one-off
+  HttpURLConnection calls in `ApiSales.portal`, `TapApi` and the APK download in `Updater` are unchanged.
 - Leads list speed (Oct 2026): `GET /api/leads` selects `LIST_COLS` (the card fields + `has_pitch`) instead of `leads.*`; the JSON
   blobs (place_json alone was 1.6 MB across 114 leads) were being read for every list, and Home loads 3–5 lists at once, which
   made the leads tab spin for seconds. `summary()` takes `has_pitch` when present. Keep new card fields in `LIST_COLS`.

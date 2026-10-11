@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import android.content.Intent
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.MutableState
@@ -134,10 +135,11 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
     LaunchedEffect(state.loggedIn) {
         if (state.loggedIn) {
             Updater.clearNotification(context)
-            state.refreshMeta()
-            Push.configure(context, state.meta?.fcm)
+            coroutineScope {
+                launch { state.refreshMeta(); Push.configure(context, state.meta?.fcm) }
+                launch { state.update = Updater.newerBuild(state.api) }
+            }
             if (startLead != null) nav.navigate("lead/$startLead")
-            state.update = Updater.newerBuild(state.api)
             // While the app stays open, keep looking: a new build shows up within 15 minutes without closing the app.
             while (true) {
                 delay(Updater.IN_APP_CHECK_MS)

@@ -54,6 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import com.knightdx91.websitebusiness.AppState
 import com.knightdx91.websitebusiness.net.Lead
 import kotlinx.coroutines.launch
@@ -79,14 +81,23 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
         loading = true
         error = null
         try {
-            leads = when (tab) {
-                "callbacks" -> state.api.leads(callbacks = "all", category = category.ifBlank { null })
-                "activity" -> state.api.leads(activity = true, category = category.ifBlank { null })
-                else -> state.api.leads(sales = tab, category = category.ifBlank { null })
+            // All four at once over the shared connection; one after another they added up on a cold start.
+            coroutineScope {
+                val list = async {
+                    when (tab) {
+                        "callbacks" -> state.api.leads(callbacks = "all", category = category.ifBlank { null })
+                        "activity" -> state.api.leads(activity = true, category = category.ifBlank { null })
+                        else -> state.api.leads(sales = tab, category = category.ifBlank { null })
+                    }
+                }
+                val dueList = async { state.api.leads(callbacks = "due") }
+                val openedList = async { state.api.leads(opened = "recent") }
+                val unread = async { runCatching { state.api.unreadCount() }.getOrDefault(state.unread) }
+                leads = list.await()
+                due = dueList.await()
+                opened = openedList.await()
+                state.unread = unread.await()
             }
-            due = state.api.leads(callbacks = "due")
-            opened = state.api.leads(opened = "recent")
-            state.unread = runCatching { state.api.unreadCount() }.getOrDefault(state.unread)
         } catch (e: com.knightdx91.websitebusiness.net.Api.Unauthorized) {
             state.signOut()
         } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
@@ -98,7 +109,12 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
     }
 
     LaunchedEffect(tab, category) { load() }
-    LifecycleResumeEffect(Unit) { scope.launch { load() }; onPauseOrDispose {} }
+    // Reload when coming back to the app, but not on the first resume: LaunchedEffect above already loads at start.
+    var resumedBefore by remember { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        if (resumedBefore) scope.launch { load() } else resumedBefore = true
+        onPauseOrDispose {}
+    }
 
     val shown = remember(leads, search) {
         val q = search.trim().lowercase()
