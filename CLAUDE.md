@@ -327,7 +327,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Settings sections fold (Oct 2026, 2.11): Android `CollapsibleCard` in `ui/Common.kt` (header tap opens/closes, chevron, state per
   title via rememberSaveable; Settings uses it for every section, "Signed in" open by default; form state is hoisted so folding never
   loses typed values) and web `collapsibleSections()` in app.js (after the Settings render: each `section.card > h2` folds its
-  body, remembered per heading in localStorage `fold.<heading>`). Other screens keep plain `SectionCard`.
+  body, remembered per heading in localStorage `fold.<heading>`). Since Oct 2026 the web business form (`form#sf`) folds
+  too: every direct `h2` of the form (Your business, Website, Team sign-in, Phone alerts, Plans & prices, Ways to pay, Extras,
+  Team goals, Runs) gathers what follows it up to the next heading or the sticky Save into a hidden div (`fold.form.<heading>`,
+  all closed by default, nodes moved not recreated so hidden fields still submit; a browser validation error on a folded field
+  opens its section first). Other screens keep plain `SectionCard`.
 - 📖 Guides (Oct 2026, `src/worker/guides.ts`; `GET /api/guides/<id>`, owner + callers; web `#/guide/<id>` `viewGuide`, Android
   `ui/GuideScreen.kt` 2.28, route `guide/{id}`): how-to guides with the exact buttons to tap, prices filled from Settings
   (`tankBoardGuide(s)`: the Price list plan line, the QR tag extra's price, `APP_ORIGIN` for the display address). Buttons in

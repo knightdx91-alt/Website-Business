@@ -3397,6 +3397,38 @@
    * sections are rarely edited. Open/closed is remembered per heading on this phone. Hidden fields still save.
    */
   function collapsibleSections() {
+    // The business form is one long card with sub-headings (Your business, Website, Team sign-in, Phone alerts, Plans &
+    // prices, Ways to pay, Extras, Team goals, Runs): each heading folds what follows it, like the Android app's sections.
+    // Nodes are only moved, never recreated, so the form still submits everything (hidden fields are submitted too).
+    const form = $app.querySelector("form#sf");
+    if (form && !form.dataset.fold) {
+      form.dataset.fold = "1";
+      let body = null;
+      for (const el of [...form.children]) {
+        if (el.matches(".sticky-save")) { body = null; continue; }
+        if (el.tagName === "H2") {
+          const h = el;
+          const key = "fold.form." + h.textContent.replace(/[^a-z]/gi, "").toLowerCase();
+          body = document.createElement("div");
+          h.after(body);
+          const arrow = document.createElement("span");
+          arrow.className = "muted";
+          arrow.style.cssText = "float:right;font-weight:400";
+          h.appendChild(arrow);
+          h.style.cursor = "pointer";
+          let open = false;
+          try { open = localStorage.getItem(key) === "1"; } catch {}
+          const b = body;
+          const paint = () => { b.hidden = !open; arrow.textContent = open ? "▴" : "▾"; };
+          h.addEventListener("click", () => { open = !open; try { localStorage.setItem(key, open ? "1" : "0"); } catch {} paint(); });
+          paint();
+          continue;
+        }
+        if (body) body.appendChild(el);
+      }
+      // A field the browser flags on Save (a bad number, a missing name) must be visible, or the message points at nothing.
+      form.addEventListener("invalid", (e) => { const fold = e.target.closest("form#sf > div[hidden]"); if (fold) fold.previousElementSibling.click(); }, true);
+    }
     $app.querySelectorAll("section.card").forEach((card) => {
       const h = card.querySelector(":scope > h2");
       if (!h || card.dataset.fold) return;
