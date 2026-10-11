@@ -331,7 +331,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   trouble. Second guide `pricetags` (the QR price tags extra): what a sheet is (8 labels, 3.75 × 2.5 in, QR → `#sec-<slug>`),
   before you can print (live site, sections), printing (100%, sticker paper, laminate, scan-test, approve layout first), when to
   reprint (renamed/added sections, never for prices), how to sell it (sign-up extras, Buy extras link, quantity = sheets, who
-  buys), after they pay, trouble. `test/worker/guides.test.ts`. Add a guide: a builder in guides.ts + `guideById` + a button.
+  buys), after they pay, trouble. Third guide `display` (tablet display): what it shows, getting the `/d/` address from the
+  board's 📺 links, setting a tablet up (home screen, screen timeout, plugged in, app pinning), mounting, what the shop needs to
+  know, selling it (free with the plan; $99 installed if we supply tablets), trouble. `test/worker/guides.test.ts`. Add a guide:
+  a builder in guides.ts + `guideById` + a button.
 - 🎓 Training (Oct 2026, `src/worker/training.ts`, migration 0017 `training_done`; web `#/training` `viewTraining`, Android
   `ui/TrainingScreen.kt`, 2.10): an in-app course for owner and callers, Home → "🎓 Training" (also Settings). 10 lessons (what
   we sell, where leads come from, before you call, showing the preview, logging calls, signing up, taking payment, finish &

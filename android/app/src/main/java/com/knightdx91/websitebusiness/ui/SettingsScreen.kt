@@ -557,6 +557,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                         OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
                         OutlinedButton(onClick = { nav.navigate("guide/tankboard") }) { Text("🐠 Tank board guide") }
                         OutlinedButton(onClick = { nav.navigate("guide/pricetags") }) { Text("🏷️ QR price tags guide") }
+                        OutlinedButton(onClick = { nav.navigate("guide/display") }) { Text("📺 Tablet display guide") }
                         OutlinedButton(onClick = { nav.navigate("plans") }) { Text("📋 Show plans") }
                         OutlinedButton(onClick = { nav.navigate("walkin") }) { Text("🚶 In-person guide") }
                         if (isOwner) {

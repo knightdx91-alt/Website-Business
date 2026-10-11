@@ -23,7 +23,7 @@ export interface Guide {
   sections: GuideSection[];
 }
 
-export const GUIDE_IDS = ["tankboard", "pricetags"] as const;
+export const GUIDE_IDS = ["tankboard", "pricetags", "display"] as const;
 
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
@@ -242,8 +242,97 @@ export function priceTagsGuide(s: AppSettings): Guide {
   };
 }
 
+export function displayGuide(s: AppSettings): Guide {
+  const list = s.plans.find((p) => p.id === "list" && p.monthly);
+  const company = s.companyName || "Underground Associates";
+  return {
+    id: "display",
+    title: "📺 Tablet display by the tank",
+    intro:
+      `A full-screen page for a cheap tablet or a TV in the shop that shows one tank (or every tank in turn) live: big name, big orange price, the photo, "3 left" when stock is low. It reads the same live list the Tank board writes, refreshes itself every 30 seconds and keeps the screen awake, so the customer standing at the tank sees the price without scanning anything. It costs us nothing to give, so it is included with the ${list?.name ?? "Price list"} plan and every website plan; the hardware is the shop's.`,
+    sections: [
+      {
+        title: "What it shows",
+        steps: [
+          "One tank: the tank name as the heading, the shop name small on the right, and a card per item: photo (or a fish mark when there is none), name, note, the price in big orange type, \"n left\" under the price when 5 or fewer are left.",
+          "Sold-out and zero-count items are gone, exactly like the price page. A tank with nothing in stock says \"Sold out for now. Ask us what's coming.\"",
+          "Every tank, rotating: the same card layout, a new tank every 10 seconds, with dots at the bottom showing which one is up.",
+          "It shrinks the text so a tank with 15 items still fits with nothing cut off, and goes to two columns on a wide screen.",
+          "Bottom left: \"Updated\" with the time of the last change on the board. Dark background, no cursor, nothing to tap.",
+        ],
+      },
+      {
+        title: "Getting the address",
+        numbered: true,
+        steps: [
+          "Open the shop's lead → 🐠 Tank board → \"Open it here\" (or open the link you texted them).",
+          "Each tank has a 📺 at the right of its name. Tapping it opens that tank's display page; copy the address from the browser bar. It looks like " + APP_ORIGIN + "/d/<lead>/<tank-name>.",
+          "For every tank in turn, use the \"All tanks, rotating\" link in the board's footer: the same address without the tank name on the end.",
+          "The address works without a login (it shows nothing but what the price page shows), so it can be typed into any tablet, phone or TV browser. It is hidden from Google.",
+        ],
+        note: "The tank part of the address is the tank's name. Rename the tank and the old address shows nothing: set the tablet up again with the new 📺 link.",
+      },
+      {
+        title: "Set up a tablet",
+        numbered: true,
+        steps: [
+          "Any Android tablet from about $40 to $80 works (Walmart onn., Amazon Fire with the Silk browser, an old phone). An iPad works too. Wi-Fi is all it needs.",
+          "Open the address in Chrome (Fire: Silk). Menu ⋮ → \"Add to Home screen\". Open it from that icon so it fills the screen with no browser bar.",
+          "Settings → Display → Screen timeout: the longest it allows or \"Never\". The page asks the screen to stay awake too, but the tablet's own setting is what you can trust. Turn brightness down a notch; it's on all day.",
+          "Keep it plugged in. A tablet on battery dies by mid-afternoon.",
+          "Stop customers tapping out of it: Settings → Security → \"App pinning\" (Samsung: \"Pin windows\"; Fire: \"Enable Fire for Kids\" or just the home-screen icon). Pin Chrome. Hold Back + Overview to unpin.",
+          "Pick the right address for that screen: the one tank it sits on, or the rotating page for a screen at the register or the door.",
+        ],
+      },
+      {
+        title: "Mounting and placement",
+        steps: [
+          "Above the tank, not in front of it: a $10 acrylic tablet stand on the top rim, a clamp mount on the stand's frame, or a wall mount behind the tank. Away from the splash line and the lid.",
+          "One tablet per tank adds up fast. Most shops do better with one or two larger screens: a 10-inch tablet or a TV with a $30 streaming stick (open the rotating address in its browser) near the register or the front door, plus QR tags on every tank.",
+          "Eye level for an adult standing at the tank, and tilted down a little so the overhead lights don't glare on it.",
+          "Run the charging cable so nobody trips on it and it never crosses the water. A short right-angle cable and a cable clip do it.",
+          "Fish rooms are humid: a tablet in a cheap silicone case lasts longer. Wipe the screen with a dry cloth; no sprays.",
+        ],
+      },
+      {
+        title: "What the shop needs to know",
+        steps: [
+          "They never touch the display. Every change is made on the Tank board; the screen follows within about 30 seconds.",
+          "If the screen looks stale, it has probably lost Wi-Fi. Tap it, swipe down to reload, or power it off and on. The page comes back by itself.",
+          "Renaming a tank on the board means that tank's screen needs the new 📺 link once. Adding items, prices, photos and sold out never need anything.",
+          "The rotating page always shows every tank, so a new tank joins it on its own.",
+          "A screen can be moved to another tank by opening that tank's 📺 link on it.",
+        ],
+      },
+      {
+        title: "Selling it (it's free, so sell the plan)",
+        steps: [
+          "The line: \"Change the price on your phone, and the sign on the tank changes too.\" Then hold your phone next to a tablet and show it: mark something sold out, watch it vanish from the screen.",
+          `It's included with the ${list?.name ?? "Price list"} plan and every website plan. You're selling the plan; the display is the part they'll remember.`,
+          "If you set the tablets up for them (buy, mount, configure), $99 per tablet installed is fair: about $60 of hardware and 20 minutes of your time. Add it to the invoice as a one-off, or quote it by hand; it isn't a listed extra.",
+          "Pair it with QR tags: the screen for the person at the tank, the tag for the person who wants to take the price home.",
+          "Good fits: fish and reptile stores, plant nurseries (a screen per bench), produce stands, bakery cases, antique malls (booth map at the door), feed stores (a screen by the bulk bins).",
+        ],
+      },
+      {
+        title: "Trouble",
+        steps: [
+          "\"Nothing on the board yet\": the shop hasn't added any tanks, or the address has a tank name that no longer exists (renamed). Open the current 📺 link.",
+          "Screen asleep: the tablet's own screen timeout is on. Settings → Display → Screen timeout → Never, and keep it plugged in.",
+          "Prices not changing: no Wi-Fi. Reload once; if it stays stale, the tablet has dropped off the network.",
+          "Page shows the browser bar or someone opened another app: open it from the home-screen icon, and turn on app pinning.",
+          "Text too small or cut off: it shrinks to fit 15 or so items. Past that, split the tank into two sections on the board (\"Tank 4 top\", \"Tank 4 bottom\").",
+          "Photos missing on the screen but on the board: photos taken on the board show within a minute; a photo uploaded in Edit shows after the next save on the board or Edit.",
+          `Anything else: text ${company} from the client's call log so everyone sees it.`,
+        ],
+      },
+    ],
+  };
+}
+
 export function guideById(id: string, s: AppSettings): Guide | null {
   if (id === "tankboard") return tankBoardGuide(s);
   if (id === "pricetags") return priceTagsGuide(s);
+  if (id === "display") return displayGuide(s);
   return null;
 }
