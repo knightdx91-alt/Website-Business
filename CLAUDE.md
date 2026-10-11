@@ -517,7 +517,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   notify too (kind status / note). Home tab **Activity** (`/leads?activity=1`, web `SALES` + Android `TABS`): leads
   somebody has worked (a call-log entry other than "Added by hand", a task, a sign-up, a typed contact or callback, or an
   opened preview), newest activity first; the summary carries `lastNote {outcome, author, body, at}`, `notes`,
-  `lastActivity` only on that list and the card shows the newest entry. Home shows "Looked at their preview" (`/api/leads?opened=recent`, last 7 days, not yet sold), the lead
+  `lastActivity` only on that list and the card shows the newest entry. Site edits alert too: `siteUpdated()` in index.ts
+  ("X updated Y's website (hours, services)", kind status) from /edits, /editform, /restyle, /photo, /gallery, /spanish,
+  /rewrite; saves by the same person on the same site within 15 min fold into one alert (text merged, time moved up). Home shows "Looked at their preview" (`/api/leads?opened=recent`, last 7 days, not yet sold), the lead
   screen shows the count. Home also asks once to turn on phone alerts (`pushAsk`, dismiss stored in localStorage).
 - Example sites (`src/examples/examples.ts`): 8 made-up businesses (555-01xx numbers, "Example" streets), one per pack,
   each a different look~layout. `npm run prepare:app && npm run examples` builds them (publish mode, fonts pointed at

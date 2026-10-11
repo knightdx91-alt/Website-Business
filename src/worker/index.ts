@@ -231,6 +231,38 @@ function markShown(lead: LeadRow): Partial<LeadRow> {
   return { sales_status: "shown", shown_at: now(), last_contact: now(), ...autoCallback(lead) };
 }
 
+const SITE_UPDATE_COLLAPSE_MS = 15 * 60_000;
+
+/**
+ * "X updated Y's website (hours, services)": one alert per editing session. The editor saves card by card, so saves by
+ * the same person on the same site within 15 minutes fold into the latest alert (its text grows, its time moves up)
+ * instead of pinging everyone again.
+ */
+async function siteUpdated(env: Env, session: Session, lead: LeadRow, what: string[]): Promise<void> {
+  const prefix = `${session.name} updated ${lead.name}'s website`;
+  const recent = await env.DB.prepare("SELECT id, text FROM events WHERE lead_id = ? AND kind = 'status' AND actor_id IS ? AND created_at > ? AND text LIKE ? ORDER BY created_at DESC LIMIT 1")
+    .bind(lead.id, session.userId, now() - SITE_UPDATE_COLLAPSE_MS, `${prefix}%`)
+    .first<{ id: string; text: string }>();
+  const parts = new Set<string>();
+  const old = /\((.*)\)$/.exec(recent?.text ?? "");
+  if (old?.[1]) old[1].split(", ").forEach((w) => parts.add(w));
+  what.forEach((w) => parts.add(w));
+  const text = `${prefix}${parts.size ? ` (${[...parts].slice(0, 8).join(", ")})` : ""}`;
+  if (recent) await env.DB.prepare("UPDATE events SET text = ?, created_at = ? WHERE id = ?").bind(text.slice(0, 500), now(), recent.id).run();
+  else await notify(env, { kind: "status", actor: session, leadId: lead.id, text });
+}
+
+const EDIT_WORDS: Record<string, string> = { hours: "hours", services: "services", events: "events", offers: "offers", plans: "plans", links: "links", proof: "awards", closures: "closures", visit: "parking & payment", hiring: "hiring", ext: "details", media: "photos", faq: "FAQ", socials: "social links", about: "about" };
+
+/** Short words for an alert from an /edits payload: which parts of the site changed. */
+function editWords(edits: { record?: Record<string, unknown>; copy?: unknown; look?: unknown; [k: string]: unknown }): string[] {
+  const out: string[] = [];
+  for (const k of Object.keys(edits.record ?? {})) out.push(EDIT_WORDS[k] ?? k.replace(/[A-Z]/g, (c) => " " + c.toLowerCase()));
+  if (edits.copy) out.push("text");
+  if (edits.look) out.push("design");
+  return out.length ? out : ["edits"];
+}
+
 /** Days since a Shown lead was shown (whole days). */
 function daysSinceShown(lead: LeadRow): number {
   return Math.max(0, Math.floor((now() - (lead.shown_at ?? lead.last_contact ?? lead.updated_at)) / 86_400_000));
@@ -1115,6 +1147,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         look = designId(cur.look, layoutOf(lead.look), recipe ? settleDna({ ...base, ...recipe.dna }) : base);
       } else look = await chooseLook(env, record, `${id}:${Date.now()}`, lead.look ?? undefined);
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), look);
+      await siteUpdated(env, session, lead, ["new design"]);
       return json({ ok: true, look });
     }
     // The site editor as data for the Android app: cards + fields in, field values out (same edits as the web editor).
@@ -1129,6 +1162,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const edits = EditsSchema.parse(built.edits);
       const next = applyEdits(JSON.parse(lead.record_json), JSON.parse(lead.copy_json), edits);
       await renderPreview(env, lead, next.record, next.copy, next.look ?? lead.look ?? "");
+      await siteUpdated(env, session, lead, editWords(edits as Parameters<typeof editWords>[0]));
       return json({ ...detail((await getLead(env, id))!), warnings: built.warnings });
     }
     if (action === "/edits" && m === "PUT") {
@@ -1136,6 +1170,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const edits = await body(req, EditsSchema);
       const next = applyEdits(JSON.parse(lead.record_json), JSON.parse(lead.copy_json), edits);
       await renderPreview(env, lead, next.record, next.copy, next.look ?? lead.look ?? "");
+      await siteUpdated(env, session, lead, editWords(edits as Parameters<typeof editWords>[0]));
       return json(detail((await getLead(env, id))!));
     }
     if (action === "/photo" && m === "POST") {
@@ -1152,6 +1187,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const h = Number(url.searchParams.get("h")) || undefined;
       record.media.hero = { src: `/assets/owner/hero.${ext}`, alt: url.searchParams.get("alt")?.slice(0, 150) || `${record.name}`, source: "owner", width: w, height: h };
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), lead.look ?? "");
+      await siteUpdated(env, session, lead, ["main photo"]);
       return json(detail((await getLead(env, id))!));
     }
     // Photo gallery (owner photos, e.g. from the photo shoot extra): up to 12, each owner/<id>/<key>.<ext>.
@@ -1170,6 +1206,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const h = Number(url.searchParams.get("h")) || undefined;
       record.media.gallery.push({ src: `/assets/owner/${key}.${ext}`, alt: url.searchParams.get("alt")?.slice(0, 150) || `Photo of ${record.name}`, source: "owner", width: w, height: h });
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), lead.look ?? "");
+      await siteUpdated(env, session, lead, ["gallery"]);
       return json(detail((await getLead(env, id))!));
     }
     if (action === "/gallery" && m === "DELETE" && leadMatch[3]) {
@@ -1180,6 +1217,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       record.media.gallery = record.media.gallery.filter((p) => !gone.includes(p));
       for (const p of gone) await env.BUCKET.delete(`owner/${id}/${p.src.slice("/assets/owner/".length)}`);
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), lead.look ?? "");
+      await siteUpdated(env, session, lead, ["gallery"]);
       return json(detail((await getLead(env, id))!));
     }
     // Spanish page (extra): AI translation of the current text, stored in copy.es; DELETE removes the page.
@@ -1195,11 +1233,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         copy.es = es;
       }
       await renderPreview(env, lead, record, copy, lead.look ?? "");
+      await siteUpdated(env, session, lead, [m === "DELETE" ? "Spanish page removed" : "Spanish page"]);
       return json(detail((await getLead(env, id))!));
     }
     if (action === "/rewrite" && m === "POST") {
       await updateLead(env, id, { rewrite: 1, status: "queued" });
       await env.JOBS.send({ type: "build", leadId: id });
+      await siteUpdated(env, session, lead, ["text rewritten"]);
       return json({ ok: true });
     }
     if (action === "/retry" && m === "POST") {
