@@ -323,6 +323,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   title via rememberSaveable; Settings uses it for every section, "Signed in" open by default; form state is hoisted so folding never
   loses typed values) and web `collapsibleSections()` in app.js (after the Settings render: each `section.card > h2` folds its
   body, remembered per heading in localStorage `fold.<heading>`). Other screens keep plain `SectionCard`.
+- 📖 Guides (Oct 2026, `src/worker/guides.ts`; `GET /api/guides/<id>`, owner + callers; web `#/guide/<id>` `viewGuide`, Android
+  `ui/GuideScreen.kt` 2.28, route `guide/{id}`): how-to guides with the exact buttons to tap, prices filled from Settings
+  (`tankBoardGuide(s)`: the Price list plan line, the QR tag extra's price, `APP_ORIGIN` for the display address). Buttons in
+  Settings → "📖 Guides" (web) / Settings → More (Android). First guide `tankboard`: the four pieces, what we sell it for, set a
+  shop up, give them the board, how the shop uses it, how a change reaches the site, QR price tags, tablet display, selling it,
+  trouble. `test/worker/guides.test.ts`. Add a guide: a builder in guides.ts + `guideById` + a button.
 - 🎓 Training (Oct 2026, `src/worker/training.ts`, migration 0017 `training_done`; web `#/training` `viewTraining`, Android
   `ui/TrainingScreen.kt`, 2.10): an in-app course for owner and callers, Home → "🎓 Training" (also Settings). 10 lessons (what
   we sell, where leads come from, before you call, showing the preview, logging calls, signing up, taking payment, finish &

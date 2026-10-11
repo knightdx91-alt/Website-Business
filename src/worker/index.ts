@@ -18,6 +18,7 @@ import { getPlace, RESTAURANT_FLAGS, searchText, type Place } from "../places/cl
 import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
+import { guideById } from "./guides.ts";
 import { LAST_ANNOUNCE_KEY, TICK_KEY, announceUpdate, fcmClientConfig, serviceAccount, serviceAccountProblem } from "./fcm.ts";
 import { clientLink, republishDirty, serveDisplay, servePhoto, servePricesFeed, serveTankBoard } from "./tankboard.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
@@ -414,6 +415,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json(await setupTap(env));
   }
   // 🎓 Training (owner and callers): the course from src/worker/training.ts plus this person's finished lessons.
+  // 📖 Guides (owner and callers): how-tos from src/worker/guides.ts, prices filled from Settings.
+  const guide = /^\/guides\/([a-z0-9-]+)$/.exec(path);
+  if (guide && m === "GET") {
+    const g = guideById(guide[1]!, await getSettings(env));
+    if (!g) throw new HttpError(404, "No such guide");
+    return json(g);
+  }
   if (path === "/training" && m === "GET") {
     const done = await env.DB.prepare("SELECT lesson_id FROM training_done WHERE user_id = ?").bind(session.userId).all<{ lesson_id: string }>();
     return json({ ...trainingCourse(await getSettings(env)), done: done.results.map((r) => r.lesson_id) });

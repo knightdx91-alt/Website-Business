@@ -189,6 +189,7 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
             composable("edit/{id}") { e -> EditScreen(state, nav, e.arguments?.getString("id") ?: "") }
             composable("playbook") { PlaybookScreen(state, nav) }
             composable("training") { TrainingScreen(state, nav) }
+            composable("guide/{id}") { e -> GuideScreen(state, nav, e.arguments?.getString("id") ?: "tankboard") }
             composable("walkin") { WalkinScreen(state, nav, null) }
             composable("walkin/{lead}") { e -> WalkinScreen(state, nav, e.arguments?.getString("lead")) }
             composable("plans") { ShowPlansScreen(state, nav, null) }

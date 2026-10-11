@@ -1721,6 +1721,21 @@
     ];
   }
 
+  /** 📖 Guides: a how-to from /api/guides/<id> (one source with the Android app). Settings → Guides. */
+  async function viewGuide(id) {
+    setNav("home");
+    const my = renderSeq;
+    $app.innerHTML = `<section class="card"><h2>📖 Guide</h2><p class="muted">Loading…</p></section>`;
+    let g;
+    try { g = await api(`/guides/${id}`); } catch (err) { if (stale(my)) return; $app.innerHTML = `<section class="card"><p class="bad">${esc(err.message || NO_CONNECTION)}</p></section>`; return; }
+    if (stale(my)) return;
+    $app.innerHTML = `<section class="card"><h2>${esc(g.title)}</h2><p class="muted">${esc(g.intro)}</p>
+      <p class="small muted">Tap a section to open it. <a href="#/settings">Back to Settings</a></p></section>
+      ${g.sections.map((s, i) => `<details class="card"${i === 0 ? " open" : ""}><summary style="cursor:pointer"><strong>${esc(s.title)}</strong></summary>
+        <${s.numbered ? "ol" : "ul"}>${s.steps.map((x) => `<li style="margin-bottom:6px">${esc(x)}</li>`).join("")}</${s.numbered ? "ol" : "ul"}>
+        ${s.note ? `<p class="small muted"><strong>Good to know:</strong> ${esc(s.note)}</p>` : ""}</details>`).join("")}`;
+  }
+
   /** 🎓 Training: the course from /api/training (one source with the Android app), progress saved per person. */
   async function viewTraining() {
     setNav("home");
@@ -3088,6 +3103,9 @@
         <button class="btn" id="install"${installPrompt ? "" : " hidden"}>Install app</button>
         <button class="btn btn--danger" id="logout">Log out</button></div>
         <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
+      <section class="card"><h2>📖 Guides</h2>
+        <p class="small muted">How to set up and sell what we offer, with the exact buttons to tap. Prices in the guides come from Settings.</p>
+        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">🐠 Tank board, price page & QR tags</a><a class="btn" href="#/training">🎓 Training course</a></div></section>
       <section class="card"><h2>Android app</h2>
         <p class="small muted">Install the app on an Android phone. After downloading, open the file and allow installing from this source if asked. Log in once in the app with the same password.</p>
         <a class="btn" href="/api/android.apk" download>Download Android app</a></section>
@@ -3740,6 +3758,7 @@
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/playbook") return await viewPlaybook();
       if (h === "#/training") return await viewTraining();
+      if ((m = /^#\/guide\/([a-z0-9-]+)$/.exec(h))) return await viewGuide(m[1]);
       if ((m = /^#\/walkin(?:\/([a-z0-9]+))?$/.exec(h))) return await viewWalkin(m[1]);
       if ((m = /^#\/plans(?:\/([a-z0-9]+))?$/.exec(h))) return await viewShowPlans(m[1]);
       if (h === "#/route") return await viewRoute();

@@ -555,6 +555,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedButton(onClick = { nav.navigate("playbook") }) { Text("💬 Plans & answers") }
                         OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
+                        OutlinedButton(onClick = { nav.navigate("guide/tankboard") }) { Text("🐠 Tank board guide") }
                         OutlinedButton(onClick = { nav.navigate("plans") }) { Text("📋 Show plans") }
                         OutlinedButton(onClick = { nav.navigate("walkin") }) { Text("🚶 In-person guide") }
                         if (isOwner) {
