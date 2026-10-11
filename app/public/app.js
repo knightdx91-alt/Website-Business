@@ -1131,6 +1131,7 @@
     if (hasServices) confirmable.push(["services", isS ? "Services and prices are right" : isParts ? "The what-we-carry list is right" : "Services list is right"]);
     if (hasTowns) confirmable.push(["service_area", "Service area towns are right"]);
     if (isR) confirmable.push(["menu", "Menu is right"]);
+    if ([r.media.hero].concat(r.media.gallery || []).some((p) => p && p.source === "site")) confirmable.push(["site_photos", "Photos from their old website are theirs (not the site builder's stock)"]);
     const priceOf = (s) => {
       const p = s.price;
       if (!p) return "";

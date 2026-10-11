@@ -268,7 +268,7 @@ export const EditsSchema = z.object({
         .max(20)
         .optional(),
       galleryAlts: z.record(z.string(), z.string().trim().max(150)).optional(),
-      confirmed: z.array(z.enum(["name", "phone", "address", "hours", "services", "service_area", "variant", "menu"])).optional(),
+      confirmed: z.array(z.enum(["name", "phone", "address", "hours", "services", "service_area", "variant", "menu", "site_photos"])).optional(),
       /* ---- trades, lawn and cleaning modules (Oct 2026); empty strings clear a field ---- */
       /** Plans & pricing cards; an empty list removes them (a lawn crew then shows the no-price defaults again). */
       plans: z

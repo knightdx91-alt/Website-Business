@@ -1,5 +1,5 @@
 import { CLIENT_SCRIPT } from "./client-script.ts";
-import { actionBar, announcements, footer, gallery, header, hiring, sectionHead, type Ctx } from "./components.ts";
+import { actionBar, announcements, footer, gallery, header, hiring, sectionHead, type Ctx, todo } from "./components.ts";
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
 import { html, jsonForScript, raw, type Raw } from "./html.ts";
@@ -104,6 +104,12 @@ function withExtras(ctx: Ctx, body: Raw): Raw {
   }
   const jobs = hiring(ctx).value;
   if (jobs) out = /<section class="cta[ "]/.test(out) ? out.replace(/<section class="cta[ "]/, (m) => jobs + m) : out.replace("</main>", `${jobs}</main>`);
+  // Photos taken from their old website go live only once the owner says they're theirs (not the builder's stock).
+  const fromSite = [ctx.r.media.hero, ...ctx.r.media.gallery].some((p) => p?.source === "site");
+  if (fromSite && !ctx.r.confirmed.includes("site_photos")) {
+    const t = todo(ctx, "Confirm the photos from your old website are yours", "We brought over photos from your current site. Tick 'Photos from their old website are theirs' in Edit once you've checked none are stock images from the site builder, or delete the ones that are.", true).value;
+    if (t) out = out.includes('id="photos"') ? out.replace(/<section class="section[^"]*" id="photos"/, (m) => t + m) : out.replace("</main>", `${t}</main>`);
+  }
   return raw(out);
 }
 

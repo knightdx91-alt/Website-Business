@@ -2,7 +2,8 @@
 export type CategoryId = "restaurant" | "contractor" | "salon" | "auto" | "landscaping" | "cleaning" | "print" | "retail" | "finance" | "church" | "general";
 
 /** Where a value came from. `google` images may appear in previews only. */
-export type Source = "places" | "owner" | "ai" | "system" | "stock" | "google";
+/** `site` = taken from the business's own current website (theirs to use, confirmed by the owner before publishing). */
+export type Source = "places" | "owner" | "ai" | "system" | "stock" | "google" | "site";
 
 /** Fields that must be owner-confirmed before publish. */
 export type ConfirmableField =
@@ -13,6 +14,8 @@ export type ConfirmableField =
   | "services"
   | "service_area"
   | "variant"
+  /** Photos brought over from their old website are theirs, not the site builder's stock. */
+  | "site_photos"
   | "menu";
 
 export interface Interval {
@@ -486,6 +489,8 @@ export interface ExistingSite {
   foundedYear?: number;
   /** Lines about closing, moving, reopening: the caller should know before the visit. */
   notices: string[];
+  /** Their own photos (builder stock, logos and icons filtered out), largest version first. Downloaded by the build. */
+  images: Array<{ src: string; alt?: string }>;
   fetchedAt: string;
 }
 

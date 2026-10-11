@@ -340,6 +340,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   write fresh and keep move/closure notices out of the copy; `check()` flags any copied sentence (`quotesReview` on the
   paragraphs) so the writer retries. Edit shows a read-only "Their current website" card (web + editform, collapsed). The
   container's proxy blocks many outside sites, so test the fetch from the Worker, not here. `test/site-import.test.ts`.
+  Photos too: `extractImages()` keeps their own `<img>`s (src / data-src / largest srcset; GoDaddy `/:/rs=…` resize suffix
+  dropped; logos, icons, pixels, and builder stock paths like `/isteam/stock/`, unsplash, pexels, shutterstock skipped; ≤ 12),
+  `fetchSitePhotos()` downloads up to 6 (jpeg/png/webp, 25 KB–8 MB), `importSitePhotos()` in pipeline.ts stores them at
+  `owner/<id>/s<n>.<ext>` with `source: "site"`: the first becomes the hero when the record only has a Google photo, the rest
+  fill the gallery to 12; re-imported on rewrite or when none are left, owner uploads untouched, never for churches.
+  Publishing needs `confirmed` **`site_photos`** ("Photos from their old website are theirs (not the site builder's stock)",
+  Confirm card on web + editform) or the preview shows a REQUIRED to-do (render.ts `withExtras`).
 - Pages elsewhere (Oct 2026, `src/places/web-presence.ts`, migration 0016 `leads.found_url`): Google only reports the website linked
   on the profile, so "No website" can be wrong (Luna's BBQ has a page on stonebridgewedding.com). With Worker secret
   `BRAVE_SEARCH_API_KEY` (Brave Search API, free 2,000 queries/month, ~$3/1,000 after; without it nothing changes) the app runs one

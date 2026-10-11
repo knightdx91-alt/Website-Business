@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applySiteFacts, extractSiteFacts } from "../src/places/site-import.ts";
+import { applySiteFacts, extractImages, extractSiteFacts } from "../src/places/site-import.ts";
 
 const HTML = `<!doctype html><html><head><title>King Fish Aquatics</title><meta name="description" content="Cullman's locally owned aquatics store"></head>
 <body><script>var x = "Cullman's locally owned Aquatics store";</script><style>.a{}</style>
@@ -42,4 +42,17 @@ test("site facts fill record gaps and never overwrite what's there", () => {
   const kept = { email: "owner@example.com", foundedYear: 2001, links: { social: { facebook: "https://facebook.com/other" } } };
   assert.deepEqual(applySiteFacts(kept, f), []);
   assert.equal(kept.email, "owner@example.com");
+});
+
+test("their own photos are kept, the builder's stock, logos and icons are not, and GoDaddy's resize suffix is dropped", () => {
+  const html = `<img src="//img1.wsimg.com/isteam/ip/abc123/tank-wall.jpg/:/rs=w:600,h:400,cg:true,m/cr=w:600,h:400" alt="Our saltwater wall">
+<img src="https://img1.wsimg.com/isteam/stock/12345/:/rs=w:600" alt="Happy family">
+<img src="/images/logo.png" alt="King Fish logo"><img src="https://x.com/pixel.gif" width="1">
+<img data-src="https://kingfishaquatics.co/uploads/store-front.jpg" src="data:image/gif;base64,R0lGOD" alt="">
+<img srcset="https://kingfishaquatics.co/u/a-400.jpg 400w, https://kingfishaquatics.co/u/a-1200.jpg 1200w" src="https://kingfishaquatics.co/u/a-400.jpg">
+<img src="https://img1.wsimg.com/isteam/ip/abc123/tank-wall.jpg/:/rs=w:300">`;
+  const imgs = extractImages(html, "https://kingfishaquatics.co/");
+  assert.deepEqual(imgs.map((i) => i.src), ["https://img1.wsimg.com/isteam/ip/abc123/tank-wall.jpg", "https://kingfishaquatics.co/uploads/store-front.jpg", "https://kingfishaquatics.co/u/a-1200.jpg"]);
+  assert.equal(imgs[0]!.alt, "Our saltwater wall");
+  assert.equal(extractSiteFacts("https://kingfishaquatics.co/", html).images.length, 3);
 });

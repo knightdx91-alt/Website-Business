@@ -12,6 +12,50 @@ const MAX_BYTES = 400_000;
 const BLOCK = /<\/(?:p|div|li|h[1-6]|section|article|header|footer|td|th|blockquote|figcaption|dd|dt|br|tr)\s*>|<br\s*\/?>/gi;
 const NOISE = /\b(cookie|cookies|this website uses|privacy policy|terms of (use|service)|all rights reserved|powered by|website builder|sign up for our newsletter|subscribe|copyright|©)\b/i;
 const NOTICE = /\b(clos(ed|ing)|mov(ed|ing)|relocat\w*|re-?open\w*|new location|temporar\w*|under construction|coming soon|grand opening|retir\w*)\b/i;
+/** Images that are not the business's own photos: logos, icons, tracking pixels, and the stock libraries site builders bundle. */
+const NOT_A_PHOTO = /logo|icon|favicon|badge|pixel|tracking|spacer|placeholder|avatar|sprite|\.svg|\.gif|\.ico|data:|1x1|blank\./i;
+const STOCK = /\/isteam\/stock\/|unsplash|pexels|pixabay|shutterstock|istockphoto|gettyimages|stock\.adobe|depositphotos|dreamstime|stocksy|\/stock\//i;
+
+/** Absolute, de-sized image URLs: GoDaddy's `/:/rs=w:600…` resize suffix is dropped so the original comes down. */
+function imageUrl(src: string, base: string): string | null {
+  try {
+    const u = new URL(src.trim(), base);
+    if (!/^https?:$/.test(u.protocol)) return null;
+    let s = u.toString();
+    const cut = s.indexOf("/:/");
+    if (/wsimg\.com/.test(u.hostname) && cut > 0) s = s.slice(0, cut);
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+/** Their photos from <img> tags (src, data-src, the largest srcset entry), in page order, deduped, at most 12. */
+export function extractImages(html: string, base: string): Array<{ src: string; alt?: string }> {
+  const out: Array<{ src: string; alt?: string }> = [];
+  const seen = new Set<string>();
+  for (const m of html.matchAll(/<img\b([^>]*)>/gi)) {
+    const attrs = m[1]!;
+    const attr = (n: string) => new RegExp(`\\b${n}=["']([^"']*)["']`, "i").exec(attrs)?.[1];
+    let src = attr("data-src") || attr("data-lazy-src") || attr("src") || "";
+    const srcset = attr("srcset") || attr("data-srcset");
+    if (srcset) {
+      const best = srcset.split(",").map((x) => x.trim().split(/\s+/)).filter((p) => p[0]).sort((a, b) => (parseInt(b[1] ?? "0", 10) || 0) - (parseInt(a[1] ?? "0", 10) || 0))[0];
+      if (best?.[0]) src = best[0];
+    }
+    const alt = decode(attr("alt") ?? "").trim() || undefined;
+    const w = parseInt(attr("width") ?? "", 10);
+    if (!src || NOT_A_PHOTO.test(src) || NOT_A_PHOTO.test(alt ?? "") || STOCK.test(src) || (w && w < 200)) continue;
+    const abs = imageUrl(src, base);
+    if (!abs) continue;
+    const key = abs.replace(/\?.*$/, "");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ src: abs, alt });
+    if (out.length >= 12) break;
+  }
+  return out;
+}
 
 function decode(s: string): string {
   return s
@@ -68,8 +112,37 @@ export function extractSiteFacts(url: string, html: string): ExistingSite {
     social,
     foundedYear: year ? Number(year) : undefined,
     notices,
+    images: extractImages(body, url),
     fetchedAt: new Date().toISOString().slice(0, 10),
   };
+}
+
+export interface SitePhoto {
+  bytes: ArrayBuffer;
+  type: "image/jpeg" | "image/png" | "image/webp";
+  ext: "jpg" | "png" | "webp";
+  alt?: string;
+  src: string;
+}
+
+/** Downloads up to `max` of their photos: real image types only, 25 KB to 8 MB, one at a time so a slow host can't hang the build. */
+export async function fetchSitePhotos(images: ExistingSite["images"], max = 6, fetchFn: typeof fetch = fetch): Promise<SitePhoto[]> {
+  const out: SitePhoto[] = [];
+  for (const img of images) {
+    if (out.length >= max) break;
+    try {
+      const res = await fetchFn(img.src, { headers: { "user-agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/128 Mobile Safari/537.36", accept: "image/*" }, signal: AbortSignal.timeout(8000) });
+      const type = (res.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+      const ext = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const)[type as "image/jpeg"];
+      if (!res.ok || !ext) continue;
+      const bytes = await res.arrayBuffer();
+      if (bytes.byteLength < 25_000 || bytes.byteLength > 8_000_000) continue;
+      out.push({ bytes, type: type as SitePhoto["type"], ext, alt: img.alt, src: img.src });
+    } catch {
+      /* skip this one */
+    }
+  }
+  return out;
 }
 
 /** Fetches and extracts; null when the site is down, not HTML, or looks like a social page. Never throws. */

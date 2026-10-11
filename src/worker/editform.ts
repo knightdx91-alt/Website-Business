@@ -145,6 +145,7 @@ function confirmable(r: AnyRecord): Array<[string, string]> {
   if (hasServices) out.push(["services", isS ? "Services and prices are right" : isParts ? "The what-we-carry list is right" : "Services list is right"]);
   if (hasTowns) out.push(["service_area", "Service area towns are right"]);
   if (isR) out.push(["menu", "Menu is right"]);
+  if ([r.media.hero, ...r.media.gallery].some((p: { source?: string } | undefined) => p?.source === "site")) out.push(["site_photos", "Photos from their old website are theirs (not the site builder's stock)"]);
   return out;
 }
 
