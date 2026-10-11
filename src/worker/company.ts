@@ -84,6 +84,7 @@ function faq(s: AppSettings): Array<[string, string]> {
         ? `Pick a ${commitText(s)} plan with no setup fee; after that, cancel any time with 30 days' notice.${s.flexSetup ? ` Rather not commit? Month to month is available with a one-time ${money(s.flexSetup)} setup fee.` : ""}${s.annualMonthsFree ? ` Paying for a year up front gets you ${s.annualMonthsFree} months free: 12 months for the price of ${12 - s.annualMonthsFree}.` : ""}`
         : "No. Cancel any time with 30 days' notice.",
     ],
+    ["I already have a website. Can you use what's on it?", "Yes. If your current site is yours (not a directory's listing for you), we bring its text over as facts for the new one and move your own photos across; you confirm they're yours before anything goes live. A site that's old, slow or broken on phones is exactly what we replace."],
     ["Who owns my content?", "You do. Your business name, logo, photos and text belong to you. If you have your own web address, it stays in your name."],
     ["Can you use my own photos?", "Yes, and we recommend it. Send us photos of your place, your work and your team and we'll put them in."],
     ["Can you help with my Google listing?", "Yes. Our Plus and Pro plans include a Google Business Profile tune-up, and Pro includes monthly posts and photo updates."],
@@ -105,6 +106,8 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   }
   if (path === "/portfolio" && req.method === "GET") return portfolio(env);
   if (path === "/pricing" && req.method === "GET") return pricingPage(env);
+  if (path === "/price-list" && req.method === "GET") return priceListPage(env);
+  if (path === "/tank-board" || path === "/live-price-list") return Response.redirect(`${ORIGIN}/price-list`, 301);
   if (path === "/about" && req.method === "GET") return aboutPage(env);
   if (path === "/cullman-county" && req.method === "GET") return countyPage(env);
   if (path.startsWith("/websites-for/") && req.method === "GET") {
@@ -115,7 +118,7 @@ export async function serveCompany(env: Env, req: Request, url: URL): Promise<Re
   if (path === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`, { headers: { "content-type": "text/plain" } });
   if (path === "/sitemap.xml") {
     const today = new Date().toISOString().slice(0, 10);
-    const urls = ["/", "/pricing", "/portfolio", "/about", "/cullman-county", ...TRADES.map((t) => `/websites-for/${t.slug}`), "/terms", "/privacy"];
+    const urls = ["/", "/pricing", "/price-list", "/portfolio", "/about", "/cullman-county", ...TRADES.map((t) => `/websites-for/${t.slug}`), "/terms", "/privacy"];
     return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((u) => `<url><loc>${ORIGIN}${u}</loc><lastmod>${today}</lastmod></url>`).join("")}</urlset>\n`, { headers: { "content-type": "application/xml", "cache-control": "public, max-age=3600" } });
   }
   // Fonts and icons come from the app's static assets.
@@ -584,14 +587,15 @@ const TRADES: Trade[] = [
   {
     slug: "shops",
     cat: "retail",
-    name: "boutiques, gift shops, antique malls, thrift stores, florists, feed and furniture stores",
+    name: "boutiques, gift shops, fish and pet stores, plant nurseries, antique malls, thrift stores, florists, feed and furniture stores",
     h1: "Websites for shops and boutiques in Cullman, AL",
     intro: "People drive past you every day and still don't know what you carry or when you're open. Your site fixes that and gives your Facebook posts somewhere to point.",
-    includes: ["Hours, address and the street line up top, with open or closed right now", "What you carry, by department or brand, so Google matches the search", "What's new this week, in your words, with a photo", "Shop-online or order-flowers buttons that go to your Square or Shopify store", "Florists: occasions, delivery area and cut-off times; vendor booths and donations for antique malls and thrift stores", "Gift cards and events when you have them"],
+    includes: ["Hours, address and the street line up top, with open or closed right now", "What you carry, by department or brand, so Google matches the search", "What's new this week, in your words, with a photo", "Shop-online or order-flowers buttons that go to your Square or Shopify store", "Florists: occasions, delivery area and cut-off times; vendor booths and donations for antique malls and thrift stores", "Gift cards and events when you have them", "Stock that changes daily? A live price list with a section per tank or shelf, QR price tags, a board you update from your phone and a tablet display by the tank"],
     faq: [
       ["I post everything on Facebook already.", "Keep posting. The site gives those posts a link, and it's the page Google shows the person who doesn't use Facebook."],
       ["Can customers buy on the site?", "The site sends them to your online store if you have one. We don't build a separate checkout; one store is enough to run."],
       ["How often can I change 'what's new'?", "As often as you like. Text us the line and a photo."],
+      ["My prices change every day. Can the site keep up?", "Yes. The live price list has a section for every tank, shelf or bin, and you change names, prices, counts and photos from your phone; the page follows within a minute, and a QR tag on the shelf opens that section. It comes with every plan, or on its own as the Price list plan."],
     ],
   },
   {
@@ -759,7 +763,7 @@ function priceListHtml(s: AppSettings): string {
   return `<section class="sec" id="price-list"><div class="wrap narrow"><h2>Just need a live price list?</h2>
 <p class="lead">For shops whose stock changes every day: fish stores, plant nurseries, produce stands, resale. A price page with a section for every tank or shelf, QR tags, and a board you update from your phone. ${money(p.monthly)} a month, no minimum.</p>
 <ul>${lines.map((x) => `<li>${e(x)}</li>`).join("")}</ul>
-<p><a class="btn btn--small" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a> <a class="btn btn--small btn--line" href="/#contact">Ask us about it</a></p></div></section>`;
+<p><a class="btn btn--small" href="/price-list">How it works</a> <a class="btn btn--small btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a></p></div></section>`;
 }
 
 function planCard(p: AppSettings["plans"][number], s: AppSettings, o: { full?: boolean } = {}): string {
@@ -976,6 +980,7 @@ ${extrasHtml(s, { compact: true })}
 <p style="margin-top:18px"><a class="btn btn--line" href="/pricing">Full pricing, ways to pay and the fine print</a></p>
 </div></section>` : ""}
 
+${priceListTeaser(s)}
 ${ownerSection(s, ownerPhoto)}
 ${quotes.length > 1 ? `<section class="sec sec--alt"><div class="wrap"><h2>From our clients</h2><div class="grid">${quotes.slice(1, 4).map(quoteHtml).join("")}</div></div></section>` : ""}
 
@@ -987,6 +992,72 @@ ${faqHtml(faq(s).slice(0, 5))}
 
 ${contactSection(s, { sent, missing })}`;
   return marketingPage(s, { path: "/", title, description, body, ld: pageLd(s, "/", title, description), gaEvents: sent ? [["generate_lead", { method: "contact_form" }]] : [] });
+}
+
+
+/** One line on the home page pointing shops with daily-changing stock at the live price list. */
+function priceListTeaser(s: AppSettings): string {
+  const p = listPlan(s);
+  return `<section class="sec" id="price-list-teaser"><div class="wrap narrow"><div class="card"><p class="eyebrow">New for shops</p>
+<h2 style="margin-top:6px">A price list that changes when you change it</h2>
+<p>Fish store, plant nursery, produce stand, resale: change what's in a tank or on a shelf from your phone, and the price page, the QR tag on the shelf and the screen by the tank all follow within a minute.${p ? ` Included with every website plan, or on its own for ${money(p.monthly)} a month with no minimum.` : ""}</p>
+<p><a class="btn btn--small" href="/price-list">See how it works</a></p></div></div></section>`;
+}
+
+/** /price-list: the live price list, Tank board, QR tags and tablet display, for shops whose stock changes daily. */
+async function priceListPage(env: Env): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const p = listPlan(s);
+  const lowest = lowestOf(s);
+  const tags = s.addons.find((a) => /price tag|shelf label/i.test(a.name));
+  const title = `Live price list, QR price tags and Tank board for shops | ${name}`;
+  const description = `For Cullman-area shops whose stock changes daily: a price page with a section per tank or shelf, QR tags that open it, a board you update from your phone, and a tablet display by the tank.${p ? ` ${money(p.monthly)} a month, no minimum, or included with any website plan.` : ""}`;
+  const serviceLd = { "@type": "Service", "@id": `${ORIGIN}/price-list#service`, name: "Live price list with QR price tags", serviceType: "Live price page, QR shelf labels and inventory board", provider: { "@id": `${ORIGIN}/#business` }, areaServed: townList(s).map((n) => ({ "@type": "City", name: n })), ...(p ? { offers: { "@type": "Offer", price: p.monthly, priceCurrency: "USD", description: `${p.name} plan, per month, no minimum term` } } : {}) };
+  const pieces: Array<[string, string, string]> = [
+    ["📄", "The price page", "A page on your website with a section for every tank, shelf or bin: each item with its name, price, a note and a photo. Sold-out items disappear; five or fewer shows “3 left”. Public, or hidden from Google if you'd rather competitors not read it."],
+    ["📱", "The Tank board", "A private link we text you. It opens on any phone, no app and no password. Add a tank, add what's in it, type the price and how many, snap a photo, tap Sold out. Every change saves by itself."],
+    ["🏷️", "QR price tags", "A printed sheet of labels, one per tank or shelf. Each QR opens that section of your price page, so a price change on your phone is a price change on the shelf. Nobody rewrites a tag."],
+    ["📺", "The tablet display", "Put any cheap tablet by a tank and it shows that tank's stock and prices full-screen, live, all day. Or one screen by the register that rotates through every tank."],
+  ];
+  const steps: Array<[string, string]> = [
+    ["We set it up", "Your price page goes on your website, your first tanks go on the board with you, and we print your first sheet of QR tags."],
+    ["You change it from your phone", "New fish in, price change, sold out: open the board, tap, done. Twenty seconds, no computer."],
+    ["Everything follows", "The page updates within about a minute. The QR tag on the shelf and the tablet by the tank show the same thing, because they read the same page."],
+  ];
+  const who = ["Fish, reptile and pet stores", "Plant nurseries and garden centers", "Produce stands and farm stores", "Antique malls and resale shops", "Feed and hardware stores with bulk bins", "Bakery cases and butcher counters"];
+  const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Live price list</p>
+<h1>A price list that changes when you change it</h1>
+<p class="lead">Built for shops whose stock changes every day. You change what's in a tank or on a shelf from your phone; your website's price page, the QR tag on the shelf and the screen by the tank all follow within a minute.</p>
+<div class="btns"><a class="btn" href="/#contact">Ask us about it</a>${p ? `<a class="btn btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a>` : ""}</div></div></section>
+<section class="sec sec--alt"><div class="wrap"><h2>How it works</h2><ol class="steps">${steps.map(([h, t]) => `<li><h3>${e(h)}</h3><p>${e(t)}</p></li>`).join("")}</ol></div></section>
+<section class="sec"><div class="wrap"><h2>The four pieces</h2><div class="grid">${pieces.map(([i, h, t]) => `<div class="card"><p style="font-size:2rem;margin:0">${i}</p><h3>${e(h)}</h3><p>${e(t)}</p></div>`).join("")}</div></div></section>
+<section class="sec sec--alt"><div class="wrap trade__grid"><div><h2>What your customers get</h2><ul class="ticks">
+<li>At the tank: scan the tag or glance at the screen and see exactly what's in it today, with prices and photos.</li>
+<li>At home: your price page shows up with your website on Google, so people check what you have before they drive over, and call about the one they want.</li>
+<li>Fewer “how much is this one?” questions, and no arguing over a price on an old tag.</li></ul>
+<h2 style="margin-top:28px">What you do</h2><ul class="ticks">
+<li>Keep the board honest: tap Sold out when the last one goes, change the number when the price does.</li>
+<li>Take a photo when something worth showing comes in. The board does it from the camera.</li>
+<li>That's it. You never touch the website, and anyone on your staff with the link can do it.</li></ul></div>
+<div><h2>Who it's for</h2><ul class="ticks">${who.map((w) => `<li>${e(w)}</li>`).join("")}</ul>
+<p class="small muted" style="margin-top:14px">Anything with a section name you can stick a label on and stock that doesn't sit still.</p></div></div></section>
+<section class="sec" id="pricing"><div class="wrap narrow"><h2>What it costs</h2><ul class="ticks">
+${p ? `<li><strong>Just the price list, board and tags:</strong> the ${e(p.name)} plan, ${money(p.monthly)} a month. No minimum term and no setup fee; cancel any time with 30 days' notice.${tags ? " Your first sheet of QR tags is included." : ""}</li>` : ""}
+<li><strong>With a website:</strong> included in every website plan${lowest ? `, from ${money(lowest)} a month` : ""}. Every month on the ${p ? e(p.name) : "Price list"} plan counts toward a website later; the price page just becomes part of it.</li>
+${tags ? `<li><strong>More QR tag sheets</strong> (8 tags each): ${e(addonPrice(tags))}. Reprints after you rename or add a tank are at cost.</li>` : ""}
+<li><strong>Tablet by the tank:</strong> any $40 to $80 tablet works; we'll set it up for you.</li></ul>
+<div class="btns" style="margin-top:18px"><a class="btn" href="/#contact">Ask us about it</a>${p ? `<a class="btn btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a>` : ""}<a class="btn btn--line" href="/pricing">All plans and pricing</a></div></div></section>
+<section class="sec sec--alt" id="faq"><div class="wrap narrow"><h2>Questions shops ask</h2>${faqHtml([
+    ["Do I need a computer?", "No. The board is a web page that opens on any phone. No app to install, no password to remember; we text you the link."],
+    ["How fast does a change show up?", "On the price page within about a minute (the page reads the live list every time it loads). The QR tag and the tablet read the same page, so they follow at the same time."],
+    ["What if my staff change something by mistake?", "The board only edits the price list, nothing else on your site. Fix it on the board and the page follows. If the link ever gets out, we shut off every old link in one tap and send you a new one."],
+    ["Can I keep my prices off Google?", "Yes. Mark the price list private and it stays out of your site's menu and out of search engines; the QR tags and the tablet still work."],
+    ["Do I have to buy a whole website?", p ? `No. The ${p.name} plan is the price page, the board, the tags and the display on their own for ${money(p.monthly)} a month, with no minimum. If you add a website later, every month counts toward it.` : "No. Ask us about the Price list plan: the price page, the board, the tags and the display on their own."],
+    ["What about photos?", "Take them on the board with your phone camera; they show on the page next to the item. We never use Google's photos of your store on the page or the tags."],
+  ])}</div></section>
+${contactSection(s)}`;
+  return marketingPage(s, { path: "/price-list", title, description, body, ld: pageLd(s, "/price-list", title, description, [serviceLd]) });
 }
 
 async function pricingPage(env: Env): Promise<Response> {
@@ -1130,7 +1201,7 @@ async function portfolio(env: Env): Promise<Response> {
 function footer(legal: string, s: AppSettings): string {
   return `<footer class="ftr"><div class="wrap">
 <p class="ftr__name">${e(legal)} · ${MARKET_TOWN}, Alabama${s.companyPhone ? ` · <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : ""}${s.companyEmail ? ` · <a href="mailto:${e(s.companyEmail)}">${e(s.companyEmail)}</a>` : ""}</p>
-<nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/portfolio">Our work</a><a href="/about">About</a><a href="/cullman-county">Where we work</a><a href="/extras">Clients: add extras</a><a href="/terms">Terms &amp; refunds</a><a href="/privacy">Privacy</a>${s.companyFacebookUrl ? `<a href="${e(s.companyFacebookUrl)}" rel="noopener">Facebook</a>` : ""}${s.companyReviewUrl ? `<a href="${e(s.companyReviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</nav>
+<nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/price-list">Live price list</a><a href="/portfolio">Our work</a><a href="/about">About</a><a href="/cullman-county">Where we work</a><a href="/extras">Clients: add extras</a><a href="/terms">Terms &amp; refunds</a><a href="/privacy">Privacy</a>${s.companyFacebookUrl ? `<a href="${e(s.companyFacebookUrl)}" rel="noopener">Facebook</a>` : ""}${s.companyReviewUrl ? `<a href="${e(s.companyReviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</nav>
 <p class="small">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)}</p>
 </div></footer>`;
 }

@@ -934,6 +934,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Business` per line; real clients only, nothing shows until typed), `siteTowns` (comma list → county page, footer,
   areaServed). `liveClients()` (sold + live) replaces the first badge from 3 up. No FAQPage schema (Google dropped FAQ
   rich results 7 May 2026), no aggregateRating. Owner photo: add `app/public/owner.jpg` (square); until then the UA badge.
+- Company site, price list (Oct 2026): `/price-list` (`priceListPage` in company.ts; `/tank-board` and `/live-price-list` redirect):
+  the live price list + Tank board + QR tags + tablet display for shops with daily-changing stock. Hero, 3 steps, the four
+  pieces, what customers get / what you do / who it's for, What it costs (the Price list plan line, included with site plans,
+  tag sheets, tablet; all from Settings), 6 FAQs, contact; Service schema with an Offer for the plan. Linked from the footer
+  ("Live price list"), the home teaser `priceListTeaser()` (card before the owner section), the /pricing and shops strip
+  (`priceListHtml` → "How it works"), and in the sitemap. The shops trade entry now names fish/pet stores and nurseries, lists the
+  live price list in "What your site includes" and answers "My prices change every day". Home FAQ gained "I already have a
+  website. Can you use what's on it?" (the site import, with the directory caveat).
 - Client-site SEO (Oct 2026): titles were already `<Business> | <Service> in <Town>, AL`; added `x-default` hreflang,
   `record.seo.googleSiteVerification` (Edit → Links → "Search Console code"; `<meta name="google-site-verification">`
   on published pages only; `editform` field `gsc`), `rel="nofollow"` on the footer "Website by" credit, and two SEO
