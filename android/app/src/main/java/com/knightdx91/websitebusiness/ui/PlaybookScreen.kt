@@ -152,7 +152,7 @@ private fun PlanPitchCard(p: PlanOffer, c: Content, o: PlanOptions) {
                 o.terms.commits.isNotEmpty() -> "No setup fee on the ${o.terms.commitWords} plan"
                 else -> "No setup fee"
             }
-            Text("$setup · about ${moneyDollars(p.perDay)} a day", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("$setup · billed monthly", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (pitch != null && pitch.fit.isNotBlank()) Row(Modifier.padding(top = 6.dp)) { Text("Good for: ", fontWeight = FontWeight.Bold); Text(pitch.fit) }
             if (p.includes.isNotEmpty()) {
                 Text("What they get", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))

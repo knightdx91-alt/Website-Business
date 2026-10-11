@@ -238,7 +238,7 @@ export function priceShort(s: Partial<AppSettings>, plans: Plan[], church = fals
 /** Common things owners say on the call, and an honest answer to each, with the prices and terms from Settings filled in. */
 export function playbookObjections(s: Partial<AppSettings>, plans: Plan[]): Array<[string, string]> {
   const cheapest = cheapestOf(plans);
-  const low = cheapest ? `${cheapest.name} is ${money(cheapest.monthly)} a month, about ${money(Math.round((cheapest.monthly * 12 / 365) * 100) / 100)} a day` : "Our starter plan is low monthly";
+  const low = cheapest ? `${cheapest.name} is ${money(cheapest.monthly)} a month` : "Our starter plan is low monthly";
   const t = payTerms(s);
   const min = t.min;
   const flex = t.flex;

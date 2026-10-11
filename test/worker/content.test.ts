@@ -46,7 +46,7 @@ test("playbook objections match app.js, with the prices and terms from Settings 
     if (!/\$|6-month|12 months|Underground/.test(a)) inAppJs("objection answer", a);
   }
   const by = (q: string) => list.find(([x]) => x.startsWith(q))![1];
-  assert.equal(by("“It's too expensive.”"), "I hear you. Basic is $49 a month, about $1.61 a day, with no setup fee on the 6- or 12-month plan. If it brings you one customer a month, it pays for itself. Want to start there? You can move up any time.");
+  assert.equal(by("“It's too expensive.”"), "I hear you. Basic is $49 a month, with no setup fee on the 6- or 12-month plan. If it brings you one customer a month, it pays for itself. Want to start there? You can move up any time.");
   assert.equal(by("“I don't want a contract.”"), "No problem. There's a 6-month plan, same price and still no setup fee. Or go month to month: same monthly price, a one-time $299 setup fee, and cancel any time with 30 days' notice.");
   assert.match(by("“Is this a scam?”"), /^Fair question\. Underground Associates is a local company here in Cullman\. You can see your site/);
   assert.match(by("“Do I own it?”"), /After the first 12 months you can cancel any time with 30 days' notice, and we'll send you a copy/);

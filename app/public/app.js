@@ -1582,7 +1582,6 @@
     const company = s.companyName || "Underground Associates";
     const church = !!lead && lead.category === "church";
     const t = payTerms(s, church);
-    const perDay = (m) => money(Math.round((m * 12 / 365) * 100) / 100);
     $nav.hidden = true;
     document.body.classList.add("showing");
     $app.innerHTML = `<div class="show">
@@ -1599,7 +1598,7 @@
           <h2>${esc(p.name)}</h2>
           <p class="show__tag">${esc(PLAN_TAGLINE[p.id] || "")}</p>
           <p class="show__price"><strong>${money(p.monthly)}</strong><span>/month</span></p>
-          <p class="show__day">${p.setup ? `${money(p.setup)} setup · ` : t.commits.length ? `No setup fee on ${commitWords(t)} plans · ` : ""}about ${perDay(p.monthly)} a day</p>
+          <p class="show__day">${p.setup ? `${money(p.setup)} setup · billed monthly` : t.commits.length ? `No setup fee on ${commitWords(t)} plans` : "Billed monthly"}</p>
           <ul>${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
           ${leadId ? `<button class="show__choose" data-choose="${esc(p.id)}">Choose ${esc(p.name)}</button>` : ""}
           <p class="show__agree"><a href="/api/contract?${leadId ? `lead=${encodeURIComponent(leadId)}&` : ""}plan=${encodeURIComponent(p.id)}" target="_blank" rel="noopener">Read the agreement</a></p>
@@ -1711,7 +1710,7 @@
   // Common things owners say on the call, and an honest answer to each.
   function playbookObjections(s, plans) {
     const cheapest = plans.reduce((a, p) => (p.id !== "list" && p.monthly && (!a || p.monthly < a.monthly) ? p : a), null);
-    const low = cheapest ? `${esc(cheapest.name)} is ${money(cheapest.monthly)} a month, about ${money(Math.round((cheapest.monthly * 12 / 365) * 100) / 100)} a day` : "Our starter plan is low monthly";
+    const low = cheapest ? `${esc(cheapest.name)} is ${money(cheapest.monthly)} a month` : "Our starter plan is low monthly";
     const t = payTerms(s);
     const min = t.min;
     const flex = t.flex;
@@ -1838,12 +1837,11 @@
     const s = meta.settings;
     const plans = s.plans.length ? s.plans : SUGGESTED_PLANS;
     const t = payTerms(s);
-    const perDay = (m) => money(Math.round((m * 12 / 365) * 100) / 100);
     const planCard = (p) => {
       const pitch = PLAN_PITCH[p.id] || { fit: "", points: [], line: "" };
       const includes = String(p.includes || "").split("\n").map((x) => x.trim()).filter(Boolean);
       return `<section class="card${p.id === "plus" ? " opener" : ""}"><h2>${esc(p.name)}: ${money(p.monthly)}/month${p.id === "plus" ? " ⭐ most pick this" : ""}</h2>
-        <p class="small muted">${p.setup ? `${money(p.setup)} setup` : t.commits.length ? `No setup fee on the ${commitWords(t)} plan` : "No setup fee"} · about ${perDay(p.monthly)} a day</p>
+        <p class="small muted">${p.setup ? `${money(p.setup)} setup` : t.commits.length ? `No setup fee on the ${commitWords(t)} plan` : "No setup fee"} · billed monthly</p>
         ${pitch.fit ? `<p><strong>Good for:</strong> ${esc(pitch.fit)}</p>` : ""}
         ${includes.length ? `<p><strong>What they get</strong></p><ul class="list">${includes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         ${pitch.points.length ? `<p><strong>Why it's worth it</strong></p><ul class="list">${pitch.points.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}

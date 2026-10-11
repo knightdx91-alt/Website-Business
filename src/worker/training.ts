@@ -5,7 +5,8 @@ import { isListPlan, type AppSettings } from "./db.ts";
  * on the client's own domain, as short lessons with the exact buttons to tap, a "try it now" exercise and a quick check.
  * One source for the web app and the Android app (`GET /api/training`); progress is per person (`training_done`).
  * Placeholders: {company}, {basic}, {plus}, {pro} (plan names + monthly prices from Settings), {basicName}/{plusName}/{proName},
- * {perDay} (the cheapest website plan as "under $2 a day"), {listPlan} (the Price list plan with its price).
+ * {fromMonthly} (the cheapest website plan as "$49 a month"; prices are always said per month, never per day: the team found
+ * "a dollar a day" confusing), {listPlan} (the Price list plan with its price).
  */
 
 export interface CheckQuestion {
@@ -38,7 +39,8 @@ const LESSONS: Lesson[] = [
     steps: [
       "We build a website for a local business that doesn't have one, before we ever talk to them. They see it finished, not a mock-up.",
       "They pay a monthly plan that covers hosting, updates and fixes: {basic}, {plus} or {pro}. Most pick {plusName}. No setup fee on a 6- or 12-month plan.",
-      "The line: \"We already built your website. Want to see it? If you like it, it's live this week for {perDay}.\"",
+      "The line: \"We already built your website. Want to see it? If you like it, it's live this week, from {fromMonthly}.\"",
+      "Say prices the way the bill arrives: per month. \"{plus}\", not \"a few dollars a day\". Per-day math sounds like a trick and makes people do arithmetic instead of listening.",
       "We never guess at facts. Hours, prices and claims come from the owner. The site is reviewed by them before it goes live.",
       "You are never selling a website. You are selling the phone ringing: people who search for them find them and call.",
       "Shops whose stock changes daily (fish, plants, produce, parts) can also buy just the live price list: {listPlan}, no minimum. That's its own lesson near the end.",
@@ -274,7 +276,7 @@ export function trainingCourse(s: AppSettings): { lessons: Lesson[] } {
   const list = plans.find(isListPlan);
   const sitePlans = plans.filter((p) => !isListPlan(p) && p.monthly > 0);
   const cheapest = sitePlans.length ? Math.min(...sitePlans.map((p) => p.monthly)) : 0;
-  const perDay = cheapest ? `under $${Math.ceil((cheapest * 12) / 365)} a day` : "a few dollars a day";
+  const fromMonthly = cheapest ? `${money(cheapest)} a month` : "a low monthly price";
   const vars: Record<string, string> = {
     company: s.companyName || "Underground Associates",
     basic: basic ? `${basic.name} ${money(basic.monthly)}/month` : "Basic",
@@ -283,7 +285,7 @@ export function trainingCourse(s: AppSettings): { lessons: Lesson[] } {
     basicName: basic?.name ?? "Basic",
     plusName: plus?.name ?? "Plus",
     proName: pro?.name ?? "Pro",
-    perDay,
+    fromMonthly,
     listPlan: list && list.monthly > 0 ? `the ${list.name} plan at ${money(list.monthly)} a month` : "the Price list plan",
   };
   const fill = (t: string) => t.replace(/\{(\w+)\}/g, (m, k: string) => vars[k] ?? m);

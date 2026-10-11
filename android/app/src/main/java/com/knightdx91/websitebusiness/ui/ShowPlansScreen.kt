@@ -174,11 +174,11 @@ private fun PlanCard(p: PlanOffer, c: Content, o: PlanOptions, leadId: String?, 
                 Text("/month", modifier = Modifier.padding(start = 4.dp, bottom = 6.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             val setup = when {
-                p.setup > 0 -> "${moneyDollars(p.setup)} setup · "
-                o.terms.commits.isNotEmpty() -> "No setup fee on ${o.terms.commitWords} plans · "
-                else -> ""
+                p.setup > 0 -> "${moneyDollars(p.setup)} setup · billed monthly"
+                o.terms.commits.isNotEmpty() -> "No setup fee on ${o.terms.commitWords} plans"
+                else -> "Billed monthly"
             }
-            Text("${setup}about ${moneyDollars(p.perDay)} a day", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(setup, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Bullets(p.includes, Modifier.padding(top = 6.dp))
             if (p.options.isNotEmpty()) {
                 Text(

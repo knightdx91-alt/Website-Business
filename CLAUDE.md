@@ -936,6 +936,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Company site policies: `/terms` (plans, ways to pay, cancellation & refund policy at `#refunds`, the service agreement,
   limits, Alabama law) and `/privacy`, both rendered from Settings (`policyPage` in company.ts; bump `POLICIES_UPDATED`
   when the wording changes). `/refunds` redirects to `/terms#refunds`. Linked from the footer and the sign-up page.
+- Prices are said per month, never per day (Oct 2026): a team member found "about a dollar a day" confusing, so the Show plans
+  cards, Plans & answers cards (web + Android 2.35 `ShowPlansScreen` / `PlaybookScreen`), the "too expensive" objection answer
+  (`playbookObjections` in app.js + content.ts) and the training pitch line ({fromMonthly}) all say "$49 a month" / "billed
+  monthly". `/api/plans/options` still returns `perDay` for older app builds; nothing displays it. Don't reintroduce per-day math.
 - Show plans (`#/plans` or `#/plans/<leadId>`, owner and callers): customer-facing, always light, app bar hidden.
   Plan cards from Settings (tagline per tier in `PLAN_TAGLINE`), every-plan list, ways to pay, add-ons, fine print.
   From a lead, "Choose <plan>" creates that lead's sign-up link and opens it on the same phone.

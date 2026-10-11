@@ -30,7 +30,8 @@ test("prices come from Settings: plan lines, the per-day line and the Price list
   const { lessons } = trainingCourse(settings());
   const first = lessons[0]!;
   assert.match(first.steps.join("\n"), /Basic \$49\/month, Plus \$89\/month or Pro \$149\/month/);
-  assert.match(first.steps.join("\n"), /under \$2 a day/); // 49 × 12 / 365 = $1.61
+  assert.match(first.steps.join("\n"), /from \$49 a month/);
+  assert.doesNotMatch(lessons.map((l) => l.steps.join("\n")).join("\n"), /a day\b.*\$|\$[\d.]+ a day/); // prices per month, never per day
   assert.match(first.steps.join("\n"), /the Price list plan at \$29 a month/);
   const pl = lessons.find((l) => l.id === "live-price-list")!;
   assert.match(pl.steps.join("\n"), /Price list plan at \$29 a month, no minimum/);
