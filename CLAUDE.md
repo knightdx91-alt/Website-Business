@@ -569,6 +569,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
+- Add to home screen with the shop's name (Oct 2026, `src/worker/homescreen.ts`): the board serves a per-shop web app manifest at
+  `/c/<token>/manifest.webmanifest` (name "<Shop> · <Board name>", short_name the shop name when ≤14 chars, start_url/scope the
+  signed board folder, standalone, navy theme) and `/c/<token>/icon.svg` (`appIconSvg`: navy rounded square, gold initial; the brand
+  PNGs ride along for Chrome's 192/512 rule); the tablet display has the same at `/d/<id>/manifest.webmanifest[?tank=<slug>]` +
+  `/d/<id>/icon.svg` (`serveDisplayMeta`, public, display fullscreen, one app per tank page). `homescreenHead()` adds the manifest
+  link + iOS meta; `homescreenPrompt()` is the bar "Add <Shop> to your home screen" (Chrome's `beforeinstallprompt` → Add calls
+  `prompt()`; iPhone shows Share → Add to Home Screen words after 1.5 s; never when already standalone; "Not now" snoozes 30 days in
+  localStorage `a2hs.<key>`). The texted board link and the guides say to tap Add. Headless check: scratchpad `a2hs-check.mjs`.
 - Hardware is never ours to supply (Oct 2026, owner's rule): the "Tablet display, supplied & set up" and "Barcode scanner, paired to
   the tablet" extras added earlier that day were removed from DEFAULT_ADDONS, live Settings and every page the same day. Tablets and
   handheld scanners are the shop's own purchase; we show them how (display guide). Don't add offerings that commit the business to

@@ -73,7 +73,7 @@ import {
   servePricesFeed,
   serveTankBoard,
 } from "./tankboard.ts";
-import { serveDisplay, serveStation } from "./tablet.ts";
+import { serveDisplay, serveDisplayMeta, serveStation } from "./tablet.ts";
 import {
   addCaller,
   checkPassword,
@@ -2977,7 +2977,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         : null;
       const board = (recW?.board ?? "Stock board").toLowerCase();
       const secW = (recW?.section ?? "tank").toLowerCase();
-      const text = `Hi! Here's your ${lead.name} ${board}: ${link}  Open it on your phone, bookmark it, and change what's in each ${secW} any time. Prices and "sold out" show on your website within a minute. Have your stock in a spreadsheet? "Put a whole list on at once" on the board takes it.`;
+      const text = `Hi! Here's your ${lead.name} ${board}: ${link}  Open it on your phone and tap "Add" when it offers your home screen, so it opens like an app. Change what's in each ${secW} any time. Prices and "sold out" show on your website within a minute. Have your stock in a spreadsheet? "Put a whole list on at once" on the board takes it.`;
       await notify(env, {
         kind: "status",
         actor: session,
@@ -3505,6 +3505,9 @@ async function handle(req: Request, env: Env): Promise<Response> {
         pricingUrl: "https://undergroundassociates.com/pricing#price-list",
       });
     }
+    const displayMeta = /^\/d\/([a-z0-9]+)\/(manifest\.webmanifest|icon\.svg)$/.exec(url.pathname);
+    if (displayMeta && req.method === "GET")
+      return await serveDisplayMeta(env, displayMeta[1]!, displayMeta[2] === "icon.svg" ? "icon" : "manifest", url.searchParams.get("tank") ?? "");
     const display = /^\/d\/([a-z0-9]+)(?:\/([a-z0-9-]*))?$/.exec(url.pathname);
     if (display && req.method === "GET")
       return await serveDisplay(env, display[1]!, display[2] ?? "", url.origin);

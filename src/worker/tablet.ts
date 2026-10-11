@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { hmac, safeEqual } from "./auth.ts";
 import { draftItemInfo, infoRows } from "../copy/iteminfo.ts";
-import { autoMatchPhotos } from "../generator/packs/retail.ts";
+import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
 import {
   KINDS,
   kindWords,
@@ -25,6 +25,7 @@ import {
 } from "./db.ts";
 import { HttpError, newId, type Env } from "./env.ts";
 import { escHtml } from "./page.ts";
+import { appIconSvg, homescreenHead, homescreenPrompt, webManifest } from "./homescreen.ts";
 import {
   photoUrl,
   priceList,
@@ -702,6 +703,18 @@ export async function serveStation(
 }
 
 /** The tablet page itself. */
+/** `/d/<id>/manifest.webmanifest` (+ `?tank=<slug>` for one tank's page) and `/d/<id>/icon.svg`: public like the display itself. */
+export async function serveDisplayMeta(env: Env, leadId: string, what: "manifest" | "icon", slug: string): Promise<Response> {
+  const lead = await getLead(env, leadId);
+  const record = lead?.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null;
+  if (!lead || !record || lead.status === "expired") throw new HttpError(404, "Not found");
+  if (what === "icon") return appIconSvg(record.name);
+  const W = kindWords(record);
+  const tank = slug ? priceList(record).sections.find((x) => sectionSlug(x.name) === slug) : null;
+  const name = tank ? `${record.name} · ${tank.name}` : `${record.name} · display`;
+  return webManifest({ name, shortName: tank ? tank.name.slice(0, 14) : record.name.slice(0, 14), description: `Live ${W.title.toLowerCase()} at ${record.name}, for a tablet or TV by the ${W.section.toLowerCase()}.`, startUrl: `/d/${leadId}/${tank ? slug : ""}`, scope: `/d/${leadId}/`, iconUrl: `/d/${leadId}/icon.svg`, display: "fullscreen" });
+}
+
 export async function serveDisplay(
   env: Env,
   leadId: string,
@@ -724,6 +737,7 @@ export async function serveDisplay(
   const FIELDS = JSON.stringify(W.fields.map(([k, l, ex]) => [k, l, ex]));
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow"><title>${escHtml(title)}</title>
+<link rel="icon" href="/d/${escHtml(leadId)}/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/brand/logo-192.png">${homescreenHead({ manifestUrl: `/d/${leadId}/manifest.webmanifest${slug ? `?tank=${encodeURIComponent(slug)}` : ""}`, title: tank ? `${record.name} ${tank.name}` : record.name })}
 <style>
 :root{--bg:#0b1324;--ink:#f6f7fb;--muted:#9aa6bf;--gold:#fca311;--card:#141f38;--line:#2b3a5e;--ok:#2bd46f;--bad:#ff6b6b}
 *{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--ink);font:clamp(18px,2.6vw,30px)/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
@@ -935,7 +949,8 @@ function moreSheet(k){var s=pick(),it=s.items[k];if(!it)return;var r=rows(it.inf
 function takePhoto(section,name,cb){var cam=$("cam");cam.value="";cam.onchange=function(){var f=cam.files&&cam.files[0];if(!f)return;var img=new Image();var url=URL.createObjectURL(f);img.onload=function(){var max=1600,w=img.width,h=img.height,k=Math.min(1,max/Math.max(w,h));var c=document.createElement("canvas");c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
     c.toBlob(function(blob){fetch(BASE+"/staff/photo?section="+encodeURIComponent(section)+"&item="+encodeURIComponent(name)+"&w="+c.width+"&h="+c.height,{method:"POST",headers:{"content-type":"image/jpeg","x-staff":staffTok||""},body:blob}).then(function(r){if(!r.ok)throw new Error("Photo failed ("+r.status+")");return r.json()}).then(function(){cb&&cb()}).catch(function(e){alert(e.message)})},"image/jpeg",0.85)};img.src=url};cam.click()}
 })();
-</script></body></html>`;
+</script>${homescreenPrompt({ appName: tank ? `${record.name} ${tank.name}` : `${record.name} display`, key: `/d/${leadId}`, dark: true })}
+</body></html>`;
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",

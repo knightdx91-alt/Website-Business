@@ -109,7 +109,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
           'Open the lead → the "📋 … board" card (named for the shop: Tank board, Parts board, Lot board, Stock board; it shows on every lead once the preview is ready).',
           'Tap "💬 Text them their … board link". Your messaging app opens with the link and a short note; send it. Callers can do this too.',
           'Or tap "Open it here" to show it on your own phone first. It\'s a good demo: add a tank, tap the camera, mark something sold out, then open the price page and watch it change.',
-          "Tell them: bookmark it or add it to the home screen (Chrome ⋮ → Add to Home screen). Anyone with the link can edit, so they should only share it with staff.",
+          "Tell them: when the board offers \"Add <their shop> to your home screen\", tap Add; it then opens like an app with their name on the icon (iPhone: Share → Add to Home Screen; the board shows those words). Anyone with the link can edit, so they should only share it with staff.",
           'If the link gets out: "Revoke old links" (owner) kills every link sent so far. Text them a new one.',
         ],
       },
@@ -168,7 +168,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
         steps: [
           "The tablet is also the shop's inventory station: staff unlock it (PIN, NFC tag or a code approved from the phone) and add fish, change counts, take photos and get AI care cards right at the tank. Customers tap a fish for its care card. The full tour is in the Tablet display guide.",
           `Open the shop's board, tap 📺 on a tank, and copy that address (it looks like ${APP_ORIGIN}/d/<lead>/<tank>). Without a tank name at the end it rotates through every tank, 10 seconds each.`,
-          "On the tablet: open that address in Chrome, then ⋮ → Add to Home screen. Open it from the icon so it fills the screen.",
+          "On the tablet: open that address in Chrome and tap Add when the page offers the home screen (else ⋮ → Add to Home screen). Open it from the icon so it fills the screen.",
           "Settings → Display → Screen timeout → never (or as long as it allows), and keep it plugged in. The page also asks the tablet to stay awake.",
           "To stop customers tapping out of it: Settings → Security → App pinning (name varies by phone), then pin Chrome.",
           'It refreshes by itself every 30 seconds and shrinks the text so a tank with 15 items still fits. Big price in orange, photo if there is one, "3 left" under the price. A customer taps a fish to read its care card (adult size, what it eats, temperament, tank size, water).',

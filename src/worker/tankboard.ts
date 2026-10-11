@@ -12,6 +12,7 @@ import type {
   MenuSection,
 } from "../generator/types.ts";
 import { escHtml } from "./page.ts";
+import { appIconSvg, homescreenHead, homescreenPrompt, webManifest } from "./homescreen.ts";
 import { renderPreview } from "./pipeline.ts";
 import { publishLead } from "./publish.ts";
 import {
@@ -420,6 +421,11 @@ export async function serveTankBoard(
       },
     });
   }
+  if (rest === "/manifest.webmanifest" && req.method === "GET") {
+    const W = kindWords(record);
+    return webManifest({ name: `${record.name} · ${W.board}`, shortName: record.name.length <= 14 ? record.name : W.board, description: `What's in every ${W.section.toLowerCase()} at ${record.name}: prices, counts and photos, changed from your phone.`, startUrl: `${base}/`, scope: `${base}/`, iconUrl: `${base}/icon.svg` });
+  }
+  if (rest === "/icon.svg" && req.method === "GET") return appIconSvg(record.name);
   if (rest === "/lookup" && req.method === "GET") {
     // The board's Scan mode: what a code is (a row here, something from the catalog, or a product name from its UPC).
     if (!scanningOn(record))
@@ -531,7 +537,7 @@ export function boardPage(
   const sec = W.section.toLowerCase();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#14213d"><title>${escHtml(W.board)} · ${name}</title>
-<link rel="icon" href="/brand/logo-192.png"><link rel="apple-touch-icon" href="/brand/logo-192.png">
+<link rel="icon" href="${escHtml(base)}/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/brand/logo-192.png">${homescreenHead({ manifestUrl: `${base}/manifest.webmanifest`, title: record.name })}
 <style>
 :root{--navy:#14213d;--gold:#fca311;--ink:#16181d;--muted:#5b6270;--line:#e1e4ea;--bg:#f4f5f8;--ok:#0f7b3b;--warn:#8a5300}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:90px}
@@ -578,6 +584,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 <p style="margin:0 0 4px">Staff NFC tag: write this text on any NFC sticker or fob with a free "NFC Tools" app, then tap it on the tablet: <code id="nfcText" style="user-select:all"></code></p>
 <p class="muted" id="staffMsg" style="margin:4px 0 0"></p></div></section>
 <div id="scanOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px"><video id="scanVid" playsinline muted autoplay style="width:100%;max-width:520px;max-height:60vh;border-radius:12px;background:#000"></video><p id="scanMsg" style="color:#fff;margin:0"></p><button class="btn btn--line" id="scanCancel" type="button" style="color:#fff;border-color:#fff">Cancel</button></div>
+${homescreenPrompt({ appName: record.name, key: base })}
 <footer>📺 means "show this ${escHtml(sec)} on a screen": open that link on a tablet beside it and it shows what's in it, live. <a href="/d/${escHtml(leadId)}/" target="_blank" rel="noopener">Everything, rotating</a>.<br>${escHtml(W.board)} by Underground Associates · Anything odd? Text us.</footer>
 <script>
 (function(){
