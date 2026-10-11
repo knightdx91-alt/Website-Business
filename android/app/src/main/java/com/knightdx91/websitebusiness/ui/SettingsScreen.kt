@@ -435,7 +435,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
-                SectionCard("Signed in") {
+                CollapsibleCard("Signed in", defaultOpen = true) {
                     Text("${meta?.meName ?: prefs.name}${if (isOwner) " · full access" else " · caller"}${if (prefs.email.isNotBlank()) "\n${prefs.email}" else ""}")
                     OutlinedButton(onClick = { scope.launch { state.api.logout(); state.signOut() } }, modifier = Modifier.padding(top = 8.dp)) { Text("Sign out") }
                 }
@@ -445,7 +445,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                 val f = form
                 val m = sm
                 if (f == null || m == null) item {
-                    SectionCard("Business settings") {
+                    CollapsibleCard("Business settings") {
                         if (loadError.isNotBlank()) {
                             Text(loadError, color = Warn)
                             OutlinedButton(onClick = { scope.launch { loadOwner() } }, modifier = Modifier.padding(top = 6.dp)) { Text("Try again") }
@@ -487,7 +487,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                         )
                     }
                     item {
-                        SectionCard("Backup") {
+                        CollapsibleCard("Backup") {
                             Text("A copy of your leads, notes, sign-ups and settings as a file. Keep it somewhere safe now and then.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
                                 OutlinedButton(onClick = { downloadBackup() }) { Text("⬇️ Download backup") }
@@ -500,7 +500,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
             }
 
             item {
-                SectionCard("App version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") {
+                CollapsibleCard("App version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") {
                     val u = update
                     when {
                         u == null -> Text("Checking for updates…", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -515,7 +515,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                 }
             }
             if (isOwner) item {
-                SectionCard("💳 Tap to Pay") {
+                CollapsibleCard("💳 Tap to Pay") {
                     Text("Take a client's card on your phone, in person: they sign on the sign-up page, then tap their card on the back of the phone. The card is saved in Stripe for the monthly or yearly renewals.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     val t = tap
                     when {
@@ -530,7 +530,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                 }
             }
             item {
-                SectionCard("More") {
+                CollapsibleCard("More") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedButton(onClick = { nav.navigate("playbook") }) { Text("💬 Plans & answers") }
                         OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
@@ -637,7 +637,7 @@ private fun SubHead(text: String) {
 
 @Composable
 private fun BusinessCard(f: SettingsForm, showsCallerName: Boolean) {
-    SectionCard("Your business") {
+    CollapsibleCard("Your business") {
         Field(f.companyName, { f.companyName = it }, "Company name", hint = "What clients see", placeholder = "e.g. Underground Associates", caps = KeyboardCapitalization.Words)
         Field(f.legalName, { f.legalName = it }, "Legal name", hint = "Who signs client agreements", placeholder = "e.g. Underground Associates LLC", caps = KeyboardCapitalization.Words)
         Field(f.companyPhone, { f.companyPhone = it }, "Business phone", keyboard = KeyboardType.Phone)
@@ -660,7 +660,7 @@ private fun BusinessCard(f: SettingsForm, showsCallerName: Boolean) {
 
 @Composable
 private fun SignInCard(f: SettingsForm) {
-    SectionCard("Team sign-in (Google)") {
+    CollapsibleCard("Team sign-in (Google)") {
         Hint("Everyone signs in with their company Google account. One-time setup in Google Cloud, then paste the web client ID here.")
         Field(f.googleClientId, { f.googleClientId = it }, "Google client ID", hint = "The OAuth “Web application” client, ends in .apps.googleusercontent.com", placeholder = "1234567890-abc.apps.googleusercontent.com")
         Field(f.googleDomain, { f.googleDomain = it }, "Company domain", keyboard = KeyboardType.Uri)
@@ -671,7 +671,7 @@ private fun SignInCard(f: SettingsForm) {
 
 @Composable
 private fun PlansCard(f: SettingsForm, m: SettingsMeta, mailOut: String, mailBusy: Boolean, onMailTest: () -> Unit) {
-    SectionCard("Plans & prices") {
+    CollapsibleCard("Plans & prices") {
         Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
             Column(Modifier.padding(10.dp)) {
                 if (m.checkout.online) Text("✅ Online checkout is on. Sign-up links, “Buy now” on your website and “Buy extras” links all go to a Stripe checkout with exactly what the client picked. The payment links below aren't needed.", style = MaterialTheme.typography.bodySmall)
@@ -707,7 +707,7 @@ private fun PlansCard(f: SettingsForm, m: SettingsMeta, mailOut: String, mailBus
 
 @Composable
 private fun WaysToPayCard(f: SettingsForm) {
-    SectionCard("Ways to pay") {
+    CollapsibleCard("Ways to pay") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Field(f.shortMonths, { f.shortMonths = it }, "Short plan (months)", hint = "No setup fee · 0 = don't offer", keyboard = KeyboardType.Number, modifier = Modifier.weight(1f))
             Field(f.minMonths, { f.minMonths = it }, "Standard plan (months)", hint = "No setup fee", keyboard = KeyboardType.Number, modifier = Modifier.weight(1f))
@@ -723,7 +723,7 @@ private fun WaysToPayCard(f: SettingsForm) {
 
 @Composable
 private fun FeesCard(f: SettingsForm) {
-    SectionCard("Fees, goals & commission") {
+    CollapsibleCard("Fees, goals & commission") {
         Field(f.lateFee, { f.lateFee = it }, "Late fee (\$)", hint = "Added once per missed payment, 10 days after it fails · 0 = none", keyboard = KeyboardType.Decimal)
         Field(f.payoffDiscount, { f.payoffDiscount = it }, "Early payoff discount (%)", hint = "Off the remaining months when they pay the early cancellation fee up front · 0 = none", keyboard = KeyboardType.Number)
         Field(f.interestRate, { f.interestRate = it }, "Interest on overdue balances (% a year)", hint = "After 30 days overdue · Alabama allows up to 8 in a written contract · 0 = none", keyboard = KeyboardType.Decimal)
@@ -750,7 +750,7 @@ private fun PreviewCard(m: SettingsMeta, plan: String, onPlan: (String) -> Unit,
         else -> BILLING_LABELS[id] ?: id
     }
     val qs = "plan=${URLEncoder.encode(plan, "UTF-8")}&billing=${URLEncoder.encode(billingPicked, "UTF-8")}"
-    SectionCard("📄 Preview the agreement") {
+    CollapsibleCard("📄 Preview the agreement") {
         Hint("See the exact agreement a client would sign with the numbers above. Uses what's saved, so tap Save first after changing anything.")
         if (plans.isEmpty()) Hint("Save a plan with a monthly price first.", Modifier.padding(top = 6.dp))
         else {
@@ -774,7 +774,7 @@ private fun PreviewCard(m: SettingsMeta, plan: String, onPlan: (String) -> Unit,
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ExtrasCard(f: SettingsForm) {
-    SectionCard("Extras") {
+    CollapsibleCard("Extras") {
         Hint("Shown on the sign-up page and in call guides. Leave a name blank to remove it.")
         f.addons.forEachIndexed { i, a ->
             if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp))
@@ -800,7 +800,7 @@ private fun ExtrasCard(f: SettingsForm) {
 
 @Composable
 private fun AgreementCard(f: SettingsForm, onReset: () -> Unit) {
-    SectionCard("Client agreement") {
+    CollapsibleCard("Client agreement") {
         Hint("Plain-language starting point, not legal advice. Have a lawyer look it over once.")
         OutlinedTextField(
             value = f.terms,
@@ -817,7 +817,7 @@ private fun AgreementCard(f: SettingsForm, onReset: () -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RunsCard(f: SettingsForm, m: SettingsMeta) {
-    SectionCard("Runs") {
+    CollapsibleCard("Runs") {
         Field(f.cap, { f.cap = it.filter { ch -> ch.isDigit() }.take(3) }, "Default most sites per run", keyboard = KeyboardType.Number)
         Text("AI writer", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -828,7 +828,7 @@ private fun RunsCard(f: SettingsForm, m: SettingsMeta) {
 
 @Composable
 private fun UsageCard(u: Usage?) {
-    SectionCard("Spending, last 30 days") {
+    CollapsibleCard("Spending, last 30 days") {
         if (u == null) Hint("Couldn't load spending.", Modifier.padding(top = 4.dp))
         else {
             Text("AI writing: ${String.format(Locale.US, "\$%.2f", u.aiCost)}", modifier = Modifier.padding(top = 4.dp))
@@ -856,7 +856,7 @@ private fun TeamCard(
     var newEmail by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var newAdmin by remember { mutableStateOf(false) }
-    SectionCard("Team") {
+    CollapsibleCard("Team") {
         Hint("Callers can see leads, previews and call guides, text preview links, log calls and set callbacks. They can't run searches, edit or publish sites, delete leads, or see settings, spending or the inbox.\nFull access can do everything you can, under their own name.")
         if (callers.isEmpty()) Hint("No callers yet.", Modifier.padding(top = 8.dp))
         callers.forEach { c ->

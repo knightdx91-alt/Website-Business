@@ -3144,6 +3144,32 @@
         <p class="small muted">Without these, clients who pick those options are told you'll send an invoice.</p></details></fieldset>`).join("");
   }
 
+  /**
+   * Settings: every card folds behind its heading (tap to open, tap again to close) so the page stays short; most
+   * sections are rarely edited. Open/closed is remembered per heading on this phone. Hidden fields still save.
+   */
+  function collapsibleSections() {
+    $app.querySelectorAll("section.card").forEach((card) => {
+      const h = card.querySelector(":scope > h2");
+      if (!h || card.dataset.fold) return;
+      card.dataset.fold = "1";
+      const key = "fold." + h.textContent.replace(/[^a-z]/gi, "").toLowerCase();
+      const body = document.createElement("div");
+      while (h.nextSibling) body.appendChild(h.nextSibling);
+      card.appendChild(body);
+      const arrow = document.createElement("span");
+      arrow.className = "muted";
+      arrow.style.cssText = "float:right;font-weight:400";
+      h.appendChild(arrow);
+      h.style.cursor = "pointer";
+      let open = false;
+      try { open = localStorage.getItem(key) === "1"; } catch {}
+      const paint = () => { body.hidden = !open; arrow.textContent = open ? "▴" : "▾"; };
+      h.addEventListener("click", () => { open = !open; try { localStorage.setItem(key, open ? "1" : "0"); } catch {} paint(); });
+      paint();
+    });
+  }
+
   async function viewSettings() {
     setNav("settings");
     const my = renderSeq;
@@ -3233,6 +3259,7 @@
       ${callersCard(callers)}
       ${deviceCard()}
     </div>`;
+    collapsibleSections();
     bindCallers();
     bindDevice();
     $app.querySelector("#resetterms").addEventListener("click", () => {

@@ -3,6 +3,14 @@ package com.knightdx91.websitebusiness.ui
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +38,28 @@ fun SectionCard(title: String, modifier: Modifier = Modifier, content: @Composab
         Column(Modifier.padding(14.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             content()
+        }
+    }
+}
+
+/**
+ * A section that opens when its header is tapped and closes the same way (Settings: most sections are rarely edited, so
+ * they start closed and the page stays short). Open/closed is remembered per title while the screen lives. Form state
+ * must be hoisted outside the card, as Settings does, so closing a section never loses typed values.
+ */
+@Composable
+fun CollapsibleCard(title: String, modifier: Modifier = Modifier, defaultOpen: Boolean = false, summary: String? = null, content: @Composable () -> Unit) {
+    var open by rememberSaveable(title) { mutableStateOf(defaultOpen) }
+    Card(modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (!open && !summary.isNullOrBlank()) Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, if (open) "Collapse" else "Expand", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (open) content()
         }
     }
 }

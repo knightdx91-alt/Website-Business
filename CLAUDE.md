@@ -273,6 +273,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Done Oct 2026 (Cloud project 322487745515): Web client `…-39uoftmq9b43htr4k6thsebt0k7pded6` is in Settings (`googleClientId`);
   Android client `…-aku343iill2rs8jjtodi8orsq5d7fs5k` exists and is used by nothing in code (Credential Manager only takes the
   Web ID). Which is which was checked by sending Google a custom-scheme redirect: only the Web client is refused.
+- Settings sections fold (Oct 2026, 2.11): Android `CollapsibleCard` in `ui/Common.kt` (header tap opens/closes, chevron, state per
+  title via rememberSaveable; Settings uses it for every section, "Signed in" open by default; form state is hoisted so folding never
+  loses typed values) and web `collapsibleSections()` in app.js (after the Settings render: each `section.card > h2` folds its
+  body, remembered per heading in localStorage `fold.<heading>`). Other screens keep plain `SectionCard`.
 - 🎓 Training (Oct 2026, `src/worker/training.ts`, migration 0017 `training_done`; web `#/training` `viewTraining`, Android
   `ui/TrainingScreen.kt`, 2.10): an in-app course for owner and callers, Home → "🎓 Training" (also Settings). 10 lessons (what
   we sell, where leads come from, before you call, showing the preview, logging calls, signing up, taking payment, finish &
