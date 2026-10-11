@@ -114,6 +114,8 @@ export interface MenuItem {
   image?: Image;
   /** Care card for a living thing (fish shops): shown when a customer taps the item on the price page or the tablet. */
   info?: ItemInfo;
+  /** The product's barcode (UPC/EAN or the shop's own label), so the tablet's scanner finds it. */
+  barcode?: string;
 }
 
 /** What a live price list holds: sets the words (tank / bench / case / shelf) and the care-card fields. See generator/pricelist.ts. */
@@ -144,6 +146,7 @@ export interface CatalogEntry {
   price?: string;
   image?: Image;
   info?: ItemInfo;
+  barcode?: string;
 }
 
 export type MenuTag = "spicy" | "vegetarian" | "vegan" | "gluten_free" | "house_favorite" | "new" | "popular";

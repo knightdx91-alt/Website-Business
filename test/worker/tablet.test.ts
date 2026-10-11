@@ -65,3 +65,46 @@ test("the price page folds a care card under an item", async () => {
   assert.match(prices, /<details class="menu-item__more"><summary>About this one<\/summary><dl><dt>Adult size<\/dt><dd>3 in<\/dd>/);
   assert.match(prices, /Lives 3 to 5 years\./);
 });
+
+test("barcodes: find by code (current section first), add by code, set/clear, kept through a board save and in the catalog", async () => {
+  const { addToTank, findByBarcode, setItem, catalogOf, normalizeCode, lookupBarcode } = await import("../../src/worker/tablet.ts");
+  const { applyClientItems } = await import("../../src/worker/tankboard.ts");
+  const r = shop();
+  assert.equal(normalizeCode(" 0 12345-678905\n"), "012345-678905");
+  // Scan an unknown code → a new item carries it; scanning again finds the row.
+  addToTank(r, "Shelf 1", "Tetra Flakes 200 g", 3, "$8.99", "012345678905");
+  const hit = findByBarcode(r, "012345678905");
+  assert.equal(hit.item?.item.name, "Tetra Flakes 200 g");
+  assert.equal(hit.item?.section, "Shelf 1");
+  // The same product on a second shelf: the scan prefers the section the staff is looking at.
+  addToTank(r, "Shelf 2", "Tetra Flakes 200 g", 2);
+  assert.equal(findByBarcode(r, "012345678905", "Shelf 2").item?.section, "Shelf 2");
+  assert.equal(findByBarcode(r, "012345678905").item?.section, "Shelf 1");
+  // Linking a code to an item added by name; one code belongs to one product.
+  addToTank(r, "Shelf 1", "Bloodworms", 5);
+  setItem(r, "Shelf 1", "Bloodworms", { barcode: "012345678905" });
+  assert.equal(findByBarcode(r, "012345678905").item?.item.name, "Bloodworms");
+  assert.equal(findByBarcode(r, "012345678905", "Shelf 2").item?.section, "Shelf 1"); // not on Shelf 2 any more: falls back to where it is
+  assert.equal(catalogOf(r).find((c) => c.name === "Tetra Flakes 200 g")?.barcode, undefined);
+  assert.equal(catalogOf(r).find((c) => c.name === "Bloodworms")?.barcode, "012345678905");
+  // Clearing.
+  setItem(r, "Shelf 1", "Bloodworms", { barcode: "" });
+  assert.deepEqual(findByBarcode(r, "012345678905"), {});
+  // The board (phone) saves the list without barcodes: they ride along by name; a typed one is normalized.
+  setItem(r, "Shelf 1", "Bloodworms", { barcode: "4006381333931" });
+  applyClientItems(r, { sections: [{ name: "Shelf 1", items: [{ name: "Bloodworms", qty: 5 }, { name: "Neon Tetra", price: "$2.99", barcode: " 55 55 " }] }] });
+  assert.equal(findByBarcode(r, "4006381333931").item?.item.name, "Bloodworms");
+  assert.equal(findByBarcode(r, "5555").item?.item.name, "Neon Tetra");
+  // A sold-out-and-removed product keeps its code in the catalog, so the next scan brings it back.
+  applyClientItems(r, { sections: [{ name: "Shelf 1", items: [{ name: "Neon Tetra", price: "$2.99" }] }] });
+  assert.equal(findByBarcode(r, "4006381333931").catalog?.name, "Bloodworms");
+  // Unknown codes: the Open Food Facts lookup turns a product record into a name; non-UPC codes and errors give null.
+  const fake = (async (url: string | URL | Request) => {
+    assert.match(String(url), /openfoodfacts\.org\/api\/v2\/product\/4006381333931/);
+    return new Response(JSON.stringify({ product: { product_name: "Tetra Flakes", brands: "Tetra,Spectrum", quantity: "200 g" } }));
+  }) as unknown as typeof fetch;
+  assert.equal(await lookupBarcode("4006381333931", fake), "Tetra Flakes 200 g");
+  assert.equal(await lookupBarcode("ABC-123", fake), null);
+  assert.equal(await lookupBarcode("4006381333931", (async () => new Response("", { status: 404 })) as unknown as typeof fetch), null);
+  assert.equal(await lookupBarcode("4006381333931", (async () => { throw new Error("down"); }) as unknown as typeof fetch), null);
+});

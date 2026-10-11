@@ -8,7 +8,7 @@ import type { BusinessRecord, Copy, Image, ItemInfo, MenuSection } from "../gene
 import { escHtml } from "./page.ts";
 import { renderPreview } from "./pipeline.ts";
 import { publishLead } from "./publish.ts";
-import { approveUnlock, nfcSecret, setStaffPin } from "./tablet.ts";
+import { approveUnlock, nfcSecret, normalizeCode, setStaffPin } from "./tablet.ts";
 
 /**
  * Tank board: the client's own live editor for their price list (built for King Fish Aquatics, whose tanks change several
@@ -76,7 +76,7 @@ export function pricesFeed(lead: LeadRow, record: BusinessRecord, origin: string
         note: s.note ?? "",
         items: s.items
           .filter((it) => all || (!it.soldOut && it.qty !== 0))
-          .map((it) => ({ name: it.name, price: it.price ?? "", note: it.description ?? "", qty: it.qty ?? null, soldOut: !!it.soldOut, image: photo(it.image) ?? null, imageSrc: it.image?.src ?? null, info: it.info ?? null })),
+          .map((it) => ({ name: it.name, price: it.price ?? "", note: it.description ?? "", qty: it.qty ?? null, soldOut: !!it.soldOut, image: photo(it.image) ?? null, imageSrc: it.image?.src ?? null, info: it.info ?? null, barcode: it.barcode ?? "" })),
       }))
       .filter((s) => all || s.items.length),
   };
@@ -95,6 +95,7 @@ const ItemsBody = z.object({
               price: z.string().trim().max(30).optional(),
               note: z.string().trim().max(200).optional(),
               qty: z.number().int().min(0).max(9999).nullable().optional(),
+              barcode: z.string().trim().max(80).optional(),
               soldOut: z.boolean().optional(),
               /** The gallery file the item's photo is (kept across edits); "" clears. */
               imageSrc: z.string().max(200).nullable().optional(),
@@ -114,8 +115,15 @@ export function applyClientItems(record: BusinessRecord, body: z.infer<typeof It
   for (const s of pl.sections) for (const it of s.items) if (it.image) byFile.set(it.image.src, it.image);
   // Care cards ride along by name (the board doesn't edit them; the tablet and the catalog do).
   const infoByName = new Map<string, ItemInfo | undefined>();
-  for (const c of pl.catalog ?? []) if (c.info) infoByName.set(c.name.toLowerCase(), c.info);
-  for (const s of pl.sections) for (const it of s.items) if (it.info) infoByName.set(it.name.toLowerCase(), it.info);
+  const codeByName = new Map<string, string>();
+  for (const c of pl.catalog ?? []) {
+    if (c.info) infoByName.set(c.name.toLowerCase(), c.info);
+    if (c.barcode) codeByName.set(c.name.toLowerCase(), c.barcode);
+  }
+  for (const s of pl.sections) for (const it of s.items) {
+    if (it.info) infoByName.set(it.name.toLowerCase(), it.info);
+    if (it.barcode) codeByName.set(it.name.toLowerCase(), it.barcode);
+  }
   const sections: MenuSection[] = body.sections.map((s) => ({
     name: s.name,
     note: s.note || undefined,
@@ -127,6 +135,7 @@ export function applyClientItems(record: BusinessRecord, body: z.infer<typeof It
       soldOut: it.soldOut || undefined,
       image: it.imageSrc ? byFile.get(it.imageSrc) : undefined,
       info: infoByName.get(it.name.toLowerCase()),
+      barcode: it.barcode === undefined ? codeByName.get(it.name.toLowerCase()) : normalizeCode(it.barcode) || undefined,
     })),
   }));
   autoMatchPhotos(sections, record.media.gallery);
@@ -268,6 +277,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 <div class="row" style="margin-bottom:8px"><label style="flex:1 1 160px">Tablet showing a code? Type it here<input id="codeIn" inputmode="numeric" placeholder="123 456" style="width:100%;margin-top:4px"></label><button class="btn btn--line" id="codeGo" type="button" style="padding:10px 12px">Approve</button></div>
 <p style="margin:0 0 4px">Staff NFC tag: write this text on any NFC sticker or fob with a free "NFC Tools" app, then tap it on the tablet: <code id="nfcText" style="user-select:all"></code></p>
 <p class="muted" id="staffMsg" style="margin:4px 0 0"></p></div></section>
+<div id="scanOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px"><video id="scanVid" playsinline muted autoplay style="width:100%;max-width:520px;max-height:60vh;border-radius:12px;background:#000"></video><p id="scanMsg" style="color:#fff;margin:0"></p><button class="btn btn--line" id="scanCancel" type="button" style="color:#fff;border-color:#fff">Cancel</button></div>
 <footer>📺 means "show this ${escHtml(sec)} on a screen": open that link on a tablet beside it and it shows what's in it, live. <a href="/d/${escHtml(leadId)}/" target="_blank" rel="noopener">Everything, rotating</a>.<br>${escHtml(W.board)} by Underground Associates · Anything odd? Text us.</footer>
 <script>
 (function(){
@@ -280,10 +290,11 @@ function render(){
     s.items.map(function(it,ii){return '<div class="item'+(it.soldOut?' out':'')+'" data-i="'+ii+'"><label class="ph" title="Take or pick a photo">'+(it.image?'<img src="'+esc(it.image)+'" alt="">':'📷')+'<input type="file" accept="image/*" capture="environment" data-a="photo"></label><div>'+
       '<div class="row"><input class="nm" value="'+esc(it.name)+'" data-f="name" placeholder="What is it?" aria-label="Name"><input class="pr" value="'+esc(it.price)+'" data-f="price" placeholder="$" inputmode="decimal" aria-label="Price"><input class="qt" value="'+(it.qty==null?"":it.qty)+'" data-f="qty" placeholder="how many" inputmode="numeric" aria-label="How many"></div>'+
       '<div class="row"><input class="nt" value="'+esc(it.note)+'" data-f="note" placeholder="Note (size, pairs only, feeding…)" aria-label="Note"></div>'+
+      '<div class="row"><input class="bc" value="'+esc(it.barcode||"")+'" data-f="barcode" placeholder="Barcode (scan or type)" inputmode="numeric" aria-label="Barcode" style="flex:1 1 9em"><button class="ic" data-a="scan" type="button" title="Scan the barcode with the camera">▦</button></div>'+
       '<div class="row"><button class="chip'+(it.soldOut?' on':'')+'" data-a="sold" type="button">'+(it.soldOut?'Sold out · tap when back':'In stock · tap if sold out')+'</button><button class="ic" data-a="delitem" title="Remove">🗑</button></div></div></div>'}).join("")+
     '<button class="add" data-a="additem" type="button">+ Add to this ${escHtml(sec)}</button></section>'}).join("");
 }
-function collect(){return{sections:data.sections.map(function(s){return{name:s.name,note:s.note||"",items:s.items.map(function(it){return{name:it.name,price:it.price||"",note:it.note||"",qty:(it.qty===""||it.qty==null)?null:Number(it.qty),soldOut:!!it.soldOut,imageSrc:it.imageSrc||""}})}})}}
+function collect(){return{sections:data.sections.map(function(s){return{name:s.name,note:s.note||"",items:s.items.map(function(it){return{name:it.name,price:it.price||"",note:it.note||"",qty:(it.qty===""||it.qty==null)?null:Number(it.qty),soldOut:!!it.soldOut,imageSrc:it.imageSrc||"",barcode:it.barcode||""}})}})}}
 function save(now){clearTimeout(timer);status("Saving…");timer=setTimeout(function(){
   var body=collect();body.sections=body.sections.filter(function(s){return s.name.trim()});body.sections.forEach(function(s){s.items=s.items.filter(function(i){return i.name.trim()})});
   fetch(BASE+"/items",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error("Save failed ("+r.status+")");return r.json()}).then(function(j){
@@ -297,6 +308,7 @@ m.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b|
   if(a==="additem"){s.items.push({name:"",price:"",note:"",qty:null,soldOut:false,image:null,imageSrc:null});render();var last=sec&&m.querySelector('[data-s="'+si+'"] .item:last-of-type .nm');if(last)last.focus();return}
   var row=b.closest("[data-i]");var it=row?s.items[+row.dataset.i]:null;
   if(a==="sold"&&it){it.soldOut=!it.soldOut;render();save(true)}
+  if(a==="scan"&&it){scanInto(function(code){it.barcode=code;render();save(true)},row.querySelector('[data-f="barcode"]'))}
   if(a==="delitem"&&it&&confirm("Remove "+(it.name||"this item")+" from the board?")){s.items.splice(+row.dataset.i,1);render();save(true)}
   if(a==="deltank"&&confirm("Remove "+s.name+" and everything in it?")){data.sections.splice(si,1);render();save(true)}
   if(a==="up"&&si>0){data.sections.splice(si-1,0,data.sections.splice(si,1)[0]);render();save(true)}
@@ -305,9 +317,18 @@ m.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b|
 m.addEventListener("change",function(e){var t=e.target;if(t.dataset.a!=="photo"||!t.files||!t.files[0])return;var sec=t.closest("[data-s]");var s=data.sections[+sec.dataset.s];var it=s.items[+t.closest("[data-i]").dataset.i];if(!it.name.trim()){alert("Give it a name first, then add the photo.");return}
   status("Sending photo…");var f=t.files[0];var img=new Image();var url=URL.createObjectURL(f);img.onload=function(){var max=1600,w=img.width,h=img.height,k=Math.min(1,max/Math.max(w,h));var c=document.createElement("canvas");c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
     c.toBlob(function(blob){fetch(BASE+"/photo?section="+encodeURIComponent(s.name)+"&item="+encodeURIComponent(it.name)+"&w="+c.width+"&h="+c.height,{method:"POST",headers:{"content-type":"image/jpeg"},body:blob}).then(function(r){if(!r.ok)throw new Error("Photo failed ("+r.status+")");return r.json()}).then(function(j){it.image=j.image;it.imageSrc=j.imageSrc;render();status("Photo saved ✓","saved")}).catch(function(e){status(e.message,"err")})},"image/jpeg",0.85)};img.src=url});
+var scanStream=null,scanT=null;
+function scanStop(){clearTimeout(scanT);if(scanStream){scanStream.getTracks().forEach(function(x){x.stop()});scanStream=null}document.getElementById("scanOv").style.display="none";document.getElementById("scanVid").srcObject=null}
+function scanInto(cb,input){var det=null;try{det=("BarcodeDetector" in window)?new BarcodeDetector():null}catch(e){}
+  if(!det||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){alert("This phone's browser can't read barcodes with the camera. Type the code, or plug in a scanner (it types the code for you).");if(input)input.focus();return}
+  var o=document.getElementById("scanOv"),v=document.getElementById("scanVid");o.style.display="flex";document.getElementById("scanMsg").textContent="Hold the barcode in front of the camera.";
+  navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}}).then(function(st){scanStream=st;v.srcObject=st;v.play().catch(function(){});
+    var loop=function(){if(!scanStream)return;if(v.readyState>=2){det.detect(v).then(function(codes){var c=codes&&codes.length&&codes[0].rawValue;if(c){scanStop();cb(String(c).replace(/[^0-9A-Za-z\-._]/g,"").slice(0,64))}else scanT=setTimeout(loop,250)}).catch(function(){scanT=setTimeout(loop,400)})}else scanT=setTimeout(loop,250)};loop()
+  }).catch(function(){scanStop();alert("Couldn't open the camera. Type the code instead.");if(input)input.focus()})}
+document.getElementById("scanCancel").addEventListener("click",scanStop);
 document.getElementById("addTank").addEventListener("click",function(){var n=prompt("${escHtml(W.section)} or section name (e.g. ${escHtml(W.section)} 12, New arrivals)");if(!n||!n.trim())return;data.sections.push({name:n.trim(),slug:"",note:"",items:[]});render();save(true);window.scrollTo(0,document.body.scrollHeight)});
 load();
 })();
 </script></body></html>`;
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "referrer-policy": "no-referrer", "content-security-policy": "default-src 'self'; img-src 'self' blob: data: https:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
+  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "referrer-policy": "no-referrer", "content-security-policy": "default-src 'self'; img-src 'self' blob: data: https:; media-src 'self' blob: mediastream:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
 }

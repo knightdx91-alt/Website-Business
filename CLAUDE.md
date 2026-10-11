@@ -579,6 +579,18 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   catalog search and a new-name path (count → photo prompt → AI card), locks after 3 idle minutes or "Done". Board: "Tablet &
   staff" section (Save PIN `PUT /c/…/staffpin`, approve code, NFC text; `/data` carries `staffPinSet`, `nfcText`).
   `test/worker/tablet.test.ts`. Guides and the customer pitch describe it.
+  Barcodes (Oct 2026): `MenuItem.barcode` / `CatalogEntry.barcode` (`normalizeCode`: letters, digits, `-._`, ≤64). Staff bar
+  "▦ Scan": the tablet camera via the browser's `BarcodeDetector` (Chrome on Android; headless/desktop Linux has none, so the
+  sheet says to use a handheld USB/Bluetooth scanner, which types the code + Enter into `#scanIn`). `GET /l/<id>/staff/find?
+  code&section` (`findByBarcode`: a row on the board, the staff's current section first, else a catalog entry, else
+  `lookupBarcode()` = Open Food Facts v2 product name + brand + quantity for 8–14-digit codes, 4 s, best effort) → the sheet
+  shows the item + an amount (− n + / Other) with "➕ Put in" (`/staff/add`) or "➖ Take out" (`/staff/adjust` −n); a catalog
+  hit is put into the current section with its code; an unknown code asks for a name (prefilled from the lookup), price, amount →
+  `/staff/add {barcode}` → photo prompt + AI card as for any new item; "Scan the next one" chains. ⋯ → "Barcode: … ▦ Scan it /
+  Change / Clear" (`/staff/set {barcode}`; `setBarcodeEverywhere`: one code = one product, kept on the catalog after the last one
+  sells; `addToTank(…, barcode)`). The phone board has a Barcode field per item + ▦ (camera scan when the browser can read
+  barcodes, else focus the field); `ItemsBody.barcode`, `applyClientItems` carries codes by name when the board sends none;
+  the feed items carry `barcode`. Both pages' CSP got `media-src 'self' blob: mediastream:` for the camera preview.
 - Live price list for every business (Oct 2026, `src/generator/pricelist.ts`): the page, its nav link and the care card moved out
   of the retail pack; render.ts wraps every pack (`nav` + `pages`) with `priceListNav` / `pricesPage`, so any category builds
   `/prices/` when `ext.retail.priceList` has sections (the storage path kept its historical name). `priceList.kind`

@@ -126,7 +126,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
           "Settings → Display → Screen timeout → never (or as long as it allows), and keep it plugged in. The page also asks the tablet to stay awake.",
           "To stop customers tapping out of it: Settings → Security → App pinning (name varies by phone), then pin Chrome.",
           "It refreshes by itself every 30 seconds and shrinks the text so a tank with 15 items still fits. Big price in orange, photo if there is one, \"3 left\" under the price. A customer taps a fish to read its care card (adult size, what it eats, temperament, tank size, water).",
-          "Staff mode: the small \"Staff\" button in the corner asks for the staff PIN (set on the Tank board), a staff NFC tag held to the back of the tablet, or a 6-digit code the shop approves on the Tank board. Then every item gets − / count / + and ⋯ (set the count, sold out, price, photo, care card), and \"+ Add\" lists everything the shop has ever stocked, or a new name: count, photo from the tablet camera, and a care card drafted by AI for the shop to check. It locks itself after 3 idle minutes; \"Done\" locks it now.",
+          "Staff mode: the small \"Staff\" button in the corner asks for the staff PIN (set on the Tank board), a staff NFC tag held to the back of the tablet, or a 6-digit code the shop approves on the Tank board. Then every item gets − / count / + and ⋯ (set the count, sold out, price, photo, care card), and \"+ Add\" lists everything the shop has ever stocked, or a new name: count, photo from the tablet camera, and a care card drafted by AI for the shop to check. \"▦ Scan\" reads a product's barcode with the tablet camera (or a cheap USB/Bluetooth scanner, which just types the code): a known product shows its name and count, you type or tap how many, then \"Put in\" or \"Take out\"; an unknown code asks for a name (food and pet products are often filled in from the barcode) and becomes a new item. ⋯ → Barcode links a code to an item that was added by name. It locks itself after 3 idle minutes; \"Done\" locks it now.",
           "Mount it above the tank in a cheap stand or clamp, away from splash. One or two bigger tablets or a TV with a streaming stick near the register, rotating through all tanks, costs less than one tablet per tank.",
         ],
       },
@@ -264,7 +264,7 @@ export function displayGuide(s: AppSettings): Guide {
           "Every tank, rotating: the same card layout, a new tank every 10 seconds, with dots at the bottom showing which one is up.",
           "It shrinks the text so a tank with 15 items still fits with nothing cut off, and goes to two columns on a wide screen.",
           "Bottom left: \"Updated\" with the time of the last change on the board. Bottom right: a small \"Staff\" button. Customers tap a fish for its care card; nothing else responds.",
-          "Staff mode (after PIN, NFC tag or phone code): − / + on every item, ⋯ for the exact count, sold out, price, a photo from the tablet camera and the care card (read, redo with AI, or edit by hand), tank chips across the bottom, \"+ New tank\", and \"+ Add\" with the shop's whole catalog and a search box. New names get a photo prompt and an AI-drafted care card. Done or 3 idle minutes locks it.",
+          "Staff mode (after PIN, NFC tag or phone code): − / + on every item, ⋯ for the exact count, sold out, price, a photo from the tablet camera and the care card (read, redo with AI, or edit by hand), tank chips across the bottom, \"+ New tank\", and \"+ Add\" with the shop's whole catalog and a search box. New names get a photo prompt and an AI-drafted care card. \"▦ Scan\": point the camera at a barcode (or use a handheld scanner), type the amount, Put in or Take out; a code nobody has scanned before becomes a new item. Done or 3 idle minutes locks it.",
         ],
       },
       {
@@ -382,7 +382,7 @@ export function customerBoardPitch(s: AppSettings, o: { business: string; live: 
       {
         title: "What you do",
         steps: [
-          `Something new comes in: on the tablet, tap Staff, enter your PIN (or tap your staff tag), tap "+ Add", tap the ${item} in the list (or type a new name) and tap how many. Twenty seconds. The same works on the board on your phone.`,
+          `Something new comes in: on the tablet, tap Staff, enter your PIN (or tap your staff tag), tap "+ Add", tap the ${item} in the list (or type a new name) and tap how many. Twenty seconds. The same works on the board on your phone. Packaged goods: tap "▦ Scan", show the barcode to the tablet camera (or use a handheld scanner), type how many, tap "Put in". Selling a case of something? Scan it and tap "Take out".`,
           `A new ${item} nobody has stocked before: type its name, tap how many, and the tablet asks for a photo and writes its info card (${W.fields.slice(0, 3).map((f) => f[1].toLowerCase()).join(", ")}…) for you to check.`,
           `Customers tap a ${item} on the tablet or the website to read its info card. Nothing they tap can change your stock: that takes your PIN, your staff tag, or your phone.`,
           "Something sells out: tap \"Sold out\". It disappears from the page until you tap it back. Or just type how many are left; at 5 or fewer the page says \"3 left\".",

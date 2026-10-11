@@ -58,7 +58,7 @@ export function catalogOf(record: BusinessRecord): CatalogEntry[] {
   for (const s of pl.sections) for (const it of s.items) {
     const k = it.name.toLowerCase();
     const c = by.get(k) ?? { name: it.name };
-    by.set(k, { ...c, name: c.name || it.name, price: it.price ?? c.price, image: it.image ?? c.image, info: it.info ?? c.info });
+    by.set(k, { ...c, name: c.name || it.name, price: it.price ?? c.price, image: it.image ?? c.image, info: it.info ?? c.info, barcode: it.barcode ?? c.barcode });
   }
   return [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -82,19 +82,50 @@ export function adjustQty(record: BusinessRecord, section: string, item: string,
   return it;
 }
 
-export function setItem(record: BusinessRecord, section: string, item: string, change: { qty?: number | null; soldOut?: boolean; price?: string; info?: ItemInfo }): MenuItem {
+export function setItem(record: BusinessRecord, section: string, item: string, change: { qty?: number | null; soldOut?: boolean; price?: string; info?: ItemInfo; barcode?: string }): MenuItem {
   const it = findItem(record, section, item);
   if (!it) throw new HttpError(404, "That item isn't on this tank any more");
   if (change.qty !== undefined) it.qty = change.qty === null ? undefined : Math.max(0, Math.min(9999, change.qty));
   if (change.soldOut !== undefined) it.soldOut = change.soldOut || undefined;
   if (change.price !== undefined) it.price = change.price.trim() || undefined;
   if (change.info !== undefined) it.info = change.info;
+  if (change.barcode !== undefined) setBarcodeEverywhere(record, it.name, normalizeCode(change.barcode));
   touchCatalog(record);
   return it;
 }
 
+/** Barcodes as the scanner reads them: digits and letters only, no spaces; 64 characters at most. */
+export function normalizeCode(code: string): string {
+  return code.replace(/[^0-9A-Za-z\-._]/g, "").slice(0, 64);
+}
+
+/** The same product in two sections shares one barcode; the catalog remembers it after the last one sells. An empty code clears it. */
+export function setBarcodeEverywhere(record: BusinessRecord, name: string, code: string): void {
+  const pl = priceList(record);
+  const key = name.toLowerCase();
+  for (const s of pl.sections) for (const it of s.items) {
+    if (it.name.toLowerCase() === key) it.barcode = code || undefined;
+    else if (code && it.barcode === code) it.barcode = undefined; // one code, one product
+  }
+  const cat = (pl.catalog ?? []).map((c) => (c.name.toLowerCase() === key ? { ...c, barcode: code || undefined } : code && c.barcode === code ? { ...c, barcode: undefined } : c));
+  record.ext.retail!.priceList = { ...pl, catalog: cat };
+}
+
+/** What a scanned code is: a row on the board (the current section first), else something from the catalog, else nothing. */
+export function findByBarcode(record: BusinessRecord, code: string, preferSection?: string): { item?: { section: string; item: MenuItem }; catalog?: CatalogEntry } {
+  const c = normalizeCode(code);
+  if (!c) return {};
+  const pl = priceList(record);
+  const rows: { section: string; item: MenuItem }[] = [];
+  for (const s of pl.sections) for (const it of s.items) if (it.barcode === c) rows.push({ section: s.name, item: it });
+  const item = rows.find((r) => r.section === preferSection) ?? rows[0];
+  if (item) return { item };
+  const cat = catalogOf(record).find((x) => x.barcode === c);
+  return cat ? { catalog: cat } : {};
+}
+
 /** Puts `qty` of a thing into a tank: an existing row gets the count added; a known catalog item brings its photo, price and care card. */
-export function addToTank(record: BusinessRecord, section: string, name: string, qty: number, price?: string): { item: MenuItem; isNew: boolean } {
+export function addToTank(record: BusinessRecord, section: string, name: string, qty: number, price?: string, barcode?: string): { item: MenuItem; isNew: boolean } {
   const pl = priceList(record);
   let sec = pl.sections.find((s) => s.name === section);
   if (!sec) {
@@ -106,13 +137,15 @@ export function addToTank(record: BusinessRecord, section: string, name: string,
     existing.qty = Math.min(9999, (existing.qty ?? 0) + qty);
     existing.soldOut = undefined;
     if (price?.trim()) existing.price = price.trim();
+    if (barcode && normalizeCode(barcode)) setBarcodeEverywhere(record, existing.name, normalizeCode(barcode));
     touchCatalog(record);
     return { item: existing, isNew: false };
   }
   const known = catalogOf(record).find((c) => c.name.toLowerCase() === name.toLowerCase());
-  const item: MenuItem = { name: known?.name ?? name.trim(), price: price?.trim() || known?.price, qty, image: known?.image, info: known?.info };
+  const item: MenuItem = { name: known?.name ?? name.trim(), price: price?.trim() || known?.price, qty, image: known?.image, info: known?.info, barcode: known?.barcode };
   sec.items.push(item);
   record.ext.retail!.priceList = pl;
+  if (barcode && normalizeCode(barcode)) setBarcodeEverywhere(record, item.name, normalizeCode(barcode));
   touchCatalog(record);
   return { item, isNew: !known };
 }
@@ -183,6 +216,27 @@ const cleanInfo = (i: z.infer<typeof InfoSchema>): ItemInfo | undefined => {
 
 const noStore = { "cache-control": "no-store" };
 
+/** A product name for a retail UPC/EAN from Open Food Facts (free, no key; food, drink, pet food and some household goods). Best effort: null when unknown or slow. */
+export async function lookupBarcode(code: string, fetcher: typeof fetch = fetch): Promise<string | null> {
+  if (!/^\d{8,14}$/.test(code)) return null;
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 4000);
+    const r = await fetcher(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,quantity`, { headers: { "user-agent": "UndergroundAssociates/1.0 (live price list; undergroundassociates.com)" }, signal: ctl.signal });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const j = (await r.json()) as { product?: { product_name?: string; brands?: string; quantity?: string } };
+    const p = j.product;
+    const name = p?.product_name?.trim();
+    if (!name) return null;
+    const brand = ((p?.brands ?? "").split(",")[0] ?? "").trim();
+    const qty = p?.quantity?.trim() ?? "";
+    return [brand && !name.toLowerCase().includes(brand.toLowerCase()) ? brand : "", name, qty && !name.includes(qty) ? qty : ""].filter(Boolean).join(" ").slice(0, 120);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * `/l/<leadId>/unlock/*` (public, from the tablet) and `/l/<leadId>/staff/*` (needs header `x-staff`). `rest` starts after the lead id.
  */
@@ -234,9 +288,20 @@ export async function serveStation(env: Env, req: Request, leadId: string, rest:
   if (!rest.startsWith("/staff/")) throw new HttpError(404, "Not found");
   if (!(await verifyStaff(env, lead, req.headers.get("x-staff")))) throw new HttpError(401, "Locked. Tap Staff and unlock again.");
   const url = new URL(req.url);
-  const feed = () => Response.json({ ...pricesFeed(lead, record, origin, true), catalog: catalogOf(record).map((c) => ({ name: c.name, price: c.price ?? "", image: photoUrl(lead, origin, c.image), hasInfo: !!c.info })) }, { headers: noStore });
+  const feed = () => Response.json({ ...pricesFeed(lead, record, origin, true), catalog: catalogOf(record).map((c) => ({ name: c.name, price: c.price ?? "", image: photoUrl(lead, origin, c.image), hasInfo: !!c.info, barcode: c.barcode ?? "" })) }, { headers: noStore });
 
   if (rest === "/staff/data" && req.method === "GET") return feed();
+  if (rest === "/staff/find" && req.method === "GET") {
+    // A scanned barcode: a row on the board, a catalog item, or (new) a product name looked up by its UPC/EAN.
+    const code = normalizeCode(url.searchParams.get("code") ?? "");
+    if (!code) throw new HttpError(400, "No code read");
+    const hit = findByBarcode(record, code, url.searchParams.get("section") ?? undefined);
+    const out: Record<string, unknown> = { code };
+    if (hit.item) out.item = { section: hit.item.section, name: hit.item.item.name, qty: hit.item.item.qty ?? null, price: hit.item.item.price ?? "", image: photoUrl(lead, origin, hit.item.item.image) };
+    else if (hit.catalog) out.catalog = { name: hit.catalog.name, price: hit.catalog.price ?? "", image: photoUrl(lead, origin, hit.catalog.image) };
+    else out.suggestion = await lookupBarcode(code);
+    return Response.json(out, { headers: noStore });
+  }
   if (rest === "/staff/adjust" && req.method === "POST") {
     const b = z.object({ ...ItemRef, delta: z.number().int().min(-9999).max(9999) }).parse(await req.json());
     adjustQty(record, b.section, b.item, b.delta);
@@ -244,15 +309,15 @@ export async function serveStation(env: Env, req: Request, leadId: string, rest:
     return feed();
   }
   if (rest === "/staff/set" && req.method === "POST") {
-    const b = z.object({ ...ItemRef, qty: z.number().int().min(0).max(9999).nullable().optional(), soldOut: z.boolean().optional(), price: z.string().max(30).optional(), info: InfoSchema.optional() }).parse(await req.json());
-    setItem(record, b.section, b.item, { qty: b.qty, soldOut: b.soldOut, price: b.price, info: b.info ? cleanInfo(b.info) : undefined });
+    const b = z.object({ ...ItemRef, qty: z.number().int().min(0).max(9999).nullable().optional(), soldOut: z.boolean().optional(), price: z.string().max(30).optional(), info: InfoSchema.optional(), barcode: z.string().max(80).optional() }).parse(await req.json());
+    setItem(record, b.section, b.item, { qty: b.qty, soldOut: b.soldOut, price: b.price, info: b.info ? cleanInfo(b.info) : undefined, barcode: b.barcode });
     if (b.info) setInfoEverywhere(record, b.item, cleanInfo(b.info));
     await saveAndRefresh(env, lead, record, { quick: true });
     return feed();
   }
   if (rest === "/staff/add" && req.method === "POST") {
-    const b = z.object({ section: z.string().trim().min(1).max(60), name: z.string().trim().min(1).max(120), qty: z.number().int().min(1).max(9999), price: z.string().trim().max(30).optional() }).parse(await req.json());
-    const { item, isNew } = addToTank(record, b.section, b.name, b.qty, b.price);
+    const b = z.object({ section: z.string().trim().min(1).max(60), name: z.string().trim().min(1).max(120), qty: z.number().int().min(1).max(9999), price: z.string().trim().max(30).optional(), barcode: z.string().max(80).optional() }).parse(await req.json());
+    const { item, isNew } = addToTank(record, b.section, b.name, b.qty, b.price, b.barcode);
     await saveAndRefresh(env, lead, record, { quick: true });
     return Response.json({ ...(await feed().json() as object), added: item.name, isNew }, { headers: noStore });
   }
@@ -353,7 +418,7 @@ body.staff .staffbar{display:flex}
 <header><h1 id="h">${escHtml(tank ? tank.name : feed.title)}</h1><span class="shop">${escHtml(record.name)}</span></header>
 <main id="m"><p class="empty">Loading…</p></main>
 <footer><span id="u"></span><span class="dots" id="dots"></span><button class="staffbtn" id="staff" type="button">Staff</button></footer>
-<div class="staffbar"><div class="tanks" id="tanks"></div><div class="row" style="margin:0"><button class="btn go" id="addbtn" type="button">+ Add</button><button class="btn ghost" id="lock" type="button">Done</button></div></div>
+<div class="staffbar"><div class="tanks" id="tanks"></div><div class="row" style="margin:0"><button class="btn go" id="addbtn" type="button">+ Add</button><button class="btn" id="scanbtn" type="button">▦ Scan</button><button class="btn ghost" id="lock" type="button">Done</button></div></div>
 
 <div class="ov" id="info"><div class="sheet" id="infoBody"></div></div>
 <div class="ov" id="unlock"><div class="sheet">
@@ -371,6 +436,14 @@ body.staff .staffbar{display:flex}
   <div class="row"><button class="btn ghost" id="addCancel" type="button">Cancel</button></div>
 </div></div>
 <div class="ov" id="more"><div class="sheet" id="moreBody"></div></div>
+<div class="ov" id="scan"><div class="sheet">
+  <h2 id="scanTitle">Scan a barcode</h2>
+  <video id="scanVid" playsinline muted autoplay style="width:100%;max-height:36vh;border-radius:.9em;background:#000;display:none"></video>
+  <div class="row"><input id="scanIn" inputmode="numeric" placeholder="Or scan with a handheld scanner, or type the code" autocomplete="off"><button class="btn small" id="scanGo" type="button">Go</button></div>
+  <p class="msg" id="scanMsg"></p>
+  <div id="scanHit" hidden></div>
+  <div class="row"><button class="btn ghost" id="scanCancel" type="button">Cancel</button></div>
+</div></div>
 <input type="file" id="cam" accept="image/*" capture="environment" hidden>
 <script>
 (function(){
@@ -422,7 +495,7 @@ $("codeBtn").onclick=function(){$("ulCode").hidden=false;$("codeMsg").textConten
 function stopPoll(){if(pollT){clearInterval(pollT);pollT=null}}
 function gotToken(t){staffTok=t;try{localStorage.setItem("staff."+LEAD,t)}catch(e){}$("unlock").classList.remove("on");$("ulCode").hidden=true;stopPoll();enter()}
 function enter(){staff=true;document.body.classList.remove("customer");document.body.classList.add("staff");$("staff").textContent="Staff ✓";cur=tankName();load().then(function(){if(!data||!data.sections.length)return;if(!cur)cur=data.sections[0].name;render()});touch()}
-function lock(){staff=false;cur=null;document.body.classList.add("customer");document.body.classList.remove("staff");$("staff").textContent="Staff";["add","more","unlock"].forEach(function(id){$(id).classList.remove("on")});load()}
+function lock(){staff=false;cur=null;document.body.classList.add("customer");document.body.classList.remove("staff");$("staff").textContent="Staff";["add","more","unlock"].forEach(function(id){$(id).classList.remove("on")});closeScan();load()}
 $("lock").onclick=lock;
 function touch(){clearTimeout(idle);idle=setTimeout(function(){if(staff)lock()},180000)}
 document.addEventListener("pointerdown",function(){if(staff)touch()});
@@ -448,11 +521,48 @@ function afterNew(name){var s=pick();var k=-1;for(var x=0;x<s.items.length;x++)i
   $("newPhoto").onclick=function(){takePhoto(s.name,name,function(){$("newMsg").className="msg ok";$("newMsg").textContent="Photo saved ✓"})};
   $("newSkip").onclick=function(){$("more").classList.remove("on")};
   $("newMsg").textContent="Writing the care card…";api("/staff/info",{method:"POST",body:JSON.stringify({name:name,section:s.name})}).then(function(j){$("newMsg").className="msg ok";$("newMsg").textContent="Care card drafted"+(j.info.unsure?" (it wasn\\'t sure; check it)":"")+". Tap ⋯ on the item to read or fix it.";load()}).catch(function(e){$("newMsg").className="msg bad";$("newMsg").textContent="No care card: "+e.message})}
+// ---- scan (barcode → count) ----
+var scanOn=null,scanCb=null,scanQty=1;
+function scanner(video,onCode,msg){var det=null;try{det=("BarcodeDetector" in window)?new BarcodeDetector():null}catch(e){det=null}
+  var stream=null,t=null,stopped=false;
+  function stop(){stopped=true;clearTimeout(t);if(stream){stream.getTracks().forEach(function(x){x.stop()});stream=null}video.srcObject=null;video.style.display="none"}
+  function loop(){if(stopped)return;if(video.readyState>=2){det.detect(video).then(function(codes){if(stopped)return;var c=codes&&codes.length&&codes[0].rawValue;if(c){stop();onCode(c)}else t=setTimeout(loop,250)}).catch(function(){t=setTimeout(loop,400)})}else t=setTimeout(loop,250)}
+  if(det&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}}).then(function(st){if(stopped){st.getTracks().forEach(function(x){x.stop()});return}stream=st;video.srcObject=st;video.style.display="block";video.play().catch(function(){});msg("Hold the barcode in front of the camera.");loop()}).catch(function(){msg("No camera: use a handheld scanner or type the code.")})}
+  else msg(det?"No camera here: use a handheld scanner or type the code.":"This tablet's browser can't read barcodes with its camera: use a handheld scanner (it types the code) or type it.");
+  return {stop:stop}}
+function openScan(title,cb){scanCb=cb||null;$("scanTitle").textContent=title||"Scan a barcode";$("scanHit").hidden=true;$("scanHit").innerHTML="";$("scanIn").value="";$("scanMsg").className="msg";$("scanMsg").textContent="";$("scan").classList.add("on");
+  if(scanOn)scanOn.stop();scanOn=scanner($("scanVid"),gotCode,function(t){$("scanMsg").textContent=t});setTimeout(function(){$("scanIn").focus()},80);touch()}
+function closeScan(){if(scanOn){scanOn.stop();scanOn=null}$("scan").classList.remove("on")}
+$("scanbtn").onclick=function(){openScan("Scan a barcode",null)};
+$("scanCancel").onclick=closeScan;
+$("scanGo").onclick=function(){var v=$("scanIn").value.trim();if(v)gotCode(v)};
+$("scanIn").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();var v=this.value.trim();if(v)gotCode(v)}});
+function gotCode(code){if(scanOn){scanOn.stop();scanOn=null}touch();$("scanIn").value="";
+  if(scanCb){var cb=scanCb;scanCb=null;closeScan();cb(code);return}
+  $("scanMsg").textContent="Looking up "+code+"…";
+  api("/staff/find?code="+encodeURIComponent(code)+"&section="+encodeURIComponent(cur||"")).then(showHit).catch(function(e){$("scanMsg").className="msg bad";$("scanMsg").textContent=e.message})}
+function qtyRow(){return '<div class="row"><span>How many?</span><div class="qty"><button class="btn small" id="sqM" type="button">−</button><b id="sqN">1</b><button class="btn small" id="sqP" type="button">+</button></div><input id="sqIn" inputmode="numeric" placeholder="Other" style="max-width:6em"></div>'}
+function bindQty(){scanQty=1;var show=function(){$("sqN").textContent=scanQty};$("sqM").onclick=function(){scanQty=Math.max(1,scanQty-1);show()};$("sqP").onclick=function(){scanQty=Math.min(9999,scanQty+1);show()};$("sqIn").addEventListener("input",function(){var n=parseInt(this.value,10);if(n>0){scanQty=Math.min(9999,n);show()}})}
+function showHit(j){var h=$("scanHit");h.hidden=false;$("scanMsg").className="msg";$("scanMsg").textContent="Code "+j.code;
+  var pic=function(img){return img?'<img class="ph" src="'+esc(img)+'" alt="">':'<div class="ph ph--none">'+EMOJI+'</div>'};
+  if(j.item){h.innerHTML='<div class="it"><div>'+pic(j.item.image)+'</div><div><div class="nm">'+esc(j.item.name)+'</div><div class="nt">In '+esc(j.item.section)+(j.item.qty==null?"":" · "+j.item.qty+" in stock")+(j.item.price?" · "+esc(j.item.price):"")+'</div></div><div></div></div>'+qtyRow()+'<div class="row"><button class="btn go" id="sAdd" type="button">➕ Put in</button><button class="btn" id="sOut" type="button">➖ Take out</button></div>';bindQty();
+    $("sAdd").onclick=function(){api("/staff/add",{method:"POST",body:JSON.stringify({section:j.item.section,name:j.item.name,qty:scanQty})}).then(afterScan).catch(function(e){alert(e.message)})};
+    $("sOut").onclick=function(){api("/staff/adjust",{method:"POST",body:JSON.stringify({section:j.item.section,item:j.item.name,delta:-scanQty})}).then(afterScan).catch(function(e){alert(e.message)})};
+    return}
+  if(j.catalog){h.innerHTML='<div class="it"><div>'+pic(j.catalog.image)+'</div><div><div class="nm">'+esc(j.catalog.name)+'</div><div class="nt">Known, none in right now'+(j.catalog.price?" · "+esc(j.catalog.price):"")+'</div></div><div></div></div><p>Put it in <b>'+esc(cur||"")+'</b>:</p>'+qtyRow()+'<div class="row"><button class="btn go" id="sAdd" type="button">➕ Put in</button></div>';bindQty();
+    $("sAdd").onclick=function(){if(!cur){var n=prompt("Name the "+SEC+" it goes in");if(!n||!n.trim())return;cur=n.trim()}api("/staff/add",{method:"POST",body:JSON.stringify({section:cur,name:j.catalog.name,qty:scanQty,barcode:j.code})}).then(afterScan).catch(function(e){alert(e.message)})};
+    return}
+  h.innerHTML='<p>New product'+(j.suggestion?" (found online; fix the name if it\'s wrong)":"")+'. Goes in <b>'+esc(cur||"")+'</b>.</p><div class="row"><input id="sName" placeholder="Name" value="'+esc(j.suggestion||"")+'"></div><div class="row"><input id="sPrice" placeholder="Price (optional)" style="max-width:10em"></div>'+qtyRow()+'<div class="row"><button class="btn go" id="sAdd" type="button">➕ Add it</button></div>';bindQty();
+  if(!j.suggestion)setTimeout(function(){$("sName").focus()},50);
+  $("sAdd").onclick=function(){var n=$("sName").value.trim();if(!n){$("sName").focus();return}if(!cur){var t=prompt("Name the "+SEC+" it goes in");if(!t||!t.trim())return;cur=t.trim()}var body={section:cur,name:n,qty:scanQty,barcode:j.code};var pr=$("sPrice").value.trim();if(pr)body.price=pr;
+    api("/staff/add",{method:"POST",body:JSON.stringify(body)}).then(function(r){data=r;closeScan();render();touch();if(r.isNew)afterNew(r.added)}).catch(function(e){alert(e.message)})}}
+function afterScan(j){data=j;render();touch();var h=$("scanHit");h.innerHTML='<p class="msg ok">Saved ✓</p><div class="row"><button class="btn go" id="sAgain" type="button">▦ Scan the next one</button><button class="btn ghost" id="sDone" type="button">Done</button></div>';$("sAgain").onclick=function(){openScan("Scan a barcode",null)};$("sDone").onclick=closeScan}
 // ---- more (per item) ----
 function moreSheet(k){var s=pick(),it=s.items[k];if(!it)return;var r=rows(it.info);var b=$("moreBody");
   b.innerHTML='<h2>'+esc(it.name)+'</h2><div class="row"><span>Count:</span><input id="mQty" inputmode="numeric" value="'+(it.qty==null?"":it.qty)+'" style="max-width:6em"><button class="btn small" id="mQtyGo" type="button">Set</button><button class="btn small ghost" id="mSold" type="button">'+(it.soldOut?"Back in stock":"Sold out")+'</button></div>'+
     '<div class="row"><span>Price:</span><input id="mPrice" value="'+esc(it.price||"")+'" style="max-width:8em"><button class="btn small" id="mPriceGo" type="button">Set</button></div>'+
     '<div class="row"><button class="btn small" id="mPhoto" type="button">📷 '+(it.image?"New photo":"Add a photo")+'</button><button class="btn small" id="mAi" type="button">✨ '+(it.info?"Redo the care card":"Write a care card")+'</button></div>'+
+    '<div class="row"><span>Barcode:</span><span class="nt">'+(it.barcode?esc(it.barcode):"none")+'</span><button class="btn small" id="mScan" type="button">▦ '+(it.barcode?"Change":"Scan it")+'</button>'+(it.barcode?'<button class="btn small ghost" id="mScanClr" type="button">Clear</button>':'')+'</div>'+
     (r.length||it.info&&it.info.notes?'<div class="rows">'+r.map(function(x){return '<b>'+esc(x[0])+'</b><span>'+esc(x[1])+'</span>'}).join("")+'</div>'+(it.info.notes?'<p>'+esc(it.info.notes)+'</p>':'')+(it.info.aiDrafted?'<p class="nt"><span class="chip ai">AI draft</span> Read it once; fix anything below.</p>':''):'<p class="nt">No info card yet.</p>')+
     '<details><summary>Edit the info card</summary><div class="rows" style="grid-template-columns:1fr">'+FIELDS.concat([["notes","Notes",""]]).map(function(f){return '<input data-f="'+f[0]+'" placeholder="'+esc(f[1])+(f[2]?" (e.g. "+esc(f[2])+")":"")+'" value="'+esc(it.info&&it.info[f[0]]||"")+'">'}).join("")+'</div><div class="row"><button class="btn small go" id="mInfoSave" type="button">Save card</button></div></details>'+
     '<p class="msg" id="mMsg"></p><div class="row"><button class="btn ghost" id="mClose" type="button">Close</button></div>';
@@ -461,6 +571,8 @@ function moreSheet(k){var s=pick(),it=s.items[k];if(!it)return;var r=rows(it.inf
   $("mClose").onclick=function(){$("more").classList.remove("on")};
   $("mQtyGo").onclick=function(){var v=$("mQty").value.trim();api("/staff/set",{method:"POST",body:JSON.stringify({section:s.name,item:it.name,qty:v===""?null:parseInt(v,10)})}).then(done).catch(function(e){alert(e.message)})};
   $("mSold").onclick=function(){api("/staff/set",{method:"POST",body:JSON.stringify({section:s.name,item:it.name,soldOut:!it.soldOut})}).then(done).catch(function(e){alert(e.message)})};
+  $("mScan").onclick=function(){$("more").classList.remove("on");openScan("Scan "+it.name+"\'s barcode",function(code){api("/staff/set",{method:"POST",body:JSON.stringify({section:s.name,item:it.name,barcode:code})}).then(function(j){data=j;render();touch();moreSheet(k)}).catch(function(e){alert(e.message)})})};
+  if($("mScanClr"))$("mScanClr").onclick=function(){api("/staff/set",{method:"POST",body:JSON.stringify({section:s.name,item:it.name,barcode:""})}).then(done).catch(function(e){alert(e.message)})};
   $("mPriceGo").onclick=function(){api("/staff/set",{method:"POST",body:JSON.stringify({section:s.name,item:it.name,price:$("mPrice").value})}).then(done).catch(function(e){alert(e.message)})};
   $("mPhoto").onclick=function(){takePhoto(s.name,it.name,function(){load();$("mMsg").className="msg ok";$("mMsg").textContent="Photo saved ✓"})};
   $("mAi").onclick=function(){$("mMsg").className="msg";$("mMsg").textContent="Writing…";api("/staff/info",{method:"POST",body:JSON.stringify({name:it.name,section:s.name,note:it.note})}).then(function(){load().then(function(){moreSheet(k)})}).catch(function(e){$("mMsg").className="msg bad";$("mMsg").textContent=e.message})};
@@ -469,5 +581,5 @@ function takePhoto(section,name,cb){var cam=$("cam");cam.value="";cam.onchange=f
     c.toBlob(function(blob){fetch(BASE+"/staff/photo?section="+encodeURIComponent(section)+"&item="+encodeURIComponent(name)+"&w="+c.width+"&h="+c.height,{method:"POST",headers:{"content-type":"image/jpeg","x-staff":staffTok||""},body:blob}).then(function(r){if(!r.ok)throw new Error("Photo failed ("+r.status+")");return r.json()}).then(function(){cb&&cb()}).catch(function(e){alert(e.message)})},"image/jpeg",0.85)};img.src=url};cam.click()}
 })();
 </script></body></html>`;
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "content-security-policy": "default-src 'self'; img-src 'self' https: data: blob:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
+  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "content-security-policy": "default-src 'self'; img-src 'self' https: data: blob:; media-src 'self' blob: mediastream:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
 }
