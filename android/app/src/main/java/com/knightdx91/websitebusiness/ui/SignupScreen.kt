@@ -393,9 +393,10 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
             val otherWays = p.options.filter { it !in mainWays }
             val standard = p.options.firstOrNull { it.id == "standard" } ?: p.options.firstOrNull()
             val featured = LinkedHashSet<Int>()
-            o.addons.forEachIndexed { i, a -> if (featured.size < MAX_FEATURED && FEATURED_EXTRAS.containsMatchIn(a.name)) featured.add(i) }
+            o.addons.forEachIndexed { i, a -> if (featured.size < MAX_FEATURED && a.group != "inventory" && FEATURED_EXTRAS.containsMatchIn(a.name)) featured.add(i) }
+            val invExtras = o.addons.indices.filter { o.addons[it].group == "inventory" }
             val topExtras = o.addons.indices.filter { it in featured }
-            val restExtras = o.addons.indices.filter { it !in featured }
+            val restExtras = o.addons.indices.filter { it !in featured && it !in invExtras }
 
             LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
@@ -439,7 +440,14 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
                         }
                     }
                 }
-                if (o.addons.isNotEmpty()) item {
+                if (invExtras.isNotEmpty() && plan == "list") item {
+                    SectionCard("Inventory add-ons") {
+                        Text("(optional)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        invExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
+                    }
+                }
+                if (topExtras.isNotEmpty() || restExtras.isNotEmpty()) item {
                     SectionCard("Add extras") {
                         Text("(optional)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(6.dp))
@@ -448,6 +456,13 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
                             TextButton(onClick = { moreExtras = !moreExtras }, contentPadding = PaddingValues(0.dp)) { Text(if (moreExtras) "▾ More extras" else "▸ More extras") }
                             if (moreExtras) restExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
                         }
+                    }
+                }
+                if (invExtras.isNotEmpty() && plan != "list") item {
+                    SectionCard("Inventory add-ons") {
+                        Text("(optional, for the live price list)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        invExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
                     }
                 }
                 item {

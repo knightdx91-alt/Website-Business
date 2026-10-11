@@ -11,10 +11,30 @@ const BODY = 10.5;
 const LEAD = 14.5;
 
 // Helvetica advance widths (per 1000 em) for ASCII 32..126, from the standard AFM.
-const W = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584];
+const W = [
+  278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278,
+  278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584,
+  584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556,
+  833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278,
+  278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222,
+  500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500,
+  500, 334, 260, 334, 584,
+];
 
 // Unicode → WinAnsi byte for the punctuation and accents we meet in agreements; everything else Latin-1 or "?".
-const WINANSI: Record<string, number> = { "‘": 0x91, "’": 0x92, "“": 0x93, "”": 0x94, "–": 0x96, "—": 0x97, "•": 0x95, "…": 0x85, "€": 0x80, "™": 0x99, " ": 0x20 };
+const WINANSI: Record<string, number> = {
+  "‘": 0x91,
+  "’": 0x92,
+  "“": 0x93,
+  "”": 0x94,
+  "–": 0x96,
+  "—": 0x97,
+  "•": 0x95,
+  "…": 0x85,
+  "€": 0x80,
+  "™": 0x99,
+  " ": 0x20,
+};
 
 function toWinAnsi(s: string): number[] {
   const out: number[] = [];
@@ -39,7 +59,8 @@ function widthOf(bytes: number[], size: number, bold: boolean): number {
 function pdfString(bytes: number[]): string {
   let s = "(";
   for (const b of bytes) {
-    if (b === 0x28 || b === 0x29 || b === 0x5c) s += "\\" + String.fromCharCode(b);
+    if (b === 0x28 || b === 0x29 || b === 0x5c)
+      s += "\\" + String.fromCharCode(b);
     else if (b < 0x20 || b > 0x7e) s += "\\" + b.toString(8).padStart(3, "0");
     else s += String.fromCharCode(b);
   }
@@ -47,7 +68,12 @@ function pdfString(bytes: number[]): string {
 }
 
 /** Greedy word wrap on measured widths; very long words are split. */
-function wrap(text: string, size: number, bold: boolean, maxW: number): number[][] {
+function wrap(
+  text: string,
+  size: number,
+  bold: boolean,
+  maxW: number,
+): number[][] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: number[][] = [];
   let cur: number[] = [];
@@ -124,7 +150,12 @@ export async function pngToPdfImage(png: Uint8Array): Promise<PdfImage | null> {
   const idat: Uint8Array[] = [];
   while (pos + 8 <= png.length) {
     const len = view.getUint32(pos);
-    const type = String.fromCharCode(png[pos + 4]!, png[pos + 5]!, png[pos + 6]!, png[pos + 7]!);
+    const type = String.fromCharCode(
+      png[pos + 4]!,
+      png[pos + 5]!,
+      png[pos + 6]!,
+      png[pos + 7]!,
+    );
     const body = png.subarray(pos + 8, pos + 8 + len);
     if (type === "IHDR") {
       width = view.getUint32(pos + 8);
@@ -137,7 +168,8 @@ export async function pngToPdfImage(png: Uint8Array): Promise<PdfImage | null> {
     pos += 12 + len;
   }
   const channels = { 0: 1, 2: 3, 4: 2, 6: 4 }[colorType];
-  if (!width || !height || depth !== 8 || !channels || interlace !== 0) return null;
+  if (!width || !height || depth !== 8 || !channels || interlace !== 0)
+    return null;
   const total = idat.reduce((n, c) => n + c.length, 0);
   const z = new Uint8Array(total);
   let o = 0;
@@ -205,7 +237,9 @@ export async function pngToPdfImage(png: Uint8Array): Promise<PdfImage | null> {
 }
 
 /** `data:image/png;base64,…` → bytes, or null. */
-export function dataUrlBytes(url: string | null | undefined): Uint8Array | null {
+export function dataUrlBytes(
+  url: string | null | undefined,
+): Uint8Array | null {
   const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(url ?? "");
   if (!m) return null;
   const bin = atob(m[1]!);
@@ -232,14 +266,27 @@ function layout(doc: PdfDoc): Op[][] {
   const pages: Op[][] = [[]];
   let y = PAGE_H - MARGIN;
   const bottom = MARGIN + 24;
-  const put = (text: string, size: number, bold: boolean, indent = 0, gapAfter = 0) => {
+  const put = (
+    text: string,
+    size: number,
+    bold: boolean,
+    indent = 0,
+    gapAfter = 0,
+  ) => {
     for (const bytes of wrap(text, size, bold, maxW - indent)) {
       if (y - size < bottom) {
         pages.push([]);
         y = PAGE_H - MARGIN;
       }
       y -= size * 1.15;
-      pages[pages.length - 1]!.push({ kind: "text", x: MARGIN + indent, y, size, bold, bytes });
+      pages[pages.length - 1]!.push({
+        kind: "text",
+        x: MARGIN + indent,
+        y,
+        size,
+        bold,
+        bytes,
+      });
       y -= Math.max(0, LEAD - size * 1.15);
     }
     y -= gapAfter;
@@ -253,7 +300,10 @@ function layout(doc: PdfDoc): Op[][] {
       y -= 6;
       continue;
     }
-    const isHeading = line.length <= 60 && /^[A-Z0-9][A-Z0-9 :&'’()/,.-]*$/.test(line) && /[A-Z]{3}/.test(line);
+    const isHeading =
+      line.length <= 60 &&
+      /^[A-Z0-9][A-Z0-9 :&'’()/,.-]*$/.test(line) &&
+      /[A-Z]{3}/.test(line);
     if (isHeading) {
       y -= 6;
       put(line, 11.5, true, 0, 2);
@@ -287,8 +337,10 @@ export function pdfBytes(doc: PdfDoc, image?: PdfImage): Uint8Array {
   const streams = pages.map((ops, i) => {
     let s = "";
     for (const op of ops) {
-      if (op.kind === "text") s += `BT /${op.bold ? "F2" : "F1"} ${op.size} Tf ${op.x.toFixed(2)} ${op.y.toFixed(2)} Td ${pdfString(op.bytes!)} Tj ET\n`;
-      else if (image) s += `q ${op.w!.toFixed(2)} 0 0 ${op.h!.toFixed(2)} ${op.x.toFixed(2)} ${op.y.toFixed(2)} cm /Im1 Do Q\n`;
+      if (op.kind === "text")
+        s += `BT /${op.bold ? "F2" : "F1"} ${op.size} Tf ${op.x.toFixed(2)} ${op.y.toFixed(2)} Td ${pdfString(op.bytes!)} Tj ET\n`;
+      else if (image)
+        s += `q ${op.w!.toFixed(2)} 0 0 ${op.h!.toFixed(2)} ${op.x.toFixed(2)} ${op.y.toFixed(2)} cm /Im1 Do Q\n`;
     }
     const pn = toWinAnsi(`Page ${i + 1} of ${pages.length}`);
     s += `BT /F1 8.5 Tf 0.4 g ${MARGIN} ${MARGIN - 18} Td ${pdfString(footerBytes)} Tj ET\n`;
@@ -299,23 +351,48 @@ export function pdfBytes(doc: PdfDoc, image?: PdfImage): Uint8Array {
 }
 
 /** Letter pages from ready content streams (Helvetica = F1, Helvetica-Bold = F2, optional image Im1). */
-function assemblePdf(streams: string[], title: string, image?: PdfImage): Uint8Array {
+function assemblePdf(
+  streams: string[],
+  title: string,
+  image?: PdfImage,
+): Uint8Array {
   const objects: Array<string | Uint8Array> = [];
   const add = (o: string | Uint8Array) => objects.push(o) && objects.length;
   const catalog = add(""); // 1, filled last
   const pagesObj = add(""); // 2
-  const f1 = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
-  const f2 = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
-  const imgObj = image ? add(concat(`<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${image.data.length} >>\nstream\n`, image.data, "\nendstream")) : 0;
+  const f1 = add(
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+  );
+  const f2 = add(
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
+  );
+  const imgObj = image
+    ? add(
+        concat(
+          `<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${image.data.length} >>\nstream\n`,
+          image.data,
+          "\nendstream",
+        ),
+      )
+    : 0;
   const pageIds: number[] = [];
   for (const s of streams) {
-    const content = add(concat(`<< /Length ${utf8len(s)} >>\nstream\n`, s, "\nendstream"));
+    const content = add(
+      concat(`<< /Length ${utf8len(s)} >>\nstream\n`, s, "\nendstream"),
+    );
     const res = `<< /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >>${imgObj ? ` /XObject << /Im1 ${imgObj} 0 R >>` : ""} >>`;
-    pageIds.push(add(`<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources ${res} /Contents ${content} 0 R >>`));
+    pageIds.push(
+      add(
+        `<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources ${res} /Contents ${content} 0 R >>`,
+      ),
+    );
   }
   objects[catalog - 1] = `<< /Type /Catalog /Pages ${pagesObj} 0 R >>`;
-  objects[pagesObj - 1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
-  const info = add(`<< /Title ${pdfString(toWinAnsi(title))} /Producer (Website Business) >>`);
+  objects[pagesObj - 1] =
+    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+  const info = add(
+    `<< /Title ${pdfString(toWinAnsi(title))} /Producer (Website Business) >>`,
+  );
 
   const parts: Uint8Array[] = [];
   const enc = new TextEncoder();
@@ -334,8 +411,12 @@ function assemblePdf(streams: string[], title: string, image?: PdfImage): Uint8A
     push("\nendobj\n");
   });
   const xref = offset;
-  push(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`);
-  push(`trailer\n<< /Size ${objects.length + 1} /Root ${catalog} 0 R /Info ${info} 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  push(
+    `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`,
+  );
+  push(
+    `trailer\n<< /Size ${objects.length + 1} /Root ${catalog} 0 R /Info ${info} 0 R >>\nstartxref\n${xref}\n%%EOF\n`,
+  );
   const out = new Uint8Array(offset);
   let p = 0;
   for (const part of parts) {
@@ -349,8 +430,26 @@ function assemblePdf(streams: string[], title: string, image?: PdfImage): Uint8A
 
 /** Drawing instructions in points from the top-left of a Letter page (612 × 792). */
 export type Draw =
-  | { t: "text"; x: number; y: number; size: number; text: string; bold?: boolean; align?: "left" | "center" | "right"; gray?: number; maxW?: number }
-  | { t: "rect"; x: number; y: number; w: number; h: number; gray?: number; stroke?: boolean }
+  | {
+      t: "text";
+      x: number;
+      y: number;
+      size: number;
+      text: string;
+      bold?: boolean;
+      align?: "left" | "center" | "right";
+      gray?: number;
+      maxW?: number;
+    }
+  | {
+      t: "rect";
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      gray?: number;
+      stroke?: boolean;
+    }
   | { t: "qr"; x: number; y: number; size: number; grid: string[] }
   | { t: "flip"; ops: Draw[] };
 
@@ -380,7 +479,10 @@ function drawOps(ops: Draw[], flipped: boolean): string {
         const row = op.grid[r]!;
         let c = 0;
         while (c < n) {
-          if (row[c] !== "1") { c++; continue; }
+          if (row[c] !== "1") {
+            c++;
+            continue;
+          }
           let run = 1;
           while (c + run < n && row[c + run] === "1") run++;
           s += `${(op.x + c * cell).toFixed(2)} ${(PAGE_H - op.y - (r + 1) * cell).toFixed(2)} ${(run * cell + 0.2).toFixed(2)} ${(cell + 0.2).toFixed(2)} re f\n`;
@@ -390,10 +492,17 @@ function drawOps(ops: Draw[], flipped: boolean): string {
       s += "Q\n";
       continue;
     }
-    const lines = op.maxW ? wrap(op.text, op.size, !!op.bold, op.maxW).map((b) => b) : [toWinAnsi(op.text)];
+    const lines = op.maxW
+      ? wrap(op.text, op.size, !!op.bold, op.maxW).map((b) => b)
+      : [toWinAnsi(op.text)];
     lines.forEach((bytes, i) => {
       const w = widthOf(bytes, op.size, !!op.bold);
-      const x = op.align === "center" ? op.x - w / 2 : op.align === "right" ? op.x - w : op.x;
+      const x =
+        op.align === "center"
+          ? op.x - w / 2
+          : op.align === "right"
+            ? op.x - w
+            : op.x;
       const y = PAGE_H - op.y - i * op.size * 1.25;
       s += `BT /${op.bold ? "F2" : "F1"} ${op.size} Tf ${(op.gray ?? 0).toFixed(2)} g ${x.toFixed(2)} ${y.toFixed(2)} Td ${pdfString(bytes)} Tj ET\n`;
     });
@@ -403,14 +512,21 @@ function drawOps(ops: Draw[], flipped: boolean): string {
 
 /** A PDF made of drawn pages (no flowing text, no page numbers). */
 export function drawPdf(pages: Draw[][], title: string): Uint8Array {
-  return assemblePdf(pages.map((ops) => drawOps(ops, false)), title);
+  return assemblePdf(
+    pages.map((ops) => drawOps(ops, false)),
+    title,
+  );
 }
 
 function utf8len(s: string): number {
   return new TextEncoder().encode(s).length;
 }
 
-function concat(head: string, body: Uint8Array | string, tail: string): Uint8Array {
+function concat(
+  head: string,
+  body: Uint8Array | string,
+  tail: string,
+): Uint8Array {
   const enc = new TextEncoder();
   const h = enc.encode(head);
   const b = typeof body === "string" ? enc.encode(body) : body;

@@ -87,7 +87,7 @@ test("follow-up texts, share texts and offer hints match app.js", () => {
   }
   inAppJs("SHARE_TEXT", SHARE_TEXT);
   inAppJs("SIGNUP_TEXT", SIGNUP_TEXT);
-  assert.equal(OFFER_HINT.length, 14);
+  assert.equal(OFFER_HINT.length, 18);
   for (const h of OFFER_HINT) {
     inAppJs("OFFER_HINT.text", h.text);
     assert.ok(appJs.includes(`[/${h.match}/i,`), `OFFER_HINT pattern not in app.js: ${h.match}`);

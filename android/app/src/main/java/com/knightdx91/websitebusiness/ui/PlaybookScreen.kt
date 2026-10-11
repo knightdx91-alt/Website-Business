@@ -115,10 +115,12 @@ fun PlaybookScreen(state: AppState, nav: NavHostController) {
                     ))
                 }
             }
-            if (o.addons.isNotEmpty()) item {
-                SectionCard("Extras") {
-                    Text("Offer one when it fits. Any extra goes with any plan.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    o.addons.forEach { a ->
+            listOf(Triple("general", "Extras", "Offer one when it fits. Any extra goes with any plan."), Triple("inventory", "Inventory add-ons", "The live price list system in pieces: offer these to shops whose stock changes, with the Price list plan or any website plan.")).forEach { (g, heading, intro) ->
+                val list = o.addons.filter { (it.group == "inventory") == (g == "inventory") }
+                if (list.isNotEmpty()) item {
+                SectionCard(heading) {
+                    Text(intro, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    list.forEach { a ->
                         Column(Modifier.padding(top = 8.dp)) {
                             Text("${a.name} · ${a.price}", fontWeight = FontWeight.SemiBold)
                             if (a.about.isNotBlank()) Text(a.about, style = MaterialTheme.typography.bodySmall)
@@ -126,6 +128,7 @@ fun PlaybookScreen(state: AppState, nav: NavHostController) {
                             if (hint.isNotBlank()) Text("Offer to: $hint", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                }
                 }
             }
             item {

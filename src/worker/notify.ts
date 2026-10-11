@@ -12,10 +12,34 @@ import { fcmSend } from "./fcm.ts";
  * what's new while logged in. That keeps details off the push service and needs no payload encryption.
  */
 
-export type EventKind = "note" | "call" | "status" | "signup_sent" | "signed" | "paid" | "published" | "added" | "message" | "run" | "preview_open" | "task" | "costs";
+export type EventKind =
+  | "note"
+  | "call"
+  | "status"
+  | "signup_sent"
+  | "signed"
+  | "paid"
+  | "published"
+  | "added"
+  | "message"
+  | "run"
+  | "preview_open"
+  | "task"
+  | "costs";
 
 /** The notifications callers get: anything added or changed on a lead, plus tasks. Not website messages or search runs. */
-export const CALLER_KINDS: EventKind[] = ["note", "call", "status", "signup_sent", "signed", "paid", "published", "added", "preview_open", "task"];
+export const CALLER_KINDS: EventKind[] = [
+  "note",
+  "call",
+  "status",
+  "signup_sent",
+  "signed",
+  "paid",
+  "published",
+  "added",
+  "preview_open",
+  "task",
+];
 const callerFilter = `AND kind IN (${CALLER_KINDS.map((k) => `'${k}'`).join(",")})`;
 
 export interface EventInput {
@@ -40,8 +64,18 @@ interface EventRow {
 /** Records the event and pings everyone else's phones. Never throws: a failed notification mustn't break the action. */
 export async function notify(env: Env, e: EventInput): Promise<void> {
   try {
-    await env.DB.prepare("INSERT INTO events (id, created_at, actor_id, actor_name, kind, lead_id, text) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(newId(), now(), e.actor?.userId ?? null, e.actor?.name ?? e.actorName ?? null, e.kind, e.leadId ?? null, e.text.slice(0, 500))
+    await env.DB.prepare(
+      "INSERT INTO events (id, created_at, actor_id, actor_name, kind, lead_id, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    )
+      .bind(
+        newId(),
+        now(),
+        e.actor?.userId ?? null,
+        e.actor?.name ?? e.actorName ?? null,
+        e.kind,
+        e.leadId ?? null,
+        e.text.slice(0, 500),
+      )
       .run();
     await pushAll(env, e.actor?.userId ?? null, e.kind);
     // Android phones: an instant "something's new" ping; each phone fetches its own filtered list.
@@ -53,13 +87,24 @@ export async function notify(env: Env, e: EventInput): Promise<void> {
 
 /** People who get this kind of notification: the owner and full-access team members, plus callers for CALLER_KINDS. */
 async function recipients(env: Env, kind: EventKind): Promise<string[]> {
-  const sql = CALLER_KINDS.includes(kind) ? "SELECT id FROM users WHERE disabled = 0" : "SELECT id FROM users WHERE admin = 1 AND disabled = 0";
+  const sql = CALLER_KINDS.includes(kind)
+    ? "SELECT id FROM users WHERE disabled = 0"
+    : "SELECT id FROM users WHERE admin = 1 AND disabled = 0";
   const team = await env.DB.prepare(sql).all<{ id: string }>();
   return ["owner", ...team.results.map((u) => u.id)];
 }
 
-export async function listEvents(env: Env, userId: string, limit = 100, caller = false) {
-  const seen = await env.DB.prepare("SELECT seen_at FROM notif_seen WHERE user_id = ?").bind(userId).first<{ seen_at: number }>();
+export async function listEvents(
+  env: Env,
+  userId: string,
+  limit = 100,
+  caller = false,
+) {
+  const seen = await env.DB.prepare(
+    "SELECT seen_at FROM notif_seen WHERE user_id = ?",
+  )
+    .bind(userId)
+    .first<{ seen_at: number }>();
   const rows = await env.DB.prepare(
     `SELECT e.*, l.name AS lead_name FROM events e LEFT JOIN leads l ON l.id = e.lead_id WHERE (e.actor_id IS NULL OR e.actor_id != ?) ${caller ? callerFilter.replace("kind", "e.kind") : ""} ORDER BY e.created_at DESC LIMIT ?`,
   )
@@ -69,20 +114,43 @@ export async function listEvents(env: Env, userId: string, limit = 100, caller =
   return {
     seenAt,
     unread: rows.results.filter((r) => r.created_at > seenAt).length,
-    items: rows.results.map((r) => ({ id: r.id, at: r.created_at, kind: r.kind, text: r.text, who: r.actor_name, leadId: r.lead_id, leadName: r.lead_name, unread: r.created_at > seenAt })),
+    items: rows.results.map((r) => ({
+      id: r.id,
+      at: r.created_at,
+      kind: r.kind,
+      text: r.text,
+      who: r.actor_name,
+      leadId: r.lead_id,
+      leadName: r.lead_name,
+      unread: r.created_at > seenAt,
+    })),
   };
 }
 
-export async function unreadCount(env: Env, userId: string, caller = false): Promise<number> {
-  const seen = await env.DB.prepare("SELECT seen_at FROM notif_seen WHERE user_id = ?").bind(userId).first<{ seen_at: number }>();
-  const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM events WHERE created_at > ? AND (actor_id IS NULL OR actor_id != ?) ${caller ? callerFilter : ""}`)
+export async function unreadCount(
+  env: Env,
+  userId: string,
+  caller = false,
+): Promise<number> {
+  const seen = await env.DB.prepare(
+    "SELECT seen_at FROM notif_seen WHERE user_id = ?",
+  )
+    .bind(userId)
+    .first<{ seen_at: number }>();
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM events WHERE created_at > ? AND (actor_id IS NULL OR actor_id != ?) ${caller ? callerFilter : ""}`,
+  )
     .bind(seen?.seen_at ?? 0, userId)
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
 
 export async function markSeen(env: Env, userId: string): Promise<void> {
-  await env.DB.prepare("INSERT INTO notif_seen (user_id, seen_at) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET seen_at = excluded.seen_at").bind(userId, now()).run();
+  await env.DB.prepare(
+    "INSERT INTO notif_seen (user_id, seen_at) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET seen_at = excluded.seen_at",
+  )
+    .bind(userId, now())
+    .run();
 }
 
 const PUSH_TITLE: Record<EventKind, string> = {
@@ -106,13 +174,27 @@ export async function latestForPush(env: Env, userId: string, caller = false) {
   const test = Number((await getSetting(env, `push_test_${userId}`)) ?? 0);
   if (test && Date.now() - test < 120_000) {
     await setSetting(env, `push_test_${userId}`, "0");
-    return { title: "Underground Associates", body: "Test notification: you're all set. You'll get one whenever someone else adds or changes something on a lead.", url: "/#/notifications", unread: 0 };
+    return {
+      title: "Underground Associates",
+      body: "Test notification: you're all set. You'll get one whenever someone else adds or changes something on a lead.",
+      url: "/#/notifications",
+      unread: 0,
+    };
   }
   const { items, unread } = await listEvents(env, userId, 5, caller);
   const top = items.find((i) => i.unread) ?? items[0];
-  if (!top) return { title: "Underground Associates", body: "Nothing new.", url: "/#/notifications", unread: 0 };
+  if (!top)
+    return {
+      title: "Underground Associates",
+      body: "Nothing new.",
+      url: "/#/notifications",
+      unread: 0,
+    };
   return {
-    title: unread > 1 ? `${unread} new updates` : PUSH_TITLE[top.kind] ?? "Underground Associates",
+    title:
+      unread > 1
+        ? `${unread} new updates`
+        : (PUSH_TITLE[top.kind] ?? "Underground Associates"),
     body: top.text,
     url: top.leadId ? `/#/lead/${top.leadId}` : "/#/notifications",
     unread,
@@ -122,8 +204,17 @@ export async function latestForPush(env: Env, userId: string, caller = false) {
 /* ---------- Web Push (VAPID, no payload) ---------- */
 
 const b64url = (buf: ArrayBuffer | Uint8Array) =>
-  btoa(String.fromCharCode(...new Uint8Array(buf as ArrayBuffer))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-const fromB64url = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+  btoa(String.fromCharCode(...new Uint8Array(buf as ArrayBuffer)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+const fromB64url = (s: string) =>
+  Uint8Array.from(
+    atob(
+      s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4),
+    ),
+    (c) => c.charCodeAt(0),
+  );
 
 /** The public key phones subscribe with (uncompressed P-256 point), or null when push isn't set up. */
 export function vapidPublicKey(env: Env): string | null {
@@ -140,11 +231,31 @@ export function vapidPublicKey(env: Env): string | null {
 
 export async function vapidAuth(env: Env, endpoint: string): Promise<string> {
   const jwk = JSON.parse(env.VAPID_PRIVATE_JWK!) as JsonWebKey;
-  const key = await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"],
+  );
   const enc = new TextEncoder();
-  const header = b64url(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
-  const claims = b64url(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: "mailto:post@undergroundassociates.com" })));
-  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(`${header}.${claims}`));
+  const header = b64url(
+    enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })),
+  );
+  const claims = b64url(
+    enc.encode(
+      JSON.stringify({
+        aud: new URL(endpoint).origin,
+        exp: Math.floor(Date.now() / 1000) + 12 * 3600,
+        sub: "mailto:post@undergroundassociates.com",
+      }),
+    ),
+  );
+  const sig = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    key,
+    enc.encode(`${header}.${claims}`),
+  );
   return `vapid t=${header}.${claims}.${b64url(sig)}, k=${vapidPublicKey(env)}`;
 }
 
@@ -152,7 +263,12 @@ export async function vapidAuth(env: Env, endpoint: string): Promise<string> {
 export function allowedEndpoint(endpoint: string): boolean {
   try {
     const u = new URL(endpoint);
-    return u.protocol === "https:" && /(^|\.)(googleapis\.com|mozilla\.com|windows\.com|push\.apple\.com)$/.test(u.hostname);
+    return (
+      u.protocol === "https:" &&
+      /(^|\.)(googleapis\.com|mozilla\.com|windows\.com|push\.apple\.com)$/.test(
+        u.hostname,
+      )
+    );
   } catch {
     return false;
   }
@@ -165,22 +281,39 @@ export async function pushTo(env: Env, endpoints: string[]): Promise<number> {
     endpoints.map(async (endpoint) => {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { Authorization: await vapidAuth(env, endpoint), TTL: "86400", Urgency: "high", "Content-Length": "0" },
+        headers: {
+          Authorization: await vapidAuth(env, endpoint),
+          TTL: "86400",
+          Urgency: "high",
+          "Content-Length": "0",
+        },
         signal: AbortSignal.timeout(5000),
       });
-      if (res.status === 404 || res.status === 410) await env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(endpoint).run();
+      if (res.status === 404 || res.status === 410)
+        await env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ?")
+          .bind(endpoint)
+          .run();
       else if (res.ok) sent++;
     }),
   );
   return sent;
 }
 
-async function pushAll(env: Env, exceptUserId: string | null, kind: EventKind): Promise<void> {
+async function pushAll(
+  env: Env,
+  exceptUserId: string | null,
+  kind: EventKind,
+): Promise<void> {
   if (!env.VAPID_PRIVATE_JWK) return;
   const who = (await recipients(env, kind)).filter((id) => id !== exceptUserId);
   if (!who.length) return;
-  const subs = await env.DB.prepare(`SELECT endpoint FROM push_subs WHERE user_id IN (${who.map(() => "?").join(",")})`)
+  const subs = await env.DB.prepare(
+    `SELECT endpoint FROM push_subs WHERE user_id IN (${who.map(() => "?").join(",")})`,
+  )
     .bind(...who)
     .all<{ endpoint: string }>();
-  await pushTo(env, subs.results.map((s) => s.endpoint));
+  await pushTo(
+    env,
+    subs.results.map((s) => s.endpoint),
+  );
 }

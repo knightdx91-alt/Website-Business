@@ -53,6 +53,10 @@ const STANDARD_EXTRA_TERMS: Array<[RegExp, string]> = [
     "Each month we write 8 to 12 Facebook and Instagram posts for your business. You approve each post before it goes up and are responsible for what you approve. You keep ownership of your Facebook and Instagram accounts and give us the access level you choose; we never post anything you haven't approved; Meta may remove or limit posts, which we don't control. Billed monthly, no partial-month refunds; cancel any time with 30 days' notice. We don't guarantee followers, reach or sales.",
   ],
   [
+    /scanning/i,
+    "Barcode scanning is switched on for your board and tablet while the add-on is active: the Scan button reads barcodes with the device camera in Chrome, or from a keyboard-mode handheld scanner. Product names suggested from public barcode databases are a starting point you check. Billed monthly; cancel with 30 days' notice, after which the Scan button goes away but every code, count and item you entered stays.",
+  ],
+  [
     /tablet/i,
     "We supply a consumer Android tablet, set it up on your Wi-Fi with your display page, and mount it where you choose (a simple stand or clamp, no wiring). The tablet is yours once paid. Hardware faults are covered by the maker's warranty, which we help you claim; damage, water and theft are not. Your Wi-Fi and power are your responsibility.",
   ],

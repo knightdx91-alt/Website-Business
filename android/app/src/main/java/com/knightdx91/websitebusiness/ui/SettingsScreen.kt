@@ -93,9 +93,11 @@ private val SUGGESTED_PLANS = listOf(
     SuggestedPlan("basic", "Basic", 0.0, 49.0, "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page\nLive price list with QR tags and a tablet display, if your stock changes"),
     SuggestedPlan("plus", "Plus", 0.0, 89.0, "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter"),
     SuggestedPlan("pro", "Pro", 0.0, 149.0, "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes"),
-    SuggestedPlan("list", "Price list", 0.0, 29.0, "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out, scan barcodes, add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time"),
+    SuggestedPlan("list", "Price list", 0.0, 29.0, "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out and add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time"),
 )
 
+/** Mirrors addonGroup() in db.ts for Settings saved before extras had a group. */
+private val INVENTORY_EXTRA = Regex("price tag|shelf label|tablet|scanner|scanning|stock list|inventory|price list|stock board|tank board", RegexOption.IGNORE_CASE)
 private val UNIT_OPTIONS = listOf("month" to "per month", "each" to "each", "one-time" to "one-time", "quote" to "quote per job")
 
 private val BILLING_LABELS = mapOf("standard" to "-month plan", "short" to "-month plan", "flex" to "Month to month", "annual" to "Pay yearly", "invoice" to "Pay by invoice (churches)")
@@ -142,8 +144,9 @@ private class PlanForm(val id: String, name: String, setup: String, monthly: Str
     val legend get() = when (id) { "basic" -> "Plan 1"; "plus" -> "Plan 2 (recommended)"; else -> "Plan 3" }
 }
 
-private class AddonForm(name: String, price: String, unit: String, about: String, terms: String) {
+private class AddonForm(name: String, price: String, unit: String, about: String, terms: String, group: String = "general") {
     val key = nextRowKey++
+    var group by mutableStateOf(group)
     var name by mutableStateOf(name)
     var price by mutableStateOf(price)
     var unit by mutableStateOf(unit)
@@ -213,7 +216,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         }
         // Existing extras show their own terms, else the standard terms for that extra (the web textarea does the same, so saving keeps them).
         s.optJSONArray("addons").objects().forEachIndexed { i, a ->
-            addons.add(AddonForm(a.txt("name"), numText(a, "price", ""), a.str("unit") ?: "one-time", a.txt("about"), a.str("terms") ?: extraTerms.getOrNull(i) ?: ""))
+            addons.add(AddonForm(a.txt("name"), numText(a, "price", ""), a.str("unit") ?: "one-time", a.txt("about"), a.str("terms") ?: extraTerms.getOrNull(i) ?: "", a.str("group") ?: (if (INVENTORY_EXTRA.containsMatchIn(a.txt("name"))) "inventory" else "general")))
         }
     }
 
@@ -290,6 +293,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
             val o = JSONObject().put("name", name).put("price", numOrZero(a.price, "$name price")).put("unit", a.unit)
             if (a.about.isNotBlank()) o.put("about", a.about.trim())
             if (a.terms.isNotBlank()) o.put("terms", a.terms.trim())
+            o.put("group", a.group)
             addonsArr.put(o)
         }
         b.put("addons", addonsArr)
@@ -826,13 +830,17 @@ private fun PreviewCard(m: SettingsMeta, plan: String, onPlan: (String) -> Unit,
 @Composable
 private fun ExtrasCard(f: SettingsForm) {
     CollapsibleCard("Extras") {
-        Hint("Shown on the sign-up page and in call guides. Leave a name blank to remove it.")
+        Hint("Shown on the sign-up page, the website and in call guides. Leave a name blank to remove it. Inventory add-ons are listed together as the live price list's pieces.")
         f.addons.forEachIndexed { i, a ->
             if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Field(a.name, { a.name = it }, "Extra ${i + 1}", placeholder = "New extra", caps = KeyboardCapitalization.Sentences)
             Field(a.price, { a.price = it }, "Price (\$)", keyboard = KeyboardType.Decimal)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
                 UNIT_OPTIONS.forEach { (id, label) -> FilterChip(selected = a.unit == id, onClick = { a.unit = id }, label = { Text(label) }) }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
+                FilterChip(selected = a.group != "inventory", onClick = { a.group = "general" }, label = { Text("Extras") })
+                FilterChip(selected = a.group == "inventory", onClick = { a.group = "inventory" }, label = { Text("Inventory add-on") })
             }
             Field(a.about, { a.about = it }, "What they get", placeholder = "One sentence on what they get", caps = KeyboardCapitalization.Sentences)
             Row(verticalAlignment = Alignment.CenterVertically) {

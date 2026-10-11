@@ -3,7 +3,7 @@ import { hmac, safeEqual } from "./auth.ts";
 import { getLead, updateLead, type LeadRow } from "./db.ts";
 import { HttpError, newId, type Env } from "./env.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
-import { kindWords, listKind } from "../generator/pricelist.ts";
+import { kindWords, listKind, scanningOn } from "../generator/pricelist.ts";
 import type {
   BusinessRecord,
   Copy,
@@ -16,6 +16,8 @@ import { renderPreview } from "./pipeline.ts";
 import { publishLead } from "./publish.ts";
 import {
   approveUnlock,
+  findByBarcode,
+  lookupBarcode,
   nfcSecret,
   normalizeCode,
   setStaffPin,
@@ -418,6 +420,35 @@ export async function serveTankBoard(
       },
     });
   }
+  if (rest === "/lookup" && req.method === "GET") {
+    // The board's Scan mode: what a code is (a row here, something from the catalog, or a product name from its UPC).
+    if (!scanningOn(record))
+      throw new HttpError(
+        403,
+        "Barcode scanning isn't turned on for this board. It's an add-on; ask us to switch it on.",
+      );
+    const code = normalizeCode(new URL(req.url).searchParams.get("code") ?? "");
+    if (!code) throw new HttpError(400, "No code read");
+    const hit = findByBarcode(record, code);
+    const out: Record<string, unknown> = { code };
+    if (hit.item)
+      out.item = {
+        section: hit.item.section,
+        name: hit.item.item.name,
+        qty: hit.item.item.qty ?? null,
+        price: hit.item.item.price ?? "",
+      };
+    else if (hit.catalog)
+      out.catalog = {
+        name: hit.catalog.name,
+        price: hit.catalog.price ?? "",
+        imageSrc: hit.catalog.image?.src ?? null,
+        image: photoUrl(lead, origin, hit.catalog.image),
+      };
+    else if (/^\d{8,14}$/.test(code))
+      out.suggestion = await lookupBarcode(code).catch(() => null);
+    return Response.json(out, { headers: { "cache-control": "no-store" } });
+  }
   if (rest === "/unlock" && req.method === "POST") {
     // The shop approves a tablet's 6-digit code from their phone.
     const { code } = (await req.json()) as { code?: string };
@@ -495,6 +526,7 @@ export function boardPage(
   leadId = "",
 ): Response {
   const name = escHtml(record.name);
+  const scan = scanningOn(record);
   const W = kindWords(record);
   const sec = W.section.toLowerCase();
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -537,7 +569,8 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 <div class="row" style="margin:8px 0"><label class="chip" style="cursor:pointer">📄 Pick a .csv file<input id="impFile" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" style="display:none"></label><button class="btn btn--line" id="impPreview" type="button" style="padding:10px 12px">Check it first</button><a class="chip" id="expCsv" href="${escHtml(base)}/export.csv" download>⬇️ Download what's on the board (.csv)</a></div>
 <div id="impPrev" hidden></div>
 <p class="muted" id="impMsg" style="margin:4px 0 0"></p></div></section>
-<div class="bar"><button class="btn btn--line" id="addTank" type="button">+ Add a ${escHtml(sec)}</button><span class="small muted">Changes save by themselves.</span></div>
+<div class="bar"><button class="btn btn--line" id="addTank" type="button">+ Add a ${escHtml(sec)}</button>${scan ? '<button class="btn" id="scanMode" type="button">▦ Scan</button>' : ""}<span class="small muted">Changes save by themselves.</span></div>
+<div id="hitOv" style="display:none;position:fixed;inset:0;background:rgba(20,33,61,.55);z-index:8;align-items:flex-end;justify-content:center"><div id="hitBody" style="background:#fff;border-radius:16px 16px 0 0;padding:16px;width:100%;max-width:720px;max-height:80vh;overflow:auto"></div></div>
 <section class="tank" id="staffbox"><div class="tank__h"><span>📺</span><b>Tablet &amp; staff</b></div><div style="padding:10px 12px" class="small">
 <p style="margin:0 0 8px">A tablet beside a ${escHtml(sec)} shows it live (the 📺 on each one). On the tablet, <b>Staff</b> unlocks adding ${escHtml(W.item)}s, counts and photos. Three ways in:</p>
 <div class="row" style="margin-bottom:8px"><label style="flex:1 1 160px">Staff PIN (4–8 digits)<input id="pinIn" inputmode="numeric" placeholder="not set" style="width:100%;margin-top:4px"></label><button class="btn btn--line" id="pinSave" type="button" style="padding:10px 12px">Save PIN</button></div>
@@ -548,7 +581,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 <footer>📺 means "show this ${escHtml(sec)} on a screen": open that link on a tablet beside it and it shows what's in it, live. <a href="/d/${escHtml(leadId)}/" target="_blank" rel="noopener">Everything, rotating</a>.<br>${escHtml(W.board)} by Underground Associates · Anything odd? Text us.</footer>
 <script>
 (function(){
-var BASE=${JSON.stringify(base)};var LEAD=${JSON.stringify(leadId)};var data=null;var timer=null;var st=document.getElementById("st");var m=document.getElementById("m");
+var BASE=${JSON.stringify(base)};var LEAD=${JSON.stringify(leadId)};var SCAN=${scan ? "true" : "false"};var data=null;var timer=null;var st=document.getElementById("st");var m=document.getElementById("m");
 function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function status(t,cls){st.textContent=t;st.className="st "+(cls||"")}
 function render(){
@@ -557,7 +590,7 @@ function render(){
     s.items.map(function(it,ii){return '<div class="item'+(it.soldOut?' out':'')+'" data-i="'+ii+'"><label class="ph" title="Take or pick a photo">'+(it.image?'<img src="'+esc(it.image)+'" alt="">':'📷')+'<input type="file" accept="image/*" capture="environment" data-a="photo"></label><div>'+
       '<div class="row"><input class="nm" value="'+esc(it.name)+'" data-f="name" placeholder="What is it?" aria-label="Name"><input class="pr" value="'+esc(it.price)+'" data-f="price" placeholder="$" inputmode="decimal" aria-label="Price"><input class="qt" value="'+(it.qty==null?"":it.qty)+'" data-f="qty" placeholder="how many" inputmode="numeric" aria-label="How many"></div>'+
       '<div class="row"><input class="nt" value="'+esc(it.note)+'" data-f="note" placeholder="Note (${escHtml(NOTE_HINT[listKind(record)])}…)" aria-label="Note"></div>'+
-      '<div class="row"><input class="bc" value="'+esc(it.barcode||"")+'" data-f="barcode" placeholder="Barcode (scan or type)" inputmode="numeric" aria-label="Barcode" style="flex:1 1 9em"><button class="ic" data-a="scan" type="button" title="Scan the barcode with the camera">▦</button></div>'+
+      (SCAN?'<div class="row"><input class="bc" value="'+esc(it.barcode||"")+'" data-f="barcode" placeholder="Barcode (scan or type)" inputmode="numeric" aria-label="Barcode" style="flex:1 1 9em"><button class="ic" data-a="scan" type="button" title="Scan the barcode with the camera">▦</button></div>':'')+
       '<div class="row"><button class="chip'+(it.soldOut?' on':'')+'" data-a="sold" type="button">'+(it.soldOut?'Sold out · tap when back':'In stock · tap if sold out')+'</button><button class="ic" data-a="delitem" title="Remove">🗑</button></div></div></div>'}).join("")+
     '<button class="add" data-a="additem" type="button">+ Add to this ${escHtml(sec)}</button></section>'}).join("");
 }
@@ -616,6 +649,31 @@ function preview(){impMsg.textContent="Reading…";var body={text:impText.value,
       imp({text:impText.value,mode:mode,columns:impCols,hasHeader:impHeader,section:document.getElementById("impSec").value}).then(function(j){var r=j.result;impMsg.textContent="Done ✓ "+r.added+" added, "+r.updated+" updated"+(r.skipped?", "+r.skipped+" skipped (the board holds 2,000 items)":"")+". "+r.items+" items in "+r.sections+" ${escHtml(sec)}s.";impPrev.hidden=true;impText.value="";impCols=null;impHeader=null;load();window.scrollTo(0,0)}).catch(function(e){impMsg.textContent=e.message;document.getElementById("impGo").disabled=false})});
   }).catch(function(e){impMsg.textContent=e.message;impPrev.hidden=true})}
 document.getElementById("impPreview").addEventListener("click",function(){impCols=null;impHeader=null;preview()});
+var hitOv=document.getElementById("hitOv"),hitBody=document.getElementById("hitBody");var scanModeBtn=document.getElementById("scanMode");
+function findCode(code){for(var i=0;i<data.sections.length;i++){var s=data.sections[i];for(var j=0;j<s.items.length;j++)if((s.items[j].barcode||"")===code)return{s:s,it:s.items[j]}}return null}
+function hitClose(){hitOv.style.display="none"}
+hitOv.addEventListener("click",function(e){if(e.target===hitOv)hitClose()});
+function qtyRowHtml(){return '<div class="row" style="margin:10px 0;align-items:center"><span>How many?</span><button class="chip" id="hM" type="button">−</button><b id="hN" style="min-width:2ch;text-align:center">1</b><button class="chip" id="hP" type="button">+</button><input id="hIn" inputmode="numeric" placeholder="Other" style="max-width:5em"></div>'}
+var hq=1;function bindQty(){hq=1;var show=function(){document.getElementById("hN").textContent=hq};document.getElementById("hM").onclick=function(){hq=Math.max(1,hq-1);show()};document.getElementById("hP").onclick=function(){hq=Math.min(9999,hq+1);show()};document.getElementById("hIn").addEventListener("input",function(){var n=parseInt(this.value,10);if(n>0){hq=Math.min(9999,n);show()}})}
+function afterHit(text){hitBody.innerHTML='<p class="saved">'+esc(text)+'</p><div class="row"><button class="btn" id="hNext" type="button">▦ Scan the next one</button><button class="btn btn--line" id="hDone" type="button">Done</button></div>';document.getElementById("hNext").onclick=function(){hitClose();scanInto(scanHit,null)};document.getElementById("hDone").onclick=hitClose}
+function scanHit(code){var hit=findCode(code);hitOv.style.display="flex";
+  if(hit){hitBody.innerHTML='<h3 style="margin:0 0 4px">'+esc(hit.it.name)+'</h3><p class="small muted" style="margin:0">In '+esc(hit.s.name)+(hit.it.qty==null?"":" · "+hit.it.qty+" in stock")+(hit.it.price?" · "+esc(hit.it.price):"")+' · code '+esc(code)+'</p>'+qtyRowHtml()+'<div class="row"><button class="btn" id="hPut" type="button">➕ Put in</button><button class="btn btn--line" id="hOut" type="button">➖ Take out</button><button class="ic" id="hX" type="button" title="Cancel">✕</button></div>';bindQty();
+    document.getElementById("hPut").onclick=function(){hit.it.qty=Math.min(9999,(Number(hit.it.qty)||0)+hq);hit.it.soldOut=false;render();save(true);afterHit("Put in "+hq+" · "+hit.it.name+" now "+hit.it.qty)};
+    document.getElementById("hOut").onclick=function(){hit.it.qty=Math.max(0,(Number(hit.it.qty)||0)-hq);if(hit.it.qty===0)hit.it.soldOut=true;render();save(true);afterHit("Took out "+hq+" · "+hit.it.name+" now "+hit.it.qty+(hit.it.qty===0?" (sold out)":""))};
+    document.getElementById("hX").onclick=hitClose;return}
+  hitBody.innerHTML='<p>Looking up '+esc(code)+'…</p>';
+  fetch(BASE+"/lookup?code="+encodeURIComponent(code)).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Lookup failed");return j})}).then(function(j){
+    var known=j.catalog||null;var nm=known?known.name:(j.suggestion||"");
+    var secOpts=data.sections.map(function(s,i){return '<option value="'+i+'">'+esc(s.name)+'</option>'}).join("")+'<option value="new">+ New ${escHtml(sec)}…</option>';
+    hitBody.innerHTML='<h3 style="margin:0 0 4px">'+(known?"Known, none in right now":"New product")+'</h3><p class="small muted" style="margin:0">Code '+esc(code)+(j.suggestion&&!known?" · found online, fix the name if it is wrong":"")+'</p><div class="row" style="margin-top:8px"><input id="hName" class="nm" placeholder="Name" value="'+esc(nm)+'"><input id="hPrice" class="pr" placeholder="$" inputmode="decimal" value="'+esc(known&&known.price||"")+'"></div><div class="row" style="margin-top:6px"><label class="small">Goes in <select id="hSec" style="font:inherit;padding:6px">'+secOpts+'</select></label></div>'+qtyRowHtml()+'<div class="row"><button class="btn" id="hAdd" type="button">➕ Put in</button><button class="ic" id="hX" type="button" title="Cancel">✕</button></div>';bindQty();
+    if(!nm)setTimeout(function(){document.getElementById("hName").focus()},50);
+    document.getElementById("hX").onclick=hitClose;
+    document.getElementById("hAdd").onclick=function(){var name=document.getElementById("hName").value.trim();if(!name){alert("Give it a name.");return}var si=document.getElementById("hSec").value;var s;if(si==="new"){var n=prompt("${escHtml(W.section)} or section name");if(!n||!n.trim())return;s={name:n.trim(),slug:"",note:"",items:[]};data.sections.push(s)}else s=data.sections[+si];
+      var ex=null;for(var k=0;k<s.items.length;k++)if(s.items[k].name.toLowerCase()===name.toLowerCase())ex=s.items[k];
+      if(ex){ex.qty=Math.min(9999,(Number(ex.qty)||0)+hq);ex.soldOut=false;ex.barcode=code}else s.items.push({name:name,price:document.getElementById("hPrice").value.trim(),note:"",qty:hq,soldOut:false,image:known?known.image:null,imageSrc:known?known.imageSrc:null,barcode:code});
+      render();save(true);afterHit("Put in "+hq+" · "+name)}
+  }).catch(function(e){hitBody.innerHTML='<p class="err">'+esc(e.message)+'</p><div class="row"><button class="btn btn--line" id="hX" type="button">Close</button></div>';document.getElementById("hX").onclick=hitClose})}
+if(scanModeBtn)scanModeBtn.addEventListener("click",function(){scanInto(scanHit,null)});
 document.getElementById("addTank").addEventListener("click",function(){var n=prompt("${escHtml(W.section)} or section name (e.g. ${escHtml(W.section)} 12, New arrivals)");if(!n||!n.trim())return;data.sections.push({name:n.trim(),slug:"",note:"",items:[]});render();save(true);window.scrollTo(0,document.body.scrollHeight)});
 load();
 })();

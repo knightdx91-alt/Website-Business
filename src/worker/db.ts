@@ -104,7 +104,7 @@ export const DEFAULT_LIST_PLAN: Plan = {
     "Put your whole list on at once: paste it from a spreadsheet or your register's export",
     "Sold out hides an item until it's back; the page shows how many are left",
     "QR price tags for every section (first sheet included) and a tablet display page",
-    "Staff mode on the tablet: count stock in and out, scan barcodes, add new items, PIN-locked",
+    "Staff mode on the tablet: count stock in and out and add new items, PIN-locked",
     "Fast, secure hosting; changes when you text us",
     "No minimum: cancel any time. Upgrade to a full website any time",
   ].join("\n"),
@@ -133,7 +133,24 @@ export interface AddOn {
   about?: string;
   /** Contract terms for this extra; blank uses the standard terms in contract.ts. */
   terms?: string;
+  /** "inventory" = part of the live price list system (listed together everywhere); unset = general, or guessed from the name. */
+  group?: AddOnGroup;
 }
+
+export type AddOnGroup = "general" | "inventory";
+export const ADDON_GROUP_LABEL: Record<AddOnGroup, string> = {
+  general: "Extras",
+  inventory: "Inventory add-ons",
+};
+/** Names that belong to the inventory system when no group is saved (older Settings). */
+const INVENTORY_EXTRA =
+  /price tag|shelf label|tablet|scanner|scanning|stock list|inventory|price list|stock board|tank board/i;
+export const addonGroup = (a: Pick<AddOn, "name" | "group">): AddOnGroup =>
+  a.group ?? (INVENTORY_EXTRA.test(a.name) ? "inventory" : "general");
+export const inventoryAddons = (addons: AddOn[]) =>
+  addons.filter((a) => addonGroup(a) === "inventory");
+export const generalAddons = (addons: AddOn[]) =>
+  addons.filter((a) => addonGroup(a) !== "inventory");
 
 /** "$49 one-time", "$129/month", "$35 each", or "priced per job". */
 export function addonPrice(a: Pick<AddOn, "price" | "unit">): string {
@@ -204,6 +221,7 @@ export const DEFAULT_ADDONS: AddOn[] = [
   },
   {
     name: "QR price tags & shelf labels",
+    group: "inventory",
     price: 49,
     unit: "each",
     about:
@@ -252,6 +270,7 @@ export const DEFAULT_ADDONS: AddOn[] = [
   },
   {
     name: "Tablet display, supplied & set up",
+    group: "inventory",
     price: 99,
     unit: "each",
     about:
@@ -259,6 +278,7 @@ export const DEFAULT_ADDONS: AddOn[] = [
   },
   {
     name: "Barcode scanner, paired to the tablet",
+    group: "inventory",
     price: 59,
     unit: "each",
     about:
@@ -266,10 +286,19 @@ export const DEFAULT_ADDONS: AddOn[] = [
   },
   {
     name: "Stock list loaded for you",
+    group: "inventory",
     price: 49,
     unit: "one-time",
     about:
       "Send us your spreadsheet, register export or a photo of your price board and we put the whole list on your board, sorted into sections.",
+  },
+  {
+    name: "Barcode scanning",
+    price: 15,
+    unit: "month",
+    group: "inventory",
+    about:
+      "Count packaged stock in and out by scanning it, on your board with your phone camera or on the tablet. A new code asks for a name once; many products fill it in by themselves.",
   },
 ];
 

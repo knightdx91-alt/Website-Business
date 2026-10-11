@@ -84,6 +84,14 @@ export function listKind(r: BusinessRecord): ListKind {
 
 export const kindWords = (r: BusinessRecord): KindWords => KINDS[listKind(r)];
 
+/** Barcode scanning (an add-on): on when switched on in Edit, or, for shops set up before the switch, when any code is already stored. */
+export function scanningOn(r: BusinessRecord): boolean {
+  const pl = priceListOf(r);
+  if (!pl) return false;
+  if (pl.scanning !== undefined) return pl.scanning;
+  return pl.sections.some((s) => s.items.some((it) => !!it.barcode)) || (pl.catalog ?? []).some((c) => !!c.barcode);
+}
+
 /** Rows a customer sees: the kind's named fields, then any free facts; `facts` is what non-fish kinds and the editor write. */
 export function infoRows(info: ItemInfo | undefined, kind: ListKind = "fish"): Array<[string, string]> {
   if (!info) return [];

@@ -132,9 +132,12 @@ fun ShowPlansScreen(state: AppState, nav: NavHostController, leadId: String?) {
                         }
                     }
                 }
-                if (o.addons.isNotEmpty()) item {
-                    SectionCard("Add-ons") {
-                        o.addons.forEach { a ->
+                listOf("general" to "Add-ons", "inventory" to "Inventory add-ons").forEach { (g, heading) ->
+                    val list = o.addons.filter { (it.group == "inventory") == (g == "inventory") }
+                    if (list.isNotEmpty()) item {
+                    SectionCard(heading) {
+                        if (g == "inventory") Text("For the live price list: with the Price list plan or any website plan.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        list.forEach { a ->
                             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
                                     Text(a.name, fontWeight = FontWeight.SemiBold)
@@ -143,6 +146,7 @@ fun ShowPlansScreen(state: AppState, nav: NavHostController, leadId: String?) {
                                 Text(a.price, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp))
                             }
                         }
+                    }
                     }
                 }
                 item {

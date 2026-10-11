@@ -1608,7 +1608,7 @@
       <section class="show__box"><h2>Ways to pay</h2><div class="show__ways">
         ${payWays(s, plans, church).map(([h, d]) => `<div><h3>${esc(h)}</h3><p>${d}</p></div>`).join("")}
       </div></section>
-      ${s.addons && s.addons.length ? `<section class="show__box"><h2>Add-ons</h2><ul class="show__addons">${s.addons.map((a) => `<li><span>${esc(a.name)}${a.about ? `<small>${esc(a.about)}</small>` : ""}</span><strong>${esc(addonPrice(a))}</strong></li>`).join("")}</ul></section>` : ""}
+      ${[["general", "Add-ons"], ["inventory", "Inventory add-ons"]].map(([g, h]) => { const list = (s.addons || []).filter((a) => addonGroup(a) === g); return list.length ? `<section class="show__box"><h2>${h}</h2>${g === "inventory" ? `<p class="show__fine" style="margin-top:0">For the live price list: with the ${esc((plans.find((p) => p.id === "list") || { name: "Price list" }).name)} plan or any website plan.</p>` : ""}<ul class="show__addons">${list.map((a) => `<li><span>${esc(a.name)}${a.about ? `<small>${esc(a.about)}</small>` : ""}</span><strong>${esc(addonPrice(a))}</strong></li>`).join("")}</ul></section>` : ""; }).join("")}
       <p class="show__fine">You see your website before you pay anything, and nothing goes live until you say so. Cancel with 30 days' notice${t.commits.length ? ` once your ${commitWords(t)} plan's months are up` : ""}.</p>
     </div>`;
     $app.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", async () => {
@@ -1691,7 +1691,7 @@
       fit: "Any business whose stock or prices change often (fish, plants, produce, bakeries, resale, feed, auto parts, used cars) that isn't ready for a whole website.",
       points: [
         "They change what's in each tank, bin or row from their phone in seconds. No login, no computer. Sold out hides it; the count shows how many are left.",
-        "QR tags on every section open its live prices; a cheap tablet by the tank or counter shows them with no QR at all, and in staff mode counts stock in and out by barcode.",
+        "QR tags on every section open its live prices; a cheap tablet by the tank or counter shows them with no QR at all, and with the Barcode scanning add-on counts stock in and out by barcode.",
       "A long list goes on in one go: paste it from a spreadsheet or the register's export and it's sorted into sections. No retyping.",
         "No minimum and no setup fee, so there's nothing to think about. Cancel any time.",
         "Every dollar of the month they're on it counts toward a full website when they're ready; the price page just becomes part of it.",
@@ -1937,7 +1937,7 @@
         <li><strong>Yearly rate:</strong> 12 months for the price of ${12 - ct.free} (${ct.free} months free), so it fits one budget line. ${plans.filter((p) => p.monthly).map((p) => `${esc(p.name)} ${money(p.monthly * (12 - ct.free))}/year`).join(" · ")}.</li>
         <li><strong>Expect a check or an invoice:</strong> many pay from the church account, not a card. Say yes to that; the owner sends the invoice.</li>
         <li><strong>Decisions take a meeting:</strong> deacons, elders, a board or the post. Leave the flyer for it, ask when it is, and set the callback for the day after.</li></ul></section>` : ""; })()}
-      ${s.addons && s.addons.length ? `<section class="card"><h2>Extras</h2><p class="small muted">Offer one when it fits. Any extra goes with any plan.</p><ul class="list">${s.addons.map((a) => `<li><strong>${esc(a.name)}</strong> · ${esc(addonPrice(a))}${a.about ? `<br><span class="small">${esc(a.about)}</span>` : ""}${offerHint(a.name) ? `<br><span class="small muted">Offer to: ${esc(offerHint(a.name))}</span>` : ""}</li>`).join("")}</ul></section>` : ""}
+      ${[["general", "Extras", "Offer one when it fits. Any extra goes with any plan."], ["inventory", "Inventory add-ons", "The live price list system in pieces: offer these to shops whose stock changes, with the Price list plan or any website plan."]].map(([g, h, intro]) => { const list = (s.addons || []).filter((a) => addonGroup(a) === g); return list.length ? `<section class="card"><h2>${h}</h2><p class="small muted">${intro}</p><ul class="list">${list.map((a) => `<li><strong>${esc(a.name)}</strong> · ${esc(addonPrice(a))}${a.about ? `<br><span class="small">${esc(a.about)}</span>` : ""}${offerHint(a.name) ? `<br><span class="small muted">Offer to: ${esc(offerHint(a.name))}</span>` : ""}</li>`).join("")}</ul></section>` : ""; }).join("")}
       <section class="card"><h2>If they say…</h2>
         <label class="field">Find an answer<input id="objq" type="search" placeholder="price, contract, Facebook…" autocomplete="off"></label>
         <div id="objs">${objections.map(([q, a]) => `<details class="obj"><summary>${esc(q)}</summary><p>${a}</p></details>`).join("")}</div></section>
@@ -2510,6 +2510,11 @@
 
   const PRICE_KINDS = [["", "Guess from the business"], ["fish", "Fish & aquarium"], ["plants", "Plants & nursery"], ["pets", "Pets & reptiles"], ["food", "Food & baked goods"], ["parts", "Auto parts & tires"], ["vehicles", "Vehicles & equipment"], ["goods", "Other goods"]];
   /** The live price list for any business other than a shop (shops have it inside Shop details). */
+  /** Mirrors scanningOn() in the generator: on when switched on, or (older shops) when any barcode is already stored. */
+  function scanningOnPl(pl) {
+    if (pl.scanning !== undefined && pl.scanning !== null) return !!pl.scanning;
+    return (pl.sections || []).some((s) => (s.items || []).some((it) => it.barcode)) || (pl.catalog || []).some((c) => c.barcode);
+  }
   function priceListEditCard(r) {
     const pl = (r.ext.retail && r.ext.retail.priceList) || {};
     return `<section class="card"><h2>Live price list & QR labels</h2>
@@ -2517,12 +2522,13 @@
       <label class="field">Price list <span class="hint">One item per line: Name | $Price | Note. Start a section with # Section name.</span><textarea name="plText" rows="6" placeholder="# Case&#10;Sourdough loaf | $8 | Baked daily&#10;Cinnamon rolls (6) | $14&#10;&#10;# Shelf&#10;Local honey, 16 oz | $12">${esc(pl.sections ? priceListText(pl.sections) : "")}</textarea></label>
       <div class="row"><label class="field">Page title<input name="plTitle" maxlength="40" value="${esc(pl.title || "")}" placeholder="Today's prices"></label>
       <label class="field">What's on it<select name="plKind">${PRICE_KINDS.map(([k, t]) => `<option value="${k}"${pl.kind === k ? " selected" : ""}>${t}</option>`).join("")}</select></label></div>
-      <label class="check"><input type="checkbox" name="plPublic"${pl.public !== false ? " checked" : ""}> Show the price list to Google and in the site menu (off = only reachable from the QR labels)</label></section>`;
+      <label class="check"><input type="checkbox" name="plPublic"${pl.public !== false ? " checked" : ""}> Show the price list to Google and in the site menu (off = only reachable from the QR labels)</label>
+      <label class="check"><input type="checkbox" name="plScan"${scanningOnPl(pl) ? " checked" : ""}> Barcode scanning on (the Barcode scanning add-on): a Scan button on their board and in the tablet's staff mode</label></section>`;
   }
   function priceListEditValues(f) {
     if (!f.elements.plText) return undefined;
     const kind = fsVal(f, "plKind");
-    return { text: fsVal(f, "plText") || "", title: fsVal(f, "plTitle") || "", public: !!fsOn(f, "plPublic"), ...(kind ? { kind } : {}) };
+    return { text: fsVal(f, "plText") || "", title: fsVal(f, "plTitle") || "", public: !!fsOn(f, "plPublic"), scanning: !!fsOn(f, "plScan"), ...(kind ? { kind } : {}) };
   }
 
   function retailEditCard(r, x, cb) {
@@ -2559,6 +2565,7 @@
       <div class="row"><label class="field">Page title<input name="rtPriceTitle" maxlength="40" value="${esc((x.priceList && x.priceList.title) || "")}" placeholder="Fish & prices"></label>
       <label class="field">What's on it<select name="rtPriceKind">${PRICE_KINDS.map(([k, t]) => `<option value="${k}"${(x.priceList && x.priceList.kind) === k ? " selected" : ""}>${t}</option>`).join("")}</select></label></div>
       ${cb("rtPricesPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", !x.priceList || x.priceList.public !== false)}
+      ${cb("rtPriceScan", "Barcode scanning on (the Barcode scanning add-on): a Scan button on their board and in the tablet's staff mode", scanningOnPl(x.priceList || {}))}
       <p class="small muted">Each section gets a QR label on the printable sheet (Live lead → QR price tags). A price change here is a price change on the shelf.</p>
       ${priceItemsEditHtml(r, x)}
     </section>`;
@@ -2594,7 +2601,7 @@
     if (f.elements.rtDeliveryNote) { out.deliveryNote = fsVal(f, "rtDeliveryNote"); out.financing = { lender: fsVal(f, "rtLender") || "", url: fsVal(f, "rtLenderUrl") || "" }; }
     if (f.elements.rtDropDay) { out.dropDay = fsVal(f, "rtDropDay"); out.occasions = fsLines(f, "rtOcc2"); }
     if (f.elements.rtHold) out.holdNote = fsVal(f, "rtHold");
-    if (f.elements.rtPriceList) { out.priceListText = fsVal(f, "rtPriceList") || ""; out.priceListTitle = fsVal(f, "rtPriceTitle") || ""; out.pricesPublic = !!fsOn(f, "rtPricesPublic"); if (fsVal(f, "rtPriceKind")) out.priceKind = fsVal(f, "rtPriceKind"); }
+    if (f.elements.rtPriceList) { out.priceListText = fsVal(f, "rtPriceList") || ""; out.priceListTitle = fsVal(f, "rtPriceTitle") || ""; out.pricesPublic = !!fsOn(f, "rtPricesPublic"); if (fsVal(f, "rtPriceKind")) out.priceKind = fsVal(f, "rtPriceKind"); out.priceScanning = !!fsOn(f, "rtPriceScan"); }
     const pi = priceItemsEditValues(f);
     if (pi.length) out.priceItems = pi;
     return fsClean(out);
@@ -3354,10 +3361,13 @@
     { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page\nLive price list with QR tags and a tablet display, if your stock changes" },
     { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
     { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
-    { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out, scan barcodes, add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
+    { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out and add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
   ];
   const UNIT_LABEL = { month: "/month", each: " each", "one-time": " one-time", quote: " (priced per job)" };
   const addonPrice = (a) => (a.unit === "quote" ? "Priced per job" : `${money(a.price)}${UNIT_LABEL[a.unit] || ""}`);
+  // Inventory add-ons are listed together everywhere (mirrors addonGroup in db.ts).
+  const INVENTORY_EXTRA = /price tag|shelf label|tablet|scanner|scanning|stock list|inventory|price list|stock board|tank board/i;
+  const addonGroup = (a) => a.group || (INVENTORY_EXTRA.test(a.name) ? "inventory" : "general");
 
   // Playbook: when a caller should bring each extra up (matched on the extra's name).
   const OFFER_HINT = [
@@ -3376,6 +3386,7 @@
     [/changes/i, "Bigger jobs beyond the plan: a new page or section, a redesign."],
     [/ads?\b|ad management/i, "Contractors in busy season; restaurants with a new menu or event."],
     [/tablet/i, "Any shop with a board: one tablet by the busiest tank, shelf or counter. We bring it, set it up and mount it."],
+    [/scanning/i, "Any shop with packaged stock (feed, filters, parts, bottles, food): deliveries counted in by scanning, on their phone or the tablet."],
     [/scanner/i, "Shops with packaged stock (feed, filters, parts, bottles): a delivery is counted in by scanning."],
     [/stock list|inventory/i, "Shops with a long list in a spreadsheet, a register export or on paper who don't want to type it."],
   ];
@@ -3536,10 +3547,11 @@
       <div class="row" style="flex-wrap:wrap">
         <label class="field" style="flex:1 1 120px">Churches &amp; nonprofits: yearly months free <span class="hint">4 = 12 months for the price of 8</span><input name="churchAnnualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.churchAnnualMonthsFree ?? 4}"></label></div>
         <h2 style="margin-top:18px">Extras</h2>
-        <p class="small muted">Shown on the sign-up page and in call guides. Leave a name blank to remove it.</p>
+        <p class="small muted">Shown on the sign-up page, the website and in call guides. Leave a name blank to remove it. "Inventory add-ons" are listed together as the live price list's pieces.</p>
         ${[...s.addons, { name: "", price: "", unit: "one-time" }].map((a, i) => `<div class="addon"><div class="row"><label class="field" style="flex:2"><span class="sr-only">Extra ${i + 1}</span><input name="addon_${i}_name" value="${esc(a.name)}" placeholder="New extra" maxlength="60"></label>
           <label class="field"><span class="sr-only">Price</span><input name="addon_${i}_price" type="number" min="0" inputmode="decimal" value="${a.price}" placeholder="$"></label>
-          <label class="field"><span class="sr-only">Per</span><select name="addon_${i}_unit">${Object.entries(UNIT_LABEL).map(([k, v]) => `<option value="${k}"${a.unit === k ? " selected" : ""}>${k === "quote" ? "quote per job" : v.trim().replace("/", "per ")}</option>`).join("")}</select></label></div>
+          <label class="field"><span class="sr-only">Per</span><select name="addon_${i}_unit">${Object.entries(UNIT_LABEL).map(([k, v]) => `<option value="${k}"${a.unit === k ? " selected" : ""}>${k === "quote" ? "quote per job" : v.trim().replace("/", "per ")}</option>`).join("")}</select></label>
+          <label class="field"><span class="sr-only">Group</span><select name="addon_${i}_group" title="Where it is listed"><option value="general"${a.name && addonGroup(a) !== "inventory" ? " selected" : ""}>Extras</option><option value="inventory"${a.name && addonGroup(a) === "inventory" ? " selected" : ""}>Inventory add-ons</option></select></label></div>
           <label class="field"><span class="sr-only">What they get</span><input name="addon_${i}_about" value="${esc(a.about || "")}" placeholder="One sentence on what they get" maxlength="200"></label>
           ${a.name ? `<details class="more"><summary>Contract terms for this extra</summary><label class="field"><span class="sr-only">Contract terms</span><textarea name="addon_${i}_terms" rows="4" maxlength="1500">${esc(a.terms || (meta.extraTerms || [])[i] || "")}</textarea></label><p class="small muted">Shown in the agreement customers sign when they pick this extra.</p></details>` : `<input type="hidden" name="addon_${i}_terms" value="">`}</div>`).join("")}
         <h2 style="margin-top:18px">Team goals &amp; commission</h2>
@@ -3583,7 +3595,7 @@
         const addons = [];
         for (let i = 0; f.elements[`addon_${i}_name`]; i++) {
           const name = v(`addon_${i}_name`);
-          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value, about: v(`addon_${i}_about`) || undefined, terms: v(`addon_${i}_terms`) || undefined });
+          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value, group: f.elements[`addon_${i}_group`] ? f.elements[`addon_${i}_group`].value : undefined, about: v(`addon_${i}_about`) || undefined, terms: v(`addon_${i}_terms`) || undefined });
         }
         if (plans.some((p) => !p.monthly)) return toast("Give every plan a monthly price");
         const terms = v("terms");

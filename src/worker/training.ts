@@ -376,12 +376,14 @@ const LESSONS: Lesson[] = [
   },
   {
     id: "barcode-scanning",
-    title: "Barcode scanning on the tablet",
+    title: "Barcode scanning (the add-on)",
     minutes: 4,
     who: "everyone",
     why: "Packaged goods come in by the case. Scanning beats finding each one in a list, and the shop will ask you how it works.",
     steps: [
-      'Where it lives: staff mode on the tablet. Tap Staff in the corner, unlock (PIN, staff tag or the phone code), and "▦ Scan" appears in the bottom bar. Customers never see it. The phone board has a Barcode field with a ▦ button on each item too.',
+      'It is an add-on (Barcode scanning, in the Inventory add-ons group). When a shop buys it, the owner or full access switches it on: Edit → Live price list → "Barcode scanning on". Until then there is no Scan button anywhere on their board or tablet.',
+      'On their phone board: "▦ Scan" in the bottom bar. A known product shows its name, section and count with Put in / Take out; a new code asks for a name, a price and the section. "Scan the next one" keeps going through a delivery.',
+      'Where it lives on the tablet: staff mode. Tap Staff in the corner, unlock (PIN, staff tag or the phone code), and "▦ Scan" appears in the bottom bar. Customers never see it. The phone board has a Barcode field with a ▦ button on each item too.',
       "Tap ▦ Scan and hold the product's barcode in front of the tablet's camera; Chrome reads it in about a second (the first time, tap Allow when Chrome asks for the camera). Or use any $25 to $40 USB-C or Bluetooth barcode scanner: it types the code into the box and presses Enter for you. Nothing to configure, they come in keyboard mode.",
       'A product the shop has scanned before: the sheet shows its name, which section it\'s in, how many are in stock and the price. Set the amount with − / + or type it, then "➕ Put in" for a delivery or "➖ Take out" for a case sold or sent back. "Scan the next one" keeps you going through the delivery.',
       "A product that sold out earlier: it comes back from the shop's catalog with its photo, price and info card, and goes into whichever section the tablet is on.",

@@ -1313,9 +1313,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
               unit: z.enum(["month", "each", "one-time", "quote"]),
               about: z.string().trim().max(200).optional(),
               terms: z.string().trim().max(1500).optional(),
+              group: z.enum(["general", "inventory"]).optional(),
             }),
           )
-          .max(20)
+          .max(24)
           .optional(),
         terms: z.string().trim().max(6000).optional(),
         commission: z.number().min(0).max(10_000).optional(),

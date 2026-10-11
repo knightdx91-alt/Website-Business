@@ -36,10 +36,18 @@ export type Job =
     }
   | { type: "build"; leadId: string };
 
-export function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
+export function json(
+  data: unknown,
+  status = 200,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      ...headers,
+    },
   });
 }
 
@@ -67,5 +75,10 @@ export function today(): string {
 
 /** Calendar date (YYYY-MM-DD) in Cullman's time zone, optionally some days ahead. */
 export function localDate(addDays = 0, from = Date.now()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(from + addDays * 86_400_000));
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(from + addDays * 86_400_000));
 }

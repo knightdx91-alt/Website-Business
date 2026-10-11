@@ -27,11 +27,15 @@ let jwksCache: { keys: Jwk[]; until: number } | null = null;
 async function googleKeys(): Promise<Jwk[]> {
   if (jwksCache && jwksCache.until > Date.now()) return jwksCache.keys;
   const res = await fetch(JWKS_URL, { cf: { cacheTtl: 3600 } } as RequestInit);
-  if (!res.ok) throw new HttpError(502, "Couldn't reach Google to check the sign-in");
+  if (!res.ok)
+    throw new HttpError(502, "Couldn't reach Google to check the sign-in");
   const data = (await res.json()) as { keys: Jwk[] };
   const cc = res.headers.get("cache-control") ?? "";
   const maxAge = Number(/max-age=(\d+)/.exec(cc)?.[1] ?? 3600);
-  jwksCache = { keys: data.keys, until: Date.now() + Math.min(maxAge, 6 * 3600) * 1000 };
+  jwksCache = {
+    keys: data.keys,
+    until: Date.now() + Math.min(maxAge, 6 * 3600) * 1000,
+  };
   return data.keys;
 }
 
@@ -60,29 +64,66 @@ export interface GoogleClaims {
  * Verifies a Google ID token (RS256, Google's published keys) for our OAuth client id and returns its claims. Throws a
  * 401 HttpError with a plain reason otherwise. `keys` can be injected for tests.
  */
-export async function verifyGoogleIdToken(idToken: string, clientId: string, keys?: Jwk[], nowS = Math.floor(Date.now() / 1000)): Promise<GoogleClaims> {
+export async function verifyGoogleIdToken(
+  idToken: string,
+  clientId: string,
+  keys?: Jwk[],
+  nowS = Math.floor(Date.now() / 1000),
+): Promise<GoogleClaims> {
   const parts = idToken.split(".");
-  if (parts.length !== 3) throw new HttpError(401, "That Google sign-in token is malformed");
+  if (parts.length !== 3)
+    throw new HttpError(401, "That Google sign-in token is malformed");
   const [h, p, s] = parts as [string, string, string];
-  const header = JSON.parse(new TextDecoder().decode(b64urlToBytes(h))) as { alg?: string; kid?: string };
-  if (header.alg !== "RS256" || !header.kid) throw new HttpError(401, "Unexpected Google token format");
+  const header = JSON.parse(new TextDecoder().decode(b64urlToBytes(h))) as {
+    alg?: string;
+    kid?: string;
+  };
+  if (header.alg !== "RS256" || !header.kid)
+    throw new HttpError(401, "Unexpected Google token format");
   const jwk = (keys ?? (await googleKeys())).find((k) => k.kid === header.kid);
-  if (!jwk) throw new HttpError(401, "Google's signing key wasn't recognized; try signing in again");
-  const key = await crypto.subtle.importKey("jwk", { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true }, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
-  const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64urlToBytes(s), new TextEncoder().encode(`${h}.${p}`));
+  if (!jwk)
+    throw new HttpError(
+      401,
+      "Google's signing key wasn't recognized; try signing in again",
+    );
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true },
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["verify"],
+  );
+  const ok = await crypto.subtle.verify(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    b64urlToBytes(s),
+    new TextEncoder().encode(`${h}.${p}`),
+  );
   if (!ok) throw new HttpError(401, "That Google sign-in couldn't be verified");
-  const claims = JSON.parse(new TextDecoder().decode(b64urlToBytes(p))) as GoogleClaims;
-  if (!ISSUERS.has(claims.iss)) throw new HttpError(401, "That token wasn't issued by Google");
-  if (claims.aud !== clientId) throw new HttpError(401, "That Google sign-in is for a different app");
-  if (typeof claims.exp !== "number" || claims.exp < nowS - 60) throw new HttpError(401, "That Google sign-in has expired; try again");
-  if (!claims.email || claims.email_verified !== true) throw new HttpError(401, "Google hasn't verified that email address");
+  const claims = JSON.parse(
+    new TextDecoder().decode(b64urlToBytes(p)),
+  ) as GoogleClaims;
+  if (!ISSUERS.has(claims.iss))
+    throw new HttpError(401, "That token wasn't issued by Google");
+  if (claims.aud !== clientId)
+    throw new HttpError(401, "That Google sign-in is for a different app");
+  if (typeof claims.exp !== "number" || claims.exp < nowS - 60)
+    throw new HttpError(401, "That Google sign-in has expired; try again");
+  if (!claims.email || claims.email_verified !== true)
+    throw new HttpError(401, "Google hasn't verified that email address");
   return claims;
 }
 
 /** Only company Workspace accounts: the hosted-domain claim and the address must both be on the domain. */
-export function onCompanyDomain(claims: Pick<GoogleClaims, "email" | "hd">, domain: string): boolean {
+export function onCompanyDomain(
+  claims: Pick<GoogleClaims, "email" | "hd">,
+  domain: string,
+): boolean {
   const d = domain.toLowerCase();
-  return claims.email.toLowerCase().endsWith(`@${d}`) && (claims.hd ?? "").toLowerCase() === d;
+  return (
+    claims.email.toLowerCase().endsWith(`@${d}`) &&
+    (claims.hd ?? "").toLowerCase() === d
+  );
 }
 
 interface UserByEmail {
@@ -96,22 +137,50 @@ interface UserByEmail {
  * Turns verified Google claims into a session. The owner's address (Settings → Team) is the owner; a team member with
  * that email on file keeps their role; anyone else on the company domain becomes a new caller (and the owner is told).
  */
-export async function googleSession(env: Env, claims: GoogleClaims): Promise<Session> {
+export async function googleSession(
+  env: Env,
+  claims: GoogleClaims,
+): Promise<Session> {
   const s = await getSettings(env);
   const domain = (s.googleDomain || DEFAULT_DOMAIN).toLowerCase();
-  if (!onCompanyDomain(claims, domain)) throw new HttpError(403, `Sign in with your @${domain} Google account`);
+  if (!onCompanyDomain(claims, domain))
+    throw new HttpError(403, `Sign in with your @${domain} Google account`);
   const email = claims.email.toLowerCase();
-  if (s.ownerEmail && s.ownerEmail.toLowerCase() === email) return { role: "owner", userId: "owner", name: "Owner" };
-  const u = await env.DB.prepare("SELECT id, name, disabled, admin FROM users WHERE lower(email) = ?").bind(email).first<UserByEmail>();
+  if (s.ownerEmail && s.ownerEmail.toLowerCase() === email)
+    return { role: "owner", userId: "owner", name: "Owner" };
+  const u = await env.DB.prepare(
+    "SELECT id, name, disabled, admin FROM users WHERE lower(email) = ?",
+  )
+    .bind(email)
+    .first<UserByEmail>();
   if (u) {
-    if (u.disabled) throw new HttpError(403, "Your login is turned off. Ask the owner to turn it back on.");
+    if (u.disabled)
+      throw new HttpError(
+        403,
+        "Your login is turned off. Ask the owner to turn it back on.",
+      );
     return { role: u.admin ? "owner" : "caller", userId: u.id, name: u.name };
   }
   // New person on the domain: a caller until the owner says otherwise. No password; Google is their login.
   const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-  const name = (claims.given_name || claims.name || email.split("@")[0] || "Teammate").replace(/[\u0000-\u001f"\\<>]/g, "").slice(0, 60);
+  const name = (
+    claims.given_name ||
+    claims.name ||
+    email.split("@")[0] ||
+    "Teammate"
+  )
+    .replace(/[\u0000-\u001f"\\<>]/g, "")
+    .slice(0, 60);
   const unusable = `google.${crypto.randomUUID()}`;
-  await env.DB.prepare("INSERT INTO users (id, name, password, disabled, admin, created_at, email) VALUES (?, ?, ?, 0, 0, ?, ?)").bind(id, name, unusable, Date.now(), email).run();
-  await notify(env, { kind: "added", actorName: name, text: `👋 ${name} (${email}) signed in with Google for the first time and is a caller. Settings → Team to give full access or turn them off.` });
+  await env.DB.prepare(
+    "INSERT INTO users (id, name, password, disabled, admin, created_at, email) VALUES (?, ?, ?, 0, 0, ?, ?)",
+  )
+    .bind(id, name, unusable, Date.now(), email)
+    .run();
+  await notify(env, {
+    kind: "added",
+    actorName: name,
+    text: `👋 ${name} (${email}) signed in with Google for the first time and is a caller. Settings → Team to give full access or turn them off.`,
+  });
   return { role: "caller", userId: id, name };
 }

@@ -3,7 +3,12 @@ import { z } from "zod";
 import { hmac, safeEqual } from "./auth.ts";
 import { draftItemInfo, infoRows } from "../copy/iteminfo.ts";
 import { autoMatchPhotos } from "../generator/packs/retail.ts";
-import { KINDS, kindWords, listKind } from "../generator/pricelist.ts";
+import {
+  KINDS,
+  kindWords,
+  listKind,
+  scanningOn,
+} from "../generator/pricelist.ts";
 import type {
   BusinessRecord,
   CatalogEntry,
@@ -535,6 +540,11 @@ export async function serveStation(
 
   if (rest === "/staff/data" && req.method === "GET") return feed();
   if (rest === "/staff/find" && req.method === "GET") {
+    if (!scanningOn(record))
+      throw new HttpError(
+        403,
+        "Barcode scanning isn't turned on for this shop. It's an add-on; ask us to switch it on.",
+      );
     // A scanned barcode: a row on the board, a catalog item, or (new) a product name looked up by its UPC/EAN.
     const code = normalizeCode(url.searchParams.get("code") ?? "");
     if (!code) throw new HttpError(400, "No code read");
@@ -708,6 +718,7 @@ export async function serveDisplay(
     ? `${tank.name} · ${record.name}`
     : `${feed.title} · ${record.name}`;
   const hasPin = !!priceList(record).staffPin;
+  const scan = scanningOn(record);
   const W = kindWords(record);
   const sec = W.section.toLowerCase();
   const FIELDS = JSON.stringify(W.fields.map(([k, l, ex]) => [k, l, ex]));
@@ -762,7 +773,7 @@ body.staff .staffbar{display:flex}
 <header><h1 id="h">${escHtml(tank ? tank.name : feed.title)}</h1><span class="shop">${escHtml(record.name)}</span></header>
 <main id="m"><p class="empty">Loading…</p></main>
 <footer><span id="u"></span><span class="dots" id="dots"></span><button class="staffbtn" id="staff" type="button">Staff</button></footer>
-<div class="staffbar"><div class="tanks" id="tanks"></div><div class="row" style="margin:0"><button class="btn go" id="addbtn" type="button">+ Add</button><button class="btn" id="scanbtn" type="button">▦ Scan</button><button class="btn ghost" id="lock" type="button">Done</button></div></div>
+<div class="staffbar"><div class="tanks" id="tanks"></div><div class="row" style="margin:0"><button class="btn go" id="addbtn" type="button">+ Add</button><button class="btn" id="scanbtn" type="button"${scan ? "" : " hidden"}>▦ Scan</button><button class="btn ghost" id="lock" type="button">Done</button></div></div>
 
 <div class="ov" id="info"><div class="sheet" id="infoBody"></div></div>
 <div class="ov" id="unlock"><div class="sheet">

@@ -13,6 +13,9 @@ import {
   reinstatementFeeOf,
   returnedFeeOf,
   type AppSettings,
+  addonGroup,
+  inventoryAddons,
+  generalAddons,
 } from "./db.ts";
 import {
   dollars,
@@ -147,7 +150,7 @@ function faq(s: AppSettings): Array<[string, string]> {
     ],
     [
       "My prices or stock change all the time. Can the site keep up?",
-      "Yes. Every plan includes a live price list: a page with a section for every tank, shelf, bin or row that you change from your phone, with QR tags for the shelf and a tablet display by the stock. Packaged goods scan in and out by barcode, and a whole inventory pastes in from a spreadsheet. Shops that only want that, with no website, take the Price list plan.",
+      "Yes. Every plan includes a live price list: a page with a section for every tank, shelf, bin or row that you change from your phone, with QR tags for the shelf and a tablet display by the stock. A whole inventory pastes in from a spreadsheet, and the Barcode scanning add-on counts packaged goods in and out. Shops that only want that, with no website, take the Price list plan.",
     ],
     [
       "Who owns my content?",
@@ -741,8 +744,9 @@ async function extrasRequest(
 ${note}
 <form method="post" class="form light">
 <fieldset style="border:0;padding:0;margin:0 0 6px"><legend style="font-weight:700;margin-bottom:8px">What would you like to add?</legend>
-${s.addons.map((a, i) => `<label class="xopt"><input type="checkbox" name="x_${i}"><span><strong>${e(a.name)}</strong> · ${e(addonPrice(a))}${a.about ? `<small>${e(a.about)}</small>` : ""}</span></label>`).join("")}
+${s.addons.map((a, i) => (addonGroup(a) === "inventory" ? "" : `<label class="xopt"><input type="checkbox" name="x_${i}"><span><strong>${e(a.name)}</strong> · ${e(addonPrice(a))}${a.about ? `<small>${e(a.about)}</small>` : ""}</span></label>`)).join("")}
 </fieldset>
+${inventoryAddons(s.addons).length ? `<fieldset style="border:0;padding:0;margin:0 0 6px"><legend style="font-weight:700;margin-bottom:8px">Inventory add-ons <span class="opt">(for the live price list)</span></legend>${s.addons.map((a, i) => (addonGroup(a) !== "inventory" ? "" : `<label class="xopt"><input type="checkbox" name="x_${i}"><span><strong>${e(a.name)}</strong> · ${e(addonPrice(a))}${a.about ? `<small>${e(a.about)}</small>` : ""}</span></label>`)).join("")}</fieldset>` : ""}
 <label>Business name<input name="business" required maxlength="120" autocomplete="organization"></label>
 <label>Your name<input name="name" required maxlength="100" autocomplete="name"></label>
 <label>Phone <span class="opt">(the one on your account, if you can)</span><input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
@@ -1036,7 +1040,7 @@ const TRADES: Trade[] = [
       "Tire shops: a get-a-quote form that asks size, vehicle and quantity",
       "Body shops: what to do after a wreck, the insurers you work with, and your right-to-choose line",
       "Warranty, financing and the programs you honor, worded to stay inside the rules",
-      "Auto parts stores: what you carry, a reserve-a-part form, and a live in-stock list by bin (part number, fits, brand) with QR labels, a tablet at the counter and barcode scanning",
+      "Auto parts stores: what you carry, a reserve-a-part form, and a live in-stock list by bin (part number, fits, brand) with QR labels, a tablet at the counter and barcode scanning as an add-on",
     ],
     faq: [
       [
@@ -1158,7 +1162,7 @@ const TRADES: Trade[] = [
       "Shop-online or order-flowers buttons that go to your Square or Shopify store",
       "Florists: occasions, delivery area and cut-off times; vendor booths and donations for antique malls and thrift stores",
       "Gift cards and events when you have them",
-      "Stock that changes daily? A live price list with a section per tank or shelf, QR price tags, a board you update from your phone, a tablet display by the tank and barcode scanning for packaged stock",
+      "Stock that changes daily? A live price list with a section per tank or shelf, QR price tags, a board you update from your phone, a tablet display by the tank and, as an add-on, barcode scanning for packaged stock",
     ],
     faq: [
       [
@@ -1565,10 +1569,16 @@ function extrasHtml(s: AppSettings, o: { compact?: boolean } = {}): string {
     return `<p class="xline">${s.addons.length} add-ons for any plan${lowest ? `, from ${money(lowest)}` : ""}: ${e(names.join(", "))} and more. <a href="/pricing#extras">See all extras</a>.</p>`;
   }
   const groups = new Map<string, typeof s.addons>();
-  for (const a of s.addons)
+  for (const a of generalAddons(s.addons))
     groups.set(a.unit, [...(groups.get(a.unit) ?? []), a]);
+  const inv = inventoryAddons(s.addons);
+  const list = listPlan(s);
+  const invHtml = inv.length
+    ? `<div class="xinv" id="inventory-addons"><h3 class="xgroup">Inventory add-ons</h3><p>The pieces of the <a href="/price-list">live price list</a>, for the ${list ? e(list.name) : "Price list"} plan or any website plan. The price page, the board, the tablet display page and your first sheet of QR tags are included; these are the extras around them.</p><ul class="xlist">${inv.map((a) => `<li><div class="xlist__row"><b>${e(a.name)}</b><span>${e(addonPrice(a))}</span></div>${a.about ? `<p>${e(a.about)}</p>` : ""}</li>`).join("")}</ul></div>`
+    : "";
   return `<section class="sec" id="extras"><div class="wrap"><h2>Extras</h2><p class="lead">Add any of these to any plan, at sign-up or later. Already a client? <a href="/extras">Add extras here</a>.</p>
 <div class="xcols">${[...groups.entries()].map(([unit, list]) => `<div><h3 class="xgroup">${e(UNIT_GROUP[unit] ?? unit)}</h3><ul class="xlist">${list.map((a) => `<li><div class="xlist__row"><b>${e(a.name)}</b><span>${e(addonPrice(a))}</span></div>${a.about ? `<p>${e(a.about)}</p>` : ""}</li>`).join("")}</ul></div>`).join("")}</div>
+${invHtml}
 </div></section>`;
 }
 
@@ -1833,9 +1843,6 @@ async function priceListPage(env: Env): Promise<Response> {
   const p = listPlan(s);
   const lowest = lowestOf(s);
   const tags = s.addons.find((a) => /price tag|shelf label/i.test(a.name));
-  const tablet = s.addons.find((a) => /tablet/i.test(a.name));
-  const scanner = s.addons.find((a) => /scanner/i.test(a.name));
-  const load = s.addons.find((a) => /stock list|inventory/i.test(a.name));
   const title = `Live price list, QR price tags and Stock board for any shop | ${name}`;
   const description = `For Cullman-area shops whose stock changes daily: a price page with a section per tank or shelf, QR tags that open it, a board you update from your phone, a tablet display by the tank, barcode scanning for packaged stock, and a whole inventory loaded from a spreadsheet in one go. For fish stores, parts counters, nurseries, bakeries, lots and any shop.${p ? ` ${money(p.monthly)} a month, no minimum, or included with any website plan.` : ""}`;
   const serviceLd = {
@@ -1870,7 +1877,7 @@ async function priceListPage(env: Env): Promise<Response> {
     [
       "▦",
       "Barcode scanning",
-      "Packaged goods (food, filters, parts, feed) go in and out by barcode: staff unlock the tablet, tap Scan, show the product to the camera or a cheap handheld scanner, type how many. A new code asks for a name once; many food and pet products fill it in by themselves.",
+      "An add-on. Packaged goods (food, filters, parts, feed) go in and out by barcode: tap Scan on your phone's board or in the tablet's staff mode, show the product to the camera (or a cheap handheld scanner), type how many. A new code asks for a name once; many food and pet products fill it in by themselves.",
     ],
     [
       "🏷️",
@@ -1920,17 +1927,20 @@ async function priceListPage(env: Env): Promise<Response> {
 <h2 style="margin-top:28px">What you do</h2><ul class="ticks">
 <li>Keep the board honest: tap Sold out when the last one goes, change the number when the price does.</li>
 <li>Take a photo when something worth showing comes in. The board does it from the camera.</li>
-<li>Boxed and bagged stock: scan the barcode on the tablet, type the amount, Put in or Take out. No list to search.</li>
+<li>Boxed and bagged stock (with the Barcode scanning add-on): scan the barcode on your phone or the tablet, type the amount, Put in or Take out. No list to search.</li>
 <li>That's it. You never touch the website, and anyone on your staff with the link can do it.</li></ul></div>
 <div><h2>Who it's for</h2><ul class="ticks">${who.map((w) => `<li>${e(w)}</li>`).join("")}</ul>
 <p class="small muted" style="margin-top:14px">Anything with a section name you can stick a label on and stock that doesn't sit still.</p></div></div></section>
 <section class="sec" id="pricing"><div class="wrap narrow"><h2>What it costs</h2><ul class="ticks">
 ${p ? `<li><strong>Just the price list, board and tags:</strong> the ${e(p.name)} plan, ${money(p.monthly)} a month. No minimum term and no setup fee; cancel any time with 30 days' notice.${tags ? " Your first sheet of QR tags is included." : ""}</li>` : ""}
 <li><strong>With a website:</strong> included in every website plan${lowest ? `, from ${money(lowest)} a month` : ""}. Every month on the ${p ? e(p.name) : "Price list"} plan counts toward a website later; the price page just becomes part of it.</li>
-${tags ? `<li><strong>More QR tag sheets</strong> (8 tags each): ${e(addonPrice(tags))}. Reprints after you rename or add a tank are at cost.</li>` : ""}
-${tablet ? `<li><strong>Tablet by the tank:</strong> any $40 to $80 Android tablet works and the display page is included; ${e(tablet.name)} is ${e(addonPrice(tablet))} if we bring one, set it up and mount it.</li>` : "<li><strong>Tablet by the tank:</strong> any $40 to $80 tablet works; we'll set it up for you.</li>"}
-${scanner ? `<li><strong>Barcode scanner:</strong> the tablet camera scans for free; ${e(scanner.name)} is ${e(addonPrice(scanner))} for shops that count whole deliveries.</li>` : ""}
-${load ? `<li><strong>Your stock loaded for you:</strong> pasting a spreadsheet yourself is free; ${e(load.name)} is ${e(addonPrice(load))} when you'd rather send us the list, a register export or photos of your price board.</li>` : ""}</ul>
+${inventoryAddons(s.addons)
+  .map(
+    (a) =>
+      `<li><strong>${e(a.name)}:</strong> ${e(addonPrice(a))}${a.about ? `. ${e(a.about)}` : ""}${/price tag|shelf label/i.test(a.name) ? " Reprints after you rename or add a section are at cost." : ""}${/tablet/i.test(a.name) ? " Any $40 to $80 Android tablet of your own works too; the display page itself is included." : ""}${/scanner/i.test(a.name) ? " The camera on your phone or tablet scans without it." : ""}${/stock list/i.test(a.name) ? " Pasting a spreadsheet yourself is free." : ""}</li>`,
+  )
+  .join("")}</ul>
+<p class="small muted">Everything in this list is an add-on. The price page, the board, the tablet display page and your first sheet of QR tags are included with the plan.</p>
 <div class="btns" style="margin-top:18px"><a class="btn" href="/#contact">Ask us about it</a>${p ? `<a class="btn btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a>` : ""}<a class="btn btn--line" href="/pricing">All plans and pricing</a></div></div></section>
 <section class="sec sec--alt" id="faq"><div class="wrap narrow"><h2>Questions shops ask</h2>${faqHtml(
     [
@@ -1970,7 +1980,7 @@ ${load ? `<li><strong>Your stock loaded for you:</strong> pasting a spreadsheet 
       ],
       [
         "Can my staff scan barcodes?",
-        "Yes. In staff mode the tablet reads a barcode with its camera, or with any $25 to $40 USB-C or Bluetooth scanner. A known product shows its name and count; type how many and tap Put in or Take out. A code it hasn't seen asks for a name once (food, drink and pet products are often filled in from the barcode), takes a photo and gets its info card. Only staff can scan: it takes the PIN, a staff tag or your phone to unlock.",
+        "Yes, with the Barcode scanning add-on. Your board scans with your phone camera, and in staff mode the tablet reads a barcode with its camera, or with any $25 to $40 USB-C or Bluetooth scanner. A known product shows its name and count; type how many and tap Put in or Take out. A code it hasn't seen asks for a name once (food, drink and pet products are often filled in from the barcode), takes a photo and gets its info card. Only staff can scan: it takes the PIN, a staff tag or your phone to unlock.",
       ],
     ],
   )}</div></section>
@@ -2037,7 +2047,7 @@ ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</
       ],
       [
         "Is the live price list extra?",
-        "No. It comes with every website plan. On its own, with no website, it is the Price list plan with no minimum term. The extras around it are optional: more QR tag sheets, a tablet we supply and set up, a barcode scanner paired to it, and loading your stock list for you.",
+        "No. It comes with every website plan. On its own, with no website, it is the Price list plan with no minimum term. The pieces around it are listed as inventory add-ons: barcode scanning, more QR tag sheets, a tablet we supply and set up, a scanner paired to it, and loading your stock list for you.",
       ],
       [
         "Can I pay by check or bank transfer?",

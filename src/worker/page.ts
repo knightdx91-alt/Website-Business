@@ -1,7 +1,13 @@
 /** Small standalone pages the Worker serves to business owners (sign-up, printable cards). */
 
 export function escHtml(s: unknown): string {
-  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+  return String(s ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ]!,
+  );
 }
 
 const BASE_CSS = `*{box-sizing:border-box}body{margin:0;background:#f4f5f8;color:#16181d;font:400 17px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -22,7 +28,11 @@ input[type=text],input[type=email]{width:100%;min-height:48px;padding:10px 12px;
 .btn--ghost{background:#eef1f6;color:#16181d}.btn+.btn{margin-top:10px}.ok{color:#15803d;font-weight:700}
 @media print{.noprint{display:none!important}body{background:#fff}}`;
 
-export function page(title: string, body: string, opts: { brand?: string; css?: string; status?: number } = {}): Response {
+export function page(
+  title: string,
+  body: string,
+  opts: { brand?: string; css?: string; status?: number } = {},
+): Response {
   const doc = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow"><title>${escHtml(title)}</title><style>${BASE_CSS}${opts.css ?? ""}</style></head>
 <body>${opts.brand === "" ? "" : `<div class="top noprint">${escHtml(opts.brand || "Website sign-up")}</div>`}${body}</body></html>`;
@@ -33,7 +43,8 @@ export function page(title: string, body: string, opts: { brand?: string; css?: 
       "cache-control": "no-store",
       "x-robots-tag": "noindex",
       "referrer-policy": "no-referrer",
-      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://checkout.stripe.com; frame-ancestors 'self'; base-uri 'none'",
+      "content-security-policy":
+        "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://checkout.stripe.com; frame-ancestors 'self'; base-uri 'none'",
     },
   });
 }

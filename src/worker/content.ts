@@ -71,7 +71,7 @@ export const PLAN_PITCH: Record<string, PlanPitch> = {
     fit: "Any business whose stock or prices change often (fish, plants, produce, bakeries, resale, feed, auto parts, used cars) that isn't ready for a whole website.",
     points: [
       "They change what's in each tank, bin or row from their phone in seconds. No login, no computer. Sold out hides it; the count shows how many are left.",
-      "QR tags on every section open its live prices; a cheap tablet by the tank or counter shows them with no QR at all, and in staff mode counts stock in and out by barcode.",
+      "QR tags on every section open its live prices; a cheap tablet by the tank or counter shows them with no QR at all, and with the Barcode scanning add-on counts stock in and out by barcode.",
       "A long list goes on in one go: paste it from a spreadsheet or the register's export and it's sorted into sections. No retyping.",
       "No minimum and no setup fee, so there's nothing to think about. Cancel any time.",
       "Every dollar of the month they're on it counts toward a full website when they're ready; the price page just becomes part of it.",
@@ -153,6 +153,22 @@ export const OFFER_HINT: Array<{ match: string; text: string }> = [
   {
     match: "ads?\\b|ad management",
     text: "Contractors in busy season; restaurants with a new menu or event.",
+  },
+  {
+    match: "tablet",
+    text: "Any shop with a board: one tablet by the busiest tank, shelf or counter. We bring it, set it up and mount it.",
+  },
+  {
+    match: "scanning",
+    text: "Any shop with packaged stock (feed, filters, parts, bottles, food): deliveries counted in by scanning, on their phone or the tablet.",
+  },
+  {
+    match: "scanner",
+    text: "Shops with packaged stock (feed, filters, parts, bottles): a delivery is counted in by scanning.",
+  },
+  {
+    match: "stock list|inventory",
+    text: "Shops with a long list in a spreadsheet, a register export or on paper who don't want to type it.",
   },
 ];
 
@@ -535,7 +551,7 @@ export const SUGGESTED_PLANS: Plan[] = [
     setup: 0,
     monthly: 29,
     includes:
-      "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out, scan barcodes, add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time",
+      "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out and add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time",
   },
 ];
 

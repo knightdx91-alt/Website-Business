@@ -57,31 +57,48 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const TaskInput = z.object({
   title: z.string().trim().min(1, "Give the task a name").max(200),
   notes: z.string().trim().max(2000).optional().default(""),
-  due: z.string().regex(DAY, "Use a date like 2026-10-14").nullable().optional(),
-  dueTime: z.string().regex(TIME, "Use a time like 14:30").nullable().optional(),
+  due: z
+    .string()
+    .regex(DAY, "Use a date like 2026-10-14")
+    .nullable()
+    .optional(),
+  dueTime: z
+    .string()
+    .regex(TIME, "Use a time like 14:30")
+    .nullable()
+    .optional(),
   assignee: z.string().trim().max(40).nullable().optional(),
   leadId: z.string().trim().max(40).nullable().optional(),
 });
-export const TaskPatch = TaskInput.partial().extend({ done: z.boolean().optional() });
+export const TaskPatch = TaskInput.partial().extend({
+  done: z.boolean().optional(),
+});
 
 type Names = Map<string, string>;
 
 /** Validates with a 400 and a readable message instead of a crash. */
 function parse<T>(schema: z.ZodType<T>, raw: unknown): T {
   const r = schema.safeParse(raw);
-  if (!r.success) throw new HttpError(400, r.error.issues.map((i) => i.message).join("; "));
+  if (!r.success)
+    throw new HttpError(400, r.error.issues.map((i) => i.message).join("; "));
   return r.data;
 }
 
 async function teamNames(env: Env): Promise<Names> {
   const s = await getSettings(env);
-  const rows = await env.DB.prepare("SELECT id, name FROM users").all<{ id: string; name: string }>();
+  const rows = await env.DB.prepare("SELECT id, name FROM users").all<{
+    id: string;
+    name: string;
+  }>();
   const names: Names = new Map(rows.results.map((u) => [u.id, u.name]));
   names.set("owner", s.callerName || "Owner");
   return names;
 }
 
-function toTask(r: TaskRow & { lead_name?: string | null }, names: Names): Task {
+function toTask(
+  r: TaskRow & { lead_name?: string | null },
+  names: Names,
+): Task {
   return {
     id: r.id,
     title: r.title,
@@ -102,10 +119,21 @@ function toTask(r: TaskRow & { lead_name?: string | null }, names: Names): Task 
   };
 }
 
-const SELECT = "SELECT t.*, l.name AS lead_name FROM tasks t LEFT JOIN leads l ON l.id = t.lead_id";
+const SELECT =
+  "SELECT t.*, l.name AS lead_name FROM tasks t LEFT JOIN leads l ON l.id = t.lead_id";
 
-export async function listTasks(env: Env, o: { scope: "open" | "done"; assignee?: string; leadId?: string; limit?: number }): Promise<Task[]> {
-  const where = [o.scope === "open" ? "t.done_at IS NULL" : "t.done_at IS NOT NULL"];
+export async function listTasks(
+  env: Env,
+  o: {
+    scope: "open" | "done";
+    assignee?: string;
+    leadId?: string;
+    limit?: number;
+  },
+): Promise<Task[]> {
+  const where = [
+    o.scope === "open" ? "t.done_at IS NULL" : "t.done_at IS NOT NULL",
+  ];
   const binds: unknown[] = [];
   if (o.assignee) {
     where.push("(t.assignee = ? OR t.assignee IS NULL)");
@@ -116,38 +144,70 @@ export async function listTasks(env: Env, o: { scope: "open" | "done"; assignee?
     binds.push(o.leadId);
   }
   // Open: dated ones first by date and time, then undated by newest. Done: newest first.
-  const order = o.scope === "open" ? "ORDER BY t.due IS NULL, t.due, t.due_time IS NULL, t.due_time, t.created_at DESC" : "ORDER BY t.done_at DESC";
-  const rows = await env.DB.prepare(`${SELECT} WHERE ${where.join(" AND ")} ${order} LIMIT ?`)
+  const order =
+    o.scope === "open"
+      ? "ORDER BY t.due IS NULL, t.due, t.due_time IS NULL, t.due_time, t.created_at DESC"
+      : "ORDER BY t.done_at DESC";
+  const rows = await env.DB.prepare(
+    `${SELECT} WHERE ${where.join(" AND ")} ${order} LIMIT ?`,
+  )
     .bind(...binds, o.limit ?? 200)
     .all<TaskRow & { lead_name: string | null }>();
   const names = await teamNames(env);
   return rows.results.map((r) => toTask(r, names));
 }
 
-export async function getTask(env: Env, id: string): Promise<(TaskRow & { lead_name: string | null }) | null> {
-  return env.DB.prepare(`${SELECT} WHERE t.id = ?`).bind(id).first<TaskRow & { lead_name: string | null }>();
+export async function getTask(
+  env: Env,
+  id: string,
+): Promise<(TaskRow & { lead_name: string | null }) | null> {
+  return env.DB.prepare(`${SELECT} WHERE t.id = ?`)
+    .bind(id)
+    .first<TaskRow & { lead_name: string | null }>();
 }
 
-async function checkRefs(env: Env, names: Names, input: { assignee?: string | null; leadId?: string | null; due?: string | null; dueTime?: string | null }) {
-  if (input.assignee && !names.has(input.assignee)) throw new HttpError(400, "That person isn't on the team");
+async function checkRefs(
+  env: Env,
+  names: Names,
+  input: {
+    assignee?: string | null;
+    leadId?: string | null;
+    due?: string | null;
+    dueTime?: string | null;
+  },
+) {
+  if (input.assignee && !names.has(input.assignee))
+    throw new HttpError(400, "That person isn't on the team");
   if (input.leadId) {
-    const lead = await env.DB.prepare("SELECT id FROM leads WHERE id = ?").bind(input.leadId).first();
+    const lead = await env.DB.prepare("SELECT id FROM leads WHERE id = ?")
+      .bind(input.leadId)
+      .first();
     if (!lead) throw new HttpError(404, "That lead is gone");
   }
-  if (input.dueTime && !input.due) throw new HttpError(400, "A time needs a date");
+  if (input.dueTime && !input.due)
+    throw new HttpError(400, "A time needs a date");
 }
 
 function when(due: string | null, dueTime: string | null): string {
   if (!due) return "";
   const d = new Date(`${due}T12:00:00Z`);
-  const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  const day = d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
   if (!dueTime) return day;
   const [h, m] = dueTime.split(":").map(Number) as [number, number];
   const hh = h % 12 || 12;
   return `${day} ${hh}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-export async function createTask(env: Env, session: Session, raw: unknown): Promise<Task> {
+export async function createTask(
+  env: Env,
+  session: Session,
+  raw: unknown,
+): Promise<Task> {
   const input = parse(TaskInput, raw);
   const names = await teamNames(env);
   await checkRefs(env, names, input);
@@ -156,11 +216,27 @@ export async function createTask(env: Env, session: Session, raw: unknown): Prom
   await env.DB.prepare(
     "INSERT INTO tasks (id, title, notes, due, due_time, assignee, lead_id, created_by, created_by_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
-    .bind(id, input.title, input.notes || null, input.due ?? null, input.due ? (input.dueTime ?? null) : null, input.assignee || null, input.leadId || null, session.userId, session.name, t, t)
+    .bind(
+      id,
+      input.title,
+      input.notes || null,
+      input.due ?? null,
+      input.due ? (input.dueTime ?? null) : null,
+      input.assignee || null,
+      input.leadId || null,
+      session.userId,
+      session.name,
+      t,
+      t,
+    )
     .run();
   const row = (await getTask(env, id))!;
   const task = toTask(row, names);
-  const forWhom = task.assignee ? (task.assignee === session.userId ? "themselves" : task.assigneeName) : "anyone";
+  const forWhom = task.assignee
+    ? task.assignee === session.userId
+      ? "themselves"
+      : task.assigneeName
+    : "anyone";
   await notify(env, {
     kind: "task",
     actor: session,
@@ -171,7 +247,12 @@ export async function createTask(env: Env, session: Session, raw: unknown): Prom
   return task;
 }
 
-export async function updateTask(env: Env, session: Session, id: string, raw: unknown): Promise<Task> {
+export async function updateTask(
+  env: Env,
+  session: Session,
+  id: string,
+  raw: unknown,
+): Promise<Task> {
   const patch = parse(TaskPatch, raw);
   const before = await getTask(env, id);
   if (!before) throw new HttpError(404, "Task not found");
@@ -181,30 +262,67 @@ export async function updateTask(env: Env, session: Session, id: string, raw: un
     notes: patch.notes !== undefined ? patch.notes : (before.notes ?? ""),
     due: patch.due !== undefined ? patch.due : before.due,
     dueTime: patch.dueTime !== undefined ? patch.dueTime : before.due_time,
-    assignee: patch.assignee !== undefined ? patch.assignee || null : before.assignee,
+    assignee:
+      patch.assignee !== undefined ? patch.assignee || null : before.assignee,
     leadId: patch.leadId !== undefined ? patch.leadId || null : before.lead_id,
   };
   if (!next.due) next.dueTime = null;
   await checkRefs(env, names, next);
   const t = now();
-  const doneAt = patch.done === undefined ? before.done_at : patch.done ? (before.done_at ?? t) : null;
-  const doneBy = patch.done === undefined ? before.done_by_name : patch.done ? (before.done_by_name ?? session.name) : null;
-  await env.DB.prepare("UPDATE tasks SET title = ?, notes = ?, due = ?, due_time = ?, assignee = ?, lead_id = ?, updated_at = ?, done_at = ?, done_by_name = ? WHERE id = ?")
-    .bind(next.title, next.notes || null, next.due, next.dueTime, next.assignee, next.leadId, t, doneAt, doneBy, id)
+  const doneAt =
+    patch.done === undefined
+      ? before.done_at
+      : patch.done
+        ? (before.done_at ?? t)
+        : null;
+  const doneBy =
+    patch.done === undefined
+      ? before.done_by_name
+      : patch.done
+        ? (before.done_by_name ?? session.name)
+        : null;
+  await env.DB.prepare(
+    "UPDATE tasks SET title = ?, notes = ?, due = ?, due_time = ?, assignee = ?, lead_id = ?, updated_at = ?, done_at = ?, done_by_name = ? WHERE id = ?",
+  )
+    .bind(
+      next.title,
+      next.notes || null,
+      next.due,
+      next.dueTime,
+      next.assignee,
+      next.leadId,
+      t,
+      doneAt,
+      doneBy,
+      id,
+    )
     .run();
   const row = (await getTask(env, id))!;
   const task = toTask(row, names);
   if (patch.done === true && !before.done_at) {
-    await notify(env, { kind: "task", actor: session, leadId: task.leadId, text: `✅ ${session.name} finished: ${task.title}` });
+    await notify(env, {
+      kind: "task",
+      actor: session,
+      leadId: task.leadId,
+      text: `✅ ${session.name} finished: ${task.title}`,
+    });
   }
   await syncCalendar(env, row, before);
   return task;
 }
 
-export async function deleteTask(env: Env, session: Session, id: string): Promise<void> {
+export async function deleteTask(
+  env: Env,
+  session: Session,
+  id: string,
+): Promise<void> {
   const row = await getTask(env, id);
   if (!row) return;
-  if (session.role !== "owner" && row.created_by !== session.userId) throw new HttpError(403, "Only the owner or whoever added it can delete a task");
+  if (session.role !== "owner" && row.created_by !== session.userId)
+    throw new HttpError(
+      403,
+      "Only the owner or whoever added it can delete a task",
+    );
   await env.DB.prepare("DELETE FROM tasks WHERE id = ?").bind(id).run();
   if (row.cal_uid) await sendInvite(env, row, "CANCEL", row.cal_seq + 1);
 }
@@ -217,12 +335,28 @@ function wantsCalendar(r: TaskRow): boolean {
 }
 
 /** Sends an invite, an update or a cancellation as the task changes. Never throws. */
-export async function syncCalendar(env: Env, row: TaskRow, before?: TaskRow | null): Promise<void> {
+export async function syncCalendar(
+  env: Env,
+  row: TaskRow,
+  before?: TaskRow | null,
+): Promise<void> {
   try {
     const want = wantsCalendar(row);
     if (want) {
-      const changed = !before || before.title !== row.title || before.notes !== row.notes || before.due !== row.due || before.due_time !== row.due_time || !row.cal_uid;
-      if (changed || (before && !wantsCalendar(before))) await sendInvite(env, row, "REQUEST", row.cal_uid ? row.cal_seq + 1 : 0);
+      const changed =
+        !before ||
+        before.title !== row.title ||
+        before.notes !== row.notes ||
+        before.due !== row.due ||
+        before.due_time !== row.due_time ||
+        !row.cal_uid;
+      if (changed || (before && !wantsCalendar(before)))
+        await sendInvite(
+          env,
+          row,
+          "REQUEST",
+          row.cal_uid ? row.cal_seq + 1 : 0,
+        );
     } else if (row.cal_uid && before && wantsCalendar(before)) {
       await sendInvite(env, row, "CANCEL", row.cal_seq + 1);
     }
@@ -231,12 +365,21 @@ export async function syncCalendar(env: Env, row: TaskRow, before?: TaskRow | nu
   }
 }
 
-async function sendInvite(env: Env, row: TaskRow, method: "REQUEST" | "CANCEL", seq: number): Promise<void> {
+async function sendInvite(
+  env: Env,
+  row: TaskRow,
+  method: "REQUEST" | "CANCEL",
+  seq: number,
+): Promise<void> {
   const s = await getSettings(env);
   const to = s.calendarEmail || s.directEmail;
   if (!to || !s.companyEmail) return;
   const uid = row.cal_uid ?? `task-${row.id}@undergroundassociates.com`;
-  const lead = row.lead_id ? await env.DB.prepare("SELECT name FROM leads WHERE id = ?").bind(row.lead_id).first<{ name: string | null }>() : null;
+  const lead = row.lead_id
+    ? await env.DB.prepare("SELECT name FROM leads WHERE id = ?")
+        .bind(row.lead_id)
+        .first<{ name: string | null }>()
+    : null;
   const ics = taskIcs({
     uid,
     seq,
@@ -246,19 +389,41 @@ async function sendInvite(env: Env, row: TaskRow, method: "REQUEST" | "CANCEL", 
     due: row.due!,
     dueTime: row.due_time,
     leadName: lead?.name ?? null,
-    leadUrl: row.lead_id ? `https://website-business.knightdx91.workers.dev/#/lead/${row.lead_id}` : null,
-    organizer: { name: s.companyName || "Underground Associates", email: s.companyEmail },
+    leadUrl: row.lead_id
+      ? `https://website-business.knightdx91.workers.dev/#/lead/${row.lead_id}`
+      : null,
+    organizer: {
+      name: s.companyName || "Underground Associates",
+      email: s.companyEmail,
+    },
     attendee: to,
   });
   const r = await sendEmailDetailed(env, {
     from: s.companyEmail,
     fromName: `${s.companyName || "Underground Associates"} tasks`,
     to,
-    subject: method === "CANCEL" ? `Done: ${row.title}` : `Task: ${row.title}${row.due ? ` (${when(row.due, row.due_time)})` : ""}`,
-    text: method === "CANCEL" ? `"${row.title}" is finished or removed, so it's off your calendar.` : `${row.title}${row.notes ? `\n\n${row.notes}` : ""}${lead?.name ? `\n\nAbout: ${lead.name}` : ""}\n\nFrom the Website Business app. Accept the invite to keep it on your calendar.`,
-    attachments: [{ filename: "invite.ics", content: btoa(unescape(encodeURIComponent(ics))), contentType: `text/calendar; method=${method}; charset=utf-8` }],
+    subject:
+      method === "CANCEL"
+        ? `Done: ${row.title}`
+        : `Task: ${row.title}${row.due ? ` (${when(row.due, row.due_time)})` : ""}`,
+    text:
+      method === "CANCEL"
+        ? `"${row.title}" is finished or removed, so it's off your calendar.`
+        : `${row.title}${row.notes ? `\n\n${row.notes}` : ""}${lead?.name ? `\n\nAbout: ${lead.name}` : ""}\n\nFrom the Website Business app. Accept the invite to keep it on your calendar.`,
+    attachments: [
+      {
+        filename: "invite.ics",
+        content: btoa(unescape(encodeURIComponent(ics))),
+        contentType: `text/calendar; method=${method}; charset=utf-8`,
+      },
+    ],
   });
-  if (r.ok) await env.DB.prepare("UPDATE tasks SET cal_uid = ?, cal_seq = ? WHERE id = ?").bind(uid, seq, row.id).run();
+  if (r.ok)
+    await env.DB.prepare(
+      "UPDATE tasks SET cal_uid = ?, cal_seq = ? WHERE id = ?",
+    )
+      .bind(uid, seq, row.id)
+      .run();
 }
 
 /** Cullman wall-clock date + time → UTC instant (handles daylight saving by checking the zone's own offset). */
@@ -267,16 +432,39 @@ export function chicagoToUtc(due: string, time: string): Date {
   const [h, mi] = time.split(":").map(Number) as [number, number];
   let guess = Date.UTC(y, mo - 1, d, h, mi);
   for (let i = 0; i < 2; i++) {
-    const parts = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(guess));
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: TZ,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).formatToParts(new Date(guess));
     const g = (t: string) => Number(parts.find((p) => p.type === t)!.value);
-    const asLocal = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") % 24, g("minute"));
+    const asLocal = Date.UTC(
+      g("year"),
+      g("month") - 1,
+      g("day"),
+      g("hour") % 24,
+      g("minute"),
+    );
     guess += Date.UTC(y, mo - 1, d, h, mi) - asLocal;
   }
   return new Date(guess);
 }
 
-const icsText = (t: string) => t.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+const icsText = (t: string) =>
+  t
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r?\n/g, "\\n");
+const stamp = (d: Date) =>
+  d
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 /** iCalendar lines fold at 75 octets. */
 function fold(line: string): string {
   const out: string[] = [];
@@ -303,16 +491,29 @@ export function taskIcs(o: {
   attendee: string;
   now?: Date;
 }): string {
-  const desc = [o.notes, o.leadName ? `About: ${o.leadName}` : "", o.leadUrl ?? ""].filter(Boolean).join("\n");
+  const desc = [
+    o.notes,
+    o.leadName ? `About: ${o.leadName}` : "",
+    o.leadUrl ?? "",
+  ]
+    .filter(Boolean)
+    .join("\n");
   let dt: string[];
   if (o.dueTime) {
     const start = chicagoToUtc(o.due, o.dueTime);
-    dt = [`DTSTART:${stamp(start)}`, `DTEND:${stamp(new Date(start.getTime() + 30 * 60_000))}`];
+    dt = [
+      `DTSTART:${stamp(start)}`,
+      `DTEND:${stamp(new Date(start.getTime() + 30 * 60_000))}`,
+    ];
   } else {
     const d = o.due.replace(/-/g, "");
     const next = new Date(`${o.due}T00:00:00Z`);
     next.setUTCDate(next.getUTCDate() + 1);
-    dt = [`DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${stamp(next).slice(0, 8)}`, "TRANSP:TRANSPARENT"];
+    dt = [
+      `DTSTART;VALUE=DATE:${d}`,
+      `DTEND;VALUE=DATE:${stamp(next).slice(0, 8)}`,
+      "TRANSP:TRANSPARENT",
+    ];
   }
   const lines = [
     "BEGIN:VCALENDAR",

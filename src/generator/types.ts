@@ -363,6 +363,8 @@ export interface RetailExt {
     staffPin?: string;
     /** Fish, plants, pets, food or other goods: wording and care-card fields. Guessed from the business when unset. */
     kind?: ListKind;
+    /** The Barcode scanning add-on: Scan on the board and the tablet. Unset = on only if codes are already in use. */
+    scanning?: boolean;
   };
 }
 

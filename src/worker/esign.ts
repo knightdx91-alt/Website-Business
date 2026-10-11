@@ -8,15 +8,31 @@
 const MAX_SIGNATURE_CHARS = 300_000;
 
 /** Server-side check of what the pop-up posted. Returns the cleaned values, or null if it wasn't signed properly. */
-export function readSignature(form: FormData | null): { name: string; signature: string } | null {
-  const name = String(form?.get("signer_name") ?? "").trim().replace(/\s+/g, " ").slice(0, 100);
+export function readSignature(
+  form: FormData | null,
+): { name: string; signature: string } | null {
+  const name = String(form?.get("signer_name") ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 100);
   const signature = String(form?.get("signature") ?? "");
-  if (form?.get("agree") !== "yes" || name.length < 3 || !name.includes(" ")) return null;
-  if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature) || signature.length > MAX_SIGNATURE_CHARS || signature.length < 2_000) return null;
+  if (form?.get("agree") !== "yes" || name.length < 3 || !name.includes(" "))
+    return null;
+  if (
+    !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature) ||
+    signature.length > MAX_SIGNATURE_CHARS ||
+    signature.length < 2_000
+  )
+    return null;
   return { name, signature };
 }
 
-export function esignHtml(o: { sectionsHtml: string; esc: (t: string) => string; businessField?: string; title: string }): string {
+export function esignHtml(o: {
+  sectionsHtml: string;
+  esc: (t: string) => string;
+  businessField?: string;
+  title: string;
+}): string {
   const e = o.esc;
   return `<style>
 .es-agree{display:flex;gap:10px;align-items:flex-start;border:2px solid #14213d;border-radius:12px;padding:14px;margin:6px 0 10px;cursor:pointer;background:#fff;color:#16181d;font-weight:600}

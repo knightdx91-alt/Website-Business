@@ -77,5 +77,5 @@ test("the editor-as-data carries a Live price list card for non-shops and round-
   assert.ok(card, "pricelist card");
   const values = { plText: "# Shelf\nLocal honey | $12", plTitle: "Shelf", plKind: "food", plPublic: true };
   const { edits } = editsFromForm(d, values);
-  assert.deepEqual(edits.record?.priceList, { text: "# Shelf\nLocal honey | $12", title: "Shelf", public: true, kind: "food" });
+  assert.deepEqual(edits.record?.priceList, { text: "# Shelf\nLocal honey | $12", title: "Shelf", public: true, scanning: false, kind: "food" });
 });

@@ -47,7 +47,11 @@ export function tankBoardGuide(s: AppSettings): Guide {
   const company = s.companyName || "Underground Associates";
   const tablet = s.addons.find((a) => /tablet/i.test(a.name));
   const scanner = s.addons.find((a) => /scanner/i.test(a.name));
+  const scanning = s.addons.find((a) => /scanning/i.test(a.name));
   const load = s.addons.find((a) => /stock list|inventory/i.test(a.name));
+  const SCANNING_LINE = scanning
+    ? `${scanning.name}: ${addonPrice(scanning)}. Turns the Scan button on for their board (phone camera) and the tablet's staff mode. Switch it on in Edit → Live price list → "Barcode scanning on" once they buy it.`
+    : "Barcode scanning is an add-on (add it in Settings → Extras, group Inventory add-ons); switch it on per shop in Edit → Live price list.";
   const TABLET_LINE = tablet
     ? `${tablet.name}: ${addonPrice(tablet)}. Any $40 to $80 Android tablet works; this is us bringing one, setting it up and mounting it. The display page itself is included.`
     : "Tablets are the shop's own purchase. Any $40 to $80 Android tablet works. If you set them up for the shop, $99 each installed is fair.";
@@ -78,6 +82,8 @@ export function tankBoardGuide(s: AppSettings): Guide {
           `Just the inventory system, no website: ${listLine}. The agreement says plainly it is not a website plan.`,
           "With any website plan (Basic, Plus, Pro): the price page, the board and the tablet display are included.",
           `${tagLine}. The first sheet is included with the ${list?.name ?? "Price list"} plan; reprints (renamed tanks, new tanks, wear) are a new sheet.`,
+          'Everything inventory-related is listed together as "Inventory add-ons" (Settings → Extras sets the group): on the website, Show plans, the sign-up page and Plans & answers.',
+          SCANNING_LINE,
           TABLET_LINE,
           SCANNER_LINE,
           LOAD_LINE,
@@ -174,7 +180,8 @@ export function tankBoardGuide(s: AppSettings): Guide {
         title: "Barcode scanning (packaged goods)",
         numbered: true,
         steps: [
-          "What it is: anything with a barcode (fish food, filters, medications, parts, feed bags, bottles) can be counted in and out by scanning it instead of finding it in a list. It lives in staff mode on the tablet; the phone board can scan too.",
+          'What it is: anything with a barcode (fish food, filters, medications, parts, feed bags, bottles) can be counted in and out by scanning it instead of finding it in a list. It is the Barcode scanning add-on: once they buy it, switch it on in Edit → Live price list → "Barcode scanning on" (Android: Edit → the same card). Shops that were already scanning before the add-on existed stay on.',
+          'On the phone board: "▦ Scan" in the bottom bar opens the camera; a known product shows its name, section and count with Put in / Take out; a new code asks for a name (often filled in), a price and which section it goes in. "Scan the next one" chains through a delivery. Each item also has a Barcode field with ▦ beside it.',
           "Unlock the tablet (Staff → PIN, staff tag or phone code), tap \"▦ Scan\" in the bottom bar and hold the product's barcode in front of the tablet's camera. Chrome on Android reads it in about a second. The first time, Chrome asks to use the camera: tap Allow.",
           'No camera, or a lot of scanning? Any USB-C or Bluetooth barcode scanner ($25 to $40, set to "keyboard mode", which is the default) works on the same screen: it types the code into the box and presses Enter for you. Pair it once in the tablet\'s Bluetooth settings.',
           'A product the shop has scanned before shows its name, which tank or shelf it is in, how many are in stock and the price. Tap − / + or type the amount, then "➕ Put in" (a delivery) or "➖ Take out" (a case sold, a return to the supplier). "Scan the next one" keeps going through a whole delivery.',
@@ -504,7 +511,7 @@ export function customerBoardPitch(
           `The board lists your ${sec}s. For each one you type what's in it, the price, how many, and snap a photo if you like.`,
           "Every change saves by itself and shows on your website's price page within about a minute.",
           `A small QR tag on each ${sec} opens its live prices on a customer's phone. A cheap tablet beside it can show them too, no scanning.`,
-          "Packaged goods have a barcode? Scan it on the tablet (its camera, or a cheap handheld scanner), type how many came in, done. The same scan takes them out when they sell.",
+          "Packaged goods have a barcode? With the Barcode scanning add-on, scan it on your phone or the tablet (its camera, or a cheap handheld scanner), type how many came in, done. The same scan takes them out when they sell.",
         ],
       },
       {

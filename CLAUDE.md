@@ -569,6 +569,22 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
+- Inventory add-ons + Barcode scanning add-on (Oct 2026): `AddOn.group` ("general" | "inventory"; `addonGroup()` guesses from the
+  name for older Settings via `INVENTORY_EXTRA`; `inventoryAddons()` / `generalAddons()`). Inventory add-ons are listed under their
+  own heading everywhere: company /pricing (`extrasHtml` → "Inventory add-ons" block, `#inventory-addons`), /extras, /price-list
+  "What it costs" (loops over the group), the sign-up / Buy extras picker (`pickerHtml`: first on the Price list plan, after the
+  general extras otherwise), web Show plans + Plans & answers, Android 2.38 ShowPlans / Playbook / Signup; Settings → Extras has a
+  group select (web) / chips (Android); `/api/plans/options` addons carry `group`. New default extra **"Barcode scanning" $15/month**
+  (DEFAULT_ADDONS + live Settings + `STANDARD_EXTRA_TERMS` /scanning/ + OFFER_HINT): scanning is now a per-shop switch,
+  `priceList.scanning` (`scanningOn(record)` in pricelist.ts: explicit value, else on when any barcode is already stored, so King
+  Fish-era shops keep it). Edit → Live price list / Shop details → "Barcode scanning on" (web `plScan` / `rtPriceScan`, editform
+  `plScan`, edits `priceList.scanning` / `retail.priceScanning`). Off: no Scan button on the board or the tablet, per-item ▦ hidden,
+  `/l/<id>/staff/find` and the board's `GET /c/<token>/lookup?code=` return 403. On: the phone board has **"▦ Scan"** in its bottom
+  bar (`scanHit` in boardPage: a known code shows name / section / count with − n + and Put in / Take out; an unknown code calls
+  `/lookup` (`findByBarcode` → catalog → `lookupBarcode`) and asks name / price / section (or a new one), then "Scan the next one").
+  The list plan's includes line no longer says "scan barcodes"; guides, training (lesson "Barcode scanning (the add-on)"), the
+  customer pitch and the company pages call it an add-on and say how to switch it on. Headless check: scratchpad `board-scan.mjs`
+  (fake BarcodeDetector + getUserMedia via addInitScript).
 - Company site audit (Oct 2026): every plan card says the live price list is included (Basic includes line in live Settings +
   SUGGESTED_PLANS mirrors), the pricing page says it under the cards and in two FAQs, the home FAQ has "My prices or stock change
   all the time", `priceListHtml` shows on the shops, auto, other-businesses, restaurants and lawn-care trade pages, the auto /

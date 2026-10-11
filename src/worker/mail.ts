@@ -11,7 +11,15 @@ export function mailReady(env: Env): boolean {
 
 export async function sendEmail(
   env: Env,
-  m: { from: string; fromName: string; to: string; subject: string; text: string; replyTo?: string; attachments?: MailAttachment[] },
+  m: {
+    from: string;
+    fromName: string;
+    to: string;
+    subject: string;
+    text: string;
+    replyTo?: string;
+    attachments?: MailAttachment[];
+  },
 ): Promise<boolean> {
   return (await sendEmailDetailed(env, m)).ok;
 }
@@ -26,8 +34,20 @@ export interface MailAttachment {
 
 export async function sendEmailDetailed(
   env: Env,
-  m: { from: string; fromName: string; to: string; subject: string; text: string; replyTo?: string; attachments?: MailAttachment[] },
-): Promise<{ ok: boolean; provider: "resend" | "mailersend" | null; error?: string }> {
+  m: {
+    from: string;
+    fromName: string;
+    to: string;
+    subject: string;
+    text: string;
+    replyTo?: string;
+    attachments?: MailAttachment[];
+  },
+): Promise<{
+  ok: boolean;
+  provider: "resend" | "mailersend" | null;
+  error?: string;
+}> {
   let req: { url: string; key: string; body: unknown } | null = null;
   // Resend wins when both keys are set (MailerSend turned the account down in Oct 2026).
   if (env.RESEND_API_KEY) {
@@ -40,7 +60,15 @@ export async function sendEmailDetailed(
         subject: m.subject,
         text: m.text,
         ...(m.replyTo ? { reply_to: m.replyTo } : {}),
-        ...(m.attachments?.length ? { attachments: m.attachments.map((a) => ({ filename: a.filename, content: a.content, ...(a.contentType ? { content_type: a.contentType } : {}) })) } : {}),
+        ...(m.attachments?.length
+          ? {
+              attachments: m.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                ...(a.contentType ? { content_type: a.contentType } : {}),
+              })),
+            }
+          : {}),
       },
     };
   } else if (env.MAILERSEND_API_KEY) {
@@ -53,16 +81,31 @@ export async function sendEmailDetailed(
         subject: m.subject,
         text: m.text,
         ...(m.replyTo ? { reply_to: { email: m.replyTo } } : {}),
-        ...(m.attachments?.length ? { attachments: m.attachments.map((a) => ({ filename: a.filename, content: a.content, disposition: "attachment" })) } : {}),
+        ...(m.attachments?.length
+          ? {
+              attachments: m.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                disposition: "attachment",
+              })),
+            }
+          : {}),
       },
     };
   }
-  const provider = env.RESEND_API_KEY ? "resend" : env.MAILERSEND_API_KEY ? "mailersend" : null;
+  const provider = env.RESEND_API_KEY
+    ? "resend"
+    : env.MAILERSEND_API_KEY
+      ? "mailersend"
+      : null;
   if (!req) return { ok: false, provider, error: "No email key is set" };
   try {
     const res = await fetch(req.url, {
       method: "POST",
-      headers: { authorization: `Bearer ${req.key}`, "content-type": "application/json" },
+      headers: {
+        authorization: `Bearer ${req.key}`,
+        "content-type": "application/json",
+      },
       body: JSON.stringify(req.body),
       signal: AbortSignal.timeout(10_000),
     });

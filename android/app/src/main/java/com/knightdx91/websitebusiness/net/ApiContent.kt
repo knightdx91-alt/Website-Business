@@ -122,7 +122,7 @@ data class PayWay(val title: String, val detail: String)
 
 data class PlanTerms(val min: Int, val short: Int, val commits: List<Int>, val commitWords: String, val flex: Double, val free: Int)
 
-data class AddonInfo(val name: String, val about: String, val price: String, val unit: String, /** The raw price in dollars (0 for "priced per job"). */ val amount: Double = 0.0)
+data class AddonInfo(val name: String, val about: String, val price: String, val unit: String, /** The raw price in dollars (0 for "priced per job"). */ val amount: Double = 0.0, /** "inventory" = a piece of the live price list, listed under its own heading. */ val group: String = "general")
 
 data class PlanOptions(
     val church: Boolean,
@@ -161,7 +161,7 @@ data class PlanOptions(
                 payWays = j.optJSONArray("payWays").objects().map { PayWay(it.optString("title"), it.optString("detail")) },
                 priceShort = j.optString("priceShort", "it's a low monthly price"),
                 invoice = j.optBoolean("invoice"),
-                addons = j.optJSONArray("addons").objects().map { AddonInfo(it.optString("name"), it.optString("about"), it.optString("price"), it.optString("unit"), it.optDouble("amount", priceInText(it.optString("price")))) },
+                addons = j.optJSONArray("addons").objects().map { AddonInfo(it.optString("name"), it.optString("about"), it.optString("price"), it.optString("unit"), it.optDouble("amount", priceInText(it.optString("price"))), it.optString("group", "general")) },
             )
         }
     }
