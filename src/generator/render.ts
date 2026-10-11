@@ -1,5 +1,5 @@
 import { CLIENT_SCRIPT } from "./client-script.ts";
-import { priceListNav, pricesPage } from "./pricelist.ts";
+import { priceListNav, priceListTeaser, pricesPage } from "./pricelist.ts";
 import { actionBar, announcements, footer, gallery, header, hiring, sectionHead, type Ctx, todo } from "./components.ts";
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
@@ -29,6 +29,8 @@ export interface BuildInput {
   credit?: { company: string; url: string; changeUrl: string };
   /** Prefix for every internal link and asset, e.g. "/p/abc123" when a preview is served under a path. */
   basePath?: string;
+  /** Example sites only: sample stock may stay on a published build. */
+  allowSamples?: boolean;
 }
 
 export interface BuildOutput {
@@ -105,11 +107,14 @@ function withExtras(ctx: Ctx, body: Raw): Raw {
     const ev = announcements(ctx).value;
     if (ev) out = /<section class="section[ "]/.test(out) ? out.replace(/<section class="section[ "]/, (m) => ev + m) : out.replace("</main>", `${ev}</main>`);
   }
+  // A taste of the live price list on the home page (the full list is its own page in the menu).
+  const stock = priceListTeaser(ctx).value;
+  if (stock) out = /<section class="cta[ "]/.test(out) ? out.replace(/<section class="cta[ "]/, (m) => stock + m) : out.replace("</main>", `${stock}</main>`);
   const jobs = hiring(ctx).value;
   if (jobs) out = /<section class="cta[ "]/.test(out) ? out.replace(/<section class="cta[ "]/, (m) => jobs + m) : out.replace("</main>", `${jobs}</main>`);
   // Sample stock put on the price list to show a prospect how it works never goes live: a REQUIRED to-do until it is removed.
   const sample = (ctx.r.ext.retail?.priceList?.sections ?? []).some((s) => s.items.some((it) => it.sample));
-  if (sample) {
+  if (sample && !ctx.allowSamples) {
     const t = todo(ctx, "Remove the sample items from the price list", "The price list is filled with sample items so you could see how it works. Put your real stock on the board (or paste it in from a spreadsheet), then have us remove the samples: lead page → Remove sample items.", true).value;
     if (t) out = out.replace("</main>", `${t}</main>`);
   }
@@ -149,6 +154,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     formEndpoint: input.formEndpoint,
     statsEndpoint: input.mode === "publish" ? input.statsEndpoint : undefined,
     liveData: input.liveData,
+    allowSamples: input.allowSamples,
     hasForm: pack.hasForm(input.record),
     credit: input.mode === "publish" ? input.credit : undefined,
     reviewsAllowed: pack.reviewsAllowed?.(input.record) ?? true,

@@ -26,6 +26,7 @@ for (const ex of ogOnly ? [] : EXAMPLES) {
     copy: ex.copy,
     site: { slug: ex.slug, look: ex.design, origin: `https://undergroundassociates.com${base}` },
     mode: "publish",
+    allowSamples: true,
     formEndpoint: "/examples/form",
     basePath: base,
   });

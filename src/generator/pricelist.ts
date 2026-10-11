@@ -117,6 +117,34 @@ export function infoCard(info: ItemInfo | undefined, kind: ListKind): ReturnType
   return html`<details class="menu-item__more"><summary>About this one</summary><dl>${rows.map(([k, v]) => html`<dt>${k}</dt><dd>${v}</dd>`)}</dl>${info?.notes ? html`<p>${info.notes}</p>` : ""}</details>`;
 }
 
+/**
+ * Home-page teaser: up to six things in stock (photos first), with the way to the full page. Every category gets it when the
+ * list has sections; sample items show a placeholder tile until the shop has photos.
+ */
+export function priceListTeaser(ctx: Ctx): ReturnType<typeof html> {
+  const r = ctx.r;
+  const pl = priceListOf(r);
+  if (!pl?.sections.length || pl.public === false) return raw("");
+  const kind = listKind(r);
+  const W = KINDS[kind];
+  const title = pl.title?.trim() || W.title;
+  const items = pl.sections.flatMap((s) => s.items.filter((it) => !it.soldOut && it.qty !== 0).map((it) => ({ it, section: s.name })));
+  if (!items.length) return raw("");
+  const withPhoto = items.filter(({ it }) => it.image && (ctx.mode === "preview" || it.image.source !== "google"));
+  const picks = [...withPhoto, ...items.filter((x) => !withPhoto.includes(x))].slice(0, 6);
+  const sample = picks.some(({ it }) => it.sample);
+  return html`<section class="section stock" id="stock" aria-labelledby="stock-title"><div class="wrap">
+<span class="section__label">${title}</span><h2 id="stock-title">What's in right now</h2>
+<p class="muted">Updated ${pl.lastUpdated}. The full list, by ${W.section.toLowerCase()}, is one tap away.${sample ? " These are sample items to show how it works." : ""}</p>
+<ul class="tiles">${picks.map(({ it, section }) => {
+    const img = it.image && (ctx.mode === "preview" || it.image.source !== "google") ? it.image : undefined;
+    const left = it.qty !== undefined && it.qty > 0 && it.qty <= 5 ? `${it.qty} left` : "";
+    return html`<li class="tile${img || it.sample ? "" : " tile--text"}">${img ? imageTag(img, { cls: "tile__img" }) : it.sample ? html`<div class="tile__img tile__img--ph" aria-hidden="true">${W.emoji}</div>` : ""}<div class="tile__body"><h3>${it.name}</h3>${it.price ? html`<p class="tile__price">${it.price}</p>` : ""}<p class="tile__note">${[section, left].filter(Boolean).join(" · ")}</p></div></li>`;
+  })}</ul>
+<div class="btns" style="margin-top:20px"><a class="btn btn--primary" href="/prices/">See everything: ${title}</a></div>
+</div></section>`;
+}
+
 /** The nav link, when the list is public. */
 export function priceListNav(ctx: Ctx): NavItem[] {
   const pl = priceListOf(ctx.r);
@@ -134,7 +162,7 @@ export function pricesPage(ctx: Ctx): PageSpec | null {
   const shown = pl.sections.map((s) => ({ ...s, items: s.items.filter((it) => !it.soldOut && it.qty !== 0) })).filter((s) => s.items.length);
   const qtyNote = (it: { qty?: number }) => (it.qty !== undefined && it.qty > 0 && it.qty <= 5 ? `${it.qty} left` : "");
   const sample = pl.sections.some((s) => s.items.some((it) => it.sample));
-  const sampleNote = sample && ctx.mode === "preview" ? html`<p class="note" data-sample-note><strong>Sample items.</strong> This is how your live ${title.toLowerCase()} page works: these are made-up items for a business like yours. Your real stock replaces them on your board, from your phone, and the page follows within a minute.</p>` : "";
+  const sampleNote = sample && (ctx.mode === "preview" || ctx.allowSamples) ? html`<p class="note" data-sample-note><strong>Sample items.</strong> This is how your live ${title.toLowerCase()} page works: these are made-up items for a business like yours. Your real stock replaces them on your board, from your phone, and the page follows within a minute.</p>` : "";
   const body = html`${sampleNote}<div id="prices-live"${ctx.liveData ? raw(` data-live="${ctx.liveData}"`) : ""}><nav class="menu-nav" aria-label="${title} sections">${shown.map((s) => html`<a href="#sec-${sectionSlug(s.name)}">${s.name}</a>`)}</nav>
 ${shown.map(
     (s) => html`<section class="menu-sec" id="sec-${sectionSlug(s.name)}" aria-labelledby="sec-${sectionSlug(s.name)}-t"><h2 id="sec-${sectionSlug(s.name)}-t">${s.name}</h2>${s.note ? html`<p class="muted">${s.note}</p>` : ""}
@@ -143,7 +171,10 @@ ${shown.map(
       const note = [it.description, qtyNote(it)].filter(Boolean).join(" · ");
       const card = infoCard(it.info, kind);
       const row = html`<div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${note ? html`<p>${note}</p>` : ""}${card}`;
-      return img ? html`<li class="menu-item menu-item--photo">${imageTag(img, { cls: "menu-item__img" })}<div>${row}</div></li>` : html`<li class="menu-item">${row}</li>`;
+      if (img) return html`<li class="menu-item menu-item--photo">${imageTag(img, { cls: "menu-item__img" })}<div>${row}</div></li>`;
+      // Sample items get a placeholder tile, so the photo layout shows before the shop has taken any.
+      if (it.sample) return html`<li class="menu-item menu-item--photo"><div class="menu-item__img menu-item__img--ph" aria-hidden="true">${KINDS[kind].emoji}</div><div>${row}</div></li>`;
+      return html`<li class="menu-item">${row}</li>`;
     })}</ul></section>`,
   )}</div>
 <p class="muted">Updated <span data-live-updated>${pl.lastUpdated}</span>. Stock and prices change with new arrivals; call to check before you drive over.</p>`;

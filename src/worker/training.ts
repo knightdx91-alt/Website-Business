@@ -135,13 +135,14 @@ const LESSONS: Lesson[] = [
     steps: [
       "Open Preview on the phone (open the Fold for the desktop view). Hand it to them. Let them scroll.",
       "Point at three things only: the Call button at the bottom, their hours and directions, and their services or menu. Don't tour every section.",
+      'Shop, parts counter, bakery, nursery or car lot? Before the visit, the owner or full access taps "🧪 Add sample items" (on the lead\'s board card or on the Preview screen next to Full screen). The home page then shows a "What\'s in right now" section and the menu gets an "In stock" (or "Today\'s case") page filled with made-up stock for their kind of business, so they see the live price list working instead of imagining it. Say it\'s sample stock; their own replaces it from their phone.',
       'When they correct something ("we close at 7 now", "we don\'t do roofing"), tap Edit, fix it, Save. The preview rebuilds in seconds. Fixing it in front of them is the moment they believe it\'s real.',
       "Take a photo of the storefront, truck or shop while you're there. The preview uses a Google photo, which we're not allowed to publish; the owner's photo replaces it (Edit → Photo).",
       'Ask who makes the decision and when they\'re easiest to reach. Put it in the lead with the contact note ("Ask for: Jim, mornings").',
       "Not today? Text them the link, leave a flyer, and log the call with a callback day. Never leave without one of those.",
     ],
     tryIt:
-      "On any lead, open Edit, change the hours, Save, and watch the preview update. Then change them back.",
+      "On any lead, open Edit, change the hours, Save, and watch the preview update. Then change them back. Then open the Preview screen, tap 🧪 Add sample items, find the In stock page in the site menu, and tap Remove sample items when you're done.",
     check: [
       {
         q: "The owner says their hours on the preview are wrong.",
@@ -351,7 +352,7 @@ const LESSONS: Lesson[] = [
       "Price: {listPlan}, no minimum, or included in every website plan. Every month on it counts toward a website later. The full how-to, with set-up steps and trouble, is Settings → Guides.",
     ],
     tryIt:
-      'Open the Payment test lead, tap Open it here, add a section and two items with counts, then open a 📺 link and watch them appear. Read "Show them the … board" once as if you were the shop owner.',
+      'On the Payment test lead, tap 🧪 Add sample items (board card or Preview screen) and look at the home page section and the In stock page. Then open the Payment test lead, tap Open it here, add a section and two items with counts, then open a 📺 link and watch them appear. Read "Show them the … board" once as if you were the shop owner.',
     check: [
       {
         q: "The owner's price on a tank changes. Who reprints the QR tag?",

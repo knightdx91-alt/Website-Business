@@ -14,6 +14,8 @@ export interface Ctx {
   mode: BuildMode;
   /** Where the price page fetches live stock from (`/l/<lead>/prices.json`), so tank-board edits show without a rebuild. */
   liveData?: string;
+  /** Example sites: sample items may stay (no publish-blocking to-do); previews already allow them. */
+  allowSamples?: boolean;
   site: Site;
   /** Required owner to-dos. Rendered in previews; publish fails while any exist. */
   todos: string[];

@@ -217,6 +217,9 @@ body.nav-open{overflow:hidden}
 @media (min-width:900px){.tiles{grid-template-columns:repeat(4,1fr)}}
 .tile{background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid rgba(238, 233, 224, 0.18);box-shadow:none;display:flex;flex-direction:column}
 .tile__img{width:100%;aspect-ratio:4/3;object-fit:cover}
+.tile__img--ph,.menu-item__img--ph{display:grid;place-items:center;background:var(--band);color:var(--text);font-size:2rem;line-height:1}
+.menu-item__img--ph{width:72px;height:72px;border-radius:12px}.tile__img--ph{width:100%;aspect-ratio:4/3;font-size:2.6rem}
+.stock .tile__body h3{font-size:1rem;margin:0}.stock .tile__price{font-weight:700;margin:.2em 0 0}.stock .tile__note{font-size:.9rem;opacity:.8;margin:.2em 0 0}
 .tile--text{border-top:6px solid var(--primary)}
 .tile__body{padding:14px 16px 16px}.tile__body h3{font-size:1.05rem;margin:0 0 .3em;display:flex;flex-wrap:wrap;gap:.3em .6em;align-items:baseline}.tile__body h3 a{color:inherit;text-decoration:none}.tile__body h3 a::after{content:"";position:absolute;inset:0}.tile{position:relative}
 .tile__body p{margin:0;font-size:.95rem;color:var(--text)}

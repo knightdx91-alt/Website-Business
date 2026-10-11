@@ -186,7 +186,7 @@ if (lp && typeof fetch === "function") {
           var inf = it.info || null, rows = inf ? [["Adult size", inf.maxSize], ["Eats", inf.diet], ["Temperament", inf.temperament], ["Minimum tank", inf.minTank], ["Care level", inf.care], ["Water", inf.water], ["From", inf.origin]].filter(function (x) { return x[1]; }) : [];
           var more = rows.length || (inf && inf.notes) ? '<details class="menu-item__more"><summary>About this one</summary><dl>' + rows.map(function (x) { return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>"; }).join("") + "</dl>" + (inf && inf.notes ? "<p>" + esc(inf.notes) + "</p>" : "") + "</details>" : "";
           var row = '<div class="menu-item__row"><span>' + esc(it.name) + '</span><span class="dots" aria-hidden="true"></span>' + (it.price ? "<span>" + esc(it.price) + "</span>" : "") + "</div>" + (note ? "<p>" + esc(note) + "</p>" : "") + more;
-          out += it.image ? '<li class="menu-item menu-item--photo"><img class="menu-item__img" src="' + esc(it.image) + '" alt="' + esc(it.name) + '" loading="lazy" decoding="async"><div>' + row + "</div></li>" : '<li class="menu-item">' + row + "</li>";
+          out += it.image ? '<li class="menu-item menu-item--photo"><img class="menu-item__img" src="' + esc(it.image) + '" alt="' + esc(it.name) + '" loading="lazy" decoding="async"><div>' + row + "</div></li>" : it.sample ? '<li class="menu-item menu-item--photo"><div class="menu-item__img menu-item__img--ph" aria-hidden="true">' + esc((j.words && j.words.emoji) || "") + "</div><div>" + row + "</div></li>" : '<li class="menu-item">' + row + "</li>";
         }
         out += "</ul></section>";
       }

@@ -16,19 +16,19 @@ import { websiteProblem } from "../src/places/site-check.ts";
 import { categoryRecord, restaurantRecord, sampleCopy } from "./fixtures.ts";
 
 const site = (slug = "s") => ({ slug, look: "", origin: "https://example.test" });
-const build = (record: BusinessRecord, copy: Copy, mode: "preview" | "publish" = "preview") => buildSite({ record, copy, site: site(), mode });
+const build = (record: BusinessRecord, copy: Copy, mode: "preview" | "publish" = "preview") => buildSite({ record, copy, site: site(), mode, allowSamples: true });
 
 test("a business named Premier Auto Care publishes; hype in the AI text still fails", async () => {
   const ex = EXAMPLES.find((e) => e.record.category === "auto")!;
   const record = structuredClone(ex.record);
   record.name = "Premier Auto Care #1";
   record.address.street = "12 Elevate Dr";
-  const out = await buildSite({ record, copy: ex.copy, site: site("premier"), mode: "publish" });
+  const out = await buildSite({ record, copy: ex.copy, site: site("premier"), mode: "publish", allowSamples: true });
   assert.deepEqual(out.lint.errors, []);
   assert.match(String(out.files.get("index.html")), /Premier Auto Care #1/);
   const hype = structuredClone(ex.copy);
   hype.about = [...hype.about, "Look no further for honest car care."];
-  await assert.rejects(buildSite({ record, copy: hype, site: site("premier"), mode: "publish" }), /banned phrase "look no further"/);
+  await assert.rejects(buildSite({ record, copy: hype, site: site("premier"), mode: "publish", allowSamples: true }), /banned phrase "look no further"/);
   assert.equal(bannedPhraseIn("Premiere Cleaning offers elevated service"), null, "whole words only");
   assert.equal(bannedPhraseIn("We're the #1 shop"), "#1");
   assert.equal(bannedPhraseIn("Mouth-watering ribs"), "mouth-watering");
@@ -52,10 +52,10 @@ test("no hours or testimonials: no empty columns or quote grids on live sites, h
   record.testimonials = [];
   const preview = await buildSite({ record, copy: ex.copy, site: site(), mode: "preview" });
   assert.ok(!preview.todos.includes("Add your hours") && preview.suggestions.includes("Add your hours"), "storefront hours are suggested, never required");
-  const noHoursLive = await buildSite({ record, copy: ex.copy, site: site(), mode: "publish" });
+  const noHoursLive = await buildSite({ record, copy: ex.copy, site: site(), mode: "publish", allowSamples: true });
   assert.ok(!noHoursLive.lint.publishBlockers.some((b) => /hours/i.test(b)) && noHoursLive.lint.errors.length === 0, "a shop without Google hours still publishes");
   assert.match(String(noHoursLive.files.get("index.html")), /class="visit visit--solo"/);
-  const pub = await buildSite({ record: { ...record, hours: ex.record.hours }, copy: ex.copy, site: site(), mode: "publish" });
+  const pub = await buildSite({ record: { ...record, hours: ex.record.hours }, copy: ex.copy, site: site(), mode: "publish", allowSamples: true });
   const home = String(pub.files.get("index.html"));
   assert.match(home, /Read our reviews on Google/);
   assert.doesNotMatch(home, /class="quotes"/);
@@ -78,7 +78,7 @@ test("every heading an aria-labelledby points at exists", async () => {
   records.push({ record: categoryRecord("finance", { variant: "insurance", ext: { finance: { independent: true, carriers: ["Alfa"] } } }), copy: sampleCopy(), look: "" });
   for (const { record, copy, look } of records) {
     for (const mode of (record.confirmed.length ? ["preview", "publish"] : ["preview"]) as Array<"preview" | "publish">) {
-      const out = await buildSite({ record, copy: { ...copy, es: copy.es ?? { heroTagline: "Hola", heroSub: "Sub", about: [], services: {}, faq: [], ctaTitle: "Llame", ctaLine: "Hoy", metaDescription: "x" } }, site: { slug: "a", look }, mode });
+      const out = await buildSite({ record, copy: { ...copy, es: copy.es ?? { heroTagline: "Hola", heroSub: "Sub", about: [], services: {}, faq: [], ctaTitle: "Llame", ctaLine: "Hoy", metaDescription: "x" } }, site: { slug: "a", look }, mode, allowSamples: true });
       for (const [path, content] of out.files) {
         if (!path.endsWith(".html")) continue;
         const html = String(content);
@@ -93,7 +93,7 @@ test("every heading an aria-labelledby points at exists", async () => {
 
 test("favicon, link-preview image and cache headers", async () => {
   const ex = EXAMPLES[0]!;
-  const plain = await buildSite({ record: ex.record, copy: ex.copy, site: site(), mode: "publish" });
+  const plain = await buildSite({ record: ex.record, copy: ex.copy, site: site(), mode: "publish", allowSamples: true });
   const home = String(plain.files.get("index.html"));
   assert.match(home, /<link rel="icon" href="data:image\/svg\+xml,/);
   assert.match(home, /%3Ctext[^>]*%3EM%3C%2Ftext%3E/, "the initial M");
@@ -101,7 +101,7 @@ test("favicon, link-preview image and cache headers", async () => {
   assert.doesNotMatch(home, /og:image/);
   const record = structuredClone(ex.record);
   record.media.hero = { src: "/assets/owner/hero.jpg", alt: "Front door", source: "owner", width: 1600, height: 1000 };
-  const withHero = await buildSite({ record, copy: ex.copy, site: site(), mode: "publish" });
+  const withHero = await buildSite({ record, copy: ex.copy, site: site(), mode: "publish", allowSamples: true });
   const h2 = String(withHero.files.get("index.html"));
   assert.match(h2, /property="og:image" content="https:\/\/example.test\/assets\/owner\/hero.jpg"/);
   assert.match(h2, /name="twitter:card" content="summary_large_image"/);

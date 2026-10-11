@@ -22,7 +22,6 @@ const day = (open: string, close: string) => [{ open, close }];
 /** The live price list, filled with the same sample stock a prospect's preview gets; the flags come off because example sites publish. */
 function withSampleStock(record: BusinessRecord): void {
   addSampleStock(record);
-  for (const s of record.ext.retail!.priceList!.sections) for (const it of s.items) delete it.sample;
   record.ext.retail!.priceList!.lastUpdated = "this morning";
 }
 
