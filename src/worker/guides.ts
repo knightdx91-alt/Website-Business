@@ -54,10 +54,10 @@ export function tankBoardGuide(s: AppSettings): Guide {
     : "Barcode scanning is an add-on (add it in Settings → Extras, group Inventory add-ons); switch it on per shop in Edit → Live price list.";
   const TABLET_LINE = tablet
     ? `${tablet.name}: ${addonPrice(tablet)}. Any $40 to $80 Android tablet works; this is us bringing one, setting it up and mounting it. The display page itself is included.`
-    : "Tablets are the shop's own purchase. Any $40 to $80 Android tablet works. If you set them up for the shop, $99 each installed is fair.";
+    : "Tablets are the shop's own purchase: any $40 to $80 Android tablet works, and we show them how to set it up (the display guide). We don't sell or supply hardware.";
   const SCANNER_LINE = scanner
     ? `${scanner.name}: ${addonPrice(scanner)}. The tablet camera scans for free; this is a handheld for shops that scan whole deliveries.`
-    : "A handheld barcode scanner ($25 to $40 in keyboard mode) is the shop's own purchase; the tablet camera scans for free.";
+    : "A handheld barcode scanner ($25 to $40 in keyboard mode) is the shop's own purchase; the phone or tablet camera scans for free. We don't sell or supply hardware.";
   const LOAD_LINE = load
     ? `${load.name}: ${addonPrice(load)}. They send a spreadsheet, a register export or photos of their price board; we load it. The board's own import is free when they do it themselves.`
     : "Loading a list for them is included in the set-up when it comes as a spreadsheet; a paper list retyped is an extra to quote.";
@@ -541,7 +541,7 @@ export function customerBoardPitch(
         title: `What ${company} does`,
         steps: [
           `Set up your price page and your board, and load your first ${sec}s with you if you want.`,
-          `Print your QR tags (one per ${sec}), and set up a tablet for you if you'd like one, with a barcode scanner paired to it if you want one.`,
+          `Print your QR tags (one per ${sec}), and show you how to set up a tablet of your own by the ${sec} if you'd like one (any $40 to $80 Android tablet works).`,
           `Keep it all running: hosting, security, backups, and reprints when you rename or add a ${sec}.`,
           "Answer by text. Anything odd, you text us and we fix it.",
         ],

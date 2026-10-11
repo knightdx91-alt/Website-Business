@@ -1937,10 +1937,10 @@ ${p ? `<li><strong>Just the price list, board and tags:</strong> the ${e(p.name)
 ${inventoryAddons(s.addons)
   .map(
     (a) =>
-      `<li><strong>${e(a.name)}:</strong> ${e(addonPrice(a))}${a.about ? `. ${e(a.about)}` : ""}${/price tag|shelf label/i.test(a.name) ? " Reprints after you rename or add a section are at cost." : ""}${/tablet/i.test(a.name) ? " Any $40 to $80 Android tablet of your own works too; the display page itself is included." : ""}${/scanner/i.test(a.name) ? " The camera on your phone or tablet scans without it." : ""}${/stock list/i.test(a.name) ? " Pasting a spreadsheet yourself is free." : ""}</li>`,
+      `<li><strong>${e(a.name)}:</strong> ${e(addonPrice(a))}${a.about ? `. ${e(a.about)}` : ""}${/price tag|shelf label/i.test(a.name) ? " Reprints after you rename or add a section are at cost." : ""}${/stock list/i.test(a.name) ? " Pasting a spreadsheet yourself is free." : ""}</li>`,
   )
   .join("")}</ul>
-<p class="small muted">Everything in this list is an add-on. The price page, the board, the tablet display page and your first sheet of QR tags are included with the plan.</p>
+<p class="small muted">Everything in this list is an add-on. The price page, the board, the tablet display page and your first sheet of QR tags are included with the plan. The tablet itself is yours: any $40 to $80 Android tablet works, and the camera on your phone or tablet scans barcodes; a $25 to $40 keyboard-mode handheld scanner is optional and your own purchase.</p>
 <div class="btns" style="margin-top:18px"><a class="btn" href="/#contact">Ask us about it</a>${p ? `<a class="btn btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a>` : ""}<a class="btn btn--line" href="/pricing">All plans and pricing</a></div></div></section>
 <section class="sec sec--alt" id="faq"><div class="wrap narrow"><h2>Questions shops ask</h2>${faqHtml(
     [
@@ -2047,7 +2047,7 @@ ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</
       ],
       [
         "Is the live price list extra?",
-        "No. It comes with every website plan. On its own, with no website, it is the Price list plan with no minimum term. The pieces around it are listed as inventory add-ons: barcode scanning, more QR tag sheets, a tablet we supply and set up, a scanner paired to it, and loading your stock list for you.",
+        "No. It comes with every website plan. On its own, with no website, it is the Price list plan with no minimum term. The pieces around it are listed as inventory add-ons: barcode scanning, more QR tag sheets, and loading your stock list for you. Tablets and handheld scanners are your own; any $40 to $80 Android tablet and any $25 to $40 keyboard-mode scanner work.",
       ],
       [
         "Can I pay by check or bank transfer?",
@@ -2374,7 +2374,7 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
             s.annualMonthsFree
               ? "Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews."
               : "",
-            "Extras: one-time extras aren't refundable once delivered unless we made the mistake (printed and programmed items once printed or programmed; a tablet or scanner we supplied once it is set up, with the maker's warranty covering hardware faults). Monthly extras can be canceled with 30 days' notice. A same-day build is refunded if we miss the window through our own fault; Google Business Profile setup is refunded half if Google refuses to verify.",
+            "Extras: one-time extras aren't refundable once delivered unless we made the mistake (printed and programmed items once printed or programmed). Monthly extras can be canceled with 30 days' notice. A same-day build is refunded if we miss the window through our own fault; Google Business Profile setup is refunded half if Google refuses to verify.",
             `Late payments: ${lateFeeOf(s) ? `a ${money(lateFeeOf(s))} late fee 10 days after a failed payment, ` : ""}${interestRateOf(s) ? `${interestRateOf(s)}% a year on balances over 30 days overdue, ` : ""}the site may go offline after 30 days, the agreement may end after 60 days with the balance due${reinstatementFeeOf(s) ? `, and ${money2(reinstatementFeeOf(s))} to put a site back online` : ""}.`,
             `Payment disputes: please contact us first; we refund billing mistakes in full. Disputing a charge that was due counts as a missed payment${returnedFeeOf(s) ? ` and adds a ${money2(returnedFeeOf(s))} fee` : ""}.`,
             "If we fail you: a month free for more than 24 hours of downtime in a month that's our fault. Three such months in a year, or a problem not fixed within 14 days of your written notice, lets you cancel without the rest of your term and get unused prepaid months back.",

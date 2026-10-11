@@ -342,7 +342,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   reprint (renamed/added sections, never for prices), how to sell it (sign-up extras, Buy extras link, quantity = sheets, who
   buys), after they pay, trouble. Third guide `display` (tablet display): what it shows, getting the `/d/` address from the
   board's 📺 links, setting a tablet up (home screen, screen timeout, plugged in, app pinning), mounting, what the shop needs to
-  know, selling it (free with the plan; $99 installed if we supply tablets), trouble. `test/worker/guides.test.ts`. Add a guide:
+  know, selling it (free with the plan; tablets are the shop's own), trouble. `test/worker/guides.test.ts`. Add a guide:
   a builder in guides.ts + `guideById` + a button.
 - 🐠 Show them the Tank board (Oct 2026): a customer-facing page for a shop, like Show plans (light, app bar hidden): web
   `#/showboard/<leadId>` (`viewShowBoard`), Android `ui/ShowBoardScreen.kt` 2.31 (route `showboard/{lead}`), button next to
@@ -569,6 +569,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
+- Hardware is never ours to supply (Oct 2026, owner's rule): the "Tablet display, supplied & set up" and "Barcode scanner, paired to
+  the tablet" extras added earlier that day were removed from DEFAULT_ADDONS, live Settings and every page the same day. Tablets and
+  handheld scanners are the shop's own purchase; we show them how (display guide). Don't add offerings that commit the business to
+  buying, delivering or warranting anything without asking the owner first; the `/tablet/` and `/scanner/` STANDARD_EXTRA_TERMS stay
+  only in case the owner adds such an extra deliberately.
 - Inventory add-ons + Barcode scanning add-on (Oct 2026): `AddOn.group` ("general" | "inventory"; `addonGroup()` guesses from the
   name for older Settings via `INVENTORY_EXTRA`; `inventoryAddons()` / `generalAddons()`). Inventory add-ons are listed under their
   own heading everywhere: company /pricing (`extrasHtml` → "Inventory add-ons" block, `#inventory-addons`), /extras, /price-list

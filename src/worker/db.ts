@@ -269,22 +269,6 @@ export const DEFAULT_ADDONS: AddOn[] = [
       "We run your Google or Facebook ads and report what they bring in. Ad spend is paid separately.",
   },
   {
-    name: "Tablet display, supplied & set up",
-    group: "inventory",
-    price: 99,
-    unit: "each",
-    about:
-      "A tablet by your tank, shelf or counter that shows that section live and doubles as your staff's stock station. We bring it, set it up and mount it.",
-  },
-  {
-    name: "Barcode scanner, paired to the tablet",
-    group: "inventory",
-    price: 59,
-    unit: "each",
-    about:
-      "A handheld scanner paired to your tablet, so a delivery is counted in by scanning each product instead of finding it in a list.",
-  },
-  {
     name: "Stock list loaded for you",
     group: "inventory",
     price: 49,
