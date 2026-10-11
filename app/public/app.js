@@ -1621,7 +1621,7 @@
     }));
   }
 
-  /** 🐠 Show them the Tank board: a customer-facing page for a shop (owner and callers), from /api/leads/:id/showboard. */
+  /** 📋 Show them the board: a customer-facing page for a shop (owner and callers), from /api/leads/:id/showboard. */
   async function viewShowBoard(leadId) {
     stopPolling();
     const my = renderSeq;
@@ -2859,7 +2859,7 @@
     });
     const rv = $app.querySelector("[data-clientrevoke]");
     if (rv) rv.addEventListener("click", async () => {
-      if (!confirm("Stop every tank board link sent so far? You'll text them a new one.")) return;
+      if (!confirm("Stop every board link sent so far? You'll text them a new one.")) return;
       rv.disabled = true;
       try { await api(`/leads/${l.id}/clientlink`, { method: "DELETE" }); toast("Old links no longer work. Text them a new one."); } catch (err) { toast(err.message); } finally { rv.disabled = false; }
     });
@@ -3239,7 +3239,7 @@
         <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
       <section class="card"><h2>📖 Guides</h2>
         <p class="small muted">How to set up and sell what we offer, with the exact buttons to tap. Prices in the guides come from Settings.</p>
-        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">🐠 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/training">🎓 Training course</a></div></section>
+        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/training">🎓 Training course</a></div></section>
       <section class="card"><h2>💵 Costs & usage</h2>
         <p class="small muted">Every outside service the app depends on: what it costs, what we've used this month, when it renews and what stops if it lapses. For whoever minds the bills.</p>
         <div class="btns btns--full"><a class="btn btn--primary" href="#/costs">💵 Open Costs & usage</a><a class="btn" href="#/guide/costs">📖 The guide</a></div></section>

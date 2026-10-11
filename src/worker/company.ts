@@ -1817,14 +1817,14 @@ function priceListTeaser(s: AppSettings): string {
 <p><a class="btn btn--small" href="/price-list">See how it works</a></p></div></div></section>`;
 }
 
-/** /price-list: the live price list, Tank board, QR tags and tablet display, for shops whose stock changes daily. */
+/** /price-list: the live price list, the board, QR tags and tablet display, for shops whose stock changes daily. */
 async function priceListPage(env: Env): Promise<Response> {
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
   const p = listPlan(s);
   const lowest = lowestOf(s);
   const tags = s.addons.find((a) => /price tag|shelf label/i.test(a.name));
-  const title = `Live price list, QR price tags and Tank board for shops | ${name}`;
+  const title = `Live price list, QR price tags and Stock board for any shop | ${name}`;
   const description = `For Cullman-area shops whose stock changes daily: a price page with a section per tank or shelf, QR tags that open it, a board you update from your phone, a tablet display by the tank, barcode scanning for packaged stock, and a whole inventory loaded from a spreadsheet in one go. For fish stores, parts counters, nurseries, bakeries, lots and any shop.${p ? ` ${money(p.monthly)} a month, no minimum, or included with any website plan.` : ""}`;
   const serviceLd = {
     "@type": "Service",
@@ -1852,8 +1852,8 @@ async function priceListPage(env: Env): Promise<Response> {
     ],
     [
       "📱",
-      "The Tank board",
-      "A private link we text you. It opens on any phone, no app and no password. Add a tank, add what's in it, type the price and how many, snap a photo, tap Sold out. Every change saves by itself.",
+      "The board",
+      "Your Stock board (a Tank board for a fish store, a Parts board for a parts counter, a Lot board for a dealer): a private link we text you. It opens on any phone, no app and no password. Add a section, add what's in it, type the price and how many, snap a photo, tap Sold out. Every change saves by itself.",
     ],
     [
       "▦",
@@ -2299,7 +2299,7 @@ async function policyPage(
       s.plans.length
         ? sec(
             "Plans and prices",
-            `${ul(s.plans.filter((p) => p.monthly).map((p) => `<strong>${e(p.name)}</strong>: ${money(p.monthly)} a month${p.setup ? ` plus ${money(p.setup)} setup` : ""}${isListPlan(p) ? " (a live price page, QR tags and the Tank board rather than a website; no minimum term, cancel any time)" : ""}`))}
+            `${ul(s.plans.filter((p) => p.monthly).map((p) => `<strong>${e(p.name)}</strong>: ${money(p.monthly)} a month${p.setup ? ` plus ${money(p.setup)} setup` : ""}${isListPlan(p) ? " (a live price page, QR tags and the Stock board rather than a website; no minimum term, cancel any time)" : ""}`))}
 <p>Ways to pay:</p>${ul(
               ways.map(
                 (o) =>

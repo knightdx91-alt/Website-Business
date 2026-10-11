@@ -5,11 +5,11 @@ import { customerBoardPitch, customerPitchPage, displayGuide, guideById, priceTa
 
 const settings = (over: Partial<AppSettings> = {}) => ({ plans: [{ id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "" }, DEFAULT_LIST_PLAN], addons: DEFAULT_ADDONS, companyName: "Underground Associates", ...over }) as unknown as AppSettings;
 
-test("the Tank board guide covers setup, the board, QR tags, the tablet and selling, with prices from Settings", async () => {
+test("the live inventory guide covers setup, the board, QR tags, the tablet and selling, with prices from Settings", async () => {
   const g = tankBoardGuide(settings());
   assert.ok(g.sections.length >= 9);
   const titles = g.sections.map((s) => s.title.toLowerCase());
-  for (const need of ["set a shop up", "tank board", "qr price tags", "tablet", "selling", "trouble"]) assert.ok(titles.some((t) => t.includes(need)), need);
+  for (const need of ["set a shop up", "give them the board", "whole inventory", "qr price tags", "tablet", "selling", "trouble"]) assert.ok(titles.some((t) => t.includes(need)), need);
   const text = JSON.stringify(g);
   assert.match(text, /Price list plan, \$29 a month, no minimum/);
   assert.match(text, /QR price tags & shelf labels: \$49 each/);

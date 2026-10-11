@@ -619,7 +619,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                 }
             }
 
-            // ---- tank board (retail) ----
+            // ---- the board (any category) ----
             if (ready) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
@@ -630,7 +630,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             OutlinedButton(onClick = { act("clientopen") { val (url, _) = state.api.clientLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open it here") }
                             OutlinedButton(onClick = { act("boardpitch") { val (_, text) = state.api.boardLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them the ${detail.boardName} page") }
                             if (isOwner) OutlinedButton(onClick = {
-                                ask = Ask("Revoke tank board links", "Stop every tank board link sent so far? You'll text them a new one.", "Revoke", danger = true) {
+                                ask = Ask("Revoke old board links", "Stop every ${detail.boardName.lowercase()} link sent so far? You'll text them a new one.", "Revoke", danger = true) {
                                     act("clientrevoke") { state.api.revokeClientLink(id); context.toast("Old links no longer work. Text them a new one.") }
                                 }
                             }, enabled = busy == null) { Text("Revoke old links") }

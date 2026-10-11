@@ -4,16 +4,35 @@ import { hmac, safeEqual } from "./auth.ts";
 import { draftItemInfo, infoRows } from "../copy/iteminfo.ts";
 import { autoMatchPhotos } from "../generator/packs/retail.ts";
 import { KINDS, kindWords, listKind } from "../generator/pricelist.ts";
-import type { BusinessRecord, CatalogEntry, Image, ItemInfo, MenuItem } from "../generator/types.ts";
-import { getLead, getSetting, setSetting, updateLead, type LeadRow } from "./db.ts";
+import type {
+  BusinessRecord,
+  CatalogEntry,
+  Image,
+  ItemInfo,
+  MenuItem,
+} from "../generator/types.ts";
+import {
+  getLead,
+  getSetting,
+  setSetting,
+  updateLead,
+  type LeadRow,
+} from "./db.ts";
 import { HttpError, newId, type Env } from "./env.ts";
 import { escHtml } from "./page.ts";
-import { photoUrl, priceList, pricesFeed, recordOf, saveAndRefresh, stamp } from "./tankboard.ts";
+import {
+  photoUrl,
+  priceList,
+  pricesFeed,
+  recordOf,
+  saveAndRefresh,
+  stamp,
+} from "./tankboard.ts";
 
 /**
  * The tablet station (`/d/<leadId>/<tank>`): the screen by the tank. Customers see what's in the tank with prices and tap a
  * fish for its care card. Staff tap "Staff", prove it's them (PIN, an NFC staff tag, or an approval code from the shop's own
- * Tank board on their phone) and get an inventory station: +1 / −1 / set the count, sold out, "Add" from the catalog of
+ * board on their phone) and get an inventory station: +1 / −1 / set the count, sold out, "Add" from the catalog of
  * everything the shop has stocked (or a new fish: name, count, a photo from the tablet's camera, a care card drafted by
  * Claude), and a photo button per item. Nothing a customer can reach changes stock. Staff sessions are signed tokens
  * (12 h, tied to the shop's client key, so "Revoke old links" ends them too) and the station locks itself after 3 idle minutes.
@@ -29,16 +48,26 @@ async function staffToken(env: Env, lead: LeadRow): Promise<string> {
   return `${exp}.${await hmac(env.APP_SECRET, `staff.${lead.id}.${lead.client_key}.${exp}`)}`;
 }
 
-async function verifyStaff(env: Env, lead: LeadRow, token: string | null): Promise<boolean> {
+async function verifyStaff(
+  env: Env,
+  lead: LeadRow,
+  token: string | null,
+): Promise<boolean> {
   if (!token || !lead.client_key) return false;
   const [exp, sig] = token.split(".");
-  if (!exp || !sig || !/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
-  return safeEqual(sig, await hmac(env.APP_SECRET, `staff.${lead.id}.${lead.client_key}.${exp}`));
+  if (!exp || !sig || !/^\d+$/.test(exp) || Number(exp) < Date.now())
+    return false;
+  return safeEqual(
+    sig,
+    await hmac(env.APP_SECRET, `staff.${lead.id}.${lead.client_key}.${exp}`),
+  );
 }
 
-/** The text to write on a staff NFC tag (any "NFC Tools" app): `ua-staff:<secret>`. Shown on the Tank board. */
+/** The text to write on a staff NFC tag (any "NFC Tools" app): `ua-staff:<secret>`. Shown on the board. */
 export async function nfcSecret(env: Env, lead: LeadRow): Promise<string> {
-  return (await hmac(env.APP_SECRET, `nfc.${lead.id}.${lead.client_key ?? ""}`)).slice(0, 16);
+  return (
+    await hmac(env.APP_SECRET, `nfc.${lead.id}.${lead.client_key ?? ""}`)
+  ).slice(0, 16);
 }
 
 /** Makes the client key if the shop never got a board link yet (the station needs it to sign tokens). */
@@ -55,25 +84,46 @@ export function catalogOf(record: BusinessRecord): CatalogEntry[] {
   const pl = priceList(record);
   const by = new Map<string, CatalogEntry>();
   for (const c of pl.catalog ?? []) by.set(c.name.toLowerCase(), c);
-  for (const s of pl.sections) for (const it of s.items) {
-    const k = it.name.toLowerCase();
-    const c = by.get(k) ?? { name: it.name };
-    by.set(k, { ...c, name: c.name || it.name, price: it.price ?? c.price, image: it.image ?? c.image, info: it.info ?? c.info, barcode: it.barcode ?? c.barcode });
-  }
+  for (const s of pl.sections)
+    for (const it of s.items) {
+      const k = it.name.toLowerCase();
+      const c = by.get(k) ?? { name: it.name };
+      by.set(k, {
+        ...c,
+        name: c.name || it.name,
+        price: it.price ?? c.price,
+        image: it.image ?? c.image,
+        info: it.info ?? c.info,
+        barcode: it.barcode ?? c.barcode,
+      });
+    }
   return [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function touchCatalog(record: BusinessRecord): void {
-  record.ext.retail!.priceList = { ...priceList(record), catalog: catalogOf(record), lastUpdated: stamp() };
+  record.ext.retail!.priceList = {
+    ...priceList(record),
+    catalog: catalogOf(record),
+    lastUpdated: stamp(),
+  };
 }
 
-function findItem(record: BusinessRecord, section: string, item: string): MenuItem | null {
+function findItem(
+  record: BusinessRecord,
+  section: string,
+  item: string,
+): MenuItem | null {
   const sec = priceList(record).sections.find((s) => s.name === section);
   return sec?.items.find((it) => it.name === item) ?? null;
 }
 
 /** +n / −n on a count; a count of 0 hides the item on the page (kept on the board); anything above 0 clears Sold out. */
-export function adjustQty(record: BusinessRecord, section: string, item: string, delta: number): MenuItem {
+export function adjustQty(
+  record: BusinessRecord,
+  section: string,
+  item: string,
+  delta: number,
+): MenuItem {
   const it = findItem(record, section, item);
   if (!it) throw new HttpError(404, "That item isn't on this tank any more");
   it.qty = Math.max(0, Math.min(9999, (it.qty ?? 0) + delta));
@@ -82,14 +132,28 @@ export function adjustQty(record: BusinessRecord, section: string, item: string,
   return it;
 }
 
-export function setItem(record: BusinessRecord, section: string, item: string, change: { qty?: number | null; soldOut?: boolean; price?: string; info?: ItemInfo; barcode?: string }): MenuItem {
+export function setItem(
+  record: BusinessRecord,
+  section: string,
+  item: string,
+  change: {
+    qty?: number | null;
+    soldOut?: boolean;
+    price?: string;
+    info?: ItemInfo;
+    barcode?: string;
+  },
+): MenuItem {
   const it = findItem(record, section, item);
   if (!it) throw new HttpError(404, "That item isn't on this tank any more");
-  if (change.qty !== undefined) it.qty = change.qty === null ? undefined : Math.max(0, Math.min(9999, change.qty));
+  if (change.qty !== undefined)
+    it.qty =
+      change.qty === null ? undefined : Math.max(0, Math.min(9999, change.qty));
   if (change.soldOut !== undefined) it.soldOut = change.soldOut || undefined;
   if (change.price !== undefined) it.price = change.price.trim() || undefined;
   if (change.info !== undefined) it.info = change.info;
-  if (change.barcode !== undefined) setBarcodeEverywhere(record, it.name, normalizeCode(change.barcode));
+  if (change.barcode !== undefined)
+    setBarcodeEverywhere(record, it.name, normalizeCode(change.barcode));
   touchCatalog(record);
   return it;
 }
@@ -100,24 +164,41 @@ export function normalizeCode(code: string): string {
 }
 
 /** The same product in two sections shares one barcode; the catalog remembers it after the last one sells. An empty code clears it. */
-export function setBarcodeEverywhere(record: BusinessRecord, name: string, code: string): void {
+export function setBarcodeEverywhere(
+  record: BusinessRecord,
+  name: string,
+  code: string,
+): void {
   const pl = priceList(record);
   const key = name.toLowerCase();
-  for (const s of pl.sections) for (const it of s.items) {
-    if (it.name.toLowerCase() === key) it.barcode = code || undefined;
-    else if (code && it.barcode === code) it.barcode = undefined; // one code, one product
-  }
-  const cat = (pl.catalog ?? []).map((c) => (c.name.toLowerCase() === key ? { ...c, barcode: code || undefined } : code && c.barcode === code ? { ...c, barcode: undefined } : c));
+  for (const s of pl.sections)
+    for (const it of s.items) {
+      if (it.name.toLowerCase() === key) it.barcode = code || undefined;
+      else if (code && it.barcode === code) it.barcode = undefined; // one code, one product
+    }
+  const cat = (pl.catalog ?? []).map((c) =>
+    c.name.toLowerCase() === key
+      ? { ...c, barcode: code || undefined }
+      : code && c.barcode === code
+        ? { ...c, barcode: undefined }
+        : c,
+  );
   record.ext.retail!.priceList = { ...pl, catalog: cat };
 }
 
 /** What a scanned code is: a row on the board (the current section first), else something from the catalog, else nothing. */
-export function findByBarcode(record: BusinessRecord, code: string, preferSection?: string): { item?: { section: string; item: MenuItem }; catalog?: CatalogEntry } {
+export function findByBarcode(
+  record: BusinessRecord,
+  code: string,
+  preferSection?: string,
+): { item?: { section: string; item: MenuItem }; catalog?: CatalogEntry } {
   const c = normalizeCode(code);
   if (!c) return {};
   const pl = priceList(record);
   const rows: { section: string; item: MenuItem }[] = [];
-  for (const s of pl.sections) for (const it of s.items) if (it.barcode === c) rows.push({ section: s.name, item: it });
+  for (const s of pl.sections)
+    for (const it of s.items)
+      if (it.barcode === c) rows.push({ section: s.name, item: it });
   const item = rows.find((r) => r.section === preferSection) ?? rows[0];
   if (item) return { item };
   const cat = catalogOf(record).find((x) => x.barcode === c);
@@ -125,35 +206,61 @@ export function findByBarcode(record: BusinessRecord, code: string, preferSectio
 }
 
 /** Puts `qty` of a thing into a tank: an existing row gets the count added; a known catalog item brings its photo, price and care card. */
-export function addToTank(record: BusinessRecord, section: string, name: string, qty: number, price?: string, barcode?: string): { item: MenuItem; isNew: boolean } {
+export function addToTank(
+  record: BusinessRecord,
+  section: string,
+  name: string,
+  qty: number,
+  price?: string,
+  barcode?: string,
+): { item: MenuItem; isNew: boolean } {
   const pl = priceList(record);
   let sec = pl.sections.find((s) => s.name === section);
   if (!sec) {
     sec = { name: section, items: [] };
     pl.sections.push(sec);
   }
-  const existing = sec.items.find((it) => it.name.toLowerCase() === name.toLowerCase());
+  const existing = sec.items.find(
+    (it) => it.name.toLowerCase() === name.toLowerCase(),
+  );
   if (existing) {
     existing.qty = Math.min(9999, (existing.qty ?? 0) + qty);
     existing.soldOut = undefined;
     if (price?.trim()) existing.price = price.trim();
-    if (barcode && normalizeCode(barcode)) setBarcodeEverywhere(record, existing.name, normalizeCode(barcode));
+    if (barcode && normalizeCode(barcode))
+      setBarcodeEverywhere(record, existing.name, normalizeCode(barcode));
     touchCatalog(record);
     return { item: existing, isNew: false };
   }
-  const known = catalogOf(record).find((c) => c.name.toLowerCase() === name.toLowerCase());
-  const item: MenuItem = { name: known?.name ?? name.trim(), price: price?.trim() || known?.price, qty, image: known?.image, info: known?.info, barcode: known?.barcode };
+  const known = catalogOf(record).find(
+    (c) => c.name.toLowerCase() === name.toLowerCase(),
+  );
+  const item: MenuItem = {
+    name: known?.name ?? name.trim(),
+    price: price?.trim() || known?.price,
+    qty,
+    image: known?.image,
+    info: known?.info,
+    barcode: known?.barcode,
+  };
   sec.items.push(item);
   record.ext.retail!.priceList = pl;
-  if (barcode && normalizeCode(barcode)) setBarcodeEverywhere(record, item.name, normalizeCode(barcode));
+  if (barcode && normalizeCode(barcode))
+    setBarcodeEverywhere(record, item.name, normalizeCode(barcode));
   touchCatalog(record);
   return { item, isNew: !known };
 }
 
 /** Applies a care card to every row with that name and to the catalog. */
-export function setInfoEverywhere(record: BusinessRecord, name: string, info: ItemInfo | undefined): void {
+export function setInfoEverywhere(
+  record: BusinessRecord,
+  name: string,
+  info: ItemInfo | undefined,
+): void {
   const pl = priceList(record);
-  for (const s of pl.sections) for (const it of s.items) if (it.name.toLowerCase() === name.toLowerCase()) it.info = info;
+  for (const s of pl.sections)
+    for (const it of s.items)
+      if (it.name.toLowerCase() === name.toLowerCase()) it.info = info;
   const cat = catalogOf(record);
   const c = cat.find((x) => x.name.toLowerCase() === name.toLowerCase());
   if (c) c.info = info;
@@ -163,7 +270,12 @@ export function setInfoEverywhere(record: BusinessRecord, name: string, info: It
 
 // ---- unlock flows (settings-table state) ----
 
-interface Pending { session: string; code: string; exp: number; ok: boolean }
+interface Pending {
+  session: string;
+  code: string;
+  exp: number;
+  ok: boolean;
+}
 
 async function pendingList(env: Env, leadId: string): Promise<Pending[]> {
   const raw = await getSetting(env, `unlock.${leadId}`);
@@ -171,12 +283,20 @@ async function pendingList(env: Env, leadId: string): Promise<Pending[]> {
   return raw ? (JSON.parse(raw) as Pending[]).filter((p) => p.exp > now) : [];
 }
 
-async function savePending(env: Env, leadId: string, list: Pending[]): Promise<void> {
+async function savePending(
+  env: Env,
+  leadId: string,
+  list: Pending[],
+): Promise<void> {
   await setSetting(env, `unlock.${leadId}`, JSON.stringify(list.slice(-10)));
 }
 
-/** The phone side: the shop types the tablet's code on their Tank board. */
-export async function approveUnlock(env: Env, leadId: string, code: string): Promise<boolean> {
+/** The phone side: the shop types the tablet's code on their board. */
+export async function approveUnlock(
+  env: Env,
+  leadId: string,
+  code: string,
+): Promise<boolean> {
   const list = await pendingList(env, leadId);
   const p = list.find((x) => x.code === code.replace(/\D/g, ""));
   if (!p) return false;
@@ -185,15 +305,37 @@ export async function approveUnlock(env: Env, leadId: string, code: string): Pro
   return true;
 }
 
-export async function setStaffPin(env: Env, lead: LeadRow, record: BusinessRecord, pin: string): Promise<void> {
-  if (pin && !/^\d{4,8}$/.test(pin)) throw new HttpError(400, "The staff PIN is 4 to 8 digits");
-  record.ext.retail!.priceList = { ...priceList(record), staffPin: pin || undefined };
+export async function setStaffPin(
+  env: Env,
+  lead: LeadRow,
+  record: BusinessRecord,
+  pin: string,
+): Promise<void> {
+  if (pin && !/^\d{4,8}$/.test(pin))
+    throw new HttpError(400, "The staff PIN is 4 to 8 digits");
+  record.ext.retail!.priceList = {
+    ...priceList(record),
+    staffPin: pin || undefined,
+  };
   await updateLead(env, lead.id, { record_json: JSON.stringify(record) });
 }
 
-const ItemRef = { section: z.string().trim().min(1).max(60), item: z.string().trim().min(1).max(120) };
+const ItemRef = {
+  section: z.string().trim().min(1).max(60),
+  item: z.string().trim().min(1).max(120),
+};
 const InfoSchema = z.object({
-  kind: z.enum(["fish", "invertebrate", "plant", "reptile", "bird", "small_animal", "other"]).optional(),
+  kind: z
+    .enum([
+      "fish",
+      "invertebrate",
+      "plant",
+      "reptile",
+      "bird",
+      "small_animal",
+      "other",
+    ])
+    .optional(),
   maxSize: z.string().trim().max(40).optional(),
   diet: z.string().trim().max(80).optional(),
   temperament: z.string().trim().max(60).optional(),
@@ -202,14 +344,26 @@ const InfoSchema = z.object({
   water: z.string().trim().max(80).optional(),
   origin: z.string().trim().max(60).optional(),
   notes: z.string().trim().max(300).optional(),
-  facts: z.array(z.object({ label: z.string().trim().min(1).max(40), value: z.string().trim().max(120) })).max(12).optional(),
+  facts: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1).max(40),
+        value: z.string().trim().max(120),
+      }),
+    )
+    .max(12)
+    .optional(),
 });
 
 const cleanInfo = (i: z.infer<typeof InfoSchema>): ItemInfo | undefined => {
   const out: ItemInfo = {};
   for (const [k, v] of Object.entries(i)) {
-    if (k === "facts") { const f = (v as Array<{ label: string; value: string }>).filter((x) => x.value); if (f.length) out.facts = f; }
-    else if (v) (out as Record<string, unknown>)[k] = v;
+    if (k === "facts") {
+      const f = (v as Array<{ label: string; value: string }>).filter(
+        (x) => x.value,
+      );
+      if (f.length) out.facts = f;
+    } else if (v) (out as Record<string, unknown>)[k] = v;
   }
   return Object.keys(out).length ? out : undefined;
 };
@@ -217,21 +371,42 @@ const cleanInfo = (i: z.infer<typeof InfoSchema>): ItemInfo | undefined => {
 const noStore = { "cache-control": "no-store" };
 
 /** A product name for a retail UPC/EAN from Open Food Facts (free, no key; food, drink, pet food and some household goods). Best effort: null when unknown or slow. */
-export async function lookupBarcode(code: string, fetcher: typeof fetch = fetch): Promise<string | null> {
+export async function lookupBarcode(
+  code: string,
+  fetcher: typeof fetch = fetch,
+): Promise<string | null> {
   if (!/^\d{8,14}$/.test(code)) return null;
   try {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 4000);
-    const r = await fetcher(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,quantity`, { headers: { "user-agent": "UndergroundAssociates/1.0 (live price list; undergroundassociates.com)" }, signal: ctl.signal });
+    const r = await fetcher(
+      `https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,quantity`,
+      {
+        headers: {
+          "user-agent":
+            "UndergroundAssociates/1.0 (live price list; undergroundassociates.com)",
+        },
+        signal: ctl.signal,
+      },
+    );
     clearTimeout(t);
     if (!r.ok) return null;
-    const j = (await r.json()) as { product?: { product_name?: string; brands?: string; quantity?: string } };
+    const j = (await r.json()) as {
+      product?: { product_name?: string; brands?: string; quantity?: string };
+    };
     const p = j.product;
     const name = p?.product_name?.trim();
     if (!name) return null;
     const brand = ((p?.brands ?? "").split(",")[0] ?? "").trim();
     const qty = p?.quantity?.trim() ?? "";
-    return [brand && !name.toLowerCase().includes(brand.toLowerCase()) ? brand : "", name, qty && !name.includes(qty) ? qty : ""].filter(Boolean).join(" ").slice(0, 120);
+    return [
+      brand && !name.toLowerCase().includes(brand.toLowerCase()) ? brand : "",
+      name,
+      qty && !name.includes(qty) ? qty : "",
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .slice(0, 120);
   } catch {
     return null;
   }
@@ -240,10 +415,17 @@ export async function lookupBarcode(code: string, fetcher: typeof fetch = fetch)
 /**
  * `/l/<leadId>/unlock/*` (public, from the tablet) and `/l/<leadId>/staff/*` (needs header `x-staff`). `rest` starts after the lead id.
  */
-export async function serveStation(env: Env, req: Request, leadId: string, rest: string, origin: string): Promise<Response> {
+export async function serveStation(
+  env: Env,
+  req: Request,
+  leadId: string,
+  rest: string,
+  origin: string,
+): Promise<Response> {
   const lead0 = await getLead(env, leadId);
   const record = lead0 && recordOf(lead0);
-  if (!lead0 || !record || lead0.status === "expired") throw new HttpError(404, "Not found");
+  if (!lead0 || !record || lead0.status === "expired")
+    throw new HttpError(404, "Not found");
   const lead = await withKey(env, lead0);
   const pl = priceList(record);
 
@@ -251,103 +433,257 @@ export async function serveStation(env: Env, req: Request, leadId: string, rest:
   if (rest === "/unlock/pin" && req.method === "POST") {
     const { pin } = (await req.json()) as { pin?: string };
     const key = `pinfail.${leadId}`;
-    const fail = JSON.parse((await getSetting(env, key)) ?? "null") as { n: number; until: number } | null;
-    if (fail && fail.until > Date.now()) throw new HttpError(429, "Too many tries. Wait 15 minutes, or approve from the shop's phone.");
-    if (!pl.staffPin) throw new HttpError(409, "No staff PIN is set yet. Set one on the Tank board, or approve from your phone.");
+    const fail = JSON.parse((await getSetting(env, key)) ?? "null") as {
+      n: number;
+      until: number;
+    } | null;
+    if (fail && fail.until > Date.now())
+      throw new HttpError(
+        429,
+        "Too many tries. Wait 15 minutes, or approve from the shop's phone.",
+      );
+    if (!pl.staffPin)
+      throw new HttpError(
+        409,
+        "No staff PIN is set yet. Set one on your board, or approve from your phone.",
+      );
     if (!pin || !safeEqual(String(pin), pl.staffPin)) {
-      const n = (fail && fail.until > Date.now() - PIN_LOCK_MS ? fail.n : 0) + 1;
-      await setSetting(env, key, JSON.stringify({ n, until: n >= PIN_FAILS ? Date.now() + PIN_LOCK_MS : 0 }));
-      throw new HttpError(403, n >= PIN_FAILS ? "Too many tries. Wait 15 minutes." : "That PIN isn't right");
+      const n =
+        (fail && fail.until > Date.now() - PIN_LOCK_MS ? fail.n : 0) + 1;
+      await setSetting(
+        env,
+        key,
+        JSON.stringify({
+          n,
+          until: n >= PIN_FAILS ? Date.now() + PIN_LOCK_MS : 0,
+        }),
+      );
+      throw new HttpError(
+        403,
+        n >= PIN_FAILS
+          ? "Too many tries. Wait 15 minutes."
+          : "That PIN isn't right",
+      );
     }
     await setSetting(env, key, "null");
-    return Response.json({ token: await staffToken(env, lead) }, { headers: noStore });
+    return Response.json(
+      { token: await staffToken(env, lead) },
+      { headers: noStore },
+    );
   }
   if (rest === "/unlock/nfc" && req.method === "POST") {
     const { secret } = (await req.json()) as { secret?: string };
-    if (!secret || !safeEqual(secret.trim(), await nfcSecret(env, lead))) throw new HttpError(403, "That tag isn't one of this shop's staff tags");
-    return Response.json({ token: await staffToken(env, lead) }, { headers: noStore });
+    if (!secret || !safeEqual(secret.trim(), await nfcSecret(env, lead)))
+      throw new HttpError(403, "That tag isn't one of this shop's staff tags");
+    return Response.json(
+      { token: await staffToken(env, lead) },
+      { headers: noStore },
+    );
   }
   if (rest === "/unlock/start" && req.method === "POST") {
     const list = await pendingList(env, leadId);
-    const p: Pending = { session: newId(), code: String(Math.floor(100000 + Math.random() * 900000)), exp: Date.now() + UNLOCK_MS, ok: false };
+    const p: Pending = {
+      session: newId(),
+      code: String(Math.floor(100000 + Math.random() * 900000)),
+      exp: Date.now() + UNLOCK_MS,
+      ok: false,
+    };
     list.push(p);
     await savePending(env, leadId, list);
-    return Response.json({ session: p.session, code: p.code, expiresIn: UNLOCK_MS / 1000 }, { headers: noStore });
+    return Response.json(
+      { session: p.session, code: p.code, expiresIn: UNLOCK_MS / 1000 },
+      { headers: noStore },
+    );
   }
   const poll = /^\/unlock\/([a-z0-9]+)$/.exec(rest);
   if (poll && req.method === "GET") {
     const list = await pendingList(env, leadId);
     const p = list.find((x) => x.session === poll[1]);
-    if (!p) return Response.json({ ok: false, expired: true }, { headers: noStore });
+    if (!p)
+      return Response.json({ ok: false, expired: true }, { headers: noStore });
     if (!p.ok) return Response.json({ ok: false }, { headers: noStore });
-    await savePending(env, leadId, list.filter((x) => x !== p));
-    return Response.json({ ok: true, token: await staffToken(env, lead) }, { headers: noStore });
+    await savePending(
+      env,
+      leadId,
+      list.filter((x) => x !== p),
+    );
+    return Response.json(
+      { ok: true, token: await staffToken(env, lead) },
+      { headers: noStore },
+    );
   }
 
   // --- staff (locked) ---
   if (!rest.startsWith("/staff/")) throw new HttpError(404, "Not found");
-  if (!(await verifyStaff(env, lead, req.headers.get("x-staff")))) throw new HttpError(401, "Locked. Tap Staff and unlock again.");
+  if (!(await verifyStaff(env, lead, req.headers.get("x-staff"))))
+    throw new HttpError(401, "Locked. Tap Staff and unlock again.");
   const url = new URL(req.url);
-  const feed = () => Response.json({ ...pricesFeed(lead, record, origin, true), catalog: catalogOf(record).map((c) => ({ name: c.name, price: c.price ?? "", image: photoUrl(lead, origin, c.image), hasInfo: !!c.info, barcode: c.barcode ?? "" })) }, { headers: noStore });
+  const feed = () =>
+    Response.json(
+      {
+        ...pricesFeed(lead, record, origin, true),
+        catalog: catalogOf(record).map((c) => ({
+          name: c.name,
+          price: c.price ?? "",
+          image: photoUrl(lead, origin, c.image),
+          hasInfo: !!c.info,
+          barcode: c.barcode ?? "",
+        })),
+      },
+      { headers: noStore },
+    );
 
   if (rest === "/staff/data" && req.method === "GET") return feed();
   if (rest === "/staff/find" && req.method === "GET") {
     // A scanned barcode: a row on the board, a catalog item, or (new) a product name looked up by its UPC/EAN.
     const code = normalizeCode(url.searchParams.get("code") ?? "");
     if (!code) throw new HttpError(400, "No code read");
-    const hit = findByBarcode(record, code, url.searchParams.get("section") ?? undefined);
+    const hit = findByBarcode(
+      record,
+      code,
+      url.searchParams.get("section") ?? undefined,
+    );
     const out: Record<string, unknown> = { code };
-    if (hit.item) out.item = { section: hit.item.section, name: hit.item.item.name, qty: hit.item.item.qty ?? null, price: hit.item.item.price ?? "", image: photoUrl(lead, origin, hit.item.item.image) };
-    else if (hit.catalog) out.catalog = { name: hit.catalog.name, price: hit.catalog.price ?? "", image: photoUrl(lead, origin, hit.catalog.image) };
+    if (hit.item)
+      out.item = {
+        section: hit.item.section,
+        name: hit.item.item.name,
+        qty: hit.item.item.qty ?? null,
+        price: hit.item.item.price ?? "",
+        image: photoUrl(lead, origin, hit.item.item.image),
+      };
+    else if (hit.catalog)
+      out.catalog = {
+        name: hit.catalog.name,
+        price: hit.catalog.price ?? "",
+        image: photoUrl(lead, origin, hit.catalog.image),
+      };
     else out.suggestion = await lookupBarcode(code);
     return Response.json(out, { headers: noStore });
   }
   if (rest === "/staff/adjust" && req.method === "POST") {
-    const b = z.object({ ...ItemRef, delta: z.number().int().min(-9999).max(9999) }).parse(await req.json());
+    const b = z
+      .object({ ...ItemRef, delta: z.number().int().min(-9999).max(9999) })
+      .parse(await req.json());
     adjustQty(record, b.section, b.item, b.delta);
     await saveAndRefresh(env, lead, record, { quick: true });
     return feed();
   }
   if (rest === "/staff/set" && req.method === "POST") {
-    const b = z.object({ ...ItemRef, qty: z.number().int().min(0).max(9999).nullable().optional(), soldOut: z.boolean().optional(), price: z.string().max(30).optional(), info: InfoSchema.optional(), barcode: z.string().max(80).optional() }).parse(await req.json());
-    setItem(record, b.section, b.item, { qty: b.qty, soldOut: b.soldOut, price: b.price, info: b.info ? cleanInfo(b.info) : undefined, barcode: b.barcode });
+    const b = z
+      .object({
+        ...ItemRef,
+        qty: z.number().int().min(0).max(9999).nullable().optional(),
+        soldOut: z.boolean().optional(),
+        price: z.string().max(30).optional(),
+        info: InfoSchema.optional(),
+        barcode: z.string().max(80).optional(),
+      })
+      .parse(await req.json());
+    setItem(record, b.section, b.item, {
+      qty: b.qty,
+      soldOut: b.soldOut,
+      price: b.price,
+      info: b.info ? cleanInfo(b.info) : undefined,
+      barcode: b.barcode,
+    });
     if (b.info) setInfoEverywhere(record, b.item, cleanInfo(b.info));
     await saveAndRefresh(env, lead, record, { quick: true });
     return feed();
   }
   if (rest === "/staff/add" && req.method === "POST") {
-    const b = z.object({ section: z.string().trim().min(1).max(60), name: z.string().trim().min(1).max(120), qty: z.number().int().min(1).max(9999), price: z.string().trim().max(30).optional(), barcode: z.string().max(80).optional() }).parse(await req.json());
-    const { item, isNew } = addToTank(record, b.section, b.name, b.qty, b.price, b.barcode);
+    const b = z
+      .object({
+        section: z.string().trim().min(1).max(60),
+        name: z.string().trim().min(1).max(120),
+        qty: z.number().int().min(1).max(9999),
+        price: z.string().trim().max(30).optional(),
+        barcode: z.string().max(80).optional(),
+      })
+      .parse(await req.json());
+    const { item, isNew } = addToTank(
+      record,
+      b.section,
+      b.name,
+      b.qty,
+      b.price,
+      b.barcode,
+    );
     await saveAndRefresh(env, lead, record, { quick: true });
-    return Response.json({ ...(await feed().json() as object), added: item.name, isNew }, { headers: noStore });
+    return Response.json(
+      { ...((await feed().json()) as object), added: item.name, isNew },
+      { headers: noStore },
+    );
   }
   if (rest === "/staff/photo" && req.method === "POST") {
     const type = req.headers.get("content-type") ?? "";
-    const ext = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as Record<string, string>)[type];
+    const ext = (
+      {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+      } as Record<string, string>
+    )[type];
     if (!ext) throw new HttpError(415, "Send a JPEG, PNG or WebP photo");
     const bytes = await req.arrayBuffer();
-    if (bytes.byteLength > 8_000_000) throw new HttpError(413, "That photo is over 8 MB");
+    if (bytes.byteLength > 8_000_000)
+      throw new HttpError(413, "That photo is over 8 MB");
     const section = url.searchParams.get("section") ?? "";
     const name = url.searchParams.get("item") ?? "";
     const key = `t${newId().slice(0, 10)}`;
-    await env.BUCKET.put(`owner/${leadId}/${key}.${ext}`, bytes, { httpMetadata: { contentType: type } });
-    const img: Image = { src: `/assets/owner/${key}.${ext}`, alt: name || `Photo from ${record.name}`, source: "owner", width: Number(url.searchParams.get("w")) || undefined, height: Number(url.searchParams.get("h")) || undefined, caption: name || undefined };
+    await env.BUCKET.put(`owner/${leadId}/${key}.${ext}`, bytes, {
+      httpMetadata: { contentType: type },
+    });
+    const img: Image = {
+      src: `/assets/owner/${key}.${ext}`,
+      alt: name || `Photo from ${record.name}`,
+      source: "owner",
+      width: Number(url.searchParams.get("w")) || undefined,
+      height: Number(url.searchParams.get("h")) || undefined,
+      caption: name || undefined,
+    };
     if (record.media.gallery.length < 24) record.media.gallery.push(img);
-    for (const s of pl.sections) for (const it of s.items) if (it.name.toLowerCase() === name.toLowerCase()) it.image = img;
+    for (const s of pl.sections)
+      for (const it of s.items)
+        if (it.name.toLowerCase() === name.toLowerCase()) it.image = img;
     touchCatalog(record);
     await saveAndRefresh(env, lead, record, { quick: true });
-    return Response.json({ ok: true, image: photoUrl(lead, origin, img) }, { headers: noStore });
+    return Response.json(
+      { ok: true, image: photoUrl(lead, origin, img) },
+      { headers: noStore },
+    );
   }
   if (rest === "/staff/info" && req.method === "POST") {
-    const b = z.object({ name: z.string().trim().min(1).max(120), section: z.string().max(60).optional(), note: z.string().max(200).optional() }).parse(await req.json());
-    if (!env.ANTHROPIC_API_KEY) throw new HttpError(409, "The care-card writer isn't set up");
-    const info = await draftItemInfo(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }), b.name, { shop: record.name, section: b.section, note: b.note, kind: listKind(record) });
+    const b = z
+      .object({
+        name: z.string().trim().min(1).max(120),
+        section: z.string().max(60).optional(),
+        note: z.string().max(200).optional(),
+      })
+      .parse(await req.json());
+    if (!env.ANTHROPIC_API_KEY)
+      throw new HttpError(409, "The care-card writer isn't set up");
+    const info = await draftItemInfo(
+      new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
+      b.name,
+      {
+        shop: record.name,
+        section: b.section,
+        note: b.note,
+        kind: listKind(record),
+      },
+    );
     setInfoEverywhere(record, b.name, info);
     await saveAndRefresh(env, lead, record, { quick: true });
-    return Response.json({ info, rows: infoRows(info, listKind(record)) }, { headers: noStore });
+    return Response.json(
+      { info, rows: infoRows(info, listKind(record)) },
+      { headers: noStore },
+    );
   }
   if (rest === "/staff/info" && req.method === "PUT") {
-    const b = z.object({ name: z.string().trim().min(1).max(120), info: InfoSchema }).parse(await req.json());
+    const b = z
+      .object({ name: z.string().trim().min(1).max(120), info: InfoSchema })
+      .parse(await req.json());
     setInfoEverywhere(record, b.name, cleanInfo(b.info));
     await saveAndRefresh(env, lead, record, { quick: true });
     return feed();
@@ -356,13 +692,21 @@ export async function serveStation(env: Env, req: Request, leadId: string, rest:
 }
 
 /** The tablet page itself. */
-export async function serveDisplay(env: Env, leadId: string, slug: string, origin: string): Promise<Response> {
+export async function serveDisplay(
+  env: Env,
+  leadId: string,
+  slug: string,
+  origin: string,
+): Promise<Response> {
   const lead = await getLead(env, leadId);
   const record = lead && recordOf(lead);
-  if (!lead || !record || lead.status === "expired") return new Response("Not found", { status: 404 });
+  if (!lead || !record || lead.status === "expired")
+    return new Response("Not found", { status: 404 });
   const feed = pricesFeed(lead, record, origin);
   const tank = slug ? feed.sections.find((x) => x.slug === slug) : null;
-  const title = tank ? `${tank.name} · ${record.name}` : `${feed.title} · ${record.name}`;
+  const title = tank
+    ? `${tank.name} · ${record.name}`
+    : `${feed.title} · ${record.name}`;
   const hasPin = !!priceList(record).staffPin;
   const W = kindWords(record);
   const sec = W.section.toLowerCase();
@@ -423,9 +767,9 @@ body.staff .staffbar{display:flex}
 <div class="ov" id="info"><div class="sheet" id="infoBody"></div></div>
 <div class="ov" id="unlock"><div class="sheet">
   <h2>Staff only</h2>
-  <div id="ulPin"><div class="pin" id="pinShow">&nbsp;</div><div class="pad" id="pad"></div><div class="msg" id="pinMsg">${hasPin ? "Enter the staff PIN." : "No PIN set yet: approve from the shop's phone below, or set a PIN on the Tank board."}</div></div>
+  <div id="ulPin"><div class="pin" id="pinShow">&nbsp;</div><div class="pad" id="pad"></div><div class="msg" id="pinMsg">${hasPin ? "Enter the staff PIN." : "No PIN set yet: approve from the shop's phone below, or set a PIN on the ${escHtml(W.board)}."}</div></div>
   <div class="row"><button class="btn ghost" id="nfcBtn" type="button" hidden>📶 Tap your staff tag</button><button class="btn ghost" id="codeBtn" type="button">📱 Approve from the shop's phone</button><button class="btn ghost" id="ulCancel" type="button">Cancel</button></div>
-  <div id="ulCode" hidden><p>On the shop's phone, open the <b>Tank board</b> → <b>Tablet &amp; staff</b> → type this code:</p><p class="big" id="codeShow"></p><p class="msg" id="codeMsg">Waiting…</p></div>
+  <div id="ulCode" hidden><p>On the shop's phone, open the <b>${escHtml(W.board)}</b> → <b>Tablet &amp; staff</b> → type this code:</p><p class="big" id="codeShow"></p><p class="msg" id="codeMsg">Waiting…</p></div>
 </div></div>
 <div class="ov" id="add"><div class="sheet">
   <h2 id="addTitle">Add to <span id="addTank"></span></h2>
@@ -581,5 +925,13 @@ function takePhoto(section,name,cb){var cam=$("cam");cam.value="";cam.onchange=f
     c.toBlob(function(blob){fetch(BASE+"/staff/photo?section="+encodeURIComponent(section)+"&item="+encodeURIComponent(name)+"&w="+c.width+"&h="+c.height,{method:"POST",headers:{"content-type":"image/jpeg","x-staff":staffTok||""},body:blob}).then(function(r){if(!r.ok)throw new Error("Photo failed ("+r.status+")");return r.json()}).then(function(){cb&&cb()}).catch(function(e){alert(e.message)})},"image/jpeg",0.85)};img.src=url};cam.click()}
 })();
 </script></body></html>`;
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", "content-security-policy": "default-src 'self'; img-src 'self' https: data: blob:; media-src 'self' blob: mediastream:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" } });
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex",
+      "content-security-policy":
+        "default-src 'self'; img-src 'self' https: data: blob:; media-src 'self' blob: mediastream:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'",
+    },
+  });
 }

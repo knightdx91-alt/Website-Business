@@ -2969,12 +2969,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       });
     }
     if (action === "/clientlink" && m === "POST") {
-      // Tank board: the client's own live price-list editor (retail only; see tankboard.ts).
+      // The board: the client's own live price-list editor (any category; see tankboard.ts).
       const link = await clientLink(env, lead, url.origin);
       const recW = lead.record_json
         ? kindWords(JSON.parse(lead.record_json) as BusinessRecord)
         : null;
-      const board = (recW?.board ?? "Tank board").toLowerCase();
+      const board = (recW?.board ?? "Stock board").toLowerCase();
       const secW = (recW?.section ?? "tank").toLowerCase();
       const text = `Hi! Here's your ${lead.name} ${board}: ${link}  Open it on your phone, bookmark it, and change what's in each ${secW} any time. Prices and "sold out" show on your website within a minute. Have your stock in a spreadsheet? "Put a whole list on at once" on the board takes it.`;
       await notify(env, {
@@ -2986,7 +2986,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       return json({ url: link, text });
     }
     if (action === "/showboard" && m === "GET") {
-      // Customer-facing "Show them the Tank board" page (owner + callers): the pitch for this shop, the tablet view address.
+      // Customer-facing "Show them the board" page (owner + callers): the pitch for this shop, the tablet view address.
       const live = !!lead.live_url;
       const rec = lead.record_json
         ? (JSON.parse(lead.record_json) as BusinessRecord)
@@ -3003,25 +3003,28 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       });
     }
     if (action === "/boardlink" && m === "POST") {
-      // Text the shop the customer-facing Tank board page (public, signed, 30 days).
+      // Text the shop the customer-facing board page (public, signed, 30 days).
       const link = `${url.origin}/b/${await boardPitchToken(env, lead.id)}`;
-      const text = `Hi! Here's how the Tank board would work for ${lead.name}: what you'd do, what your customers see, and what it costs. ${link}`;
+      const boardW = lead.record_json
+        ? kindWords(JSON.parse(lead.record_json) as BusinessRecord).board
+        : "Stock board";
+      const text = `Hi! Here's how the ${boardW} would work for ${lead.name}: what you'd do, what your customers see, and what it costs. ${link}`;
       await notify(env, {
         kind: "status",
         actor: session,
         leadId: lead.id,
-        text: `${session.name} sent ${lead.name} the Tank board page`,
+        text: `${session.name} sent ${lead.name} the ${boardW} page`,
       });
       return json({ url: link, text });
     }
     if (action === "/clientlink" && m === "DELETE") {
-      // Revoke: a new key means every tank board link sent so far stops working; the next "Text them" makes a fresh one.
+      // Revoke: a new key means every board link sent so far stops working; the next "Text them" makes a fresh one.
       await updateLead(env, id, { client_key: newId() });
       await notify(env, {
         kind: "status",
         actor: session,
         leadId: lead.id,
-        text: `${session.name} revoked ${lead.name}'s tank board links`,
+        text: `${session.name} revoked ${lead.name}'s board links`,
       });
       return json({ ok: true });
     }
@@ -3497,6 +3500,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
         phone: s.companyPhone,
         boardUrl: await clientLink(env, lead, url.origin),
         displayUrl: `${url.origin}/d/${lead.id}/`,
+        board: rec ? kindWords(rec).board : undefined,
         pricingUrl: "https://undergroundassociates.com/pricing#price-list",
       });
     }

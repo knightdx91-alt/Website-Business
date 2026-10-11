@@ -569,6 +569,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
+- Naming (Oct 2026): the product is the **board**, generic name "Stock board"; each shop sees its kind's name (`KINDS[kind].board`:
+  Tank board / Bench board / Enclosure board / Case board / Parts board / Lot board / Stock board) via `detail().boardName`,
+  `kindWords(record).board` (texted links, the `/b/` customer page's `board` option, tablet unlock text) and the guide wording.
+  "Tank board" now appears only as the fish kind's own name and in code comments; the guide id `tankboard` and `tankboard.ts`
+  keep their historical names. Guide title "📋 Live inventory: the board, price page & QR tags" (web button + Android 2.37
+  "📋 Live inventory guide").
 - ⬆️ Whole-inventory import (Oct 2026, `src/worker/stock-import.ts`; built so an auto parts store can use the inventory system
   without typing): the board's "Put a whole list on at once" section (every kind; `POST /c/<token>/import {text, mode, section?,
   columns?, hasHeader?, dryRun?}` = `runImport` in tankboard.ts) takes a paste from Excel / Sheets (tabs) or a .csv (register /

@@ -7,7 +7,7 @@ import type { ListKind } from "../generator/types.ts";
 /**
  * In-app how-to guides (Settings → Guides; owner and callers), one source for the web app and the Android app
  * (`GET /api/guides/<id>`). Prices and names are filled from Settings so the guide never goes stale when a price changes.
- * The first guide is the inventory system built for King Fish Aquatics: live price page + Tank board + QR tags + display.
+ * The first guide is the inventory system built for King Fish Aquatics: live price page + the board + QR tags + display.
  */
 
 export interface GuideSection {
@@ -59,7 +59,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
     : "Loading a list for them is included in the set-up when it comes as a spreadsheet; a paper list retyped is an extra to quote.";
   return {
     id: "tankboard",
-    title: "🐠 Live inventory: the board, price page & QR tags",
+    title: "📋 Live inventory: the board, price page & QR tags",
     intro:
       "The inventory system for any business whose stock changes: fish stores, plant nurseries, bakeries and produce stands, resale, feed stores, auto parts and tire shops, used car and equipment lots. Every lead has it (Edit → Live price list; shops: Shop details). \"What's on it\" (fish / plants / pets / food / auto parts & tires / vehicles & equipment / other goods) sets the words (tank, bench, case, shelf) and the info-card fields; the board is called Tank board, Bench board, Case board or Stock board to match. The shop keeps a board on their phone (what's in each tank or on each shelf, prices, counts, photos, sold out). Every change goes to a price page on their website within about a minute. QR tags on the tanks open that tank's live prices, and a cheap tablet by a tank can show them with no QR at all. Built for King Fish Aquatics in October 2026.",
     sections: [
@@ -67,7 +67,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
         title: "The four pieces",
         steps: [
           'Price page: /prices/ on their website, one section per tank or shelf, each item with name, price, note and photo. Sold-out and zero-count items disappear; 5 or fewer shows "3 left".',
-          "Tank board: a private page we text the shop. No login, no app. They edit it from any phone; changes save by themselves.",
+          "The board (Stock board; Tank board for a fish store, Parts board for a parts counter, Lot board for a dealer): a private page we text the shop. No login, no app. They edit it from any phone; changes save by themselves.",
           "QR price tags: a printable sheet of labels, one per tank or shelf. Each QR opens that tank's section of the price page.",
           "Tablet display: a full-screen page for a tablet or TV by the tank that shows that tank live and never sleeps.",
         ],
@@ -76,7 +76,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
         title: "What we sell it for",
         steps: [
           `Just the inventory system, no website: ${listLine}. The agreement says plainly it is not a website plan.`,
-          "With any website plan (Basic, Plus, Pro): the price page, Tank board and tablet display are included.",
+          "With any website plan (Basic, Plus, Pro): the price page, the board and the tablet display are included.",
           `${tagLine}. The first sheet is included with the ${list?.name ?? "Price list"} plan; reprints (renamed tanks, new tanks, wear) are a new sheet.`,
           TABLET_LINE,
           SCANNER_LINE,
@@ -97,11 +97,11 @@ export function tankBoardGuide(s: AppSettings): Guide {
         note: "Google's photos never go on the price page or a label. Only owner photos (board camera, gallery uploads, or photos imported from their own website).",
       },
       {
-        title: "Give them the Tank board",
+        title: "Give them the board",
         numbered: true,
         steps: [
-          'Open the lead → the "🐠 Tank board" card (it shows for every retail lead once the preview is ready).',
-          'Tap "💬 Text them their tank board link". Your messaging app opens with the link and a short note; send it. Callers can do this too.',
+          'Open the lead → the "📋 … board" card (named for the shop: Tank board, Parts board, Lot board, Stock board; it shows on every lead once the preview is ready).',
+          'Tap "💬 Text them their … board link". Your messaging app opens with the link and a short note; send it. Callers can do this too.',
           'Or tap "Open it here" to show it on your own phone first. It\'s a good demo: add a tank, tap the camera, mark something sold out, then open the price page and watch it change.',
           "Tell them: bookmark it or add it to the home screen (Chrome ⋮ → Add to Home screen). Anyone with the link can edit, so they should only share it with staff.",
           'If the link gets out: "Revoke old links" (owner) kills every link sent so far. Text them a new one.',
@@ -166,7 +166,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
           "Settings → Display → Screen timeout → never (or as long as it allows), and keep it plugged in. The page also asks the tablet to stay awake.",
           "To stop customers tapping out of it: Settings → Security → App pinning (name varies by phone), then pin Chrome.",
           'It refreshes by itself every 30 seconds and shrinks the text so a tank with 15 items still fits. Big price in orange, photo if there is one, "3 left" under the price. A customer taps a fish to read its care card (adult size, what it eats, temperament, tank size, water).',
-          'Staff mode: the small "Staff" button in the corner asks for the staff PIN (set on the Tank board), a staff NFC tag held to the back of the tablet, or a 6-digit code the shop approves on the Tank board. Then every item gets − / count / + and ⋯ (set the count, sold out, price, photo, care card), and "+ Add" lists everything the shop has ever stocked, or a new name: count, photo from the tablet camera, and a care card drafted by AI for the shop to check. "▦ Scan" reads a product\'s barcode with the tablet camera (or a cheap USB/Bluetooth scanner, which just types the code): a known product shows its name and count, you type or tap how many, then "Put in" or "Take out"; an unknown code asks for a name (food and pet products are often filled in from the barcode) and becomes a new item. ⋯ → Barcode links a code to an item that was added by name. It locks itself after 3 idle minutes; "Done" locks it now.',
+          'Staff mode: the small "Staff" button in the corner asks for the staff PIN (set on the board), a staff NFC tag held to the back of the tablet, or a 6-digit code the shop approves on the Tank board. Then every item gets − / count / + and ⋯ (set the count, sold out, price, photo, care card), and "+ Add" lists everything the shop has ever stocked, or a new name: count, photo from the tablet camera, and a care card drafted by AI for the shop to check. "▦ Scan" reads a product\'s barcode with the tablet camera (or a cheap USB/Bluetooth scanner, which just types the code): a known product shows its name and count, you type or tap how many, then "Put in" or "Take out"; an unknown code asks for a name (food and pet products are often filled in from the barcode) and becomes a new item. ⋯ → Barcode links a code to an item that was added by name. It locks itself after 3 idle minutes; "Done" locks it now.',
           "Mount it above the tank in a cheap stand or clamp, away from splash. One or two bigger tablets or a TV with a streaming stick near the register, rotating through all tanks, costs less than one tablet per tank.",
         ],
       },
@@ -237,7 +237,7 @@ export function priceTagsGuide(s: AppSettings): Guide {
         numbered: true,
         steps: [
           'The shop\'s site has to be live: the QR points at the real address (their own domain if one is attached, else the pages.dev address). The button says "Publish the site first" until then.',
-          'The price list needs at least one section: Edit → Shop details → "Price list & QR labels", or the shop adds tanks on their Tank board. Each section becomes one label.',
+          'The price list needs at least one section: Edit → Shop details → "Price list & QR labels", or the shop adds sections on their board. Each section becomes one label.',
           'Check the section names read well on a 1.35-inch-wide line: "Tank 12" is good, "Freshwater community tanks, left wall" wraps and gets small. Rename in Edit or on the board; the page and the label follow.',
           "A private price list (\"Public\" unticked) is fine: the labels still open it. It just isn't in the site's menu or on Google.",
         ],
@@ -271,7 +271,7 @@ export function priceTagsGuide(s: AppSettings): Guide {
           `At sign-up: it's in the extras list on the sign-up page and in the in-person sign-up on the phone (tick it, set the quantity to the number of sheets). On the ${list?.name ?? "Price list"} plan the first sheet is already included, so only add it for a second sheet.`,
           'After the sale: open the client → "💬 Text \'Buy extras\' link". They tick the tags, pick how many sheets, sign and pay online. Or they tap "Already a client? Add extras" on our website and it lands in the Inbox.',
           "Quantity = sheets, not labels. Count their sections first: 8 or fewer is one sheet.",
-          'Pair it with the Tank board: "Your phone changes the price; the tag on the tank is already right." Then scan one in front of them.',
+          'Pair it with the board: "Your phone changes the price; the tag on the tank is already right." Then scan one in front of them.',
           "Who buys it: fish and reptile stores, plant nurseries, antique malls with booth numbers, farm and feed stores, produce stands, resale with sections, bakery cases. Anything with a section name you can stick a label on.",
           "Not for: restaurants (they get QR table tents and the menu instead), service businesses (no price list).",
         ],
@@ -289,7 +289,7 @@ export function priceTagsGuide(s: AppSettings): Guide {
         title: "Trouble",
         steps: [
           "\"Publish the site first\": the site isn't live. Publish from the lead, or if it's a Price list client that's not live yet, publish now; the plan only promises the price page but the whole site goes up.",
-          '"Add a price list first": no sections yet. Edit → Shop details, or the Tank board.',
+          '"Add a price list first": no sections yet. Edit → Shop details, or the board.',
           "QR opens the page but not the right section: the section was renamed since printing. Reprint.",
           "QR opens a 404 or an old domain: a custom domain was attached or removed after printing. Reprint; the labels carry the domain.",
           'QR won\'t scan: printed too small ("Fit to page" shrinks it), glossy lamination glare, or a crease through the code. Print at 100%, matte lamination, flat.',
@@ -323,7 +323,7 @@ export function displayGuide(s: AppSettings): Guide {
         title: "Getting the address",
         numbered: true,
         steps: [
-          'Open the shop\'s lead → 🐠 Tank board → "Open it here" (or open the link you texted them).',
+          'Open the shop\'s lead → 📋 their board card → "Open it here" (or open the link you texted them).',
           "Each tank has a 📺 at the right of its name. Tapping it opens that tank's display page; copy the address from the browser bar. It looks like " +
             APP_ORIGIN +
             "/d/<lead>/<tank-name>.",
@@ -357,8 +357,8 @@ export function displayGuide(s: AppSettings): Guide {
       {
         title: "What the shop needs to know",
         steps: [
-          "Changes can be made right on the tablet (Staff) or on the Tank board on a phone; the screen, the website and the QR tags all follow within about 30 seconds.",
-          "Three ways to unlock: the staff PIN (Tank board → Tablet & staff → Save PIN), a staff NFC tag (write the text shown on the board onto a $1 NFC sticker with the free NFC Tools app; only tablets with NFC can read it), or the 6-digit code the tablet shows, typed on the board. Revoke old links on the lead ends every tablet session too.",
+          "Changes can be made right on the tablet (Staff) or on the board on a phone; the screen, the website and the QR tags all follow within about 30 seconds.",
+          "Three ways to unlock: the staff PIN (the board → Tablet & staff → Save PIN), a staff NFC tag (write the text shown on the board onto a $1 NFC sticker with the free NFC Tools app; only tablets with NFC can read it), or the 6-digit code the tablet shows, typed on the board. Revoke old links on the lead ends every tablet session too.",
           "If the screen looks stale, it has probably lost Wi-Fi. Tap it, swipe down to reload, or power it off and on. The page comes back by itself.",
           "Renaming a tank on the board means that tank's screen needs the new 📺 link once. Adding items, prices, photos and sold out never need anything.",
           "The rotating page always shows every tank, so a new tank joins it on its own.",
@@ -467,7 +467,7 @@ export function costsGuide(s: AppSettings): Guide {
   };
 }
 
-/** A customer-facing page (Show them the Tank board): what it is for them, what they do, what we do, what it costs. */
+/** A customer-facing page (Show them the board): what it is for them, what they do, what we do, what it costs. */
 export interface CustomerPitch {
   title: string;
   lead: string;
@@ -573,7 +573,7 @@ const PITCH_CSS = `
 `;
 
 /**
- * The public, texted version of "Show them the Tank board" (`/b/<leadId>.<exp>.<sig>`): the same words, with buttons to open
+ * The public, texted version of "Show them the board" (`/b/<leadId>.<exp>.<sig>`): the same words, with buttons to open
  * their own board (their private link), the tablet view, and our pricing page.
  */
 export function customerPitchPage(
@@ -585,6 +585,8 @@ export function customerPitchPage(
     boardUrl: string;
     displayUrl: string;
     pricingUrl: string;
+    /** "Tank board" / "Parts board" / … for this shop. */
+    board?: string;
   },
 ): Response {
   const e = escHtml;
@@ -595,15 +597,15 @@ export function customerPitchPage(
 ${p.sections.map(sec).join("")}
 <section class="box"><h2>What it costs</h2><ul>${p.price.map((t) => `<li>${e(t)}</li>`).join("")}</ul></section>
 <section class="box"><h2>Try it</h2><div class="btns">
-<a class="btn btn--go" href="${e(o.boardUrl)}">🐠 Open your Tank board</a>
+<a class="btn btn--go" href="${e(o.boardUrl)}">📋 Open your ${e(o.board ?? "Stock board")}</a>
 <a class="btn" href="${e(o.displayUrl)}" target="_blank" rel="noopener">📺 See the tablet view</a>
 <a class="btn" href="${e(o.pricingUrl)}" target="_blank" rel="noopener">📋 Plans and prices</a>
 ${o.phone ? `<a class="btn" href="sms:+1${e(o.phone.replace(/\D/g, "").replace(/^1/, ""))}">💬 Text us a question</a>` : ""}</div>
-<p class="fine">Your Tank board link is private: anyone with it can change your prices, so share it only with your staff. Bookmark it or add it to your home screen.</p></section>
+<p class="fine">Your ${e(o.board ?? "Stock board")} link is private: anyone with it can change your prices, so share it only with your staff. Bookmark it or add it to your home screen.</p></section>
 <p class="fine">${e(p.fine)}</p>
 <p class="co">${e(o.company)} · Websites and price pages for ${e(o.business)} and other Cullman-area businesses.</p>
 </main>`;
-  return page(`${o.business}: your Tank board`, body, {
+  return page(`${o.business}: your ${o.board ?? "Stock board"}`, body, {
     brand: o.company,
     css: PITCH_CSS,
   });
