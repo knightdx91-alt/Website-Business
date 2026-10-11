@@ -43,6 +43,7 @@ interface DocOpts {
   body: Raw;
   jsonLd: Record<string, unknown>;
   lang?: "en" | "es";
+  noindex?: boolean;
 }
 
 /** A tiny favicon with the business initial in the hero colors, inline so the site needs no extra request or file. */
@@ -67,7 +68,7 @@ function doc(ctx: Ctx, pack: CategoryPack, o: DocOpts): string {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${o.title}</title>
 <meta name="description" content="${o.description}">
-${preview ? html`<meta name="robots" content="noindex, nofollow">` : html`<link rel="canonical" href="${origin}${o.path}">`}
+${preview ? html`<meta name="robots" content="noindex, nofollow">` : o.noindex ? html`<meta name="robots" content="noindex"><link rel="canonical" href="${origin}${o.path}">` : html`<link rel="canonical" href="${origin}${o.path}">`}
 ${alternates ? html`<link rel="alternate" hreflang="en" href="${origin}/"><link rel="alternate" hreflang="es" href="${origin}/es/"><link rel="alternate" hreflang="x-default" href="${origin}/">` : ""}
 ${!preview && ctx.r.seo?.googleSiteVerification ? html`<meta name="google-site-verification" content="${ctx.r.seo.googleSiteVerification}">` : ""}
 <meta name="theme-color" content="${ctx.theme.colors.heroBg}">
@@ -135,7 +136,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     reviewsAllowed: pack.reviewsAllowed?.(input.record) ?? true,
   };
   const files = new Map<string, string | Uint8Array>();
-  const pages: Array<{ path: string; html: string }> = [];
+  const pages: Array<{ path: string; html: string; noindex?: boolean }> = [];
 
   const homeFaq = pack.homeFaq(ctx);
   const homeLd = graph([
@@ -168,8 +169,9 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
       description: p.description,
       body: html`<main id="main">${p.body}</main>`,
       jsonLd: graph([...webPageNode(ctx, p.path, p.title, p.crumb), ...(p.jsonLd ?? [])]),
+      noindex: p.noindex,
     });
-    pages.push({ path: p.path, html: page });
+    pages.push({ path: p.path, html: page, noindex: p.noindex });
   }
 
   if (ctx.hasForm) {
@@ -224,7 +226,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     files.set(
       "sitemap.xml",
       `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pages
-        .filter((p) => p.path !== "/thanks/")
+        .filter((p) => p.path !== "/thanks/" && !p.noindex)
         .map((p) => `<url><loc>${origin}${p.path}</loc></url>`)
         .join("\n")}\n</urlset>\n`,
     );

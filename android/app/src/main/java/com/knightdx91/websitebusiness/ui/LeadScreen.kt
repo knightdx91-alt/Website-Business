@@ -565,6 +565,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             if (!detail.noReviews) OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/reviewcard.pdf", "Review cards")) }) { Text("Review cards (QR)") }
                             OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/tents.pdf", "Table tents")) }) { Text("QR table tents") }
                             OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/window.pdf", "Window sign")) }) { Text("Window sign (QR)") }
+                            if (l.category == "retail") OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/pricetags.pdf", "QR price tags")) }) { Text("QR price tags") }
                         }
                         Text("Their own domain", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
                         val info = dom

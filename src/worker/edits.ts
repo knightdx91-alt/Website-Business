@@ -1,6 +1,6 @@
 import { parseDesign } from "../generator/themes.ts";
 import { z } from "zod";
-import { parseMenuText } from "../generator/menu.ts";
+import { menuToText, parseMenuText } from "../generator/menu.ts";
 import { parsePrice } from "../generator/price.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { AUTO_AMENITY_IDS, PARTS_COUNTER } from "../generator/packs/auto.ts";
@@ -230,6 +230,10 @@ export const EditsSchema = z.object({
           dropDay: z.string().trim().max(120),
           holdNote: z.string().trim().max(160),
           occasions: z.array(z.string().trim().min(1).max(40)).max(10),
+          /** Price list: same text form as a menu (`# Section`, `Name | $Price | Note`); empty clears it. */
+          priceListText: z.string().max(20_000),
+          priceListTitle: z.string().trim().max(40),
+          pricesPublic: z.boolean(),
         })
         .partial()
         .optional(),
@@ -402,7 +406,20 @@ function applyFsrpEdits(r: BusinessRecord, e: NonNullable<Edits["record"]>): voi
   }
   if (r.category === "retail" && e.retail) {
     const x = (r.ext.retail = r.ext.retail ?? {});
-    const { florist, vendors, financing, ...rest } = e.retail;
+    const { florist, vendors, financing, priceListText, priceListTitle, pricesPublic, ...rest } = e.retail;
+    if (priceListText !== undefined || priceListTitle !== undefined || pricesPublic !== undefined) {
+      const prev = x.priceList;
+      const sections = priceListText !== undefined ? parseMenuText(priceListText) : (prev?.sections ?? []);
+      const changed = priceListText !== undefined && priceListText.trim() !== menuToText(prev?.sections ?? []).trim();
+      x.priceList = sections.length
+        ? {
+            sections,
+            lastUpdated: changed || !prev ? new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" }) : prev.lastUpdated,
+            title: (priceListTitle ?? prev?.title)?.trim() || undefined,
+            public: pricesPublic ?? prev?.public ?? true,
+          }
+        : undefined;
+    }
     for (const [k, v] of Object.entries(rest)) (x as unknown as Record<string, unknown>)[k] = v === "" || (Array.isArray(v) && !v.length) ? undefined : v;
     if (florist !== undefined) {
       const f = compact({ ...(x.florist ?? {}), ...florist });

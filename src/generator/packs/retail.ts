@@ -1,5 +1,6 @@
 import { action, actions, donationsOn, type ActionId } from "../actions.ts";
 import { about, announcements, button, contactForm, ctaBand, factList, faq, gallery, hero, infoStrip, reviews, sectionHead, serviceList, todo, visit, type Ctx } from "../components.ts";
+import type { PageSpec } from "./types.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html, raw, type Raw } from "../html.ts";
 import { icon } from "../icons.ts";
@@ -223,6 +224,35 @@ export function retailBannedPhrases(r: BusinessRecord): RegExp[] {
   return out;
 }
 
+export const sectionSlug = (name: string) => name.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "section";
+
+/** The price list page, sections with anchors the QR labels point at. Private lists are noindex and unlinked. */
+export function pricesPage(ctx: Ctx): PageSpec | null {
+  const r = ctx.r;
+  const pl = ext(r).priceList;
+  if (!pl?.sections.length) return null;
+  const title = pl.title?.trim() || "Prices";
+  const call = action(r, "call")!;
+  const body = html`<nav class="menu-nav" aria-label="${title} sections">${pl.sections.map((s) => html`<a href="#sec-${sectionSlug(s.name)}">${s.name}</a>`)}</nav>
+${pl.sections.map(
+    (s) => html`<section class="menu-sec" id="sec-${sectionSlug(s.name)}" aria-labelledby="sec-${sectionSlug(s.name)}-t"><h2 id="sec-${sectionSlug(s.name)}-t">${s.name}</h2>${s.note ? html`<p class="muted">${s.note}</p>` : ""}
+<ul class="menu-items">${s.items.map((it) => html`<li class="menu-item"><div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${it.description ? html`<p>${it.description}</p>` : ""}</li>`)}</ul></section>`,
+  )}
+<p class="muted">Prices as of ${pl.lastUpdated}. Stock and prices change with new arrivals; call to check before you drive over.</p>`;
+  return {
+    path: "/prices/",
+    title: fitTitle([`${title} | ${r.name}, ${r.address.city} ${r.address.state}`, `${title} | ${r.name}`]),
+    description: `${title} at ${r.name} in ${r.address.city}, ${r.address.state}: ${pl.sections.map((s) => s.name).slice(0, 4).join(", ")}. Call ${r.phone.display} to check stock.`,
+    crumb: title,
+    noindex: pl.public === false,
+    body: html`<section class="section"><div class="wrap narrow">
+<span class="section__label">${r.name}</span><h1>${title}</h1>
+${body}
+<div class="btns" style="margin-top:28px">${button(call, "primary")}</div>
+</div></section>`,
+  };
+}
+
 export const retailPack: CategoryPack = {
   id: "retail",
   label: "Shops & boutiques",
@@ -240,6 +270,7 @@ export const retailPack: CategoryPack = {
     return fitTitle([`${r.name} | ${l} in ${r.address.city}, ${r.address.state}`, `${r.name} | ${l} in ${r.address.city}`, `${r.name} | ${r.address.city}, ${r.address.state}`, r.name]);
   },
   nav: (ctx) => [
+    ...(ext(ctx.r).priceList?.sections.length && ext(ctx.r).priceList?.public !== false ? [{ label: ext(ctx.r).priceList?.title?.trim() || "Prices", href: "/prices/" }] : []),
     ...(ctx.r.variant === "florist" ? [{ label: "Occasions", href: "/#occasions" }] : []),
     { label: "What we carry", href: "/#carry" },
     { label: "What's new", href: "/#new" },
@@ -297,7 +328,7 @@ ${faq(dataFaq(r), true)}
 ${ctaBand(ctx, actions(r, first(r)))}
 </main>`;
   },
-  pages: () => [],
+  pages: (ctx) => [pricesPage(ctx)].filter((p): p is PageSpec => !!p),
   bannedPhrases: retailBannedPhrases,
   copyBrief: (r) => ({
     voice: `Friendly and local, a little personality for a ${(LABEL[r.variant] ?? "shop").toLowerCase()} (${

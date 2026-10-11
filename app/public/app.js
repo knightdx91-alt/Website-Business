@@ -685,7 +685,8 @@
         <button class="btn" id="report">Text monthly report</button>
         ${noReviews(l) ? "" : `<a class="btn" href="/api/leads/${l.id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a>`}
         <a class="btn" href="/api/leads/${l.id}/tents" target="_blank" rel="noopener">QR table tents</a>
-        <a class="btn" href="/api/leads/${l.id}/window" target="_blank" rel="noopener">Window sign (QR)</a></div>
+        <a class="btn" href="/api/leads/${l.id}/window" target="_blank" rel="noopener">Window sign (QR)</a>
+        ${l.category === "retail" ? `<a class="btn" href="/api/leads/${l.id}/pricetags.pdf" target="_blank" rel="noopener">QR price tags</a>` : ""}</div>
       <h3 style="margin-top:16px">Their own domain</h3>
       <div id="domain"><p class="muted small">Checking…</p></div></section>`;
   }
@@ -2387,7 +2388,15 @@
       <label class="field">Drop day<input name="rtDropDay" maxlength="120" value="${esc(x.dropDay || "")}" placeholder="New arrivals every Thursday at 10, in store and on Facebook Live."></label>
       <label class="field">Occasions (one per line)<textarea name="rtOcc2" rows="3" placeholder="Homecoming&#10;Game day&#10;Prom&#10;Baby showers">${esc((x.occasions || []).join("\n"))}</textarea></label>` : ""}
       ${booths || v === "furniture" ? `<label class="field">Hold line<input name="rtHold" maxlength="160" value="${esc(x.holdNote || "")}" placeholder="Call to hold an item for 24 hours."></label>` : ""}
+      <h3>Price list &amp; QR labels</h3>
+      <label class="field">Price list <span class="hint">One item per line: Name | $Price | Note. Start a section with # Section name (one per tank, shelf or rack).</span><textarea name="rtPriceList" rows="8" placeholder="# Freshwater community&#10;Neon tetra | $2.99 | Schooling fish, keep 6+&#10;Corydoras | $6.99&#10;&#10;# Saltwater&#10;Ocellaris clownfish | $24.99">${esc(x.priceList && x.priceList.sections ? priceListText(x.priceList.sections) : "")}</textarea></label>
+      <div class="row"><label class="field">Page title<input name="rtPriceTitle" maxlength="40" value="${esc((x.priceList && x.priceList.title) || "")}" placeholder="Fish & prices"></label></div>
+      ${cb("rtPricesPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", !x.priceList || x.priceList.public !== false)}
+      <p class="small muted">Each section gets a QR label on the printable sheet (Live lead → QR price tags). A price change here is a price change on the shelf.</p>
     </section>`;
+  }
+  function priceListText(sections) {
+    return sections.map((s) => ["# " + s.name].concat(s.items.map((i) => [i.name, i.price || "", i.description || ""].join(" | ").replace(/( \| )+$/, ""))).join("\n")).join("\n\n");
   }
   function retailEditValues(f, r) {
     const v = r.variant;
@@ -2398,6 +2407,7 @@
     if (f.elements.rtDeliveryNote) { out.deliveryNote = fsVal(f, "rtDeliveryNote"); out.financing = { lender: fsVal(f, "rtLender") || "", url: fsVal(f, "rtLenderUrl") || "" }; }
     if (f.elements.rtDropDay) { out.dropDay = fsVal(f, "rtDropDay"); out.occasions = fsLines(f, "rtOcc2"); }
     if (f.elements.rtHold) out.holdNote = fsVal(f, "rtHold");
+    if (f.elements.rtPriceList) { out.priceListText = fsVal(f, "rtPriceList") || ""; out.priceListTitle = fsVal(f, "rtPriceTitle") || ""; out.pricesPublic = !!fsOn(f, "rtPricesPublic"); }
     return fsClean(out);
   }
 

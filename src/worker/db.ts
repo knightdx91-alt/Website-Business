@@ -109,6 +109,7 @@ export const DEFAULT_ADDONS: AddOn[] = [
   { name: "\"We're hiring\" section", price: 49, unit: "one-time", about: "Show the jobs you're filling and how to apply. We update it free whenever your openings change." },
   { name: "Same-day build", price: 49, unit: "one-time", about: "Live the same business day you approve it." },
   { name: "Social media posts", price: 129, unit: "month", about: "8 to 12 Facebook and Instagram posts a month written for your business. You approve them before they go up." },
+  { name: "QR price tags & shelf labels", price: 49, unit: "each", about: "A printed sheet of QR labels for your tanks, shelves or racks. Each one opens that section of your price list, so a price change on the site is a price change on the shelf." },
   { name: "QR table tents & window sign", price: 49, unit: "each", about: "A printed set with QR codes for your website, menu and Google reviews, for your tables, counter or front window." },
   { name: "Business cards, yard signs & door hangers", price: 0, unit: "quote", about: "Printed pieces that match your website, from a local print shop." },
   { name: "Logo refresh", price: 179, unit: "one-time", about: "A clean, simple logo in your site's colors, ready for signs, shirts and cards." },

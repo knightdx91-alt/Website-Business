@@ -101,6 +101,8 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
     }
   }
   if (r.category === "retail") f.push("a 'what's new' section that sends shoppers to their Facebook or Instagram for new arrivals");
+  if (r.category === "retail" && r.ext.retail?.priceList?.sections.length) f.push(`a ${r.ext.retail.priceList.title?.toLowerCase() || "price list"} page by section with printable QR labels, so a tank or shelf label opens today's prices`);
+  else if (r.category === "retail") f.push("an optional price list page by section (tanks, shelves, racks) with printable QR labels for each, so a price change on the site is a price change on the shelf");
   if (r.category === "retail" && donationsOn(r)) f.push("a Donations section (what they take and can't take, drop-off hours, and a furniture-pickup request form if they offer pickups), filled in with their own list");
   if (r.category === "auto" && r.variant === "parts") f.push("a 'what we carry' list, a 'can't find it? we'll order it' section, counter services (battery testing and the like), and a Reserve a part form that asks for year, make, model and the part");
   f.push(...fsrpFeatures(r));

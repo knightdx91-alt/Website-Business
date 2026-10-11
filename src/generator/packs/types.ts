@@ -10,6 +10,8 @@ export interface PageSpec {
   body: Raw;
   crumb: string;
   jsonLd?: Array<Record<string, unknown>>;
+  /** Keep the page out of search engines and the sitemap (a private price list reached only from QR labels). */
+  noindex?: boolean;
 }
 
 /** What the copy writer is asked to produce for this category. */

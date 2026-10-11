@@ -459,6 +459,17 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   never a form of ours), `bulletinUrl`, `appUrl` → `#connect` row. `announcements()` is called right after the opening for every
   church variant ("This season" / "Coming up"); charities get `volunteerUrl` ("Sign up to volunteer"); posts and centers get
   `hallDetails {capacity, kitchen, tables, how}` chips + "To book:" next to the `hall` paragraph (which stays a string).
+- Price list + QR price tags (retail pack, Oct 2026; built for Kingfish Aquatics' tank prices): `ext.retail.priceList`
+  {sections (MenuSection[], same text form as a menu: `# Section`, `Name | $Price | Note`), lastUpdated, title (default
+  "Prices"), public (default true)} → `/prices/` page (`pricesPage()` in retail.ts, menu-page markup, section anchors
+  `#sec-<slug>` from `sectionSlug()`), nav link when public; `public: false` = `PageSpec.noindex` → `<meta name="robots"
+  content="noindex">`, out of the sitemap and the nav (reachable only from the labels; for shops that don't want competitors
+  reading prices). Edit → Shop details → "Price list & QR labels" (`rtPriceList` / `rtPriceTitle` / `rtPricesPublic`; edits
+  `retail.priceListText|priceListTitle|pricesPublic`; the date bumps only when the text changes). Printable: `GET
+  /api/leads/:id/pricetags.pdf` (owner, live sites) = `priceTagsPdf()` in cards.ts, Letter sheets of 8 labels (2 × 4,
+  3.75 × 2.5 in), one per section, QR → that section. Buttons "QR price tags" on the Live card (web + Android, retail only).
+  Extra "QR price tags & shelf labels" $49 each (DEFAULT_ADDONS + live Settings + `STANDARD_EXTRA_TERMS`); the page itself is
+  included in every plan. Call guide mentions it (`pitch.ts`). `test/price-list.test.ts`.
 - Thrift donations (retail pack, `ext.retail.donations`, Oct 2026): on by default for `thrift` (`donationsOn` in actions.ts), any shop can
   turn it on in Edit → "Donations" (`donationsEditCard`). Section #donations after What's new: intro `note`, "We gladly take" /
   "We can't take" chips (`accepts` / `doesNotAccept`), `dropOffHours`, nonprofit `receipts` line, and with `pickup` a "Request a furniture

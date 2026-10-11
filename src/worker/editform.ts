@@ -1,3 +1,4 @@
+import { menuToText } from "../generator/menu.ts";
 /**
  * The site editor as data (Oct 2026): one description of every Edit card and field, built from a lead's detail, and the
  * reverse mapping from typed values back to the `PUT /edits` payload. The Android app renders the cards natively from
@@ -329,6 +330,14 @@ export function editForm(l: EditDetail): EditForm {
     if (v === "furniture" || v === "farm_feed" || v === "hardware") f.push(h3("Delivery & financing"), txt("rtDeliveryNote", "Delivery rule (their words)", ext.deliveryNote || "", { max: 240, placeholder: "Free delivery in Cullman County on orders over $499." }), txt("rtLender", "Financing partner", fin.lender || "", { max: 60, placeholder: "Synchrony, Acima…" }), url("rtLenderUrl", "Apply link", fin.url || ""));
     if (v === "boutique" || v === "gift") f.push(h3("New arrivals"), txt("rtDropDay", "Drop day", ext.dropDay || "", { max: 120, placeholder: "New arrivals every Thursday at 10, in store and on Facebook Live." }), ta("rtOcc2", "Occasions (one per line)", (ext.occasions || []).join("\n"), 3, { placeholder: "Homecoming\nGame day\nProm\nBaby showers" }));
     if (booths || v === "furniture") f.push(txt("rtHold", "Hold line", ext.holdNote || "", { max: 160, placeholder: "Call to hold an item for 24 hours." }));
+    const pl = ext.priceList || {};
+    f.push(
+      h3("Price list & QR labels"),
+      ta("rtPriceList", "Price list", pl.sections ? menuToText(pl.sections) : "", 8, { placeholder: "# Freshwater community\nNeon tetra | $2.99 | Schooling fish, keep 6+\nCorydoras | $6.99\n\n# Saltwater\nOcellaris clownfish | $24.99" }),
+      txt("rtPriceTitle", "Page title", pl.title || "", { max: 40, placeholder: "Fish & prices" }),
+      cb("rtPricesPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", pl.public !== false),
+      note("One item per line: Name | $Price | Note. Start a section with # Section name (one per tank, shelf or rack). Each section gets a QR label on the printable sheet (Live lead → QR price tags). A price change here is a price change on the shelf."),
+    );
     if (f.length) card("retail", "Shop details", f);
   }
 
@@ -750,6 +759,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
     if (has("rtDeliveryNote")) { out.deliveryNote = v("rtDeliveryNote"); out.financing = { lender: v("rtLender") || "", url: v("rtLenderUrl") || "" }; }
     if (has("rtDropDay")) { out.dropDay = v("rtDropDay"); out.occasions = lines("rtOcc2"); }
     if (has("rtHold")) out.holdNote = v("rtHold");
+    if (has("rtPriceList")) { out.priceListText = v("rtPriceList") || ""; out.priceListTitle = v("rtPriceTitle") || ""; out.pricesPublic = !!on("rtPricesPublic"); }
     retail = clean(out);
   }
 

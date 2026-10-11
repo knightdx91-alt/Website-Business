@@ -1,3 +1,4 @@
+import { sectionSlug } from "../generator/packs/retail.ts";
 import { layoutOf } from "../generator/design.ts";
 import { LAYOUT_IDS, LAYOUTS } from "../generator/layouts.ts";
 import { z } from "zod";
@@ -18,7 +19,7 @@ import { resolvePresence } from "../places/web-presence.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
 import { LAST_ANNOUNCE_KEY, TICK_KEY, announceUpdate, fcmClientConfig, serviceAccount, serviceAccountProblem } from "./fcm.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
-import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf } from "./cards.ts";
+import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf, priceTagsPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
 import { addDomain, getDomain, removeDomain, type PagesDomain } from "./pages.ts";
 import { cadenceFor, nextCadenceStep, salesDashboard } from "./sales.ts";
@@ -1084,6 +1085,14 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const menu = !!record?.ext.restaurant?.menu;
       const o = { business: lead.name ?? "Us", siteUrl: menu ? `${siteUrl.replace(/\/$/, "")}/menu/` : siteUrl, menu, placeId: lead.place_id, phone: record?.phone.display };
       return pdfResponse(action === "/tents.pdf" ? tableTentsPdf(o) : windowSignPdf(o), `${action === "/tents.pdf" ? "table-tents" : "window-sign"}-${id}.pdf`);
+    }
+    if (action === "/pricetags.pdf" && m === "GET") {
+      const siteUrl = lead.custom_domain ? `https://${lead.custom_domain}/` : lead.live_url;
+      if (!siteUrl) throw new HttpError(409, "Publish the site first: the QR codes point to the live price list");
+      const record = lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null;
+      const pl = record?.ext.retail?.priceList;
+      if (!pl?.sections.length) throw new HttpError(409, "Add a price list first (Edit → Shop details → Price list)");
+      return pdfResponse(priceTagsPdf({ business: lead.name ?? "Us", siteUrl, title: pl.title?.trim() || "Prices", sections: pl.sections.map((x) => ({ name: x.name, slug: sectionSlug(x.name) })) }), `price-tags-${id}.pdf`);
     }
     if (action === "/reviewcard" && m === "GET") {
       if (lead.category === "finance" && lead.record_json && (JSON.parse(lead.record_json) as BusinessRecord).variant === "financial_advisor") throw new HttpError(409, "Financial advisors can't use review cards");

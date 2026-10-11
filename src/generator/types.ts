@@ -306,6 +306,12 @@ export interface RetailExt {
   holdNote?: string;
   /** Boutique / gift occasion tiles (homecoming, game day, prom…). Florists use `florist.occasions`. */
   occasions?: string[];
+  /**
+   * A price list page (/prices/) grouped by section: tanks at a fish store, bags at a feed store, booths at an antique mall.
+   * Each section gets a printable QR label that opens it. `public` false keeps the page out of Google and off the nav (reachable
+   * only from the labels) for shops that don't want competitors reading prices.
+   */
+  priceList?: { sections: MenuSection[]; lastUpdated: string; title?: string; public?: boolean };
 }
 
 /** Tax & finance (research/tax-finance.md §9). Every claim field is owner-entered and owner-confirmed. */

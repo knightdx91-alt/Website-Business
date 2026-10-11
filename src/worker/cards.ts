@@ -162,6 +162,35 @@ export function windowSignPdf(o: { business: string; siteUrl: string; phone?: st
   return drawPdf([ops], `Window sign: ${o.business}`);
 }
 
+/**
+ * QR price tags: a Letter sheet of 8 labels (2 × 4, 3.75 × 2.5 in), one per price-list section, each QR opening that section of
+ * /prices/ on the live site. More than 8 sections → more pages. Cut on the lines; tape to the tank, shelf or rack.
+ */
+export function priceTagsPdf(o: { business: string; siteUrl: string; title: string; sections: Array<{ name: string; slug: string }> }): Uint8Array {
+  const base = o.siteUrl.replace(/\/$/, "");
+  const cols = 2, rows = 4, cw = 3.75 * IN, ch = 2.5 * IN, x0 = (LETTER.w - cols * cw) / 2, y0 = (LETTER.h - rows * ch) / 2;
+  const pages: Draw[][] = [];
+  for (let i = 0; i < o.sections.length; i += cols * rows) {
+    const ops: Draw[] = [];
+    for (let c = 1; c < cols; c++) ops.push({ t: "rect", x: x0 + c * cw, y: y0, w: 0.5, h: rows * ch, gray: 0.75 });
+    for (let r = 0; r <= rows; r++) ops.push({ t: "rect", x: x0, y: y0 + r * ch, w: cols * cw, h: 0.5, gray: 0.75 });
+    o.sections.slice(i, i + cols * rows).forEach((sec, k) => {
+      const lx = x0 + (k % cols) * cw, ly = y0 + Math.floor(k / cols) * ch;
+      const grid = qrGrid(`${base}/prices/#sec-${sec.slug}`);
+      ops.push(
+        { t: "qr", x: lx + 0.25 * IN, y: ly + 0.35 * IN, size: 1.8 * IN, grid },
+        { t: "text", x: lx + 2.25 * IN, y: ly + 0.75 * IN, size: 15, bold: true, text: sec.name, maxW: 1.35 * IN },
+        { t: "text", x: lx + 2.25 * IN, y: ly + 1.25 * IN, size: 10, bold: true, text: "Scan for today's", maxW: 1.35 * IN },
+        { t: "text", x: lx + 2.25 * IN, y: ly + 1.42 * IN, size: 10, bold: true, text: o.title.toLowerCase(), maxW: 1.35 * IN },
+        { t: "text", x: lx + 2.25 * IN, y: ly + 1.95 * IN, size: 8, text: o.business, gray: 0.4, maxW: 1.35 * IN },
+        { t: "text", x: lx + 2.25 * IN, y: ly + 2.12 * IN, size: 7, text: base.replace(/^https?:\/\//, ""), gray: 0.5, maxW: 1.35 * IN },
+      );
+    });
+    pages.push(ops);
+  }
+  return drawPdf(pages, `QR price tags: ${o.business}`);
+}
+
 /** One-page leave-behind with a QR code to the business's free preview. */
 export function previewFlyerPdf(o: { business: string; previewUrl: string; company?: string; phone?: string; caller?: string; days: number }): Uint8Array {
   const grid = qrGrid(o.previewUrl);
