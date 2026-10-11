@@ -84,6 +84,8 @@ test("directory listings are never a business's website, and Google-hosted photo
   assert.equal(isDirectoryPage("https://rps-tire-shop.localtireshops.net/"), true);
   assert.equal(isDirectoryPage("https://www.loc8nearme.com/alabama/cullman/otto-mechanic/4557899/"), true);
   assert.equal(isDirectoryPage("https://example.com/rps", "RPS Tire Shop – Tire Shop in Cullman, AL | Local Tire Shops"), true, "the title gives a directory away");
+  assert.equal(isDirectoryPage("https://lomyu.me/rps-tire-shop-511316-us"), true, "spam site generators that Google links");
+  assert.equal(isDirectoryPage("https://bizsite.link/rps-tire-shop-511316-us", "RPS Tire Shop - Locations from All Over the World"), true);
   assert.equal(isDirectoryPage("https://kingfishaquatics.co/", "King Fish Aquatics | Cullman, AL"), false);
   assert.equal(isDirectoryPage("https://www.stonebridgewedding.com/lunas-bbq", "Luna's BBQ"), false);
   const picked = pickPage(

@@ -11,7 +11,7 @@ import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { groupById, MARKET } from "../places/queries.ts";
 import { qualify, scorePlace } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
-import { applySiteFacts, fetchSitePhotos, importSiteDetailed } from "../places/site-import.ts";
+import { applySiteFacts, fetchSitePhotos, importSiteDetailed, isDirectoryPage } from "../places/site-import.ts";
 import { autoMatchPhotos } from "../generator/packs/retail.ts";
 import { websiteProblem } from "../places/site-check.ts";
 import { placeToRecord, reviewTexts } from "../places/to-record.ts";
@@ -253,7 +253,7 @@ export async function runBuild(env: Env, job: Extract<Job, { type: "build" }>): 
     const record: BusinessRecord = lead.record_json ? JSON.parse(lead.record_json) : placeToRecord(place, category);
     heroFromPlace(record, place);
     // Their current website, if they have one: read once (again after 7 days or on a rewrite) and used as facts for the copy.
-    const siteUrl = lead.found_url || (place.websiteUri && !/facebook\.|instagram\.|linktr\.ee|tiktok\./i.test(place.websiteUri) ? place.websiteUri : null);
+    const siteUrl = lead.found_url || (place.websiteUri && !/facebook\.|instagram\.|linktr\.ee|tiktok\./i.test(place.websiteUri) && !isDirectoryPage(place.websiteUri) ? place.websiteUri : null);
     const fresh = !!record.existingSite && Date.now() - Date.parse(record.existingSite.fetchedAt) <= 7 * 86_400_000;
     // The phone's read wins while fresh: it ran the page's scripts and reached hosts the server can't.
     const stale = record.existingSite?.via === "app" ? !fresh : !record.existingSite || record.existingSite.url !== siteUrl || !fresh || !!lead.rewrite;

@@ -25,8 +25,10 @@ const GOOGLE_HOSTED = /googleusercontent\.com|ggpht\.com|maps\.googleapis\.com|m
  * their text is machine-written from Google data and their photos belong to Google. Never a business's own website.
  */
 export const DIRECTORY_HOST =
-  /(^|\.)(local[a-z]*(shops?|stores?|services?|pros|repairs?|dealers?|contractors?|companies|salons?|restaurants?|clinics?|dentists?|lawyers?|plumbers?|roofers?|electricians?|mechanics?|garages?|cafes?|bakeries|florists?|groomers?|movers?|cleaners?|painters?|landscapers?)\.(net|com|org|co|us)|loc8nearme\.com|localtireshops\.net|nearme[a-z-]*\.(com|net)|[a-z-]*near-?me\.(com|net)|[a-z]+directory\.(com|net|org)|[a-z]+listings?\.(com|net))$/i;
-const DIRECTORY_TITLE = /\|\s*(local [a-z &]+(shops?|stores?|services?|pros|repair|dealers|contractors|companies|salons?|restaurants?)|[a-z ]*(directory|listings?|near me))\s*$/i;
+  /(^|\.)(local[a-z]*(shops?|stores?|services?|pros|repairs?|dealers?|contractors?|companies|salons?|restaurants?|clinics?|dentists?|lawyers?|plumbers?|roofers?|electricians?|mechanics?|garages?|cafes?|bakeries|florists?|groomers?|movers?|cleaners?|painters?|landscapers?)\.(net|com|org|co|us)|loc8nearme\.com|localtireshops\.net|lomyu\.me|bizsite\.link|nearme[a-z-]*\.(com|net)|[a-z-]*near-?me\.(com|net)|[a-z]+directory\.(com|net|org)|[a-z]+listings?\.(com|net))$/i;
+const DIRECTORY_TITLE = /\|\s*(local [a-z &]+(shops?|stores?|services?|pros|repair|dealers|contractors|companies|salons?|restaurants?)|[a-z ]*(directory|listings?|near me))\s*$|locations from all over the world/i;
+/** Spam "website" generators give every business a path like /rps-tire-shop-511316-us. */
+const JUNK_PATH = /-\d{5,}-[a-z]{2}\/?$/i;
 /** True when a page is a directory's listing for the business rather than the business's own site. */
 export function isDirectoryPage(url: string, title?: string): boolean {
   let host = "";
@@ -35,7 +37,13 @@ export function isDirectoryPage(url: string, title?: string): boolean {
   } catch {
     return false;
   }
-  return DIRECTORY_HOST.test(host) || (!!title && DIRECTORY_TITLE.test(title));
+  let path = "";
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    /* checked above */
+  }
+  return DIRECTORY_HOST.test(host) || JUNK_PATH.test(path) || (!!title && DIRECTORY_TITLE.test(title));
 }
 const STOCK = /\/isteam\/stock\/|unsplash|pexels|pixabay|shutterstock|istockphoto|gettyimages|stock\.adobe|depositphotos|dreamstime|stocksy|\/stock\//i;
 

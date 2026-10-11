@@ -221,7 +221,7 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
     menuText: record?.ext.restaurant?.menu ? menuToText(record.ext.restaurant.menu.sections) : "",
     variantLabel: record ? pack.variantLabel(record) : null,
     /** Their current website: the page our web check found, else the one Google links (never a social page). */
-    website: l.found_url || (() => { const w = l.place_json ? ((JSON.parse(l.place_json) as { websiteUri?: string }).websiteUri ?? null) : null; return w && !/facebook\.|instagram\.|linktr\.ee|tiktok\./i.test(w) ? w : null; })(),
+    website: l.found_url || (() => { const w = l.place_json ? ((JSON.parse(l.place_json) as { websiteUri?: string }).websiteUri ?? null) : null; return w && !/facebook\.|instagram\.|linktr\.ee|tiktok\./i.test(w) && !isDirectoryPage(w) ? w : null; })(),
     siteImport: record?.siteImport ?? null,
     existingSite: record?.existingSite ? { url: record.existingSite.url, fetchedAt: record.existingSite.fetchedAt, via: record.existingSite.via ?? "server", images: record.existingSite.images.length, paragraphs: record.existingSite.paragraphs.length } : null,
     looks: pack.looks.map((id) => ({ id, name: LOOKS[id]?.name ?? id })),

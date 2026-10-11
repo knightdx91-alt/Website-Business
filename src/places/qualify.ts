@@ -1,5 +1,6 @@
 import type { CategoryId } from "../generator/types.ts";
 import type { Place } from "./client.ts";
+import { isDirectoryPage } from "./site-import.ts";
 
 /** `elsewhere`: no website on the Google profile, but a web search found their page on someone else's site (web-presence.ts). */
 export type WebPresence = "none" | "social" | "free_builder" | "has_site" | "outdated" | "elsewhere";
@@ -10,6 +11,14 @@ const BOOKING = /(^|\.)(booksy\.com|vagaro\.com|squareup\.com|square\.site|style
 const FREE_BUILDER = /(^|\.)(wixsite\.com|weebly\.com|godaddysites\.com|webnode\.com|jimdosite\.com|carrd\.co|sites\.google\.com|churchcenter\.com|e-clubhouse\.org|keeq\.io)$/i;
 /** A national or parent organization's page (a Legion department, a church locator) isn't the group's own site. */
 const PARENT_ORG = /(^|\.)(legion\.org|legional\.org|vfw\.org|elks\.org|lionsclubs\.org|rotary\.org|churchofgod\.org|churchofjesuschrist\.org|jw\.org)$/i;
+
+/**
+ * Spam "website" generators that Google sometimes links from a profile (lomyu.me → bizsite.link, "Locations from All Over the
+ * World"): a machine-made page with stock pictures, so the business has no website. Shares the rule with site-import.ts.
+ */
+export function isJunkSite(websiteUri: string | undefined): boolean {
+  return !!websiteUri && isDirectoryPage(websiteUri);
+}
 
 function hostOf(websiteUri: string | undefined): string | null {
   if (!websiteUri) return null;
@@ -24,7 +33,7 @@ export function webPresence(websiteUri: string | undefined): WebPresence {
   const host = hostOf(websiteUri);
   if (!host) return "none";
   if (SOCIAL.test(host) || BOOKING.test(host)) return "social";
-  if (PARENT_ORG.test(host)) return "none";
+  if (PARENT_ORG.test(host) || isJunkSite(websiteUri)) return "none";
   if (FREE_BUILDER.test(host)) return "free_builder";
   return "has_site";
 }
