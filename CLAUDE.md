@@ -350,13 +350,17 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   auth.ts, 30 days, 410 after) = `customerPitchPage()`: the same words as a public, noindex page with "Open your Tank board"
   (their `clientLink`, made on first use), the tablet view, undergroundassociates.com/pricing#price-list and "Text us a question".
 - 🎓 Training (Oct 2026, `src/worker/training.ts`, migration 0017 `training_done`; web `#/training` `viewTraining`, Android
-  `ui/TrainingScreen.kt`, 2.10): an in-app course for owner and callers, Home → "🎓 Training" (also Settings). 10 lessons (what
+  `ui/TrainingScreen.kt`, 2.10): an in-app course for owner and callers, Home → "🎓 Training" (also Settings). 12 lessons (what
   we sell, where leads come from, before you call, showing the preview, logging calls, signing up, taking payment, finish &
-  publish [owner], their domain & email [owner], after the sale), each with the exact buttons to tap, a "Try it now" exercise
+  publish [owner], their domain & email [owner], after the sale, the live price list [board, tags, tablet], barcode scanning on
+  the tablet), each with the exact buttons to tap, a "Try it now" exercise
   (on the Payment test lead where money is involved), 1–2 quick-check questions and Mark done. `GET /api/training` returns the
-  lessons with {company}/{plan} placeholders filled from Settings plus this person's `done` ids; `PUT /api/training/progress
+  lessons with {company}/{plan} placeholders filled from Settings ({perDay} = the cheapest website plan as "under $2 a day",
+  {listPlan} = the Price list plan with its price) plus this person's `done` ids; `PUT /api/training/progress
   {lesson, done}`. Progress is per `session.userId` ('owner' or users.id). When a button or screen is renamed, update the
-  lesson text here.
+  lesson text here. Reviewed Oct 2026 against the apps' real labels (👍 Interested not "Showed them", 💳 Tap card on this phone,
+  Publish to Cloudflare / Republish changes, "Their own domain", Review cards, the 👀 opened-preview card line, the Tap to Pay
+  phone rules); `test/worker/training.test.ts` checks placeholders, answer indexes and the button names the new lessons quote.
 - Their current website as facts (Oct 2026, `src/places/site-import.ts`): when a lead has a site (`lead.found_url`, else the
   Google `websiteUri` unless it's social), `runBuild` fetches it (8 s, HTML only, 400 KB) once per 7 days or on a rewrite,
   `extractSiteFacts()` keeps title, description, h1–h3, deduped paragraphs ≥ 40 chars (cookie/copyright/newsletter filler
