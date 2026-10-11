@@ -1,6 +1,7 @@
 import type { CategoryId } from "../types.ts";
 import { autoPack } from "./auto.ts";
 import { churchPack } from "./church.ts";
+import { generalPack } from "./general.ts";
 import { cleaningPack } from "./cleaning.ts";
 import { financePack } from "./finance.ts";
 import { contractorPack } from "./contractor.ts";
@@ -23,6 +24,7 @@ export const PACKS: Partial<Record<CategoryId, CategoryPack>> = {
   retail: retailPack,
   finance: financePack,
   church: churchPack,
+  general: generalPack,
 };
 
 // Each pack lists its first four looks (best fits first); every other look written for the category joins them.

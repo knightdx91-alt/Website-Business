@@ -80,8 +80,7 @@ fun Context.toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT)
 
 val CATEGORY_LABEL = mapOf(
     "restaurant" to "Restaurant", "contractor" to "Contractor", "salon" to "Salon", "auto" to "Auto", "landscaping" to "Lawn & landscape",
-    "cleaning" to "Cleaning", "print" to "Print & signs", "retail" to "Shop", "finance" to "Tax & finance", "church" to "Church / nonprofit",
-)
+    "cleaning" to "Cleaning", "print" to "Print & signs", "retail" to "Shop", "finance" to "Tax & finance", "church" to "Church / nonprofit", "general" to "Other business")
 
 fun categoryLabel(id: String) = CATEGORY_LABEL[id] ?: id.replaceFirstChar { it.uppercase() }
 

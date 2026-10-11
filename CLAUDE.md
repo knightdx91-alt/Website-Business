@@ -345,6 +345,17 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   prompt have wording for it (the reason text carries it). `test/web-presence.test.ts`. "🔎 Re-check website" (owner, lead header
   on web and Android 2.12; `POST /api/leads/:id/webcheck`) runs the search for one lead on demand and updates presence / reason /
   found_url / score (409 when the secret is missing).
+- General pack (Oct 2026, `packs/general.ts`, category `general`): the catch-all so any business gets a site without a code change.
+  `guessCategory` never returns null now (unknown → `general`); Add a business offers "Something else" (web `PACKS`, Android
+  `ADD_PACKS`), `/leads/add` accepts it. `record.typeLabel` (Google's `primaryTypeDisplayName`, set for every category in
+  `placeToRecord`) is the label everywhere ("Gym", "Pet Store"); the variant is Google's raw primary type (`gym`), mapped to a
+  schema.org subtype by `SCHEMA_BY_TYPE` (else LocalBusiness). Services start EMPTY with the REQUIRED to-do "List what you do";
+  storefront (street shown) → hours, Visit, message form, Call + Directions (Book first when `links.booking`); no street →
+  service area, three steps, quote form. Copy brief is written around the type; `generalBannedPhrases` blocks award/best/
+  guarantee/certified/free/licensed claims. 25 looks in `looks/general.ts` (best fits town_square, clean_slate, warm_welcome,
+  night_shift), DNA `PREFS.general` + 4 recipes, example "Iron Ridge Fitness" (gym), company-site page
+  `/websites-for/other-businesses`. The generic Edit cards (text, hours, services, photos, links, design, proof) cover it;
+  there is no category card. When a trade shows up often, write it a real pack; until then it builds here.
 - Run picker = search groups (`src/places/queries.ts` SEARCH_GROUPS; `/meta.categories` serves them A to Z by label, Oct 2026). Several groups share one
   template, and the variant comes from the Google type + business name: food trucks/bakeries/coffee →
   restaurant pack; nails, pet groomers, massage (`massage`, needs the AL license # before publish) → salon

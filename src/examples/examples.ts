@@ -463,4 +463,39 @@ Turnip greens | $3`),
       }),
     };
   })(),
+  (() => {
+    const record = base({ slug: "iron-ridge-fitness", name: "Iron Ridge Fitness", category: "general", variant: "gym", phone: "0111", street: "900 Example Pkwy NW", storefront: true });
+    record.typeLabel = "Gym";
+    record.services = svc(["Monthly memberships", "Group classes", "Personal training", "Open gym 24/7 access", "Youth strength program", "Day passes"]);
+    record.foundedYear = 2019;
+    record.ownershipTags = ["locally_owned"];
+    record.testimonials = [said("Clean, never crowded, and the trainers actually know your name.", "Derek M."), said("The 6 AM class got me back in shape after two kids.", "Kayla R.")];
+    return {
+      slug: "iron-ridge-fitness",
+      kind: "Gym",
+      design: "general.night_shift~stack~h1n0b1s1v0c0f0a0p0",
+      record,
+      copy: copy({
+        heroTagline: "A locally owned gym in Cullman with room to train.",
+        heroSub: "Memberships, classes and personal training for beginners and lifters alike, on your schedule.",
+        about: ["Iron Ridge is a neighborhood gym: free weights, machines, turf and a class room, without the crowds.", "Members get a key fob for 24/7 access and coaches who check in on how you're doing."],
+        serviceBlurbs: blurbs([
+          ["Monthly memberships", "Month to month, no long contract, cancel any time."],
+          ["Group classes", "Strength, HIIT and mobility classes morning and evening."],
+          ["Personal training", "One-on-one coaching and programs built around your goals."],
+          ["Open gym 24/7 access", "Key-fob entry so you can train when it suits you."],
+          ["Youth strength program", "Coached sessions for middle and high school athletes."],
+          ["Day passes", "Visiting or trying us out? Come in for the day."],
+        ]),
+        faq: [
+          { q: "Do I need to sign a contract?", a: "No. Memberships are month to month." },
+          { q: "Can I try a class first?", a: "Yes. Your first class is on us; just come a few minutes early." },
+          { q: "Is there parking?", a: "Plenty, right out front." },
+        ],
+        ctaTitle: "Come train with us",
+        ctaLine: "Stop by for a tour or send us a message to get started.",
+        description: "Iron Ridge Fitness, a locally owned gym in Cullman, AL: memberships, group classes, personal training and 24/7 access. Come in for a tour.",
+      }),
+    };
+  })(),
 ];

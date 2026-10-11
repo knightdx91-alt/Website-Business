@@ -1,4 +1,5 @@
-export type CategoryId = "restaurant" | "contractor" | "salon" | "auto" | "landscaping" | "cleaning" | "print" | "retail" | "finance" | "church";
+/** `general` is the catch-all pack: any local business the other ten don't fit (gyms, dentists, studios, daycares, repair shops…). */
+export type CategoryId = "restaurant" | "contractor" | "salon" | "auto" | "landscaping" | "cleaning" | "print" | "retail" | "finance" | "church" | "general";
 
 /** Where a value came from. `google` images may appear in previews only. */
 export type Source = "places" | "owner" | "ai" | "system" | "stock" | "google";
@@ -471,6 +472,8 @@ export interface BusinessRecord {
   name: string;
   category: CategoryId;
   variant: string;
+  /** Google's own name for the business type ("Pet Store", "Gym"): the label the general pack uses, and a fallback for others. */
+  typeLabel?: string;
   businessStatus: string;
   phone: { e164: string; display: string };
   smsEnabled: boolean;

@@ -61,6 +61,7 @@ private val ADD_PACKS = listOf(
     "church" to "Church, VFW/Legion/Lions/lodge, food pantry or community center",
     "print" to "Print shop, sign shop, screen printing or embroidery",
     "retail" to "Shop: boutique, gifts, florist, antiques, thrift, feed or furniture",
+    "general" to "Something else: gym, clinic, daycare, studio, repair shop, any local business",
 )
 
 /** Website status label and whether it's a good sign (true) or a caution (false). */

@@ -89,6 +89,7 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
     name,
     category,
     variant: "other",
+    typeLabel: p.primaryTypeDisplayName?.text || undefined,
     businessStatus: p.businessStatus ?? "UNKNOWN",
     phone,
     smsEnabled: false,
@@ -179,6 +180,17 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
       variant,
       services: seedChurchServices(variant, name),
       ext: { church: variant === "church" ? { tradition: t.tradition, traditionLabel: t.label, spanish: /\b(iglesia|ministerio|templo|casa de oraci[oó]n)\b/i.test(name) || undefined } : {} },
+    };
+  }
+  if (category === "general") {
+    // The catch-all: Google's type is the variant ("pet_store", "gym"); services are the owner's to list (a required to-do).
+    const storefront = !!p.formattedAddress && !/service area|no storefront/i.test(name);
+    return {
+      ...base,
+      variant: p.primaryType || "other",
+      services: [],
+      serviceArea: storefront ? undefined : { towns: townsWithin(geo, 20, 8), counties: county ? [county] : [] },
+      ext: {},
     };
   }
   throw new Error(`Category ${category} not supported yet`);

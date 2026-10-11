@@ -144,6 +144,16 @@ function hash(s: string): number {
  */
 type Prefs = { [K in DnaKnob]?: Array<Dna[K]> };
 const PREFS: Record<CategoryId, Prefs> = {
+  general: {
+    hero: ["split", "stack", "banner", "card", "statement", "cover"],
+    services: ["cards", "list", "tiles", "columns"],
+    strip: ["bar", "tiles", "inline", "none"],
+    photo: ["plain", "frame"],
+    buttons: ["solid-ghost", "solid-solid", "pill", "block"],
+    headline: ["name", "service", "promise"],
+    scale: ["standard", "dramatic"],
+    motif: ["none", "dots", "rules"],
+  },
   restaurant: {
     hero: ["cover", "stack", "card", "banner", "billboard", "split"],
     services: ["cards", "tiles", "scroller", "columns", "table"],
@@ -273,6 +283,12 @@ export interface Recipe {
 }
 const R = (id: string, name: string, about: string, dna: Partial<Dna>): Recipe => ({ id, name, about, dna });
 export const RECIPES: Record<CategoryId, Recipe[]> = {
+  general: [
+    R("front-door", "Front door", "Photo first, name over it, cards.", { hero: "stack", services: "cards" }),
+    R("at-a-glance", "At a glance", "Info panel beside the photo, list of services.", { hero: "split", strip: "none", services: "list" }),
+    R("plain-sign", "Plain sign", "Big name, facts row, light tone, tiles.", { hero: "billboard", tone: "light", services: "tiles" }),
+    R("storefront", "Storefront", "Banner with a lede, bar under it, columns.", { hero: "banner", strip: "bar", services: "columns" }),
+  ],
   restaurant: [
     R("photo-first", "Photo first", "Full-screen food photo, menu tiles, swipeable specials.", { hero: "cover", services: "tiles", strip: "inline", scale: "dramatic" }),
     R("menu-board", "Menu board", "Name as a sign, price-list menu, dots texture.", { hero: "billboard", services: "table", motif: "dots", strip: "ticker" }),

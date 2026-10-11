@@ -29,7 +29,7 @@
     if (h < 24) return h + " hr ago";
     return Math.round(h / 24) + " days ago";
   };
-  const CATEGORY_LABEL = { restaurant: "Restaurant", contractor: "Contractor", salon: "Salon", auto: "Auto", landscaping: "Landscaping", cleaning: "Cleaning", print: "Print & signs", retail: "Shop", finance: "Tax & finance", church: "Church & nonprofit" };
+  const CATEGORY_LABEL = { restaurant: "Restaurant", contractor: "Contractor", salon: "Salon", auto: "Auto", landscaping: "Landscaping", cleaning: "Cleaning", print: "Print & signs", retail: "Shop", finance: "Tax & finance", church: "Church & nonprofit" , general: "Other business"};
   const groupLabel = (id) => ((meta && meta.categories.find((c) => c.id === id)) || {}).label || CATEGORY_LABEL[id] || id;
   const GOOGLE_PER_SEARCH = 0.064; // up to 2 pages of Text Search per search phrase
   const SALES = [["new", "New"], ["callbacks", "Callbacks"], ["activity", "Activity"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
@@ -2783,7 +2783,7 @@
   }
 
   /* ---------- add a business by hand ---------- */
-  const PACKS = [["restaurant", "Restaurant, cafe, bakery or food truck"], ["contractor", "Contractor or home service (plumbing, HVAC, painting, concrete, tree, pest…)"], ["salon", "Salon, barber, nails, massage or pet grooming"], ["auto", "Auto repair, body shop, detailing, towing or small engine"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning or pressure washing"], ["finance", "Tax preparer, accountant, insurance agency or financial advisor"], ["church", "Church, VFW/Legion/Lions/lodge, food pantry or community center"], ["print", "Print shop, sign shop, screen printing or embroidery"], ["retail", "Shop: boutique, gifts, florist, antiques, thrift, feed or furniture"]];
+  const PACKS = [["restaurant", "Restaurant, cafe, bakery or food truck"], ["contractor", "Contractor or home service (plumbing, HVAC, painting, concrete, tree, pest…)"], ["salon", "Salon, barber, nails, massage or pet grooming"], ["auto", "Auto repair, body shop, detailing, towing or small engine"], ["landscaping", "Landscaping or lawn care"], ["cleaning", "Cleaning or pressure washing"], ["finance", "Tax preparer, accountant, insurance agency or financial advisor"], ["church", "Church, VFW/Legion/Lions/lodge, food pantry or community center"], ["print", "Print shop, sign shop, screen printing or embroidery"], ["retail", "Shop: boutique, gifts, florist, antiques, thrift, feed or furniture"], ["general", "Something else: gym, clinic, daycare, studio, repair shop, any local business"]];
   const PRESENCE = { none: ["No website", "chip--good"], social: ["Only a social page", "chip--good"], elsewhere: ["Page on another site", "chip--good"], free_builder: ["Free-builder site", "chip--warn"], outdated: ["Outdated website", "chip--warn"], has_site: ["Has a website", "chip--warn"] };
 
   async function viewAdd() {

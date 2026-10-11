@@ -42,6 +42,7 @@ const BUSINESS_TYPES = [
   "Shop or boutique",
   "Tax, accounting or insurance",
   "Church or nonprofit",
+  "Something else",
 ];
 
 /** One line under the example sites, so nobody mistakes them for client work. */
@@ -620,6 +621,20 @@ const TRADES: Trade[] = [
     ],
   },
 ];
+
+TRADES.push({
+  slug: "other-businesses",
+  cat: "general",
+  name: "gyms, clinics, daycares, studios, repair shops and every other local business",
+  h1: "Websites for any local business in Cullman, AL",
+  intro: "Not a restaurant, a contractor or a shop? Most businesses aren't. If people look you up on their phone before they call or come in, the site does the same job: your hours, your number, what you do and a way to reach you.",
+  includes: ["Your name, hours and address up top, with open or closed right now", "What you do, listed the way customers ask for it, with a line under each", "Tap to call, directions, and a Book button if you take bookings online", "A message or quote form that lands on your phone", "Your photos, your Google rating and a link to your reviews", "Service businesses get a service-area list by town and a three-step 'how it works'"],
+  faq: [
+    ["Does my kind of business even need a website?", "If customers find you on Google, yes. The listing shows a map pin; the site is where the pin sends them, and it's what convinces them to call. Gyms, clinics, studios and daycares get looked up just like restaurants do."],
+    ["Will the wording fit what I do?", "The site is written for your kind of business, from your Google listing, and you check every line before it goes live. Nothing is claimed that you didn't tell us."],
+    ["What do you need from me?", "Three to eight things people come to you for, a few photos, and your OK. That's it."],
+  ],
+});
 
 function tradeFor(cat: CategoryId): Trade | undefined {
   return TRADES.find((t) => t.cat === cat);

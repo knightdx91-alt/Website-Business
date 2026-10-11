@@ -228,5 +228,6 @@ export function guessCategory(p: Place): CategoryId | null {
   if (/\b(salon|barber|nails?|groom)/.test(n)) return "salon";
   if (/\b(auto|motors|tire|automotive|mechanic)/.test(n)) return "auto";
   if (/\b(plumb|electric|roof|heating|air|hvac|construction|builders?)\b/.test(n)) return "contractor";
-  return null;
+  // Anything else still gets a site: the general pack labels it with Google's own type name.
+  return "general";
 }

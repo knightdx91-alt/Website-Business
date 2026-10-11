@@ -13,6 +13,7 @@ import { PRINT_LOOKS } from "./looks/print.ts";
 import { RETAIL_LOOKS } from "./looks/retail.ts";
 import { FINANCE_LOOKS } from "./looks/finance.ts";
 import { CHURCH_LOOKS } from "./looks/church.ts";
+import { GENERAL_LOOKS } from "./looks/general.ts";
 import type { CategoryId } from "./types.ts";
 
 export interface FontSpec {
@@ -240,6 +241,7 @@ export const LOOKS: Record<string, LookDef> = {
   ...RETAIL_LOOKS,
   ...FINANCE_LOOKS,
   ...CHURCH_LOOKS,
+  ...GENERAL_LOOKS,
 };
 
 /**

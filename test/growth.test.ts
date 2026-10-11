@@ -98,7 +98,7 @@ test("hand-added businesses get a sensible template guess", async () => {
   assert.equal(guessCategory(p("Cullman Sign and Banner", "point_of_interest")), "print");
   assert.equal(guessCategory(p("Lavish Boutique Cullman", "clothing_store")), "retail");
   assert.equal(guessCategory(p("Flowers & More", "point_of_interest")), "retail");
-  assert.equal(guessCategory(p("Acme Holdings", "point_of_interest")), null);
+  assert.equal(guessCategory(p("Acme Holdings", "point_of_interest")), "general"); // unknown types build on the catch-all pack
 });
 
 test("new variants are picked from the business name", async () => {
