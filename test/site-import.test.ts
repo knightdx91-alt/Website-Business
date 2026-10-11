@@ -56,3 +56,10 @@ test("their own photos are kept, the builder's stock, logos and icons are not, a
   assert.equal(imgs[0]!.alt, "Our saltwater wall");
   assert.equal(extractSiteFacts("https://kingfishaquatics.co/", html).images.length, 3);
 });
+
+test("carousel and gallery slides hidden in data attributes or JSON are found by the page sweep", () => {
+  const html = `<div class="gallery" data-slides='[{"url":"https:\\/\\/img1.wsimg.com\\/isteam\\/ip\\/abc\\/discus.jpg\\/:\\/rs=w:400"},{"url":"https://img1.wsimg.com/isteam/ip/abc/clownfish.JPG/:/rs=w:400"}]'></div>
+<div style="background-image:url(https://kingfishaquatics.co/u/reef-tank.webp)"></div><img src="https://kingfishaquatics.co/u/logo.png">`;
+  const imgs = extractImages(html, "https://kingfishaquatics.co/").map((i) => i.src);
+  assert.deepEqual(imgs, ["https://img1.wsimg.com/isteam/ip/abc/discus.jpg", "https://img1.wsimg.com/isteam/ip/abc/clownfish.JPG", "https://kingfishaquatics.co/u/reef-tank.webp"]);
+});

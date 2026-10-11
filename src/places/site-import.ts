@@ -39,13 +39,18 @@ export function cleanImages(list: Array<{ src: string; alt?: string }>, base: st
     if (!it.src || NOT_A_PHOTO.test(it.src) || NOT_A_PHOTO.test(alt ?? "") || STOCK.test(it.src)) continue;
     const abs = imageUrl(it.src, base);
     if (!abs) continue;
-    const key = abs.replace(/\?.*$/, "");
+    const key = variantKey(abs);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ src: abs, alt });
     if (out.length >= max) break;
   }
   return out;
+}
+
+/** One key per photo across its size variants: `a-400.jpg`, `a-1200.jpg`, `a_800x600.jpg` and `a.jpg?w=2` are the same picture. */
+function variantKey(abs: string): string {
+  return abs.replace(/\?.*$/, "").replace(/\/:\/.*$/, "").replace(/[-_]\d{2,4}(?:x\d{2,4})?w?(?=\.[a-z]{3,4}$)/i, "").toLowerCase();
 }
 
 /** Their photos from <img> tags (src, data-src, the largest srcset entry), in page order, deduped, at most 12. */
@@ -66,11 +71,23 @@ export function extractImages(html: string, base: string): Array<{ src: string; 
     if (!src || NOT_A_PHOTO.test(src) || NOT_A_PHOTO.test(alt ?? "") || STOCK.test(src) || (w && w < 200)) continue;
     const abs = imageUrl(src, base);
     if (!abs) continue;
-    const key = abs.replace(/\?.*$/, "");
+    const key = variantKey(abs);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ src: abs, alt });
-    if (out.length >= 12) break;
+    if (out.length >= 40) break;
+  }
+  // Carousels, galleries and lazy loaders keep their slides in data attributes, <source> tags or JSON blobs, not <img src>:
+  // sweep the whole page for anything that looks like a photo address (GoDaddy's own uploads live under /isteam/ip/).
+  const text = decode(html).replace(/\\\//g, "/");
+  for (const m of text.matchAll(/https?:\/\/[^\s"'<>()\\]+?(?:\.(?:jpe?g|png|webp)(?=[\s"'<>()?\\/:]|$)|\/isteam\/ip\/[^\s"'<>()\\]+)/gi)) {
+    const abs = imageUrl(m[0], base);
+    if (!abs || NOT_A_PHOTO.test(abs) || STOCK.test(abs)) continue;
+    const key = variantKey(abs);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ src: abs });
+    if (out.length >= 40) break;
   }
   return out;
 }

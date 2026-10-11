@@ -35,9 +35,14 @@ import org.json.JSONObject
  * exactly as a visitor sees it, scrolls so lazy photos load, then hands the page and every photo address to the Worker,
  * which extracts the facts, downloads the photos and rebuilds the text.
  */
-private const val COLLECT_JS = """(function(){var imgs=[],seen={};function add(s,a){if(!s||s.indexOf('data:')===0||seen[s])return;seen[s]=1;imgs.push({src:s,alt:a||''});}
-document.querySelectorAll('img').forEach(function(i){var big=(i.naturalWidth||i.width||0)>=200;var ss=i.getAttribute('srcset')||i.getAttribute('data-srcset');if(ss){var best=ss.split(',').map(function(x){return x.trim().split(/\s+/)}).sort(function(a,b){return (parseInt(b[1])||0)-(parseInt(a[1])||0)})[0];if(best&&best[0]&&big)add(best[0],i.alt);}var s=i.currentSrc||i.src||i.getAttribute('data-src');if(s&&big)add(s,i.alt);});
-document.querySelectorAll('*').forEach(function(el){if(el.offsetWidth<200||el.offsetHeight<120)return;var bg=getComputedStyle(el).backgroundImage;var m=bg&&/url\(["']?([^"')]+)["']?\)/.exec(bg);if(m)add(m[1],el.getAttribute('aria-label')||el.getAttribute('title')||'');});
+private const val COLLECT_JS = """(function(){var imgs=[],seen={};function add(s,a){if(!s||typeof s!=='string'||s.indexOf('data:')===0||seen[s])return;seen[s]=1;imgs.push({src:s,alt:a||''});}
+function fromSrcset(ss){if(!ss)return null;var best=ss.split(',').map(function(x){return x.trim().split(/\s+/)}).sort(function(a,b){return (parseInt(b[1])||0)-(parseInt(a[1])||0)})[0];return best&&best[0]||null;}
+// Every <img>, shown or hidden (carousel slides wait off screen): the largest srcset entry, the live source, and lazy data-* copies.
+document.querySelectorAll('img').forEach(function(i){var a=i.alt||'';var small=(i.getAttribute('width')&&parseInt(i.getAttribute('width'))<120);if(small)return;add(fromSrcset(i.getAttribute('srcset')||i.getAttribute('data-srcset')),a);add(i.currentSrc||i.src,a);['data-src','data-lazy-src','data-original','data-image','data-full','data-large'].forEach(function(k){add(i.getAttribute(k),a);});});
+document.querySelectorAll('source').forEach(function(sc){add(fromSrcset(sc.getAttribute('srcset')||sc.getAttribute('data-srcset')),'');});
+// Background images anywhere, plus any attribute on any element that holds a photo address (gallery widgets keep slides there).
+var looksPhoto=/\.(jpe?g|png|webp)(\?|$|\/:\/)|\/isteam\/ip\//i;
+document.querySelectorAll('*').forEach(function(el){var bg=getComputedStyle(el).backgroundImage;var m=bg&&/url\(["']?([^"')]+)["']?\)/.exec(bg);if(m)add(m[1],el.getAttribute('aria-label')||el.getAttribute('title')||'');for(var j=0;j<el.attributes.length;j++){var v=el.attributes[j].value;if(v&&v.length<2000&&looksPhoto.test(v)&&/^(https?:)?\/\//.test(v))add(v,el.getAttribute('alt')||el.getAttribute('aria-label')||'');}});
 return JSON.stringify({url:location.href,html:document.documentElement.outerHTML.slice(0,2500000),images:imgs.slice(0,80)});})()"""
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -105,6 +110,7 @@ fun SiteImportDialog(api: Api, leadId: String, url: String, onDone: (changed: Bo
                                     stage = "Loaded. Scrolling so every photo appears…"
                                     // Lazy photos load as they come into view: walk the page, then settle, then read it.
                                     val steps = listOf(0.2, 0.4, 0.6, 0.8, 1.0, 0.0)
+                                    view.evaluateJavascript("document.querySelectorAll('img').forEach(function(i){i.loading='eager';var d=i.getAttribute('data-src')||i.getAttribute('data-lazy-src');if(d&&!i.src)i.src=d;var ds=i.getAttribute('data-srcset');if(ds&&!i.getAttribute('srcset'))i.setAttribute('srcset',ds);});", null)
                                     steps.forEachIndexed { i, k -> handler.postDelayed({ view.evaluateJavascript("window.scrollTo(0, document.body.scrollHeight * $k)", null) }, 500L * (i + 1)) }
                                     handler.postDelayed({ collect(view) }, 500L * steps.size + 2_500L)
                                 }

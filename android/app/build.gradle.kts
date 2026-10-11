@@ -19,8 +19,8 @@ android {
         applicationId = "com.knightdx91.websitebusiness"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "2.23"
+        versionCode = 30
+        versionName = "2.24"
         // The Worker the app talks to. The Tap to Pay intent:// link may name another origin with ?o=.
         buildConfigField("String", "BASE_URL", "\"https://website-business.knightdx91.workers.dev\"")
         // Stripe's Tap to Pay library ships arm64 + armeabi-v7a natives (~20 MB each). Every phone that can run
