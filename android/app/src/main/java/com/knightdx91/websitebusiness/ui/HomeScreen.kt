@@ -91,8 +91,10 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
             state.signOut()
         } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
             error = e.message
+        } finally {
+            // Also on cancellation (tab switched, screen left mid-load): never leave the spinner on.
+            loading = false
         }
-        loading = false
     }
 
     LaunchedEffect(tab, category) { load() }

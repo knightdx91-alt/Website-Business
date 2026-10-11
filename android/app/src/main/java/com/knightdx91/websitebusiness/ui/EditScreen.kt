@@ -177,8 +177,7 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String) {
             }
             for (c in cs) if (!open.containsKey(c.id)) open[c.id] = !c.collapsed
             error = null
-        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message }
-        loading = false
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message } finally { loading = false }
     }
     LaunchedEffect(id) { load(false) }
 

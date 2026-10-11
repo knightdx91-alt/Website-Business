@@ -63,9 +63,14 @@ export function pickPage(results: WebResult[], name: string): FoundPage | null {
     }
     const host = u.hostname.replace(/^www\./, "");
     if (IGNORED_HOSTS.test(host) || /\.(gov|edu|mil)$/.test(host)) continue;
-    const bare = host.replace(/\.[a-z]+$/, "").replace(/[^a-z0-9]/g, "");
-    const own = bare.includes(slug) || (first.length >= 5 && bare.includes(first)) || (tokens.length >= 2 && bare.includes(tokens[0]! + tokens[1]!));
-    if (own) return { url: r.url, host, title: r.title, own: true };
+    // Judge "their own domain" by the registrable domain only: pops-cafe-hanceville.res-pick.com is a page on an ordering
+    // platform (a page elsewhere), not their website, even though the subdomain carries the name.
+    const registrable = host.split(".").slice(-2).join(".");
+    const bare = registrable.replace(/\.[a-z]+$/, "").replace(/[^a-z0-9]/g, "");
+    const carries = (b: string) => b.includes(slug) || (first.length >= 5 && b.includes(first)) || (tokens.length >= 2 && b.includes(tokens[0]! + tokens[1]!));
+    if (carries(bare)) return { url: r.url, host, title: r.title, own: true };
+    const sub = host.slice(0, host.length - registrable.length).replace(/[^a-z0-9]/g, "");
+    if (sub && carries(sub)) return { url: r.url, host: registrable, title: r.title, own: false };
     const title = norm(r.title);
     const path = u.pathname.toLowerCase().replace(/[^a-z0-9]/g, "");
     const titleStarts = title.startsWith(` ${joined} `) || title.startsWith(` ${joined}`);

@@ -184,6 +184,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   /api/signups/:id/refund {chargeId, amountCents, cancelPlan, reason}` (`refundSignup`: Stripe refund, optional subscription
   delete, sign-up unpaid on a full refund with the plan ended, call-log note, alert). The dialog restates the agreement's refund
   rules. Card-sheet payments now also store `stripe_payment_intent`.
+- Android 2.13 (Oct 2026): loaders clear `loading` in `finally` (Home, Edit), so a cancelled request never leaves the spinner on
+  (2.8's rethrow had skipped the reset after the try).
 - Android 2.8 (Oct 2026): every `catch (e: Exception)` in the app is preceded by `catch (e: kotlinx.coroutines.CancellationException)
   { throw e }`. Leaving a screen (or switching a Home tab) while it loads cancels the coroutine; before this the cancellation was shown
   as the error "The coroutine scope left the composition". Keep the pair when adding new catch-alls.
@@ -290,8 +292,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `BRAVE_SEARCH_API_KEY` (Brave Search API, free 2,000 queries/month, ~$3/1,000 after; without it nothing changes) the app runs one
   web search, `"<name>" <town> AL`, for every "none"/"social" lead: in search runs (`MAX_WEB_CHECKS` 15 per job), when a lead is
   added by hand, and for the first 4 open results of the Add-a-business lookup (sequential: the free plan is 1 request/second).
-  `pickPage()` skips directories / social / delivery / news / .gov hosts (`IGNORED_HOSTS`) and takes a domain carrying the name
-  (own) or a page whose title starts with the name or carries the whole name in title + path (parent page). Own domain →
+  `pickPage()` skips directories / social / delivery / news / .gov hosts (`IGNORED_HOSTS`) and takes a *registrable* domain carrying
+  the name (own; a name-bearing subdomain on a platform such as pops-cafe-hanceville.res-pick.com is a page elsewhere, host =
+  the platform) or a page whose title starts with the name or carries the whole name in title + path (parent page). Own domain →
   `websiteProblem()`: broken = presence `outdated` "(site not linked from Google)", working = `has_site` (runs skip it, hand-adds
   keep it); parent page → new presence **`elsewhere`** ("Page on <host>, not linked from Google", +5 score). The URL is stored
   in `found_url` / `foundUrl` and shown on cards and lead screens ("🔗 Found page"); the walk-in opener and the call guide

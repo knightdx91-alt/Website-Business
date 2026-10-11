@@ -23,6 +23,14 @@ test("their own unlinked domain counts as their website", () => {
   assert.equal(g?.own, true);
 });
 
+test("a name-bearing subdomain on a platform is a page elsewhere, not their website", () => {
+  const f = pickPage([{ url: "https://pops-cafe-hanceville.res-pick.com/", title: "Pop's Cafe Hanceville - Order Online" }], "Pop's Cafe Hanceville");
+  assert.equal(f?.own, false);
+  assert.equal(f?.host, "res-pick.com");
+  const g = pickPage([{ url: "https://lunasbbq.square.site/", title: "Luna's BBQ" }], "Luna's BBQ");
+  assert.equal(g, null, "square.site is ignored outright");
+});
+
 test("a page that merely mentions the name in passing is not picked", () => {
   const r = [{ url: "https://www.hancevillechamber.org/members", title: "Our members: Luna's BBQ, Stone Bridge Farms and more" }];
   assert.equal(pickPage(r, "Luna's BBQ"), null);
