@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseMenuText } from "../../src/generator/menu.ts";
 import { buildSite } from "../../src/generator/render.ts";
+import { applyPriceListEdit } from "../../src/worker/edits.ts";
+import { menuToText } from "../../src/generator/menu.ts";
 import {
   addSampleStock,
   hasSampleStock,
@@ -152,4 +154,17 @@ test("the preview shows the sample note and a REQUIRED to-do, so the site can't 
     }),
     /Remove the sample items from the price list/,
   );
+});
+
+test("retyping the list in Edit keeps sample items flagged, so they can still be removed and still block publishing", () => {
+  const r = categoryRecord("retail"); r.name = "Hanceville Hardware"; r.typeLabel = "Hardware Store"; r.variant = "hardware";
+  addSampleStock(r);
+  const text = menuToText(r.ext.retail!.priceList!.sections) + "\nMy own hammer | $19";
+  applyPriceListEdit(r, { text });
+  assert.ok(hasSampleStock(r));
+  const items = r.ext.retail!.priceList!.sections.flatMap((s) => s.items);
+  assert.equal(items.find((it) => it.name === "My own hammer")!.sample, undefined);
+  assert.ok(items.filter((it) => it.sample).length > 10);
+  removeSampleStock(r);
+  assert.deepEqual(r.ext.retail!.priceList!.sections.flatMap((s) => s.items).map((it) => it.name), ["My own hammer"]);
 });

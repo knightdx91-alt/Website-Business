@@ -29,11 +29,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.knightdx91.websitebusiness.net.leadFull
+import com.knightdx91.websitebusiness.net.sampleStock
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -60,6 +64,12 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
     var webView by remember { mutableStateOf<WebView?>(null) }
     var desktop by remember { mutableStateOf(false) }
     var mobileUa by remember { mutableStateOf("") }
+    // Sample stock on the price list (owner): null until the lead is read, or when the site is live.
+    var sample by remember { mutableStateOf<Boolean?>(null) }
+    var sampleBusy by remember { mutableStateOf(false) }
+    LaunchedEffect(id) {
+        if (state.meta?.isOwner == true) runCatching { state.api.leadFull(id) }.getOrNull()?.let { d -> if (d.lead.salesStatus != "live") sample = d.sampleStock }
+    }
 
     BackHandler { if (webView?.canGoBack() == true) webView?.goBack() else nav.popBackStack() }
 
@@ -93,6 +103,20 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
                 OutlinedButton(onClick = { share(false) }) { Text("💬 Text link") }
                 OutlinedButton(onClick = { share(true) }) { Text("🔗 Copy") }
                 if (state.meta?.isOwner == true) OutlinedButton(onClick = { nav.navigate("edit/$id") }) { Text("✏️ Edit") }
+                sample?.let { on ->
+                    OutlinedButton(enabled = !sampleBusy, onClick = {
+                        sampleBusy = true
+                        scope.launch {
+                            try {
+                                state.api.sampleStock(id, add = !on)
+                                context.toast(if (on) "Sample items removed. Rebuilding the preview…" else "Sample items added. Rebuilding the preview…")
+                                sample = !on
+                                delay(3500)
+                                webView?.loadUrl(if (on) url else "${url}prices/")
+                            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't change the sample items") } finally { sampleBusy = false }
+                        }
+                    }) { Text(if (on) "🧪 Remove sample items" else "🧪 Add sample items") }
+                }
                 OutlinedButton(onClick = { scope.launch { runCatching { state.api.shareLink(id) }.onSuccess { context.openUrl(it) }.onFailure { context.toast("Couldn't make the link") } } }) { Text("Open in Chrome") }
             }
         }

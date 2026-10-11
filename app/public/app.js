@@ -1008,17 +1008,35 @@
 
   async function viewPreview(id) {
     setNav("home");
+    const owner = isOwner();
     let mode = matchMedia("(min-width: 760px)").matches ? "desktop" : "phone";
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p>
       <div class="row" style="margin-bottom:10px"><div class="tabs" style="margin:0">
         <button type="button" data-mode="phone">Phone view</button><button type="button" data-mode="desktop">Desktop view</button></div>
-        <a class="btn btn--small" href="#/full/${id}" style="flex:none">Full screen</a></div>
+        <a class="btn btn--small" href="#/full/${id}" style="flex:none">Full screen</a><span id="previewsample" style="flex:none"></span></div>
       <div class="frame-wrap" id="fw"><iframe id="pf" title="Site preview" src="/p/${id}/"></iframe></div>
       <div id="previewshare" style="margin-top:12px"></div>`;
     const my = renderSeq;
     api("/leads/" + id).then((l) => {
       const box = document.getElementById("previewshare");
-      if (stale(my) || !box || l.status !== "ready" || l.salesStatus === "live") return;
+      if (stale(my)) return;
+      const sb = document.getElementById("previewsample");
+      if (sb && owner && l.status === "ready" && l.salesStatus !== "live") {
+        const draw = (on) => {
+          sb.innerHTML = `<button class="btn btn--small${on ? "" : " btn--line"}" type="button" title="${on ? "Sample items are on the price list (preview only)" : "Fill the price page, board and tablet with made-up stock for their kind of business"}">${on ? "🧪 Remove sample items" : "🧪 Add sample items"}</button>`;
+          sb.firstChild.addEventListener("click", async () => {
+            if (on && !confirm("Remove every sample item from the price list? Anything they typed themselves stays.")) return;
+            sb.firstChild.disabled = true; sb.firstChild.textContent = on ? "Removing…" : "Adding…";
+            try {
+              await api(`/leads/${id}/samplestock`, { method: on ? "DELETE" : "POST" });
+              toast(on ? "Sample items removed. Rebuilding the preview…" : "Sample items added. Rebuilding the preview…");
+              setTimeout(() => { if (!stale(my)) { frame.src = `/p/${id}/${on ? "" : "prices/"}`; draw(!on); } }, 3500);
+            } catch (err) { toast(err.message); draw(on); }
+          });
+        };
+        draw(!!l.sampleStock);
+      }
+      if (!box || l.status !== "ready" || l.salesStatus === "live") return;
       box.innerHTML = shareButtonsHtml();
       bindShareButtons(l);
     }).catch(() => {});

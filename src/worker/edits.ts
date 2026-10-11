@@ -929,6 +929,8 @@ export function applyPriceListEdit(
         if (it.qty === undefined && b.qty !== undefined) it.qty = b.qty;
         if (b.soldOut) it.soldOut = true;
         if (b.info) it.info = b.info;
+      // Sample stock stays flagged through a retype, so it can still be removed and still blocks publishing.
+      if (b.sample) it.sample = true;
       }
   }
   x.priceList =

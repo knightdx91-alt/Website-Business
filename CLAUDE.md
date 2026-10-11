@@ -582,7 +582,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   butcher, hardware, feed & seed, thrift / antique, boutique default), each item `MenuItem.sample: true`, appended after any real
   sections (a clashing name gets "(sample)"), kind set when blank, preview rebuilt via `saveAndRefresh`. "Remove sample items" =
   `DELETE` → `removeSampleStock` drops exactly the flagged items, empty sections and sample-only catalog names (a list left with
-  nothing disappears). `detail().sampleStock`; the board shows a 🧪 notice + chip and its saves keep the flag (`ItemsBody.sample`,
+  nothing disappears). `detail().sampleStock`; the same toggle sits on the preview screen (web `viewPreview` → "🧪 Add / Remove sample items" next to Full screen, reloads the frame on /prices/ after ~3.5 s; Android 2.40 `PreviewScreen`); `applyPriceListEdit` keeps the flag through a retype; the board shows a 🧪 notice + chip and its saves keep the flag (`ItemsBody.sample`,
   `applyClientItems`); the feed carries `sample`; the preview's /prices/ page shows a "Sample items." note (preview mode only) and
   render.ts adds the REQUIRED to-do "Remove the sample items from the price list", so `buildSite` in publish mode throws
   "Publish blocked" while any remain; the call guide says "(filled with SAMPLE items …)". Guide "Selling it" + training lesson say
