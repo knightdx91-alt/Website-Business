@@ -33,7 +33,7 @@
   const groupLabel = (id) => ((meta && meta.categories.find((c) => c.id === id)) || {}).label || CATEGORY_LABEL[id] || id;
   const GOOGLE_PER_SEARCH = 0.064; // up to 2 pages of Text Search per search phrase
   const SALES = [["new", "New"], ["callbacks", "Callbacks"], ["activity", "Activity"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
-  const OUTCOME_LABEL = { no_answer: "📵 No answer", reached: "📞 Reached", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested", link_sent: "📲 Preview link texted", signup_sent: "📝 Sent sign-up link", signed: "✍️ Signed up" };
+  const OUTCOME_LABEL = { no_answer: "📵 No answer", reached: "📞 Reached", not_in: "🚪 Owner not in", visited: "🚶 Talked in person", flyer: "📄 Left a flyer", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested", link_sent: "📲 Preview link texted", signup_sent: "📝 Sent sign-up link", signed: "✍️ Signed up" };
   const LOST_REASONS = [["price", "Price"], ["has_someone", "Has someone"], ["no_need", "No need"], ["timing", "Timing"], ["other", "Other"]];
   const NO_CONNECTION = "No connection. Check your signal and try again.";
   const money = (n) => "$" + (Number.isInteger(n) ? n : Number(n).toFixed(2));
@@ -517,7 +517,7 @@
 
   function logCardHtml(l) {
     const current = l.followUp && l.followUp >= dayFromNow(0) ? l.followUp : "";
-    return `<section class="card" id="logcard"><h2>Log this call</h2>
+    return `<section class="card" id="logcard"><h2>Log a call or visit</h2>
       <label class="field">Notes<textarea name="note" rows="3" maxlength="2000" placeholder="Who you talked to, what they said, best time to call…"></textarea></label>
       <div class="field"><span>Call back on <span class="hint">${current ? "Now set for " + esc(dayLabel(current)) : "Not set"}</span></span>
         <div class="chips">${[[1, "Tomorrow"], [3, "In 3 days"], [7, "Next week"]].map(([n, t]) => `<button type="button" class="pick" data-days="${n}">${t}</button>`).join("")}</div>
@@ -526,6 +526,9 @@
       <div class="btns btns--full" id="outcomes">
         <button class="btn" type="button" data-out="no_answer">📵 No answer</button>
         <button class="btn" type="button" data-out="reached">📞 Reached</button>
+        <button class="btn" type="button" data-out="not_in">🚪 Owner not in</button>
+        <button class="btn" type="button" data-out="visited">🚶 Talked in person</button>
+        <button class="btn" type="button" data-out="flyer">📄 Left a flyer</button>
         <button class="btn" type="button" data-out="shown">👍 Interested (shown)</button>
         <button class="btn" type="button" data-out="callback">📅 Call back</button>
         <button class="btn btn--good" type="button" data-out="sold">🎉 Sold</button>
@@ -534,7 +537,7 @@
       <div id="lostwhy" hidden style="margin-top:10px"><p style="margin:0 0 6px"><strong>Why not?</strong> <span class="small muted">Tap one to save.</span></p>
         <div class="chips">${LOST_REASONS.map(([k, t]) => `<button type="button" class="pick" data-why="${k}">${t}</button>`).join("")}<button type="button" class="linkbtn" data-why-cancel>Cancel</button></div></div>
       <p style="margin:10px 0 0"><button class="linkbtn" type="button" data-out="note">Just save a note</button></p>
-      <p class="small muted" style="margin-top:6px">No answer schedules a callback for tomorrow unless you pick a day. Sold and Not interested clear the callback. If they ask not to be called again, tap Not interested.</p></section>`;
+      <p class="small muted" style="margin-top:6px">No answer and Owner not in schedule a callback for tomorrow unless you pick a day. Left a flyer marks them Shown (the flyer has their preview on it). Sold and Not interested clear the callback. If they ask not to be called again, tap Not interested.</p></section>`;
   }
 
   function bindLog(l, after) {
@@ -3075,7 +3078,7 @@
     const lost = d.lostReasons || {};
     const lostTotal = Object.values(lost).reduce((a, b) => a + (Number(b) || 0), 0);
     const table = (rows) => rows.length
-      ? `<table class="stats"><thead><tr><th>Who</th><th>Calls</th><th>Reached</th><th>Interested</th><th>Sold</th></tr></thead><tbody>${rows
+      ? `<table class="stats"><thead><tr><th>Who</th><th>Calls/visits</th><th>Reached</th><th>Interested</th><th>Sold</th></tr></thead><tbody>${rows
           .map((r) => `<tr><th scope="row">${esc(r.person)}</th><td>${r.calls}</td><td>${r.reached}</td><td>${r.interested}</td><td><strong>${r.sold}</strong></td></tr>`).join("")}</tbody></table>`
       : `<p class="muted small">No calls logged yet.</p>`;
     $app.innerHTML = `<h1>Sales</h1>

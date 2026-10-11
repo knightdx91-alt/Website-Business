@@ -110,8 +110,8 @@ const LESSONS: Lesson[] = [
     who: "everyone",
     why: "The team shares one list. If it isn't logged, someone else calls them again tomorrow.",
     steps: [
-      "After each call or visit, tap Log a call on the lead. Pick the outcome: No answer, Reached, Call back, Showed them, Sold, Not interested.",
-      "No answer sets a callback for tomorrow automatically. Call back lets you pick the day. Sold and Not interested clear it.",
+      "After each call or visit, use Log a call or visit on the lead. Phone: No answer, Reached. In person: Owner not in, Talked in person, Left a flyer. Then: Showed them, Call back, Sold, Not interested.",
+      "No answer and Owner not in set a callback for tomorrow automatically. Left a flyer marks them Shown (the flyer carries their preview). Call back lets you pick the day. Sold and Not interested clear it.",
       "Not interested asks why (price, has someone, no need, timing). Pick honestly: it feeds the sales numbers.",
       "Add a one-line note with anything useful: who you spoke to, what they said, what to try next. Everyone on the team gets an alert, and the Activity tab shows it.",
       "Callbacks show on the Today card on the day they're due. Overdue ones float to the top.",

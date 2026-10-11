@@ -10,7 +10,7 @@ function startOf(day: string): number {
   return Date.parse(`${day}T00:00:00-06:00`);
 }
 
-const CALL_OUTCOMES = ["no_answer", "reached", "callback", "shown", "sold", "not_interested"];
+const CALL_OUTCOMES = ["no_answer", "reached", "not_in", "visited", "flyer", "callback", "shown", "sold", "not_interested"];
 
 /** Why a prospect said no: the app logs "not_interested" with a body starting "Reason: <word>". */
 export const LOST_REASONS = ["price", "has_someone", "no_need", "timing", "other"] as const;
@@ -97,7 +97,7 @@ export async function salesDashboard(env: Env) {
       if (n.created_at < since) continue;
       const r = row(n.author);
       r.calls++;
-      if (n.outcome !== "no_answer") r.reached++;
+      if (n.outcome !== "no_answer" && n.outcome !== "not_in") r.reached++;
       if (n.outcome === "callback" || n.outcome === "shown") r.interested++;
     }
     for (const s of sales.results) {

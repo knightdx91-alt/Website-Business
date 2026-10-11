@@ -173,8 +173,9 @@ interface NoteRow {
 }
 
 // link_sent: a preview link was texted or copied (counts as contact, nothing else). reached: someone answered (no status change).
-const OUTCOMES = ["note", "no_answer", "reached", "link_sent", "callback", "shown", "sold", "not_interested"] as const;
-const OUTCOME_STATUS: Partial<Record<(typeof OUTCOMES)[number], LeadRow["sales_status"]>> = { shown: "shown", sold: "sold", not_interested: "not_interested" };
+/** Phone outcomes (no_answer, reached), in-person outcomes (not_in = owner wasn't there, visited = talked in person, flyer = left the preview flyer) and the shared ones. */
+const OUTCOMES = ["note", "no_answer", "reached", "not_in", "visited", "flyer", "link_sent", "callback", "shown", "sold", "not_interested"] as const;
+const OUTCOME_STATUS: Partial<Record<(typeof OUTCOMES)[number], LeadRow["sales_status"]>> = { shown: "shown", sold: "sold", not_interested: "not_interested", flyer: "shown" };
 const PAY_LINK = z.string().trim().url().max(500).refine((u) => u.startsWith("https://"), "Payment links must start with https://");
 const CALLER_NAME = z.string().trim().min(1).max(60).regex(/^[^\u0000-\u001f"\\<>]+$/, "Use letters and spaces only");
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-09");
@@ -1171,12 +1172,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       if (becomesShown) fields.shown_at = now();
       if (input.followUp !== undefined) fields.follow_up = input.followUp;
       else if (becomesShown) Object.assign(fields, autoCallback(lead));
-      else if ((input.outcome === "no_answer" || input.outcome === "reached") && lead.sales_status === "shown") {
+      else if ((input.outcome === "no_answer" || input.outcome === "reached" || input.outcome === "visited" || input.outcome === "not_in") && lead.sales_status === "shown") {
         // Already shown: the next step on the cadence (day 5 text, day 10 walk-in, day 21 last text), dated from the day shown.
         const days = daysSinceShown(lead);
         nextStep = nextCadenceStep(days);
         if (nextStep) fields.follow_up = localDate(Math.max(1, nextStep.day - days));
-      } else if (input.outcome === "no_answer") fields.follow_up = localDate(1);
+      } else if (input.outcome === "no_answer" || input.outcome === "not_in") fields.follow_up = localDate(1);
       else if (input.outcome === "sold" || input.outcome === "not_interested") fields.follow_up = null;
       await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(newId(), id, session.name, input.outcome === "note" ? null : input.outcome, input.note, now())
@@ -1186,6 +1187,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         note: `added a note on ${lead.name}`,
         no_answer: `called ${lead.name}: no answer`,
         reached: `reached ${lead.name}`,
+        not_in: `stopped by ${lead.name}: the owner wasn't in`,
+        visited: `talked to ${lead.name} in person`,
+        flyer: `left a flyer at ${lead.name}`,
         link_sent: `sent ${lead.name} their preview link`,
         callback: `called ${lead.name}: call back ${fields.follow_up ?? ""}`.trim(),
         shown: `called ${lead.name}: they're interested 👍`,

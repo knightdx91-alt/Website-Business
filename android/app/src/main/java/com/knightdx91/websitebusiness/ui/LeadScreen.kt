@@ -211,7 +211,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
 
     fun saveLog() {
         val l = d ?: return
-        val o = outcome ?: return context.toast("Pick how the call went")
+        val o = outcome ?: return context.toast("Pick how it went")
         if (o == "not_interested" && lostReason == null) return context.toast("Pick a reason")
         val body = if (o == "not_interested") "Reason: $lostReason. ${note.trim()}".trim() else note.trim()
         act("log") {
@@ -357,7 +357,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             if (!live) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
-                        Text("Log this call", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Log a call or visit", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             OUTCOME_LABEL.forEach { (k, label) -> FilterChip(selected = outcome == k, onClick = { outcome = k; if (k == "callback" && callback == null) callback = dayFromNow(1); if (k != "not_interested") lostReason = null }, label = { Text(label) }) }
                         }

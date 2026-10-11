@@ -181,6 +181,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Call log: `lead_notes` (outcome + note + author) and `leads.follow_up` (YYYY-MM-DD, Cullman time) via
   `POST /api/leads/:id/log`. "No answer" defaults the callback to tomorrow; Sold/Not interested clear it.
   Home shows "Call back today" (due + overdue). A future callback keeps a lead from expiring, capped at 90 days.
+  In-person outcomes (Oct 2026, Android 2.33): the card is "Log a call or visit" with `not_in` (🚪 Owner not in: callback tomorrow,
+  not counted as reached), `visited` (🚶 Talked in person: like Reached, incl. the cadence next step) and `flyer` (📄 Left a flyer:
+  marks Shown + autoCallback, since the flyer carries the preview). `OUTCOMES` in index.ts, `CALL_OUTCOMES` in sales.ts (the
+  sales table column is "Calls/visits"), `OUTCOME_LABEL` in app.js and Android Format.kt, the training lesson. The walk-in guide
+  (`#/walkin/<id>`, Android WalkinScreen) is the in-person script and carries the same log card.
 - Refunds from the app (2.3, Oct 2026): the lead screen's paid sign-up has "↩ Refund" (owner): `GET /api/signups/:id/refund`
   (`refundable` in tap.ts: the customer's succeeded charges with what's left to refund, the plan subscription) and `POST
   /api/signups/:id/refund {chargeId, amountCents, cancelPlan, reason}` (`refundSignup`: Stripe refund, optional subscription

@@ -221,7 +221,7 @@ private fun SalesTable(rows: List<SalesRow>) {
     Column(Modifier.padding(top = 6.dp)) {
         Row {
             Text("Who", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            listOf("Calls", "Reached", "Interest", "Sold").forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, modifier = num) }
+            listOf("Calls/visits", "Reached", "Interest", "Sold").forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, modifier = num) }
         }
         HorizontalDivider(Modifier.padding(vertical = 4.dp))
         rows.forEach { r ->
