@@ -53,6 +53,7 @@ import com.knightdx91.websitebusiness.ui.RouteScreen
 import com.knightdx91.websitebusiness.ui.SalesScreen
 import com.knightdx91.websitebusiness.ui.HomeScreen
 import com.knightdx91.websitebusiness.ui.TrainingScreen
+import com.knightdx91.websitebusiness.ui.GuideScreen
 import com.knightdx91.websitebusiness.ui.UpdateDialog
 import com.knightdx91.websitebusiness.ui.PreviewScreen
 import com.knightdx91.websitebusiness.ui.LeadScreen
