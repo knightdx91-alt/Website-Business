@@ -949,6 +949,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   app as "Payment test (not a real business)", status ready / shown): every sign-up on it is $1 (`saveOrder` + both sign-up
   paths), no Stripe Checkout (tap or the card sheet only), `activatePlan` starts no subscription and the note says TEST; its
   Buy extras page (open /api/leads/<id>/extraslink while logged in) offers only a $1 item.
+  Since Oct 2026 the test lead (id f043cb5ec556468e) has a real preview: a clone of the Willow & Wren example record + copy
+  (name "Payment test (not a real business)", placeId paytest, phone 256-555-0100, sample stock + scanning on, approved copy,
+  confirmed fields) built locally with `buildSite` the way `renderPreview` does (basePath `/p/<id>`, liveData) and uploaded to R2
+  `previews/<id>/` with `wrangler r2 object put`; record_json / copy_json / look / lint_json set by D1 SQL (scratchpad
+  `build-paytest.mts`). Reset for a fresh run-through: sales_status 'new', signups cleared. Publishing it makes a real Pages
+  project: delete it afterwards.
   Verified end to end in Oct 2026 (checkout → webhook → purchase marked paid → notification); refund it in Stripe after.
 - "Already a client? Add extras" (`/extras` on the company site, `extrasRequest` in company.ts): existing clients pick
   extras and leave business name, name and phone; `findClient` matches a sold/live lead by phone (10 digits) or
