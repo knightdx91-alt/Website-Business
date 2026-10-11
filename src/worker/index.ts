@@ -1285,7 +1285,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await siteUpdated(env, session, lead, ["main photo"]);
       return json(detail((await getLead(env, id))!));
     }
-    // Photo gallery (owner photos, e.g. from the photo shoot extra): up to 12, each owner/<id>/<key>.<ext>.
+    // Photo gallery (owner photos, e.g. from the photo shoot extra, or brought over from their old site): up to 24, each owner/<id>/<key>.<ext>.
     if (action === "/gallery" && m === "POST") {
       if (!lead.record_json || !lead.copy_json) throw new HttpError(409, "This site hasn't finished building yet");
       const type = req.headers.get("content-type") ?? "";
@@ -1294,7 +1294,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const bytes = await req.arrayBuffer();
       if (bytes.byteLength > 8_000_000) throw new HttpError(413, "That photo is over 8 MB");
       const record = JSON.parse(lead.record_json) as BusinessRecord;
-      if (record.media.gallery.length >= 12) throw new HttpError(409, "The gallery holds 12 photos. Remove one first.");
+      if (record.media.gallery.length >= 24) throw new HttpError(409, "The gallery holds 24 photos. Remove one first.");
       const key = `g${newId().slice(0, 10)}`;
       await env.BUCKET.put(`owner/${id}/${key}.${ext}`, bytes, { httpMetadata: { contentType: type } });
       const w = Number(url.searchParams.get("w")) || undefined;

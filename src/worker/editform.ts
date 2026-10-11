@@ -193,7 +193,7 @@ export function editForm(l: EditDetail): EditForm {
     galleryFields.push(sel(`gpair_${key}`, "Before/after", p.pairWith || "", [["", "Not a “before” photo"], ...gallery.filter((o) => o !== p).map((o): [string, string] => [photoKey(o.src), `This is the BEFORE of: ${o.caption || o.alt || photoKey(o.src)}`])]));
   }
   card("gallery", "Photo gallery", [
-    note("Up to 12 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site. Captions show under the photo (“Patio, Hanceville”); pick a photo's “after” to show the two side by side."),
+    note("Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site. Captions show under the photo (“Patio, Hanceville”); pick a photo's “after” to show the two side by side."),
     ...galleryFields,
   ], { kind: "gallery", gallery: gallery.map((p) => ({ key: photoKey(p.src), src: p.src, alt: p.alt || "", caption: p.caption || "", town: p.town || "", pairWith: p.pairWith || "" })) });
 
@@ -348,6 +348,15 @@ export function editForm(l: EditDetail): EditForm {
       cb("rtPricesPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", pl.public !== false),
       note("One item per line: Name | $Price | Note. Start a section with # Section name (one per tank, shelf or rack). Each section gets a QR label on the printable sheet (Live lead → QR price tags). A price change here is a price change on the shelf."),
     );
+    const plItems: AnyRecord[] = (pl.sections || []).flatMap((sc: AnyRecord) => sc.items).slice(0, 120);
+    const plPhotos: AnyRecord[] = gallery.filter((g) => g.source !== "google");
+    if (plItems.length && plPhotos.length) {
+      f.push(h3(`Item photos (${plItems.length} items)`), note("A gallery photo per item shows on the price list next to the price. Photos whose caption names the item are picked automatically; change any here."));
+      plItems.forEach((it, i) => {
+        f.push({ type: "hidden", name: `pi_name_${i}`, value: it.name });
+        f.push(sel(`pi_img_${i}`, it.name, it.image?.src || "", [["", "No photo"], ...plPhotos.map((g, gi): [string, string] => [g.src, `Photo ${gi + 1}: ${g.alt}`])]));
+      });
+    }
     if (f.length) card("retail", "Shop details", f);
   }
 
@@ -770,6 +779,9 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
     if (has("rtDropDay")) { out.dropDay = v("rtDropDay"); out.occasions = lines("rtOcc2"); }
     if (has("rtHold")) out.holdNote = v("rtHold");
     if (has("rtPriceList")) { out.priceListText = v("rtPriceList") || ""; out.priceListTitle = v("rtPriceTitle") || ""; out.pricesPublic = !!on("rtPricesPublic"); }
+    const pi: AnyRecord[] = [];
+    for (let i = 0; i < 120; i++) { const name = v(`pi_name_${i}`); if (!name) break; pi.push({ name, image: v(`pi_img_${i}`) ?? "" }); }
+    if (pi.length) out.priceItems = pi;
     retail = clean(out);
   }
 

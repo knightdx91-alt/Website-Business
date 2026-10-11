@@ -1,10 +1,10 @@
 import { action, actions, donationsOn, type ActionId } from "../actions.ts";
-import { about, announcements, button, contactForm, ctaBand, factList, faq, gallery, hero, infoStrip, reviews, sectionHead, serviceList, todo, visit, type Ctx } from "../components.ts";
+import { about, announcements, button, contactForm, ctaBand, factList, faq, gallery, hero, imageTag, infoStrip, reviews, sectionHead, serviceList, todo, visit, type Ctx } from "../components.ts";
 import type { PageSpec } from "./types.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html, raw, type Raw } from "../html.ts";
 import { icon } from "../icons.ts";
-import type { BusinessRecord, Faq, RetailDonations, RetailExt, Service } from "../types.ts";
+import type { BusinessRecord, Faq, Image, MenuSection, RetailDonations, RetailExt, Service } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
 /** research/retail-shops.md §10, checked in order; Google has no antique or feed-store type, so names decide those. */
@@ -226,6 +226,26 @@ export function retailBannedPhrases(r: BusinessRecord): RegExp[] {
 
 export const sectionSlug = (name: string) => name.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "section";
 
+/**
+ * Gives price-list items a photo from the gallery when a photo's alt text names the item ("Neon tetra" ↔ "neon tetra school")
+ * and the item has none yet. Used after photos come over from their old site and after the list is saved. Returns how many.
+ */
+export function autoMatchPhotos(sections: MenuSection[], photos: Image[]): number {
+  const usable = photos.filter((p) => p.source !== "google" && p.alt);
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  let n = 0;
+  for (const sec of sections) {
+    for (const it of sec.items) {
+      if (it.image) continue;
+      const name = norm(it.name);
+      if (name.length < 4) continue;
+      const hit = usable.find((p) => { const a = norm(p.alt); return a === name || a.includes(name) || (a.length >= 6 && name.includes(a)); });
+      if (hit) { it.image = hit; n++; }
+    }
+  }
+  return n;
+}
+
 /** The price list page, sections with anchors the QR labels point at. Private lists are noindex and unlinked. */
 export function pricesPage(ctx: Ctx): PageSpec | null {
   const r = ctx.r;
@@ -236,7 +256,11 @@ export function pricesPage(ctx: Ctx): PageSpec | null {
   const body = html`<nav class="menu-nav" aria-label="${title} sections">${pl.sections.map((s) => html`<a href="#sec-${sectionSlug(s.name)}">${s.name}</a>`)}</nav>
 ${pl.sections.map(
     (s) => html`<section class="menu-sec" id="sec-${sectionSlug(s.name)}" aria-labelledby="sec-${sectionSlug(s.name)}-t"><h2 id="sec-${sectionSlug(s.name)}-t">${s.name}</h2>${s.note ? html`<p class="muted">${s.note}</p>` : ""}
-<ul class="menu-items">${s.items.map((it) => html`<li class="menu-item"><div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${it.description ? html`<p>${it.description}</p>` : ""}</li>`)}</ul></section>`,
+<ul class="menu-items">${s.items.map((it) => {
+      const img = it.image && (ctx.mode === "preview" || it.image.source !== "google") ? it.image : undefined;
+      const row = html`<div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${it.description ? html`<p>${it.description}</p>` : ""}`;
+      return img ? html`<li class="menu-item menu-item--photo">${imageTag(img, { cls: "menu-item__img" })}<div>${row}</div></li>` : html`<li class="menu-item">${row}</li>`;
+    })}</ul></section>`,
   )}
 <p class="muted">Prices as of ${pl.lastUpdated}. Stock and prices change with new arrivals; call to check before you drive over.</p>`;
   return {

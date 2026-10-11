@@ -3,6 +3,7 @@ import { z } from "zod";
 import { menuToText, parseMenuText } from "../generator/menu.ts";
 import { parsePrice } from "../generator/price.ts";
 import { packFor } from "../generator/packs/index.ts";
+import { autoMatchPhotos } from "../generator/packs/retail.ts";
 import { AUTO_AMENITY_IDS, PARTS_COUNTER } from "../generator/packs/auto.ts";
 import { CLEANING_FACILITIES } from "../generator/packs/cleaning.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
@@ -234,6 +235,8 @@ export const EditsSchema = z.object({
           priceListText: z.string().max(20_000),
           priceListTitle: z.string().trim().max(40),
           pricesPublic: z.boolean(),
+          /** Per-item photo (a gallery file) matched by item name; "" clears. */
+          priceItems: z.array(z.object({ name: z.string().trim().min(1).max(120), image: z.string().trim().max(200).optional() })).max(300),
         })
         .partial()
         .optional(),
@@ -406,7 +409,7 @@ function applyFsrpEdits(r: BusinessRecord, e: NonNullable<Edits["record"]>): voi
   }
   if (r.category === "retail" && e.retail) {
     const x = (r.ext.retail = r.ext.retail ?? {});
-    const { florist, vendors, financing, priceListText, priceListTitle, pricesPublic, ...rest } = e.retail;
+    const { florist, vendors, financing, priceListText, priceListTitle, pricesPublic, priceItems, ...rest } = e.retail;
     if (priceListText !== undefined || priceListTitle !== undefined || pricesPublic !== undefined) {
       const prev = x.priceList;
       const sections = priceListText !== undefined ? parseMenuText(priceListText) : (prev?.sections ?? []);
@@ -419,6 +422,20 @@ function applyFsrpEdits(r: BusinessRecord, e: NonNullable<Edits["record"]>): voi
             public: pricesPublic ?? prev?.public ?? true,
           }
         : undefined;
+      // Retyping the list loses nothing: photos follow items of the same name, then unmatched items try the gallery's alt text.
+      if (x.priceList && prev) {
+        const before = new Map(prev.sections.flatMap((sc) => sc.items).filter((i) => i.image).map((i) => [i.name.toLowerCase(), i.image!]));
+        for (const sc of x.priceList.sections) for (const it of sc.items) if (!it.image && before.has(it.name.toLowerCase())) it.image = before.get(it.name.toLowerCase());
+      }
+      if (x.priceList) autoMatchPhotos(x.priceList.sections, r.media.gallery);
+    }
+    if (priceItems && x.priceList) {
+      const gallery = new Map(r.media.gallery.filter((g) => g.source !== "google").map((g) => [g.src, g]));
+      const wanted = new Map(priceItems.map((m) => [m.name.toLowerCase(), m]));
+      for (const sc of x.priceList.sections) for (const it of sc.items) {
+        const m = wanted.get(it.name.toLowerCase());
+        if (m && m.image !== undefined) it.image = m.image && gallery.has(m.image) ? gallery.get(m.image) : undefined;
+      }
     }
     for (const [k, v] of Object.entries(rest)) (x as unknown as Record<string, unknown>)[k] = v === "" || (Array.isArray(v) && !v.length) ? undefined : v;
     if (florist !== undefined) {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildSite } from "../../src/generator/render.ts";
 import { parseMenuText } from "../../src/generator/menu.ts";
-import { pricesPage, sectionSlug } from "../../src/generator/packs/retail.ts";
+import { autoMatchPhotos, pricesPage, sectionSlug } from "../../src/generator/packs/retail.ts";
 import { priceTagsPdf } from "../../src/worker/cards.ts";
 import { applyEdits } from "../../src/worker/edits.ts";
 import { categoryRecord, sampleCopy } from "../fixtures.ts";
@@ -64,4 +64,26 @@ test("the QR price tag sheet is a PDF with one label per section and a page per 
   assert.match(text, /^%PDF/);
   assert.equal((text.match(/\/Type \/Page\b/g) ?? []).length, 2);
   assert.equal(sectionSlug("Freshwater & Community"), "freshwater-and-community");
+});
+
+test("items get photos: matched from gallery captions automatically, shown on the price page, and kept when the list is retyped", async () => {
+  const record = shop();
+  record.media.gallery = [
+    { src: "/assets/owner/s1.jpg", alt: "Neon tetra school in the community tank", source: "site" },
+    { src: "/assets/owner/s2.jpg", alt: "Store front", source: "site" },
+  ];
+  const sections = parseMenuText(LIST);
+  assert.equal(autoMatchPhotos(sections, record.media.gallery), 1);
+  assert.equal(sections[0]!.items[0]!.image?.src, "/assets/owner/s1.jpg");
+  record.confirmed = [...record.confirmed, "site_photos"];
+  record.ext.retail = { ...(record.ext.retail ?? {}), priceList: { sections, lastUpdated: "October 11, 2026", public: true } };
+  const out = await buildSite({ record, copy: approved(), site: site("retail.mercantile~classic"), mode: "publish" });
+  assert.match(file(out, "prices/index.html"), /menu-item--photo[\s\S]*s1\.jpg/);
+  const retyped = applyEdits(record, approved(), { record: { retail: { priceListText: LIST + "\nCardinal tetra | $3.49" } } } as never).record;
+  const items = retyped.ext.retail!.priceList!.sections.flatMap((s) => s.items);
+  assert.equal(items.find((i) => i.name === "Neon tetra")?.image?.src, "/assets/owner/s1.jpg", "photo follows the item through a retype");
+  const picked = applyEdits(retyped, approved(), { record: { retail: { priceItems: [{ name: "Cardinal tetra", image: "/assets/owner/s2.jpg" }, { name: "Neon tetra", image: "" }] } } } as never).record;
+  const after = picked.ext.retail!.priceList!.sections.flatMap((s) => s.items);
+  assert.equal(after.find((i) => i.name === "Cardinal tetra")?.image?.src, "/assets/owner/s2.jpg");
+  assert.equal(after.find((i) => i.name === "Neon tetra")?.image, undefined);
 });

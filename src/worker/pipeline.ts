@@ -12,6 +12,7 @@ import { groupById, MARKET } from "../places/queries.ts";
 import { qualify, scorePlace } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
 import { applySiteFacts, fetchSitePhotos, importSite } from "../places/site-import.ts";
+import { autoMatchPhotos } from "../generator/packs/retail.ts";
 import { websiteProblem } from "../places/site-check.ts";
 import { placeToRecord, reviewTexts } from "../places/to-record.ts";
 import { addUsage, getLead, getSettings, MODEL_PRICES, updateLead, type LeadRow } from "./db.ts";
@@ -121,15 +122,15 @@ export function dnaHints(record: BusinessRecord): DnaHints {
 
 /**
  * Their own photos from their current website → R2 `owner/<id>/s<n>.<ext>` and the record: the first becomes the hero when the
- * record only has a Google photo (which may never go live), the rest fill the gallery up to 12. Earlier site photos are
+ * record only has a Google photo (which may never go live), the rest fill the gallery up to 24. Earlier site photos are
  * replaced (the owner may have deleted some on purpose: only runs when none are left, or on a rewrite). Owner-uploaded
  * photos are never touched. Publishing still needs the owner's "these are ours" tick (confirmed `site_photos`).
  */
 export async function importSitePhotos(env: Env, leadId: string, record: BusinessRecord, images: Array<{ src: string; alt?: string }>): Promise<number> {
   if (!images.length || record.category === "church") return 0;
   const keep = (i: { source: string } | undefined) => !!i && i.source !== "site";
-  const room = 12 - record.media.gallery.filter(keep).length;
-  const photos = await fetchSitePhotos(images, Math.max(0, Math.min(6, room + 1)));
+  const room = 24 - record.media.gallery.filter(keep).length;
+  const photos = await fetchSitePhotos(images, Math.max(0, Math.min(12, room + 1)));
   if (!photos.length) return 0;
   const old = await env.BUCKET.list({ prefix: `owner/${leadId}/s` });
   await Promise.all(old.objects.map((o) => env.BUCKET.delete(o.key)));
@@ -140,7 +141,7 @@ export async function importSitePhotos(env: Env, leadId: string, record: Busines
     await env.BUCKET.put(`owner/${leadId}/${key}.${ph.ext}`, ph.bytes, { httpMetadata: { contentType: ph.type } });
     const img = { src: `/assets/owner/${key}.${ph.ext}`, alt: ph.alt?.slice(0, 150) || `Photo from ${record.name}`, source: "site" as const };
     if (n === 0 && (!record.media.hero || record.media.hero.source === "google")) record.media.hero = img;
-    else if (record.media.gallery.length < 12) record.media.gallery.push(img);
+    else if (record.media.gallery.length < 24) record.media.gallery.push(img);
     n++;
   }
   return n;
@@ -210,7 +211,7 @@ export async function runBuild(env: Env, job: Extract<Job, { type: "build" }>): 
       if (found) {
         record.existingSite = found;
         applySiteFacts(record, found);
-        await importSitePhotos(env, lead.id, record, found.images);
+        if ((await importSitePhotos(env, lead.id, record, found.images)) && record.ext.retail?.priceList) autoMatchPhotos(record.ext.retail.priceList.sections, record.media.gallery);
       }
     }
 

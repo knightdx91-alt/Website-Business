@@ -1064,7 +1064,7 @@
   }
   function galleryCardHtml(id, r) {
     return `<section class="card" id="card-gallery"><h2>Photo gallery</h2>
-        <p class="small muted">Up to 12 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site.</p>
+        <p class="small muted">Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site.</p>
         ${r.media.gallery.length ? `<ul class="thumbs" style="grid-template-columns:1fr">${r.media.gallery.map((p) => { const key = photoKey(p.src); return `<li style="text-align:left"><div class="row" style="align-items:flex-start"><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy" style="width:88px;flex:none"><div style="flex:1;min-width:0"><div class="row"><label class="field">Caption<input name="gcap_${esc(key)}" maxlength="80" value="${esc(p.caption || "")}" placeholder="Patio"></label><label class="field">Town<input name="gtown_${esc(key)}" maxlength="40" value="${esc(p.town || "")}" placeholder="Hanceville"></label></div>
             <label class="field">Before/after<select name="gpair_${esc(key)}"><option value="">Not a “before” photo</option>${r.media.gallery.filter((o) => o !== p).map((o) => { const ok = photoKey(o.src); return `<option value="${esc(ok)}"${p.pairWith === ok ? " selected" : ""}>This is the BEFORE of: ${esc(o.caption || o.alt || ok)}</option>`; }).join("")}</select></label>
             <button class="linkbtn" type="button" data-eact="delphoto" data-photo="${esc(key)}">Remove</button></div></div></li>`; }).join("")}</ul>
@@ -2400,7 +2400,27 @@
       <div class="row"><label class="field">Page title<input name="rtPriceTitle" maxlength="40" value="${esc((x.priceList && x.priceList.title) || "")}" placeholder="Fish & prices"></label></div>
       ${cb("rtPricesPublic", "Show the price list to Google and in the site menu (off = only reachable from the QR labels)", !x.priceList || x.priceList.public !== false)}
       <p class="small muted">Each section gets a QR label on the printable sheet (Live lead → QR price tags). A price change here is a price change on the shelf.</p>
+      ${priceItemsEditHtml(r, x)}
     </section>`;
+  }
+  function priceItemsEditHtml(r, x) {
+    const items = (((x.priceList || {}).sections) || []).flatMap((s) => s.items).slice(0, 120);
+    const photos = (r.media.gallery || []).filter((g) => g.source !== "google");
+    if (!items.length || !photos.length) return "";
+    const opt = (it) => photos.map((g, i) => `<option value="${esc(g.src)}"${it.image && it.image.src === g.src ? " selected" : ""}>Photo ${i + 1}: ${esc(g.alt)}</option>`).join("");
+    return `<details class="more"><summary>Item photos (${items.length} items)</summary>
+      <p class="small muted">A gallery photo per item shows on the price list next to the price. Photos whose caption names the item are picked automatically; change any here.</p>
+      ${items.map((it, i) => `<label class="field" style="margin-bottom:6px">${esc(it.name)}<input type="hidden" name="pi_name_${i}" value="${esc(it.name)}"><select name="pi_img_${i}"><option value="">No photo</option>${opt(it)}</select></label>`).join("")}
+    </details>`;
+  }
+  function priceItemsEditValues(f) {
+    const out = [];
+    for (let i = 0; i < 120; i++) {
+      const name = fsVal(f, `pi_name_${i}`);
+      if (!name) break;
+      out.push({ name, image: fsVal(f, `pi_img_${i}`) || "" });
+    }
+    return out;
   }
   function priceListText(sections) {
     return sections.map((s) => ["# " + s.name].concat(s.items.map((i) => [i.name, i.price || "", i.description || ""].join(" | ").replace(/( \| )+$/, ""))).join("\n")).join("\n\n");
@@ -2415,6 +2435,8 @@
     if (f.elements.rtDropDay) { out.dropDay = fsVal(f, "rtDropDay"); out.occasions = fsLines(f, "rtOcc2"); }
     if (f.elements.rtHold) out.holdNote = fsVal(f, "rtHold");
     if (f.elements.rtPriceList) { out.priceListText = fsVal(f, "rtPriceList") || ""; out.priceListTitle = fsVal(f, "rtPriceTitle") || ""; out.pricesPublic = !!fsOn(f, "rtPricesPublic"); }
+    const pi = priceItemsEditValues(f);
+    if (pi.length) out.priceItems = pi;
     return fsClean(out);
   }
 

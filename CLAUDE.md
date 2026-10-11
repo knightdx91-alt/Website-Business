@@ -342,9 +342,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   container's proxy blocks many outside sites, so test the fetch from the Worker, not here. `test/site-import.test.ts`.
   Photos too: `extractImages()` keeps their own `<img>`s (src / data-src / largest srcset; GoDaddy `/:/rs=…` resize suffix
   dropped; logos, icons, pixels, and builder stock paths like `/isteam/stock/`, unsplash, pexels, shutterstock skipped; ≤ 12),
-  `fetchSitePhotos()` downloads up to 6 (jpeg/png/webp, 25 KB–8 MB), `importSitePhotos()` in pipeline.ts stores them at
+  `fetchSitePhotos()` downloads up to 12 (jpeg/png/webp, 25 KB–8 MB), `importSitePhotos()` in pipeline.ts stores them at
   `owner/<id>/s<n>.<ext>` with `source: "site"`: the first becomes the hero when the record only has a Google photo, the rest
-  fill the gallery to 12; re-imported on rewrite or when none are left, owner uploads untouched, never for churches.
+  fill the gallery to 24; re-imported on rewrite or when none are left, owner uploads untouched, never for churches.
   Publishing needs `confirmed` **`site_photos`** ("Photos from their old website are theirs (not the site builder's stock)",
   Confirm card on web + editform) or the preview shows a REQUIRED to-do (render.ts `withExtras`).
 - Pages elsewhere (Oct 2026, `src/places/web-presence.ts`, migration 0016 `leads.found_url`): Google only reports the website linked
@@ -485,7 +485,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   /api/leads/:id/pricetags.pdf` (owner, live sites) = `priceTagsPdf()` in cards.ts, Letter sheets of 8 labels (2 × 4,
   3.75 × 2.5 in), one per section, QR → that section. Buttons "QR price tags" on the Live card (web + Android, retail only).
   Extra "QR price tags & shelf labels" $49 each (DEFAULT_ADDONS + live Settings + `STANDARD_EXTRA_TERMS`); the page itself is
-  included in every plan. Call guide mentions it (`pitch.ts`). `test/price-list.test.ts`.
+  included in every plan. Call guide mentions it (`pitch.ts`). `test/worker/price-list.test.ts`. Items carry a photo
+  (`MenuItem.image`, a gallery file, rendered `menu-item--photo` on /prices/): `autoMatchPhotos()` pairs gallery captions
+  with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
+  and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
 - Thrift donations (retail pack, `ext.retail.donations`, Oct 2026): on by default for `thrift` (`donationsOn` in actions.ts), any shop can
   turn it on in Edit → "Donations" (`donationsEditCard`). Section #donations after What's new: intro `note`, "We gladly take" /
   "We can't take" chips (`accepts` / `doesNotAccept`), `dropOffHours`, nonprofit `receipts` line, and with `pickup` a "Request a furniture
