@@ -76,6 +76,7 @@ import com.knightdx91.websitebusiness.net.deleteLead
 import com.knightdx91.websitebusiness.net.deleteNote
 import com.knightdx91.websitebusiness.net.domain
 import com.knightdx91.websitebusiness.net.extrasLink
+import com.knightdx91.websitebusiness.net.clientLink
 import com.knightdx91.websitebusiness.net.fill
 import com.knightdx91.websitebusiness.net.flyerLeft
 import com.knightdx91.websitebusiness.net.leadFull
@@ -604,6 +605,20 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                                 }
                                 Text("They buy the domain (about $10–15 a year, at Cloudflare, GoDaddy or Namecheap), then add it here.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
                             }
+                        }
+                    }
+                }
+            }
+
+            // ---- tank board (retail) ----
+            if (ready && l.category == "retail") item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("🐠 Tank board", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Their own page for what's in each tank (or on each shelf): name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it.", style = MaterialTheme.typography.bodySmall, color = muted)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
+                            OutlinedButton(onClick = { act("clientlink") { val (_, text) = state.api.clientLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them their tank board link") }
+                            OutlinedButton(onClick = { act("clientopen") { val (url, _) = state.api.clientLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open it here") }
                         }
                     }
                 }

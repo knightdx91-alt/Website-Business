@@ -19,6 +19,7 @@ import { guessCategory, isChain, scorePlace, webPresence, type WebPresence } fro
 import { resolvePresence } from "../places/web-presence.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
 import { LAST_ANNOUNCE_KEY, TICK_KEY, announceUpdate, fcmClientConfig, serviceAccount, serviceAccountProblem } from "./fcm.ts";
+import { clientLink, republishDirty, servePhoto, servePricesFeed, serveTankBoard } from "./tankboard.ts";
 import { addCaller, checkPassword, clearCookie, extrasToken, getSession, hasOwner, listCallers, loginAllowed, pruneLoginFailures, recordLoginFailure, removeCaller, sessionCookie, sessionToken, setupOwner, shareToken, signupToken, updateCaller, verifyExtras, verifyShare, verifySignup, type Session } from "./auth.ts";
 import { previewFlyer, reviewCards, tableTents, windowSign, previewFlyerPdf, reviewCardsPdf, tableTentsPdf, windowSignPdf, priceTagsPdf } from "./cards.ts";
 import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
@@ -877,7 +878,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const action = leadMatch[2] ?? "";
     const sub = leadMatch[3];
     const lead: LeadRow = await requireLead(env, id);
-    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/signups", "/flyer", "/extraslink", "/contact"].includes(action) || (action === "/flyer.pdf" && m === "GET");
+    const callerSafe = (action === "" && m === "GET") || ["/status", "/share", "/pitch", "/log", "/notes", "/followup", "/signup", "/signups", "/flyer", "/extraslink", "/contact", "/clientlink"].includes(action) || (action === "/flyer.pdf" && m === "GET");
     if (!callerSafe) ownerOnly();
 
     if (action === "" && m === "GET") {
@@ -1364,6 +1365,14 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await siteUpdated(env, session, lead, ["details from their website"]);
       return json({ ok: true, paragraphs: facts.paragraphs.length, headings: facts.headings.length, images: facts.images.length, photos, notices: facts.notices, foundedYear: facts.foundedYear ?? null, email: facts.emails[0] ?? null });
     }
+    if (action === "/clientlink" && m === "POST") {
+      // Tank board: the client's own live price-list editor (retail only; see tankboard.ts).
+      if (lead.category !== "retail") throw new HttpError(409, "The tank board is for shops with a price list");
+      const link = await clientLink(env, lead, url.origin);
+      const text = `Hi! Here's your ${lead.name} tank board: ${link}  Open it on your phone, bookmark it, and change what's in each tank any time. Prices and "sold out" show on your website within a minute.`;
+      await notify(env, { kind: "status", actor: session, leadId: lead.id, text: `${session.name} sent ${lead.name} their tank board link` });
+      return json({ url: link, text });
+    }
     if (action === "/rewrite" && m === "POST") {
       await updateLead(env, id, { rewrite: 1, status: "queued" });
       await env.JOBS.send({ type: "build", leadId: id });
@@ -1584,6 +1593,10 @@ export default {
         if (!rest) return Response.redirect(`${url.origin}/s/${token}/`, 301);
         return await serveShared(env, req, leadId, token, rest);
       }
+      const client = /^\/c\/([a-z0-9]+)\.([A-Za-z0-9_-]+)(\/.*)?$/.exec(url.pathname);
+      if (client) return await serveTankBoard(env, req, client[1]!, client[2]!, client[3] ?? "", url.origin);
+      const live = /^\/l\/([a-z0-9]+)\/(prices\.json|photo\/([A-Za-z0-9_.-]+))$/.exec(url.pathname);
+      if (live) return live[2] === "prices.json" ? await servePricesFeed(env, live[1]!, url.origin) : await servePhoto(env, live[1]!, live[3]!);
       if (url.pathname === "/.well-known/assetlinks.json") return json(ASSET_LINKS, 200, { "cache-control": "public, max-age=3600" });
       const signup = /^\/a\/([a-z0-9]+)\.(basic|plus|pro)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(url.pathname);
       if (signup && (req.method === "GET" || req.method === "POST")) {
@@ -1638,6 +1651,7 @@ export default {
     if (event.cron === CRON_MINUTE) {
       // A new Android build in R2 → one push to every phone (no-op without the Firebase secret).
       await announceUpdate(env);
+      await republishDirty(env);
       return;
     }
     if (event.cron === CRON_WEEKLY_BACKUP) {

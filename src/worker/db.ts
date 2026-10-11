@@ -15,6 +15,10 @@ export interface LeadRow {
   reason: string | null;
   /** A page the web-presence check found (their unlinked site, or a page on a parent site). */
   found_url?: string | null;
+  /** Tank board (migration 0018): signs the client's link; null until first sent. A new key revokes old links. */
+  client_key?: string | null;
+  /** 1 after a client edit on a live site: the minute cron republishes and clears it. */
+  prices_dirty?: number | null;
   score: number;
   status: "queued" | "building" | "ready" | "failed" | "expired";
   sales_status: "new" | "shown" | "sold" | "live" | "not_interested";

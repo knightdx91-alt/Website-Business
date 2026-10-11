@@ -12,6 +12,8 @@ export interface Ctx {
   copy: Copy;
   theme: Theme;
   mode: BuildMode;
+  /** Where the price page fetches live stock from (`/l/<lead>/prices.json`), so tank-board edits show without a rebuild. */
+  liveData?: string;
   site: Site;
   /** Required owner to-dos. Rendered in previews; publish fails while any exist. */
   todos: string[];

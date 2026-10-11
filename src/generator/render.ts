@@ -19,6 +19,8 @@ export interface BuildInput {
   mode: BuildMode;
   formEndpoint?: string;
   statsEndpoint?: string;
+  /** Live price-list feed URL for the /prices/ page (tank board); relative in previews, absolute on published sites. */
+  liveData?: string;
   reviewTexts?: string[];
   /** Returns the bytes of an @fontsource woff2 file. Omit to leave fonts out (previews serve them separately). */
   loadFont?: (pkg: string, file: string) => Promise<Uint8Array>;
@@ -137,6 +139,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     suggestions: [],
     formEndpoint: input.formEndpoint,
     statsEndpoint: input.mode === "publish" ? input.statsEndpoint : undefined,
+    liveData: input.liveData,
     hasForm: pack.hasForm(input.record),
     credit: input.mode === "publish" ? input.credit : undefined,
     reviewsAllowed: pack.reviewsAllowed?.(input.record) ?? true,

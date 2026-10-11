@@ -870,6 +870,9 @@
           <button class="btn btn--good" data-act="publish"${blockers.length ? " disabled" : ""}>${l.liveUrl ? "Republish changes" : "Publish to Cloudflare"}</button>
           <button class="btn" data-act="zip"${blockers.length ? " disabled" : ""}>Download zip</button>
         </div></section>` : ""}
+      ${ready && l.category === "retail" ? `<section class="card"><h2>🐠 Tank board</h2>
+        <p class="muted small">Their own page for what's in each tank (or on each shelf): name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it.</p>
+        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their tank board link</button><button class="btn" type="button" data-clientlink="open">Open it here</button></div></section>` : ""}
       ${owner ? `<section class="card"><h2>More</h2><div class="btns">
         ${ready ? `<button class="btn btn--small" data-act="rewrite">Rewrite text with AI</button>` : ""}
         ${l.salesStatus !== "live" ? `<button class="btn btn--small btn--danger" data-act="delete">Delete lead</button>` : ""}
@@ -2672,6 +2675,14 @@
   }
 
   function bindReviewAsk(l) {
+    $app.querySelectorAll("[data-clientlink]").forEach((cb) => cb.addEventListener("click", async () => {
+      cb.disabled = true;
+      try {
+        const { url, text } = await api(`/leads/${l.id}/clientlink`, { method: "POST" });
+        if (cb.dataset.clientlink === "open") window.open(url, "_blank", "noopener");
+        else location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(text)}`;
+      } catch (err) { toast(err.message); } finally { cb.disabled = false; }
+    }));
     const xb = $app.querySelector("[data-extraslink]");
     if (xb) xb.addEventListener("click", async () => {
       xb.disabled = true;

@@ -177,6 +177,9 @@ suspend fun Api.setPaid(id: String, signupId: String, paid: Boolean): JSONObject
 /** A 30-day "Buy extras" link for a sold/live client. */
 suspend fun Api.extrasLink(id: String): String = postJson("/leads/$id/extraslink").optString("url")
 
+/** Tank board: the client's own live price-list editor (retail). Returns the link and a ready-to-send text. */
+suspend fun Api.clientLink(id: String): Pair<String, String> = postJson("/leads/$id/clientlink").let { it.optString("url") to it.optString("text") }
+
 suspend fun Api.clearFollowUp(id: String): JSONObject = putJson("/leads/$id/followup", JSONObject().put("date", JSONObject.NULL))
 suspend fun Api.deleteNote(id: String, noteId: String) { deleteJson("/leads/$id/notes/$noteId") }
 

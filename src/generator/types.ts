@@ -107,6 +107,9 @@ export interface MenuItem {
   description?: string;
   price?: string;
   tags?: MenuTag[];
+  /** Price lists (tank board): how many are in (blank = not counted) and whether it's gone for now (hidden on the page, kept on the board). */
+  qty?: number;
+  soldOut?: boolean;
   /** An owner photo (one of the gallery files); Google photos never go on menu items. */
   image?: Image;
 }

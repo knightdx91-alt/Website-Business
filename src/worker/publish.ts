@@ -43,6 +43,7 @@ async function buildForPublish(env: Env, lead: LeadRow, appOrigin: string, siteO
       mode: "publish",
       formEndpoint: `${appOrigin}/f/${lead.id}`,
       statsEndpoint: `${appOrigin}/t/${lead.id}`,
+      liveData: `${appOrigin}/l/${lead.id}/prices.json`,
       // Same check as previews: testimonials pasted from Google reviews are caught before they go live.
       reviewTexts: lead.place_json ? reviewTexts(JSON.parse(lead.place_json) as Place) : [],
       loadFont: await loadFontFrom(env, appOrigin),

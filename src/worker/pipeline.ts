@@ -178,6 +178,7 @@ export async function renderPreview(env: Env, lead: LeadRow, record: BusinessRec
     mode: "preview",
     basePath: `/p/${lead.id}`,
     reviewTexts: place ? reviewTexts(place) : [],
+    liveData: `/l/${lead.id}/prices.json`,
   });
   await Promise.all(
     [...out.files].map(([path, content]) =>

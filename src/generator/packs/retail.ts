@@ -253,16 +253,19 @@ export function pricesPage(ctx: Ctx): PageSpec | null {
   if (!pl?.sections.length) return null;
   const title = pl.title?.trim() || "Prices";
   const call = action(r, "call")!;
-  const body = html`<nav class="menu-nav" aria-label="${title} sections">${pl.sections.map((s) => html`<a href="#sec-${sectionSlug(s.name)}">${s.name}</a>`)}</nav>
-${pl.sections.map(
+  const shown = pl.sections.map((s) => ({ ...s, items: s.items.filter((it) => !it.soldOut && it.qty !== 0) })).filter((s) => s.items.length);
+  const qtyNote = (it: { qty?: number }) => (it.qty !== undefined && it.qty > 0 && it.qty <= 5 ? `${it.qty} left` : "");
+  const body = html`<div id="prices-live"${ctx.liveData ? raw(` data-live="${ctx.liveData}"`) : ""}><nav class="menu-nav" aria-label="${title} sections">${shown.map((s) => html`<a href="#sec-${sectionSlug(s.name)}">${s.name}</a>`)}</nav>
+${shown.map(
     (s) => html`<section class="menu-sec" id="sec-${sectionSlug(s.name)}" aria-labelledby="sec-${sectionSlug(s.name)}-t"><h2 id="sec-${sectionSlug(s.name)}-t">${s.name}</h2>${s.note ? html`<p class="muted">${s.note}</p>` : ""}
 <ul class="menu-items">${s.items.map((it) => {
       const img = it.image && (ctx.mode === "preview" || it.image.source !== "google") ? it.image : undefined;
-      const row = html`<div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${it.description ? html`<p>${it.description}</p>` : ""}`;
+      const note = [it.description, qtyNote(it)].filter(Boolean).join(" · ");
+      const row = html`<div class="menu-item__row"><span>${it.name}</span><span class="dots" aria-hidden="true"></span>${it.price ? html`<span>${it.price}</span>` : ""}</div>${note ? html`<p>${note}</p>` : ""}`;
       return img ? html`<li class="menu-item menu-item--photo">${imageTag(img, { cls: "menu-item__img" })}<div>${row}</div></li>` : html`<li class="menu-item">${row}</li>`;
     })}</ul></section>`,
-  )}
-<p class="muted">Prices as of ${pl.lastUpdated}. Stock and prices change with new arrivals; call to check before you drive over.</p>`;
+  )}</div>
+<p class="muted">Updated <span data-live-updated>${pl.lastUpdated}</span>. Stock and prices change with new arrivals; call to check before you drive over.</p>`;
   return {
     path: "/prices/",
     title: fitTitle([`${title} | ${r.name}, ${r.address.city} ${r.address.state}`, `${title} | ${r.name}`]),
