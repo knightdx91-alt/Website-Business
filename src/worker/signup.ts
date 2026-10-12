@@ -364,6 +364,8 @@ export async function serveSignup(
   const business = lead.name ?? "your business";
   const url = new URL(req.url);
   const here = `${origin}${url.pathname}`;
+  // Three-tap sign-up: the signer's name and email start filled from what the team already typed (changeable).
+  const prefill = signupPrefill(lead);
   // Pay by invoice: every client when Settings allows it (the default), always churches, or a link carrying ?invoice=1.
   const allowInvoice =
     settings.invoiceForAll !== false ||
@@ -572,9 +574,9 @@ ${
     : `<form class="card" method="post"><h2>${already ? "Sign again" : "Sign up"}</h2>
 ${pickerHtml(settings, { planId, esc: escHtml, showPlans: false, category: lead.category, invoice: allowInvoice, founder: await founderOffer(env, settings), referredBy: await referredByFor(env, lead, settings), billing: /^(short|standard|flex|annual|invoice)$/.test(new URL(req.url).searchParams.get("billing") ?? "") ? new URL(req.url).searchParams.get("billing")! : undefined })}
 <label>Your title <span class="muted small" style="font-weight:400">(optional)</span><input type="text" name="title" placeholder="Owner" maxlength="60"></label>
-<label>Email for receipts<input type="email" name="email" autocomplete="email" required maxlength="120"></label>
+<label>Email for receipts<input type="email" name="email" autocomplete="email" required maxlength="120" value="${escHtml(prefill.email)}"></label>
 <div style="position:absolute;left:-9999px" aria-hidden="true"><label>Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
-${esignHtml({ sectionsHtml: contractSectionsHtml(settings, { business, kind: "signup", esc: escHtml }), esc: escHtml, title: "Your agreement" })}
+${esignHtml({ sectionsHtml: contractSectionsHtml(settings, { business, kind: "signup", esc: escHtml }), esc: escHtml, title: "Your agreement", name: prefill.name })}
 <p class="small muted">See also our <a href="https://undergroundassociates.com/terms#refunds" target="_blank" rel="noopener">cancellation &amp; refund policy</a> and <a href="https://undergroundassociates.com/privacy" target="_blank" rel="noopener">privacy policy</a>.</p>
 <p><strong>${GO_LIVE_TEXT}</strong></p>
 <button class="btn" type="submit" id="pk-go" data-pay="${env.STRIPE_SECRET_KEY ? "Sign and continue to payment" : "Accept and continue"}" data-invoice="Sign and request an invoice">${env.STRIPE_SECRET_KEY ? "Sign and continue to payment" : "Accept and continue"}</button>
@@ -1032,6 +1034,31 @@ export async function achFormPdf(
 }
 
 // ---- the Android app: agreement as JSON, and signing without the web page ----
+
+/**
+ * What the sign-up form starts with: the lead's "Ask for" contact as the signer (when it reads like a person's name)
+ * and the business email we know (from their old site or Google). Both stay editable.
+ */
+export function signupPrefill(lead: {
+  contact?: string | null;
+  record_json?: string | null;
+}): { name: string; email: string } {
+  const contact = (lead.contact ?? "").trim().replace(/\s+/g, " ");
+  const name =
+    /^[A-Za-z][A-Za-z.'\- ]{1,59}$/.test(contact) && !/\d|@/.test(contact)
+      ? contact
+      : "";
+  let email = "";
+  try {
+    const r = lead.record_json
+      ? (JSON.parse(lead.record_json) as { email?: string })
+      : null;
+    if (r?.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) email = r.email;
+  } catch {
+    /* no record yet */
+  }
+  return { name, email };
+}
 
 const HEADING_LINE = /^[A-Z0-9][A-Z0-9 &'’,.:()/-]{2,}$/;
 

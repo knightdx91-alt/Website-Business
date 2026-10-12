@@ -31,6 +31,7 @@ export const GUIDE_IDS = [
   "pricetags",
   "display",
   "costs",
+  "words",
 ] as const;
 
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
@@ -405,6 +406,7 @@ export function guideById(id: string, s: AppSettings): Guide | null {
   if (id === "pricetags") return priceTagsGuide(s);
   if (id === "display") return displayGuide(s);
   if (id === "costs") return costsGuide(s);
+  if (id === "words") return wordsGuide(s);
   return null;
 }
 
@@ -617,4 +619,81 @@ ${o.phone ? `<a class="btn" href="sms:+1${e(o.phone.replace(/\D/g, "").replace(/
     brand: o.company,
     css: PITCH_CSS,
   });
+}
+
+/**
+ * 📖 What the words mean: the glossary behind every label in the app, so a new teammate never has to guess what
+ * "Shown" or "Ready" means. Keep it in step with the labels (status tabs, cards, Settings) when they change.
+ */
+export function wordsGuide(s: AppSettings): Guide {
+  const company = s.companyName || "Underground Associates";
+  const list = s.plans.find((p) => p.id === "list" && p.monthly);
+  return {
+    id: "words",
+    title: "📖 What the words mean",
+    intro: `Every label in the app, in plain words. Two kinds of status live on a lead: how far the SALE has got (New, Shown, Sold, Live, Not interested) and how far the PREVIEW has got (Building, Ready, Failed). The sale status is the one you work; the preview status just says whether the website is ready to show.`,
+    sections: [
+      {
+        title: "Sale status (the tabs on Home)",
+        steps: [
+          "New: nobody has shown them the preview yet. The job is to call or walk in and show it.",
+          "Shown: they've seen their preview (in person, by text link, or we left a flyer). Follow-ups run from here: day 2 call, day 5 text, day 10 walk in, day 21 last text.",
+          "Sold: they signed the agreement. If the payment isn't finished the card says so; once paid, the job is Finish & publish.",
+          "Live: the website is published on the internet. Ask for a Google review, send the monthly report, sell extras.",
+          "Not interested: they said no. We ask why (price, has someone, no need, timing) and the lead drops off after 30 days.",
+        ],
+      },
+      {
+        title: "Preview status",
+        steps: [
+          "Building (or Queued): the app is writing the words and laying out the pages. A few minutes.",
+          "Ready: the preview can be shown. Every New lead you call should be Ready.",
+          "Failed: the build broke. Tap Try the build again; if it fails twice, use Report this.",
+          "Expired: an unsold lead we stopped keeping (New after 30 days, Shown after 60). Only the Google Place ID stays; add it again by hand if they come back.",
+        ],
+      },
+      {
+        title: "The one-line next step",
+        steps: [
+          "Every lead page opens with one line saying what to do next and a button that does it. The Home queue is the same line for every lead that needs something, most urgent first.",
+          "Signed, payment not finished: take the payment (tap, card or payment link).",
+          "Callback today / overdue: the day you booked when you logged the last call.",
+          "They opened their preview: the prospect looked at the link in the last 7 days. Call while it's fresh.",
+          "Day N: Call / Text / Walk in: the follow-up cadence after Shown.",
+          "Finish & publish: the site is paid for; the checklist lists what's missing before it can go live.",
+        ],
+      },
+      {
+        title: "Money words",
+        steps: [
+          "Plan: the monthly website service (Basic, Plus, Pro). The Price list plan is the live price page and board without a website" + (list ? ` (${money(list.monthly)} a month)` : "") + ".",
+          "Way to pay: the term they pick. 6-month or 12-month plan (no setup fee), month to month (the one with a setup fee), or yearly up front (months free). Churches can pay by invoice.",
+          "Extras: one-time or monthly add-ons (logo, Spanish page, Google profile setup, NFC card…). The app also says add-ons; same thing. Inventory add-ons are the ones for the board.",
+          "Sign-up: the agreement they sign on the phone or from a texted link. Signed means the agreement is done; Paid means the money is in.",
+          "Tap to Pay: tapping their card on an Android phone. Card sheet: typing the card number in. Payment link: a texted link they pay on their own.",
+          "Founding customer: one of the first paying clients, who picks a free extra. Referral: a client who sends us a business gets months free once that business pays.",
+        ],
+      },
+      {
+        title: "Website words",
+        steps: [
+          "Preview: the website we built before they buy. Private, behind our login, or shared by a 14-day link.",
+          "Publish: putting the site live on the internet. Republish: pushing changes to a live site.",
+          "Owner to-do: something only the business owner can answer (hours, license number, team names). Required ones block publishing; suggested ones are talking points.",
+          "Confirm: the owner says name, phone, address and hours are right. Approve: the owner has read the site text. Both happen in Edit and both are needed to publish.",
+          "Design: the colors and fonts (a look), the page structure (a layout) and the smaller choices (style). Try another design changes all three.",
+          "Board: the shop's own live price list editor on their phone (Tank board, Parts board, Stock board, named for their kind of shop). QR price tags and the tablet display read from it.",
+        ],
+      },
+      {
+        title: "People words",
+        steps: [
+          `Owner: ${company}'s account. Full access: a team member who can do everything the owner can (Settings, Sales, Inbox, Costs).`,
+          "Caller: a team member who works leads end to end (calls, previews, sign-ups, payments, publishing) but can't change Settings or prices.",
+          "Ask for: the person at the business to ask for, and the best time to catch them. Typed on the lead page.",
+          "Alerts (the bell): what other people did on leads. Settings → Alerts lets you choose Everything, My leads or Important only.",
+        ],
+      },
+    ],
+  };
 }

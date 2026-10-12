@@ -1,5 +1,6 @@
 import { getSettings, type Plan } from "./db.ts";
 import { localDate, type Env } from "./env.ts";
+import { funnel, type FunnelLead } from "./queue.ts";
 
 /** Start of a Cullman calendar day as a timestamp (CST/CDT handled by trying both offsets). */
 function startOf(day: string): number {
@@ -202,7 +203,16 @@ export async function salesDashboard(env: Env) {
     ).results.map((u) => u.name),
   );
   const month = table(periods.month);
+  // The funnel: every lead that ever reached each stage (expired ones included, they were still shown or not).
+  const funnelRows = await env.DB.prepare(
+    `SELECT l.created_at, l.shown_at, l.sales_status, l.published_at,
+       (SELECT MIN(s.created_at) FROM signups s WHERE s.lead_id = l.id) AS signed_at,
+       COALESCE((SELECT MIN(n.created_at) FROM lead_notes n WHERE n.lead_id = l.id AND (n.body LIKE 'Paid %' OR n.body LIKE 'Paid through%' OR n.body LIKE 'Marked paid%')),
+                (SELECT MIN(s.created_at) FROM signups s WHERE s.lead_id = l.id AND s.paid = 1)) AS paid_at
+     FROM leads l WHERE l.place_id != 'paytest'`,
+  ).all<FunnelLead>();
   return {
+    funnel: funnel(funnelRows.results),
     week: table(periods.week),
     month,
     commission,

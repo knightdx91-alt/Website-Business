@@ -1,7 +1,13 @@
 import { newId, now, type Env } from "./env.ts";
 import type { Session } from "./auth.ts";
-import { getSetting, setSetting } from "./db.ts";
+import { getSetting, getSettings, setSetting } from "./db.ts";
 import { fcmSend } from "./fcm.ts";
+import {
+  IMPORTANT_KINDS,
+  alertPrefKey,
+  parseAlertMode,
+  type AlertMode,
+} from "./queue.ts";
 
 /**
  * Notifications: what other people did (notes, call outcomes, sales, sign-ups, publishes, website messages).
@@ -25,7 +31,8 @@ export type EventKind =
   | "run"
   | "preview_open"
   | "task"
-  | "costs";
+  | "costs"
+  | "problem";
 
 /** The notifications callers get: anything added or changed on a lead, plus tasks. Not website messages or search runs. */
 export const CALLER_KINDS: EventKind[] = [
@@ -77,7 +84,7 @@ export async function notify(env: Env, e: EventInput): Promise<void> {
         e.text.slice(0, 500),
       )
       .run();
-    await pushAll(env, e.actor?.userId ?? null, e.kind);
+    await pushAll(env, e.actor?.userId ?? null, e.kind, e.leadId ?? null);
     // Android phones: an instant "something's new" ping; each phone fetches its own filtered list.
     await fcmSend(env, { kind: "alerts" });
   } catch (err) {
@@ -94,6 +101,49 @@ async function recipients(env: Env, kind: EventKind): Promise<string[]> {
   return ["owner", ...team.results.map((u) => u.id)];
 }
 
+/* ---------- Alert preferences (Oct 2026) ---------- */
+
+/** A person's alert mode: everything (default), only their own leads, or important kinds only. */
+export async function getAlertMode(env: Env, userId: string): Promise<AlertMode> {
+  return parseAlertMode(await getSetting(env, alertPrefKey(userId)));
+}
+
+export async function setAlertMode(env: Env, userId: string, mode: AlertMode): Promise<void> {
+  await setSetting(env, alertPrefKey(userId), JSON.stringify({ mode }));
+}
+
+const importantList = IMPORTANT_KINDS.map((k) => `'${k}'`).join(",");
+
+/**
+ * The SQL that applies a mode to the events table (alias `e`), plus its binds. "mine" = events on leads this person
+ * has logged a call or visit on, sent a sign-up link for, or that someone opened a preview of after they worked it,
+ * plus the important kinds everywhere; "important" = the important kinds only.
+ */
+function modeFilter(mode: AlertMode, userName: string): { sql: string; binds: unknown[] } {
+  if (mode === "important") return { sql: `AND e.kind IN (${importantList})`, binds: [] };
+  if (mode === "mine")
+    return {
+      sql: `AND (e.kind IN (${importantList}) OR e.lead_id IS NULL OR EXISTS (SELECT 1 FROM lead_notes n WHERE n.lead_id = e.lead_id AND n.author = ?) OR EXISTS (SELECT 1 FROM signups s WHERE s.lead_id = e.lead_id AND s.sent_by = ?))`,
+      binds: [userName, userName],
+    };
+  return { sql: "", binds: [] };
+}
+
+async function userName(env: Env, userId: string): Promise<string> {
+  if (userId === "owner") return (await getSettings(env)).callerName || "Owner";
+  const row = await env.DB.prepare("SELECT name FROM users WHERE id = ?")
+    .bind(userId)
+    .first<{ name: string }>();
+  return row?.name ?? "";
+}
+
+/** The person's filter, ready to splice into a query on `events e`. */
+async function prefFilter(env: Env, userId: string): Promise<{ sql: string; binds: unknown[] }> {
+  const mode = await getAlertMode(env, userId);
+  if (mode === "all") return { sql: "", binds: [] };
+  return modeFilter(mode, mode === "mine" ? await userName(env, userId) : "");
+}
+
 export async function listEvents(
   env: Env,
   userId: string,
@@ -105,10 +155,11 @@ export async function listEvents(
   )
     .bind(userId)
     .first<{ seen_at: number }>();
+  const pref = await prefFilter(env, userId);
   const rows = await env.DB.prepare(
-    `SELECT e.*, l.name AS lead_name FROM events e LEFT JOIN leads l ON l.id = e.lead_id WHERE (e.actor_id IS NULL OR e.actor_id != ?) ${caller ? callerFilter.replace("kind", "e.kind") : ""} ORDER BY e.created_at DESC LIMIT ?`,
+    `SELECT e.*, l.name AS lead_name FROM events e LEFT JOIN leads l ON l.id = e.lead_id WHERE (e.actor_id IS NULL OR e.actor_id != ?) ${caller ? callerFilter.replace("kind", "e.kind") : ""} ${pref.sql} ORDER BY e.created_at DESC LIMIT ?`,
   )
-    .bind(userId, limit)
+    .bind(userId, ...pref.binds, limit)
     .all<EventRow & { lead_name: string | null }>();
   const seenAt = seen?.seen_at ?? 0;
   return {
@@ -137,10 +188,11 @@ export async function unreadCount(
   )
     .bind(userId)
     .first<{ seen_at: number }>();
+  const pref = await prefFilter(env, userId);
   const row = await env.DB.prepare(
-    `SELECT COUNT(*) AS n FROM events WHERE created_at > ? AND (actor_id IS NULL OR actor_id != ?) ${caller ? callerFilter : ""}`,
+    `SELECT COUNT(*) AS n FROM events e WHERE e.created_at > ? AND (e.actor_id IS NULL OR e.actor_id != ?) ${caller ? callerFilter.replace("kind", "e.kind") : ""} ${pref.sql}`,
   )
-    .bind(seen?.seen_at ?? 0, userId)
+    .bind(seen?.seen_at ?? 0, userId, ...pref.binds)
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
@@ -167,6 +219,7 @@ const PUSH_TITLE: Record<EventKind, string> = {
   preview_open: "👀 Preview opened",
   task: "📝 Task",
   costs: "💵 Costs & usage",
+  problem: "🐞 Problem reported",
 };
 
 /** What a phone shows when a push arrives: the newest unread item, or a count when there are several. */
@@ -199,6 +252,43 @@ export async function latestForPush(env: Env, userId: string, caller = false) {
     url: top.leadId ? `/#/lead/${top.leadId}` : "/#/notifications",
     unread,
   };
+}
+
+/** Drops recipients whose alert mode doesn't want this event (important-only, or "my leads" for someone else's lead). */
+async function wantsPush(
+  env: Env,
+  ids: string[],
+  kind: EventKind,
+  leadId: string | null,
+): Promise<string[]> {
+  if ((IMPORTANT_KINDS as readonly string[]).includes(kind)) return ids;
+  const prefs = await env.DB.prepare(
+    "SELECT key, value FROM settings WHERE key LIKE 'notif_prefs.%'",
+  ).all<{ key: string; value: string }>();
+  const modes = new Map(
+    prefs.results.map((r) => [r.key.slice("notif_prefs.".length), parseAlertMode(r.value)]),
+  );
+  const out: string[] = [];
+  for (const id of ids) {
+    const mode = modes.get(id) ?? "all";
+    if (mode === "all") {
+      out.push(id);
+      continue;
+    }
+    if (mode === "important") continue;
+    if (!leadId) {
+      out.push(id);
+      continue;
+    }
+    const name = await userName(env, id);
+    const mine = await env.DB.prepare(
+      "SELECT 1 AS x FROM lead_notes WHERE lead_id = ? AND author = ? UNION SELECT 1 FROM signups WHERE lead_id = ? AND sent_by = ? LIMIT 1",
+    )
+      .bind(leadId, name, leadId, name)
+      .first();
+    if (mine) out.push(id);
+  }
+  return out;
 }
 
 /* ---------- Web Push (VAPID, no payload) ---------- */
@@ -303,9 +393,12 @@ async function pushAll(
   env: Env,
   exceptUserId: string | null,
   kind: EventKind,
+  leadId: string | null,
 ): Promise<void> {
   if (!env.VAPID_PRIVATE_JWK) return;
-  const who = (await recipients(env, kind)).filter((id) => id !== exceptUserId);
+  let who = (await recipients(env, kind)).filter((id) => id !== exceptUserId);
+  if (!who.length) return;
+  who = await wantsPush(env, who, kind, leadId);
   if (!who.length) return;
   const subs = await env.DB.prepare(
     `SELECT endpoint FROM push_subs WHERE user_id IN (${who.map(() => "?").join(",")})`,

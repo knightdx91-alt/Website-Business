@@ -32,9 +32,12 @@ export function esignHtml(o: {
   esc: (t: string) => string;
   businessField?: string;
   title: string;
+  /** Prefilled signer name (from the lead's contact); they can change it. */
+  name?: string;
 }): string {
   const e = o.esc;
   return `<style>
+.ct--short{background:#f4f6fb;border-radius:12px;padding:12px 14px;margin:0 0 12px}.ct--short h3{margin-top:0}.ct-short{margin:0;padding-left:20px}.ct-short li{margin:4px 0}.ct-note{font-size:.85em;color:#555;margin:8px 0 0}
 .es-agree{display:flex;gap:10px;align-items:flex-start;border:2px solid #14213d;border-radius:12px;padding:14px;margin:6px 0 10px;cursor:pointer;background:#fff;color:#16181d;font-weight:600}
 .es-agree input{width:22px;height:22px;min-height:0;margin-top:2px;flex:none}
 .es-status{margin:0 0 12px;font-weight:700}.es-status.ok{color:#0f5132}.es-status.warn{color:#8a5300}
@@ -60,7 +63,7 @@ dialog.es::backdrop{background:rgba(10,15,30,.6)}
 <dialog class="es" id="es-dlg" aria-labelledby="es-h">
 <div class="es-head"><h2 id="es-h">${e(o.title)}</h2><button type="button" class="es-x" id="es-x" aria-label="Close">×</button></div>
 <div class="es-body">${o.sectionsHtml}
-<div class="es-sign"><label>Your full legal name<input type="text" id="es-name" autocomplete="name" maxlength="100"></label>
+<div class="es-sign"><label>Your full legal name<input type="text" id="es-name" autocomplete="name" maxlength="100" value="${e(o.name ?? "")}"></label>
 <label>Sign with your finger<canvas class="es-pad" id="es-pad" aria-label="Signature pad"></canvas></label>
 <label class="es-row"><input type="checkbox" id="es-consent"> <span>I agree to this agreement and to sign it electronically. I'm authorized to sign for this business.</span></label>
 <p class="es-err" id="es-err" hidden></p>
@@ -88,6 +91,8 @@ function fill(){
  var o=dlg.querySelector("[data-order]");o.innerHTML="";var ul=document.createElement("ul");items.forEach(function(i){var li=document.createElement("li");li.textContent=i;ul.appendChild(li)});o.appendChild(ul);
  if(t1){var p=document.createElement("p");p.textContent=txt(t1)+(t2?". "+txt(t2):"");o.appendChild(p);}
  if(bizField){var bz=q('[name="'+bizField+'"]');dlg.querySelectorAll("[data-business]").forEach(function(s){s.textContent=bz&&bz.value.trim()?bz.value.trim():"your business"});}
+ var sd=dlg.querySelector("[data-short-today]");if(sd){sd.textContent=t1?txt(t1)+(t2?". "+txt(t2):""):"";sd.hidden=!t1;}
+ dlg.querySelectorAll("[data-short-billing]").forEach(function(s){var pp=s.getAttribute("data-plan");s.hidden=!b||s.getAttribute("data-short-billing")!==b.value||(pp&&(!plan||pp!==plan.value))});
 }
 function sizePad(){var r=pad.getBoundingClientRect(),k=window.devicePixelRatio||1;pad.width=Math.round(r.width*k);pad.height=Math.round(r.height*k);cx.setTransform(k,0,0,k,0,0);cx.lineWidth=2.6;cx.lineCap="round";cx.lineJoin="round";cx.strokeStyle="#111";inked=false;}
 function pt(e){var r=pad.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]}

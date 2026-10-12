@@ -1,5 +1,6 @@
 import { promoTerms } from "./referrals.ts";
 import type { PricedOrder } from "./checkout.ts";
+import { contractSummary, summaryTail, termLine } from "./queue.ts";
 import {
   isListPlan,
   addonPrice,
@@ -196,6 +197,8 @@ export function contractText(
     o.kind === "signup" ? `WEBSITE SERVICES AGREEMENT` : `EXTRAS AGREEMENT`,
   );
   out.push(`Between ${legal} ("we") and ${o.business} ("you").`);
+  // Plain summary first (the same facts the sections below spell out), so a signer gets the gist before the detail.
+  out.push("", "IN SHORT", ...contractSummary(s, order, o.kind).map((l) => `- ${l}`));
   out.push("", "YOUR ORDER", ...orderLines(order));
   if (o.kind === "signup") {
     if (order.plan) {
@@ -256,7 +259,9 @@ export function contractSectionsHtml(
   const e = o.esc;
   const legal = legalName(s);
   const sec = (title: string, body: string, attr = "") =>
-    `<section class="ct"${attr}><h3>${e(title)}</h3>${body}</section>`;
+    attr.startsWith(" class=")
+      ? `<section${attr}><h3>${e(title)}</h3>${body}</section>`
+      : `<section class="ct"${attr}><h3>${e(title)}</h3>${body}</section>`;
   const para = (t: string) =>
     t
       .split("\n")
@@ -267,6 +272,35 @@ export function contractSectionsHtml(
   parts.push(
     `<p class="ct-title"><strong>${o.kind === "signup" ? "Website Services Agreement" : "Extras Agreement"}</strong><br>Between ${e(legal)} (“we”) and <span data-business>${e(o.business)}</span> (“you”).</p>`,
   );
+  // "In short": the price line is filled by the page from the live total; the term line follows the way to pay picked.
+  if (o.kind === "signup") {
+    const billings = ["short", "standard", "flex", "annual", "invoice"];
+    const termLis = s.plans
+      .filter((p) => p.monthly)
+      .flatMap((p) =>
+        billings.map(
+          (b) =>
+            `<li data-plan="${p.id}" data-short-billing="${b}" hidden>${e(termLine(s, p, b === "invoice" ? "standard" : b))}</li>`,
+        ),
+      )
+      .join("");
+    parts.push(
+      sec(
+        "In short",
+        `<ul class="ct-short"><li data-short-today></li>${termLis}${summaryTail(s)
+          .map((l) => `<li>${e(l)}</li>`)
+          .join("")}</ul><p class="ct-note">The full agreement follows; these lines restate it.</p>`,
+        ' class="ct ct--short"',
+      ),
+    );
+  } else {
+    parts.push(
+      sec(
+        "In short",
+        `<ul class="ct-short"><li data-short-today></li><li>Each extra's own terms are below. Your website agreement doesn't change.</li></ul>`,
+      ),
+    );
+  }
   parts.push(sec("Your order", `<div data-order></div>`));
   if (o.kind === "signup") {
     for (const p of s.plans.filter((x) => x.monthly)) {

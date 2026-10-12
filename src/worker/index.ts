@@ -145,9 +145,19 @@ import {
   purchasesFor,
   serveExtras,
   serveSignup,
+  signupPrefill,
   signupsFor,
   websiteOrders,
 } from "./signup.ts";
+import {
+  ALERT_MODES,
+  START_LESSONS,
+  START_PRACTICE,
+  healthItems,
+  nextStepFor,
+  publishChecklist,
+  rankQueue,
+} from "./queue.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { EXPIRE_SQL } from "./expire.ts";
 import {
@@ -178,7 +188,9 @@ import {
 import { handleFormPost } from "./forms.ts";
 import {
   allowedEndpoint,
+  getAlertMode,
   latestForPush,
+  setAlertMode,
   listEvents,
   markSeen,
   notify,
@@ -351,7 +363,7 @@ function summary(
           lastActivity: l.last_activity ?? null,
         }
       : {};
-  return {
+  const out = {
     ...activity,
     id: l.id,
     runId: l.run_id,
@@ -392,6 +404,8 @@ function summary(
       : null,
     createdAt: l.created_at,
   };
+  /** The one thing to do next on this lead (title, one line, button, route), the same on every screen. */
+  return { ...out, nextStep: nextStepFor(out, localDate()) };
 }
 
 interface NoteRow {
@@ -571,6 +585,8 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
     dna: l.look ? (parseDesign(l.look).dna ?? LEGACY_DNA) : null,
     layout: l.look ? layoutOf(l.look) : null,
     lookBase: l.look ? parseDesign(l.look).look : null,
+    /** Finish & publish: every blocker with the Edit card that fixes it (empty = Publish works). */
+    checklist: publishChecklist(lint, l.category),
     /** Shown leads: days since they were shown and the next follow-up step; null otherwise. */
     cadence:
       l.sales_status === "shown"
@@ -1073,6 +1089,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       : null;
     return json({
       ...plansOptions(settings, forLead?.category),
+      /** Signer name / email the native sign-up starts with (from the lead's contact and known email). */
+      prefill: forLead ? signupPrefill(forLead) : null,
       founder: await founderOffer(env, settings),
       referredBy: referrer
         ? {
@@ -1115,8 +1133,33 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       ),
       addons: shared.addons.map(({ terms: _t, ...a }) => a),
     };
+    const doneRows = await env.DB.prepare(
+      "SELECT lesson_id FROM training_done WHERE user_id = ?",
+    )
+      .bind(session.userId)
+      .all<{ lesson_id: string }>();
+    const doneIds = new Set(doneRows.results.map((r) => r.lesson_id));
+    const course = trainingCourse(settings).lessons;
+    const startLessons = [...START_LESSONS, START_PRACTICE].map((id) => ({
+      id,
+      title: course.find((l) => l.id === id)?.title ?? id,
+      done: doneIds.has(id),
+      practice: id === START_PRACTICE,
+    }));
+    const startDismissed = !!(await getSetting(env, `start_dismissed.${session.userId}`));
     return json({
-      me: { role: session.role, name: session.name, id: session.userId },
+      me: {
+        role: session.role,
+        name: session.name,
+        id: session.userId,
+        /** Alert preference: all / mine / important. */
+        alertMode: await getAlertMode(env, session.userId),
+      },
+      /** The Start-here card for new teammates: three lessons and the practice run; `show` false once done or dismissed. */
+      start: {
+        show: !startDismissed && startLessons.some((l) => !l.done),
+        lessons: startLessons,
+      },
       team,
       checkout: {
         online: !!env.STRIPE_SECRET_KEY,
@@ -1146,6 +1189,131 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       })),
       settings: isOwner ? settings : forCaller,
     });
+  }
+
+  // The Home queue (owner and callers): every lead that needs something, most urgent first, with its one next step.
+  if (path === "/queue" && m === "GET") {
+    const rows = await env.DB.prepare(
+      `SELECT ${LIST_COLS}, (SELECT s.paid FROM signups s WHERE s.lead_id = leads.id ORDER BY s.created_at DESC LIMIT 1) AS latest_signup_paid FROM leads WHERE status != 'expired' AND sales_status NOT IN ('not_interested', 'live') AND place_id != 'paytest' ORDER BY score DESC LIMIT 800`,
+    ).all<LeadRow & { latest_signup_paid: number | null; has_pitch: number | null }>();
+    const today = localDate();
+    const ranked = rankQueue(rows.results.map(summary), today);
+    return json({
+      today,
+      rows: ranked.rows.map((r) => ({ lead: r.lead, step: r.step })),
+      counts: ranked.counts,
+    });
+  }
+  // Settings health strip (owner / full access): is every outside piece connected.
+  if (path === "/health" && m === "GET") {
+    ownerOnly();
+    const settings = await getSettings(env);
+    const tap = await tapStatus(env, settings);
+    return json({
+      items: healthItems({
+        stripeKey: !!env.STRIPE_SECRET_KEY,
+        stripeWebhook: !!env.STRIPE_WEBHOOK_SECRET,
+        stripePublishableKey: !!settings.stripePublishableKey,
+        tap: { ready: tap.ready, why: tap.why },
+        email: mailReady(env),
+        companyEmail: settings.companyEmail ?? "",
+        googleClientId: !!settings.googleClientId,
+        fcmClient: !!fcmClientConfig(settings),
+        fcmServer: !!serviceAccount(env),
+        webPush: !!env.VAPID_PRIVATE_JWK,
+        braveSearch: !!env.BRAVE_SEARCH_API_KEY,
+        reviewLink: !!settings.companyReviewUrl,
+        companyAddress: !!(settings.companyStreet && settings.companyCity),
+        plansPriced: settings.plans.filter((p) => p.monthly).length,
+      }),
+    });
+  }
+  // Alert preferences: everything / my leads / important only, per person.
+  if (path === "/notifications/prefs" && m === "GET")
+    return json({ mode: await getAlertMode(env, session.userId), modes: ALERT_MODES });
+  if (path === "/notifications/prefs" && m === "PUT") {
+    const { mode } = await body(req, z.object({ mode: z.enum(["all", "mine", "important"]) }));
+    await setAlertMode(env, session.userId, mode);
+    return json({ mode, modes: ALERT_MODES });
+  }
+  // "Report this": a problem from either app, with the screen and step, for the owner to read (and an alert).
+  if (path === "/report" && m === "POST") {
+    const r = await body(
+      req,
+      z.object({
+        app: z.enum(["web", "android"]),
+        screen: z.string().trim().max(120).optional(),
+        step: z.string().trim().max(120).optional(),
+        message: z.string().trim().min(1).max(1000),
+        detail: z.string().trim().max(4000).optional(),
+        device: z.string().trim().max(200).optional(),
+        leadId: z.string().regex(/^[a-z0-9]+$/).optional(),
+      }),
+    );
+    const id = newId();
+    await env.DB.prepare(
+      "INSERT INTO problem_reports (id, created_at, user_id, user_name, app, screen, step, message, detail, device, lead_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+      .bind(id, now(), session.userId, session.name, r.app, r.screen ?? null, r.step ?? null, r.message, r.detail ?? null, r.device ?? null, r.leadId ?? null)
+      .run();
+    await notify(env, {
+      kind: "problem",
+      actor: session,
+      leadId: r.leadId ?? null,
+      text: `${session.name} reported a problem${r.screen ? ` on ${r.screen}` : ""}: ${r.message.slice(0, 160)}`,
+    });
+    return json({ ok: true, id });
+  }
+  if (path === "/problems" && m === "GET") {
+    ownerOnly();
+    const rows = await env.DB.prepare(
+      "SELECT p.*, l.name AS lead_name FROM problem_reports p LEFT JOIN leads l ON l.id = p.lead_id ORDER BY (p.status = 'open') DESC, p.created_at DESC LIMIT 100",
+    ).all<{
+      id: string;
+      created_at: number;
+      user_name: string | null;
+      app: string;
+      screen: string | null;
+      step: string | null;
+      message: string;
+      detail: string | null;
+      device: string | null;
+      lead_id: string | null;
+      lead_name: string | null;
+      status: string;
+      done_at: number | null;
+    }>();
+    return json({
+      problems: rows.results.map((p) => ({
+        id: p.id,
+        at: p.created_at,
+        who: p.user_name,
+        app: p.app,
+        screen: p.screen,
+        step: p.step,
+        message: p.message,
+        detail: p.detail,
+        device: p.device,
+        leadId: p.lead_id,
+        leadName: p.lead_name,
+        status: p.status,
+        doneAt: p.done_at,
+      })),
+    });
+  }
+  const problemDone = /^\/problems\/([a-z0-9]+)\/(done|reopen)$/.exec(path);
+  if (problemDone && m === "POST") {
+    ownerOnly();
+    const done = problemDone[2] === "done";
+    await env.DB.prepare("UPDATE problem_reports SET status = ?, done_at = ? WHERE id = ?")
+      .bind(done ? "done" : "open", done ? now() : null, problemDone[1]!)
+      .run();
+    return json({ ok: true });
+  }
+  // "Start here" on Home: hidden once dismissed or finished.
+  if (path === "/start/dismiss" && m === "POST") {
+    await setSetting(env, `start_dismissed.${session.userId}`, String(now()));
+    return json({ ok: true });
   }
 
   // Notifications: the owner and full-access team see what everyone else did; callers only see preview opens.
