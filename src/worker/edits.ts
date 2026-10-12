@@ -4,7 +4,12 @@ import { menuToText, parseMenuText } from "../generator/menu.ts";
 import { parsePrice } from "../generator/price.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { autoMatchPhotos } from "../generator/packs/retail.ts";
-import { AUTO_AMENITY_IDS, PARTS_COUNTER } from "../generator/packs/auto.ts";
+import {
+  AUTO_AMENITY_IDS,
+  AUTO_VARIANTS,
+  PARTS_COUNTER,
+  setAutoVariant,
+} from "../generator/packs/auto.ts";
 import { CLEANING_FACILITIES } from "../generator/packs/cleaning.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import {
@@ -325,6 +330,8 @@ export const EditsSchema = z.object({
         })
         .partial()
         .optional(),
+      /** Auto shops: the kind of shop (repair / tires / parts store …) when Google's type or the name got it wrong. */
+      autoKind: z.enum(AUTO_VARIANTS as [string, ...string[]]).optional(),
       /** The live price list for any business (stored at ext.retail.priceList whatever the category; generator/pricelist.ts). */
       priceList: z
         .object({
@@ -1024,6 +1031,7 @@ export function applyEdits(
             }
           : undefined;
     }
+    if (r.category === "auto" && e.autoKind) setAutoVariant(r, e.autoKind);
     if (e.parts && r.variant === "parts") {
       const x: Record<string, unknown> = { ...(r.ext.auto.parts ?? {}) };
       for (const [k, v] of Object.entries(e.parts))

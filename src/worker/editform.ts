@@ -1,4 +1,5 @@
 import type { BusinessRecord } from "../generator/types.ts";
+import { AUTO_VARIANT_LABELS } from "../generator/packs/auto.ts";
 import { scanningOn } from "../generator/pricelist.ts";
 import { menuToText } from "../generator/menu.ts";
 /**
@@ -265,6 +266,7 @@ const sel = (
   ...o,
 });
 const h3 = (text: string): Field => ({ type: "heading", text });
+const AUTO_KIND_OPTIONS = Object.entries(AUTO_VARIANT_LABELS) as Array<[string, string]>;
 const note = (text: string): Field => ({ type: "note", text });
 const url = (
   name: string,
@@ -1234,6 +1236,8 @@ export function editForm(l: EditDetail): EditForm {
     const isOn = (id: string) =>
       id in counter ? !!counter[id] : PARTS_DEFAULT_ON.includes(id);
     card("parts", "Auto parts details", [
+      sel("autoKind", "Kind of shop", r.variant, AUTO_KIND_OPTIONS),
+      note("Change the kind if Google got it wrong (a parts store built as a repair shop): the sections switch now and the text is rewritten for the new kind."),
       note(
         "The site sells the counter: call to check stock, special orders, people who know the part. Only what the owner tells you.",
       ),
@@ -1288,6 +1292,8 @@ export function editForm(l: EditDetail): EditForm {
       tow = ext.tow || {},
       body = ext.body || {};
     const f: Field[] = [
+      sel("autoKind", "Kind of shop", r.variant, AUTO_KIND_OPTIONS),
+      note("Change the kind if Google got it wrong (a parts store built as a repair shop sells parts, not repairs): the sections switch now and the text is rewritten for the new kind."),
       note(
         "Only what the owner confirms. Amenities go in a “Good to know” row under the opening; programs show as plain text (no logos).",
       ),
@@ -2612,6 +2618,8 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
       })()
     : undefined;
 
+  const autoKind =
+    isA && v("autoKind") && v("autoKind") !== r.variant ? v("autoKind") : undefined;
   const auto =
     isA && !isParts
       ? clean({
@@ -2994,6 +3002,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
     donations,
     parts,
     auto,
+    autoKind,
     finance,
     church,
     contractor,

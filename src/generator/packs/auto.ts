@@ -43,6 +43,30 @@ const LABEL: Record<string, string> = {
   parts: "Auto Parts Store",
 };
 
+/** Every kind of auto business the pack builds, with its label (Edit → "Kind of shop"). */
+export const AUTO_VARIANT_LABELS: Record<string, string> = LABEL;
+export const AUTO_VARIANTS = Object.keys(LABEL);
+
+/**
+ * Re-kinds an auto record whose kind was detected wrong (The Parts Store was built as a repair shop before the parts
+ * variant existed). Services still equal to the old kind's seed list are reseeded for the new kind; a parts store gets
+ * its parts extension and no service area. Returns false when nothing changed. The copy must be rewritten afterwards.
+ */
+export function setAutoVariant(r: BusinessRecord, variant: string): boolean {
+  if (!(variant in LABEL) || r.variant === variant) return false;
+  const ids = (list: Service[]) => list.map((x) => x.id).sort().join("|");
+  const untouched = !r.services?.length || ids(r.services) === ids(seedAutoServices(r.variant));
+  r.variant = variant;
+  if (untouched) r.services = seedAutoServices(variant);
+  const auto = { ...((r.ext as { auto?: Record<string, unknown> }).auto ?? {}) };
+  if (variant === "parts") {
+    if (!auto.parts) auto.parts = {};
+    (r as { serviceArea?: unknown }).serviceArea = undefined;
+  }
+  (r.ext as { auto?: Record<string, unknown> }).auto = auto;
+  return true;
+}
+
 const SEEDS: Record<string, string[]> = {
   general: ["Brakes", "Oil changes", "Check engine light & diagnostics", "Tires & alignment", "AC & heating", "Engine repair", "Suspension & steering", "Batteries & electrical"],
   tire: ["Tires", "Alignment", "Brakes", "Oil changes", "Check engine light & diagnostics", "Suspension & steering"],

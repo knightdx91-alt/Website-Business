@@ -1463,6 +1463,7 @@
           events: parseEventLines(val("events") || ""),
           ...(isP ? { email: val("email"), designHelp: on("designHelp"), proofBeforePrint: on("proofBeforePrint"), ...(r.variant === "signs" ? { install: on("install") } : {}) } : {}),
           ...(isRt ? { giftCards: on("giftCards"), delivery: on("delivery"), donations: donationsEditValues(f) } : {}),
+          ...(isA && val("autoKind") && val("autoKind") !== r.variant ? { autoKind: val("autoKind") } : {}),
           ...(isParts ? { parts: partsEditValues(f) } : {}),
           ...(isA && !isParts ? { auto: autoEditValues(f, r) } : {}),
           ...(isF ? { finance: financeEditValues(f, r) } : {}),
@@ -2058,6 +2059,7 @@
     const counter = p.counter || {};
     const isOn = (id) => (id in counter ? !!counter[id] : PARTS_DEFAULT_ON.includes(id));
     return `<section class="card"><h2>Auto parts details</h2>
+      ${autoKindField(r)}
       <p class="small muted">The site sells the counter: call to check stock, special orders, people who know the part. Only what the owner tells you.</p>
       <label class="field">What they carry (one per line)<textarea name="services" rows="8">${esc(serviceLines)}</textarea></label>
       <h3>Services at the counter</h3>
@@ -2237,6 +2239,9 @@
     return { checklist: { rooms, tiers: v("kTiers").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 4), extras: lines("kExtras").slice(0, 20) } };
   }
   /* ---------- auto repair shops: amenities, programs, financing, and the towing / tire / body modules (research/trends-2026 §1) ---------- */
+  /** Kinds of auto business the auto template builds (mirrors AUTO_VARIANT_LABELS in packs/auto.ts). */
+  const AUTO_KINDS = [["general", "Auto Repair"], ["tire", "Tires & Auto Repair"], ["transmission", "Transmission Repair"], ["diesel", "Diesel & Auto Repair"], ["european", "Import Auto Repair"], ["towing", "Towing & Auto Repair"], ["body", "Auto Body & Collision Repair"], ["detailing", "Auto Detailing"], ["small_engine", "Small Engine Repair"], ["glass", "Auto Glass"], ["exhaust", "Muffler & Exhaust"], ["parts", "Auto Parts Store"]];
+  const autoKindField = (r) => `<label class="field">Kind of shop <select name="autoKind">${AUTO_KINDS.map(([k, l]) => `<option value="${k}"${r.variant === k ? " selected" : ""}>${l}</option>`).join("")}</select></label><p class="small muted">Change it if Google got it wrong (a parts store built as a repair shop sells parts, not repairs). The sections switch when you save and the text is rewritten for the new kind.</p>`;
   const AUTO_AMENITIES = [["loaner", "Loaner cars"], ["shuttle", "Shuttle service"], ["key_drop", "After-hours key drop"], ["wifi", "Waiting room with Wi-Fi"], ["digital_inspection", "Digital inspections texted to you"], ["second_opinion", "Free second opinions"], ["walk_ins", "Walk-ins welcome"], ["same_day", "Same-day service on most jobs"], ["towing", "Towing available"], ["spanish", "Spanish spoken"]];
   const AUTO_PROGRAMS = ["NAPA AutoCare", "TechNet", "Jasper", "AAA Approved Auto Repair", "Bosch Service", "ASE Blue Seal", "RepairPal Certified", "BBB Accredited"];
   function autoEditCard(r, x, cb) {
@@ -2249,6 +2254,7 @@
     const body = x.body || {};
     const inp = (name, label, value, ph, type) => `<label class="field">${label}<input name="${name}" type="${type || "text"}" value="${esc(value || "")}" placeholder="${esc(ph || "")}"></label>`;
     return `<section class="card"><h2>Auto shop details</h2>
+      ${autoKindField(r)}
       <p class="small muted">Only what the owner confirms. Amenities go in a “Good to know” row under the opening; programs show as plain text (no logos).</p>
       <h3>Good to know</h3>
       ${AUTO_AMENITIES.map(([id, label]) => cb("am_" + id, label, on.has(id))).join("")}

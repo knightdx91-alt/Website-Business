@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { autoVariant, setAutoVariant } from "../generator/packs/auto.ts";
 import { writeCopy } from "../copy/write.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { churchVariant } from "../generator/packs/church.ts";
@@ -427,6 +428,11 @@ export async function runBuild(
       ? JSON.parse(lead.record_json)
       : placeToRecord(place, category);
     heroFromPlace(record, place);
+    // Shops built before their kind existed (a parts store built as a repair shop): a rewrite re-reads Google's type and the name.
+    if (lead.rewrite && category === "auto" && record.variant === "general") {
+      const detected = autoVariant(place.primaryType, place.types ?? [], record.name);
+      if (detected !== "general") setAutoVariant(record, detected);
+    }
     // Their current website, if they have one: read once (again after 7 days or on a rewrite) and used as facts for the copy.
     const siteUrl =
       lead.found_url ||

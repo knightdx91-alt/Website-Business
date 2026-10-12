@@ -512,6 +512,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   it get the suggested to-do "Can customers text this number?" (under the closing section). The open/closed pill shows once:
   when the hero shows it (`ctx.statusShown`), the info strip's clock line shows today's hours instead (`data-today-hours`,
   filled by `todayText()` in the client script: "Today 11 AM – 8 PM" / "Closed today"). `test/text-open.test.ts`.
+- Kind of shop (Oct 2026): The Parts Store, LLC (Hanceville; Google type `auto_parts_store`) was built before the parts variant existed,
+  so its record said `general` and the copy sold repairs. `setAutoVariant(record, kind)` in packs/auto.ts re-kinds a record (services
+  still equal to the old kind's seed are reseeded, a parts store gets `ext.auto.parts` and no service area); `runBuild` calls it on a
+  rewrite when an auto record is `general` but `autoVariant()` now says otherwise, and Edit → "Auto shop details" / "Auto parts
+  details" has a "Kind of shop" select (web `autoKindField`, editform `autoKind` via `AUTO_KIND_OPTIONS`, `edits.record.autoKind`
+  zod over `AUTO_VARIANTS`); the /edits and /editform routes queue a rewrite when the kind changed, so the words follow the sections.
+  `test/auto-kind.test.ts`.
 - Auto parts stores (auto pack, variant `parts`, Oct 2026): `autoVariant` picks it from the name ("auto parts", "parts & supply"…, not
   "parts & repair"/salvage) or Google's `auto_parts_store`; search group "Auto parts stores"; chains (O'Reilly, AutoZone, NAPA,
   Carquest…) are in the auto chain list. Label "Auto Parts Store", schema `AutoPartsStore`, no service area. The site sells the

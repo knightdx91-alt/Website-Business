@@ -2797,6 +2797,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         next.copy,
         next.look ?? lead.look ?? "",
       );
+      // A new kind of shop needs new words: queue a rewrite (the preview above already has the new sections).
+      if (
+        edits.record?.autoKind &&
+        edits.record.autoKind !==
+          (JSON.parse(lead.record_json) as { variant?: string }).variant
+      ) {
+        await updateLead(env, id, { rewrite: 1, status: "queued" });
+        await env.JOBS.send({ type: "build", leadId: id });
+      }
       await siteUpdated(
         env,
         session,
@@ -2824,6 +2833,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         next.copy,
         next.look ?? lead.look ?? "",
       );
+      // A new kind of shop needs new words: queue a rewrite (the preview above already has the new sections).
+      if (
+        edits.record?.autoKind &&
+        edits.record.autoKind !==
+          (JSON.parse(lead.record_json) as { variant?: string }).variant
+      ) {
+        await updateLead(env, id, { rewrite: 1, status: "queued" });
+        await env.JOBS.send({ type: "build", leadId: id });
+      }
       await siteUpdated(
         env,
         session,
