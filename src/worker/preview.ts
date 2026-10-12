@@ -1,3 +1,4 @@
+import { isManualPlaceId } from "../places/manual.ts";
 import { buildCss } from "../generator/css.ts";
 import { resolveTheme } from "../generator/themes.ts";
 import { fetchPhoto, type Place } from "../places/client.ts";
@@ -18,6 +19,8 @@ async function googleHero(
   place: Place,
   index = 0,
 ): Promise<Response> {
+  // Typed-in businesses have no Google listing, so there's nothing to fetch.
+  if (isManualPlaceId(place.id)) return new Response("Not found", { status: 404 });
   const name = place.photos?.[index]?.name;
   const tryFetch = async (photoName: string) => {
     const { bytes, contentType: type } = await fetchPhoto(

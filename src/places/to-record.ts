@@ -9,6 +9,7 @@ import { salonVariant, seedSalonServices } from "../generator/packs/salon.ts";
 import { printVariant, seedPrintServices } from "../generator/packs/print.ts";
 import { restaurantVariant } from "../generator/packs/restaurant.ts";
 import { retailVariant, seedRetailCarry } from "../generator/packs/retail.ts";
+import { RENTAL_KINDS, rentalKind, seedRentals } from "../generator/packs/general.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import type { BusinessRecord, CategoryId, Hours, Interval, RestaurantExt } from "../generator/types.ts";
 import type { Place, PlacePeriodPoint } from "./client.ts";
@@ -184,7 +185,21 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
   }
   if (category === "general") {
     // The catch-all: Google's type is the variant ("pet_store", "gym"); services are the owner's to list (a required to-do).
-    const storefront = !!p.formattedAddress && !/service area|no storefront/i.test(name);
+    const rental = rentalKind(name, p.primaryTypeDisplayName?.text ?? "");
+    if (rental) {
+      // Party and porta-potty rentals deliver: a service area, no street on the site, their own label and seeded rentals.
+      const typed = p.primaryTypeDisplayName?.text;
+      return {
+        ...base,
+        variant: rental,
+        typeLabel: typed && !/^services?$/i.test(typed) ? typed : RENTAL_KINDS[rental].label,
+        showStreetAddress: false,
+        services: seedRentals(rental),
+        serviceArea: { towns: townsWithin(geo, 30, 10), counties: county ? [county] : [] },
+        ext: {},
+      };
+    }
+    const storefront = !!p.formattedAddress && !p.pureServiceAreaBusiness && !/service area|no storefront/i.test(name);
     return {
       ...base,
       variant: p.primaryType || "other",

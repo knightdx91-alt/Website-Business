@@ -1308,8 +1308,23 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Add a business by hand (`#/add`, owner and callers): `/api/places/search?q=` runs one Places text search near
   Cullman (flags existing leads, chains, closed, no phone, website status, guesses the template via `guessCategory`);
   `POST /api/leads/add {placeId, category}` fetches Place Details, inserts the lead (or revives an expired one),
-  logs "Added by hand" in the call log and queues the build. Businesses not on Google can't be added: the site
-  needs Google's data, so they're pointed at the Google profile setup extra instead.
+  logs "Added by hand" in the call log and queues the build. Businesses not on Google Maps: see "Not on Google" below.
+- Not on Google (Oct 2026, owner's ask: VIP Rents LLC has no Maps listing; Android 2.55): the Add screen's "Not on Google? Add it by
+  hand" form (web `#mf` in viewAdd, Android `ManualAddCard` in AddBusinessScreen + `Api.addManualLead`) → `POST /api/leads/manual`
+  {name, phone, town, street?, zip?, category, kind?, web?, comesToCustomers?} (owner + callers). `manualPlace()` in
+  `src/places/manual.ts` builds a stand-in `Place` (id `manual:<leadId>`, town center from `NORTH_AL_TOWNS`, address components,
+  `primaryTypeDisplayName` = the typed "what they do", a Maps search link, `pureServiceAreaBusiness` when they come to the customer
+  or have no street), so placeToRecord / runBuild / recategorize work unchanged. A lead with the same phone opens instead of a twin.
+  Reason "Not on Google Maps · …", a call-log note to double-check the details and offer the profile setup. `isManualPlaceId()`:
+  never expires (EXPIRE_SQL skips `manual:%`), no Google import / review cards / tents / window sign (409 `NOT_ON_GOOGLE`), no
+  Google photo fetches; `detail().notOnGoogle` → "📍 Not on Google Maps" line on the lead page (web + Android) and the Google
+  import button hidden. When they later get a listing, adding them from a Google search makes a second lead (not merged yet).
+- Party & event rentals (Oct 2026): search group `party_rentals` (bounce houses, party / tent / event / table-and-chair /
+  porta-potty rentals) on the catch-all pack. `rentalKind(name, label)` in packs/general.ts → variant `party_rental` ("Party &
+  Event Rentals": bounce houses, water slides, tents, tables & chairs) or `portable_toilet`, used by placeToRecord's general branch
+  for runs, Google hand-adds and typed-in businesses (Google only calls them "Services"): their own label unless one was typed,
+  seeded rentals (unconfirmed), a 30-mile service area with no street, a "Check your date" form (event date + where), rental
+  steps, and a brief that never promises free delivery or setup. `test/worker/manual-add.test.ts`.
 - Company website: https://undergroundassociates.com (domain on the same Cloudflare account, attached to this Worker
   as custom domains in wrangler.jsonc; www redirects to apex). `src/worker/company.ts` renders it per request from
   Settings (plans, phone, email), so price changes show immediately. Its contact form posts to `/contact` and lands

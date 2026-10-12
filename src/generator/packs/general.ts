@@ -58,6 +58,33 @@ const SCHEMA_BY_TYPE: Record<string, string> = {
   martial_arts_school: "SportsActivityLocation",
 };
 
+/** Rental businesses Google only calls "Services": they get their own label, seeded rentals and a date-first form. */
+export const RENTAL_KINDS = {
+  party_rental: {
+    label: "Party & Event Rentals",
+    seed: [["bounce", "Bounce houses"], ["slides", "Water slides"], ["tents", "Tents"], ["tables", "Tables & chairs"]],
+  },
+  portable_toilet: {
+    label: "Portable Toilet Rentals",
+    seed: [["standard", "Standard portable toilets"], ["ada", "Accessible (ADA) units"], ["handwash", "Hand-wash stations"], ["events", "Event & job-site service"]],
+  },
+} as const;
+export type RentalKind = keyof typeof RENTAL_KINDS;
+
+/** "Bouncers Inflatable Rentals", "Cullman Porta Potty Rentals", "VIP Rents" with a party-rental kind typed in → its kind. */
+export function rentalKind(name: string, label = ""): RentalKind | null {
+  const t = `${name} ${label}`;
+  if (/\b(porta[- ]?(potty|potties|johns?)|portable (toilets?|restrooms?)|restroom trailers?)\b/i.test(t)) return "portable_toilet";
+  if (/\b(bounce|bouncers?|bouncies|inflatables?|jumpers?|moon ?walks?|water ?slides?|party (rentals?|rents)|event rentals?|tent rentals?|tables? (and|&) chairs?|party (&|and) event)\b/i.test(t)) return "party_rental";
+  return null;
+}
+
+export function seedRentals(kind: RentalKind): Array<{ id: string; name: string; featured: boolean }> {
+  return RENTAL_KINDS[kind].seed.map(([id, name]) => ({ id, name, featured: true }));
+}
+
+const isRental = (r: BusinessRecord) => r.variant in RENTAL_KINDS;
+
 export function generalLabel(r: BusinessRecord): string {
   return r.typeLabel?.trim() || "Local Business";
 }
@@ -66,6 +93,12 @@ export function generalLabel(r: BusinessRecord): string {
 export function isStorefront(r: BusinessRecord): boolean {
   return !r.serviceArea || (r.showStreetAddress && !!r.address.street);
 }
+
+const STEPS_RENTAL = [
+  { title: "Pick your date", body: "Call, text or send the form with your date, place and what you'd like." },
+  { title: "We deliver and set up", body: "We bring it out and get it set up before your event." },
+  { title: "We pick it up", body: "When the party's over, we come back for it." },
+];
 
 const STEPS_SERVICE = [
   { title: "Get in touch", body: "Call, text or send the form. Tell us what you need." },
@@ -143,9 +176,15 @@ export const generalPack: CategoryPack = {
     const primary: Action[] = storefront
       ? actions(r, r.links.booking ? ["book", "call"] : ["call", "directions"])
       : actions(r, r.smsEnabled ? ["quote", "call", "text"] : ["quote", "call"]);
-    const fields: FormField[] = [{ name: "reach", label: "Best way to reach you", options: ["Call", "Text", "Email"] }];
-    const formOpts = storefront ? { title: "Send us a message", topic: "Message", button: "Send", details: "What can we help you with?" } : { title: "Request a quote", topic: "Quote", button: "Request a quote", details: "Tell us about the job" };
-    const formIntro = storefront ? "Questions? Send a note and we'll get back to you." : "Tell us what you need and we'll get back to you with a price.";
+    const rental = isRental(r);
+    const fields: FormField[] = [
+      ...(rental ? [{ name: "event_date" as const, label: r.variant === "portable_toilet" ? "Date you need it" : "Event date", type: "date" as const }, { name: "location" as const, label: "Where (town or address)" }] : []),
+      { name: "reach", label: "Best way to reach you", options: ["Call", "Text", "Email"] },
+    ];
+    const formOpts = rental
+      ? { title: "Check your date", topic: "Booking", button: "Check my date", details: "What would you like to rent?" }
+      : storefront ? { title: "Send us a message", topic: "Message", button: "Send", details: "What can we help you with?" } : { title: "Request a quote", topic: "Quote", button: "Request a quote", details: "Tell us about the job" };
+    const formIntro = rental ? "Tell us your date and what you'd like, and we'll let you know what's open and the price." : storefront ? "Questions? Send a note and we'll get back to you." : "Tell us what you need and we'll get back to you with a price.";
     return html`${hero(ctx, {
       eyebrow: `${t} · ${r.address.city}, ${r.address.state}`,
       h1: r.name,
@@ -172,7 +211,7 @@ ${plans(ctx, { label: "Pricing", title: "Plans and pricing" })}
 ${offersSection(ctx)}
 ${storefront ? "" : html`<section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">
 ${sectionHead("How it works", "Three easy steps", undefined, "how-title")}
-${steps(ctx.copy.steps?.length ? ctx.copy.steps : STEPS_SERVICE)}
+${steps(ctx.copy.steps?.length ? ctx.copy.steps : rental ? STEPS_RENTAL : STEPS_SERVICE)}
 </div></section>`}
 ${gallery(ctx, "Send us a few photos", "Your place, your work, your team: five phone photos in daylight are plenty. We'll put the best ones here.")}
 ${reviews(ctx)}
@@ -195,7 +234,7 @@ ${ctaBand(ctx, primary)}
         serviceBlurbs: "For each service id, one line (12-25 words) on what it is or who it's for. General and true; no prices, no promises.",
         faq: `5-6 general questions a first-time customer asks a ${t.toLowerCase()} before coming in or calling (what to bring, how to book, first-visit expectations, payment types, parking, appointments vs walk-ins) with helpful general answers (30-55 words). Never state this business's own policies, prices or hours; say to call or check the listing where it depends.`,
         about: `Two short paragraphs (70-110 words total). The owner's story is unknown: a neutral, true introduction to a ${t.toLowerCase()} in ${r.address.city} (what kind of place it is, who it serves, where). Do not invent history, team size, years or credentials.`,
-        ...(storefront ? {} : { steps: "Three steps (title 2-4 words, body one sentence) for how a new customer gets started with a service business like this: contact, agree, done.", serviceAreaIntro: "One or two sentences about serving the town and the nearby communities listed." }),
+        ...(storefront ? {} : isRental(r) ? { steps: "Three steps (title 2-4 words, body one sentence) for renting from a business like this: pick your date and items, they deliver and set up, they pick it up. Never promise free delivery, setup or times.", serviceAreaIntro: "One or two sentences about delivering to the town and the nearby communities listed." } : { steps: "Three steps (title 2-4 words, body one sentence) for how a new customer gets started with a service business like this: contact, agree, done.", serviceAreaIntro: "One or two sentences about serving the town and the nearby communities listed." }),
         cta: `ctaTitle: 3-7 words. ctaLine: one sentence, at most 18 words, inviting them to ${storefront ? "come by or get in touch" : "ask for a quote"}.`,
         metaDescription: `140-155 characters: ${t.toLowerCase()} + town + one true fact + an action.`,
       },

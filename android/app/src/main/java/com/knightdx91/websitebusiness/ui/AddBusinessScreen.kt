@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -46,6 +48,7 @@ import com.knightdx91.websitebusiness.AppState
 import com.knightdx91.websitebusiness.net.Api
 import com.knightdx91.websitebusiness.net.PlaceResult
 import com.knightdx91.websitebusiness.net.addLead
+import com.knightdx91.websitebusiness.net.addManualLead
 import com.knightdx91.websitebusiness.net.searchPlaces
 import kotlinx.coroutines.launch
 
@@ -203,14 +206,75 @@ fun AddBusinessScreen(state: AppState, nav: NavHostController) {
                     }
                 }
             }
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Text(
-                        "Not on Google? Their website needs Google's details (hours, map, reviews), so they need a Google Business Profile first. That's your Google profile setup extra. Once their listing is live, search for it here.",
-                        Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+            item { ManualAddCard(state, nav) }
+        }
+    }
+}
+
+/** A business Google Maps doesn't list (VIP Rents): typed in by hand, built like any other lead. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ManualAddCard(state: AppState, nav: NavHostController) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var open by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var town by remember { mutableStateOf("") }
+    var street by remember { mutableStateOf("") }
+    var zip by remember { mutableStateOf("") }
+    var kind by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf<String?>(null) }
+    var web by remember { mutableStateOf("") }
+    var mobile by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Not on Google? Add it by hand", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                TextButton(onClick = { open = !open }) { Text(if (open) "Hide" else "Open") }
             }
+            if (!open) return@Column
+            Text(
+                "For a business Google Maps doesn't list. The site is built from what you type, so it starts with no hours, photos or reviews: fill those in on Edit. Offer them the Google profile setup too.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val field = Modifier.fillMaxWidth().padding(top = 6.dp)
+            OutlinedTextField(name, { name = it.take(120) }, label = { Text("Business name") }, singleLine = true, modifier = field)
+            OutlinedTextField(phone, { phone = it.take(30) }, label = { Text("Phone") }, placeholder = { Text("(256) 555-0123") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = field)
+            OutlinedTextField(town, { town = it.take(60) }, label = { Text("Town") }, placeholder = { Text("Cullman") }, singleLine = true, modifier = field)
+            OutlinedTextField(street, { street = it.take(120) }, label = { Text("Street address (optional)") }, supportingText = { Text("Leave blank if they don't have a shop") }, singleLine = true, modifier = field)
+            OutlinedTextField(zip, { zip = it.take(10) }, label = { Text("ZIP (optional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = field)
+            OutlinedTextField(kind, { kind = it.take(60) }, label = { Text("What they do") }, placeholder = { Text("Party & event rentals") }, singleLine = true, modifier = field)
+            Text("Kind of business:", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ADD_PACKS.forEach { (id, _) -> FilterChip(selected = category == id, onClick = { category = id }, label = { Text(categoryLabel(id)) }) }
+            }
+            OutlinedTextField(web, { web = it.take(300) }, label = { Text("Facebook or web page (optional)") }, placeholder = { Text("https://facebook.com/…") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = field)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                Checkbox(checked = mobile, onCheckedChange = { mobile = it })
+                Text("They come to the customer (no shop to visit)", style = MaterialTheme.typography.bodyMedium)
+            }
+            Button(
+                onClick = {
+                    when {
+                        name.trim().length < 2 -> return@Button context.toast("Type the business name")
+                        phoneDigits(phone).length < 10 -> return@Button context.toast("Type their 10-digit phone number")
+                        town.trim().length < 2 -> return@Button context.toast("Type the town")
+                        category == null -> return@Button context.toast("Pick the kind of business")
+                    }
+                    busy = true
+                    scope.launch {
+                        try {
+                            val res = state.api.addManualLead(name, phone, town, street, zip, kind, category!!, web, mobile)
+                            context.toast(if (res.existed) "A business with that phone number is already in your leads" else "Added! Building the site now (about a minute).")
+                            nav.navigate("lead/${res.id}")
+                        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't add it") } finally { busy = false }
+                    }
+                },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) { Text(if (busy) "Adding…" else "Add & build site") }
         }
     }
 }

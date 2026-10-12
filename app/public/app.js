@@ -954,7 +954,7 @@
     const C = {};
     C.head = `<section class="card">
         <h1>${esc(r ? r.name : l.name)}</h1>
-        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}${work && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="webcheck" title="Search the web for a page Google doesn't show">🔎 Re-check website</button> <button class="btn btn--small" type="button" data-act="googleimport" title="Pull the latest hours, phone, rating, payment and parking info and photo from their Google listing, then rewrite the text">🔄 Import from their Google page</button>` : ""}</p>${l.googleImportedAt ? `<p class="small muted">Refreshed from their Google page ${esc(new Date(l.googleImportedAt).toLocaleDateString())}.</p>` : ""}${foundLine(l)}
+        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}${work && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="webcheck" title="Search the web for a page Google doesn't show">🔎 Re-check website</button>${l.notOnGoogle ? "" : ` <button class="btn btn--small" type="button" data-act="googleimport" title="Pull the latest hours, phone, rating, payment and parking info and photo from their Google listing, then rewrite the text">🔄 Import from their Google page</button>`}` : ""}</p>${l.notOnGoogle ? `<p class="small" style="color:var(--warn)">📍 Not on Google Maps. This site was built from what was typed in: check every detail with the owner, and offer the Google profile setup so customers can find them on Maps.</p>` : ""}${l.googleImportedAt ? `<p class="small muted">Refreshed from their Google page ${esc(new Date(l.googleImportedAt).toLocaleDateString())}.</p>` : ""}${foundLine(l)}
         ${l.rating ? `<p><span class="stars">★ ${l.rating.toFixed(1)}</span> on Google</p>` : ""}
         <p>${esc(l.address || "")}</p>
         <div id="askbox"></div>
@@ -3286,7 +3286,21 @@
         <input name="q" required minlength="3" maxlength="120" autocomplete="off" placeholder="e.g. Rusty's Diner"></label>
         <button class="btn btn--primary" type="submit">Search Google</button></form>
       <ul class="list" id="results"></ul>
-      <section class="card small muted"><strong>Not on Google?</strong> Their website needs Google's details (hours, map, reviews), so they need a Google Business Profile first. That's your Google profile setup extra. Once their listing is live, search for it here.</section>`;
+      <details class="card" id="manualBox"><summary><strong>Not on Google? Add it by hand</strong></summary>
+        <p class="small muted">For a business Google Maps doesn't list. The site is built from what you type, so it starts with no hours, photos or reviews: fill those in on Edit. Offer them the Google profile setup too.</p>
+        <form id="mf">
+          <label class="field">Business name<input name="name" required minlength="2" maxlength="120" autocomplete="off"></label>
+          <label class="field">Phone<input name="phone" type="tel" inputmode="tel" required autocomplete="off" placeholder="(256) 555-0123"></label>
+          <label class="field">Town<input name="town" required maxlength="60" autocomplete="off" placeholder="Cullman" list="mfTowns"></label>
+          <datalist id="mfTowns">${START_TOWNS.map(([t]) => `<option value="${t}">`).join("")}</datalist>
+          <label class="field">Street address <span class="hint">optional; leave blank if they don't have a shop</span><input name="street" maxlength="120" autocomplete="off"></label>
+          <label class="field">ZIP <span class="hint">optional</span><input name="zip" inputmode="numeric" maxlength="10" autocomplete="off"></label>
+          <label class="field">What they do <span class="hint">a few words, e.g. “Party & event rentals”</span><input name="kind" maxlength="60" autocomplete="off"></label>
+          <label class="field">Kind of business<select name="category" required><option value="">Pick the closest…</option>${PACKS.map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
+          <label class="field">Facebook or web page <span class="hint">optional, starts with https://</span><input name="web" type="url" maxlength="300" autocomplete="off"></label>
+          <label class="check"><input type="checkbox" name="mobile"> They come to the customer (no shop to visit)</label>
+          <div class="btns btns--full"><button class="btn btn--primary" type="submit">Add &amp; build site</button></div>
+        </form></details>`;
     const list = $app.querySelector("#results");
     $app.querySelector("#sq").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -3329,6 +3343,18 @@
           } catch (err) { toast(err.message); b.disabled = false; b.textContent = "Add & build site"; }
         }));
       } catch (err) { list.innerHTML = ""; toast(err.message); } finally { btn.disabled = false; }
+    });
+    $app.querySelector("#mf").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target, b = f.querySelector("button");
+      if (f.phone.value.replace(/\D/g, "").length < 10) { f.phone.focus(); return toast("Type their 10-digit phone number"); }
+      b.disabled = true; b.innerHTML = '<span class="spin"></span> Adding…';
+      try {
+        const v = (k) => f[k].value.trim() || undefined;
+        const res = await api("/leads/manual", { method: "POST", json: { name: v("name"), phone: v("phone"), town: v("town"), street: v("street"), zip: v("zip"), kind: v("kind"), category: f.category.value, web: v("web"), comesToCustomers: f.mobile.checked } });
+        toast(res.existed ? "A business with that phone number is already in your leads" : "Added! Building the site now (about a minute).");
+        go("#/lead/" + res.id);
+      } catch (err) { toast(err.message); b.disabled = false; b.textContent = "Add & build site"; }
     });
     $app.querySelector("[name=q]").focus();
   }

@@ -29,6 +29,8 @@ export interface Place {
   rating?: number;
   userRatingCount?: number;
   googleMapsUri?: string;
+  /** Google's flag for businesses with no storefront (they go to the customer). */
+  pureServiceAreaBusiness?: boolean;
   websiteUri?: string;
   photos?: PlacePhoto[];
   priceLevel?: string;

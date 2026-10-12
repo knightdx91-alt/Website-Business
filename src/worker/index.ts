@@ -57,6 +57,7 @@ import {
   type WebPresence,
 } from "../places/qualify.ts";
 import { resolvePresence } from "../places/web-presence.ts";
+import { isManualPlaceId, manualPlace } from "../places/manual.ts";
 import { LESSON_IDS, trainingCourse } from "./training.ts";
 import { customerBoardPitch, customerPitchPage, guideById } from "./guides.ts";
 import {
@@ -569,6 +570,8 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
       })(),
     siteImport: record?.siteImport ?? null,
     googleImportedAt: record?.googleImportedAt ?? null,
+    /** Typed in by hand: no Google Maps listing, so no Google import, review link or Google photos. */
+    notOnGoogle: isManualPlaceId(l.place_id),
     existingSite: record?.existingSite
       ? {
           url: record.existingSite.url,
@@ -629,6 +632,10 @@ function markShown(lead: LeadRow): Partial<LeadRow> {
 }
 
 const SITE_UPDATE_COLLAPSE_MS = 15 * 60_000;
+
+/** For Google-only tools on a lead that was typed in by hand. */
+const NOT_ON_GOOGLE =
+  "They aren't on Google Maps yet, so there's no Google listing to use. Set up their Google Business Profile first (the profile setup extra).";
 
 /**
  * "X updated Y's website (hours, services)": one alert per editing session. The editor saves card by card, so saves by
@@ -2035,6 +2042,89 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return json({ id, existed: false });
   }
 
+  // A business that isn't on Google Maps (VIP Rents): built from what the team types in (owner and callers).
+  if (path === "/leads/manual" && m === "POST") {
+    const input = await body(
+      req,
+      z.object({
+        name: z.string().trim().min(2).max(120),
+        phone: z.string().trim().min(7).max(30),
+        town: z.string().trim().min(2).max(60),
+        street: z.string().trim().max(120).optional(),
+        zip: z.string().trim().max(10).optional(),
+        category: z.enum(CATEGORY_IDS),
+        kind: z.string().trim().max(60).optional(),
+        web: z.string().trim().max(300).optional(),
+        comesToCustomers: z.boolean().optional(),
+      }),
+    );
+    const phone = normalizeUsPhone(input.phone);
+    if (!phone)
+      throw new HttpError(400, "That doesn't look like a 10-digit US phone number.");
+    if (input.web && !/^https?:\/\/[^\s]+\.[^\s]+/i.test(input.web))
+      throw new HttpError(400, "The web page should start with https:// (or leave it blank).");
+    // Same phone already in the app (from a run or an earlier hand-add): open that one instead of making a twin.
+    const digits = phone.e164.replace(/\D/g, "").slice(-10);
+    const dupe = await env.DB.prepare(
+      "SELECT id FROM leads WHERE status != 'expired' AND replace(replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', ''), '+1', '') = ? LIMIT 1",
+    )
+      .bind(digits)
+      .first<{ id: string }>();
+    if (dupe) return json({ id: dupe.id, existed: true });
+    const id = newId();
+    const p = manualPlace(id, input);
+    let presence = webPresence(p.websiteUri) as WebPresence;
+    let label: string = PRESENCE_LABEL[presence];
+    let foundUrl: string | null = null;
+    if (presence === "none" || presence === "social") {
+      const found = await resolvePresence(env.BRAVE_SEARCH_API_KEY, p);
+      if (found) ({ presence, label, url: foundUrl } = found);
+    }
+    const reason = `Not on Google Maps · ${label} · added by ${session.name}`;
+    await env.DB.prepare(
+      `INSERT INTO leads (id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, score, status, place_json, lat, lng, fetched_at, created_at, updated_at, found_url)
+       VALUES (?, ?, NULL, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        id,
+        p.id,
+        input.category,
+        p.displayName?.text ?? input.name,
+        p.nationalPhoneNumber,
+        p.formattedAddress ?? "",
+        presence,
+        reason,
+        scorePlace(p, presence),
+        JSON.stringify(p),
+        p.location?.latitude ?? null,
+        p.location?.longitude ?? null,
+        now(),
+        now(),
+        now(),
+        foundUrl,
+      )
+      .run();
+    await env.DB.prepare(
+      "INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)",
+    )
+      .bind(
+        newId(),
+        id,
+        session.name,
+        "Added by hand: not on Google Maps, so everything came from what was typed in. Double-check the details with the owner, and offer to set up their Google Business Profile.",
+        now(),
+      )
+      .run();
+    await env.JOBS.send({ type: "build", leadId: id });
+    await notify(env, {
+      kind: "added",
+      actor: session,
+      leadId: id,
+      text: `${session.name} added ${input.name} by hand (not on Google Maps)`,
+    });
+    return json({ id, existed: false });
+  }
+
   if (path === "/leads" && m === "GET") {
     const where: string[] = ["status != 'expired'"];
     const binds: unknown[] = [];
@@ -2525,6 +2615,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       }
     }
     if (action === "/reviewcard.pdf" && m === "GET") {
+      if (isManualPlaceId(lead.place_id))
+        throw new HttpError(409, NOT_ON_GOOGLE);
       if (
         lead.category === "finance" &&
         lead.record_json &&
@@ -2538,6 +2630,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       );
     }
     if ((action === "/tents.pdf" || action === "/window.pdf") && m === "GET") {
+      if (isManualPlaceId(lead.place_id))
+        throw new HttpError(409, NOT_ON_GOOGLE);
       const siteUrl = lead.custom_domain
         ? `https://${lead.custom_domain}/`
         : lead.live_url;
@@ -2594,6 +2688,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       );
     }
     if (action === "/reviewcard" && m === "GET") {
+      if (isManualPlaceId(lead.place_id))
+        throw new HttpError(409, NOT_ON_GOOGLE);
       if (
         lead.category === "finance" &&
         lead.record_json &&
@@ -2604,6 +2700,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       return reviewCards(lead.name ?? "us", lead.place_id);
     }
     if ((action === "/tents" || action === "/window") && m === "GET") {
+      if (isManualPlaceId(lead.place_id))
+        throw new HttpError(409, NOT_ON_GOOGLE);
       const siteUrl = lead.custom_domain
         ? `https://${lead.custom_domain}/`
         : lead.live_url;
@@ -2866,6 +2964,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     // link into the record (never over what the owner confirmed), then a rewrite so the words follow Google's newest
     // summary and reviews and the main photo is the newest Google photo. Costs one Place Details call + the copy.
     if (action === "/googleimport" && m === "POST") {
+      if (isManualPlaceId(lead.place_id))
+        throw new HttpError(409, NOT_ON_GOOGLE);
       if (isPayTest(lead)) throw new HttpError(409, "The practice lead has no Google page");
       if (!lead.record_json) throw new HttpError(409, "This site hasn't been built yet");
       const place = await getPlace(

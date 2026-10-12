@@ -56,6 +56,21 @@ suspend fun Api.addLead(placeId: String, category: String, phone: String?): AddL
     return AddLeadResult(r.optString("id"), r.optBoolean("existed"))
 }
 
+/** `POST /api/leads/manual`: a business that isn't on Google Maps, built from what was typed in. */
+suspend fun Api.addManualLead(
+    name: String, phone: String, town: String, street: String, zip: String,
+    kind: String, category: String, web: String, comesToCustomers: Boolean,
+): AddLeadResult {
+    val b = JSONObject().put("name", name.trim()).put("phone", phone.trim()).put("town", town.trim())
+        .put("category", category).put("comesToCustomers", comesToCustomers)
+    if (street.isNotBlank()) b.put("street", street.trim())
+    if (zip.isNotBlank()) b.put("zip", zip.trim())
+    if (kind.isNotBlank()) b.put("kind", kind.trim())
+    if (web.isNotBlank()) b.put("web", web.trim())
+    val r = postJson("/leads/manual", b)
+    return AddLeadResult(r.optString("id"), r.optBoolean("existed"))
+}
+
 /** Open leads with their Google Place IDs (the walk-in route's directions link carries them). */
 data class RouteLead(val lead: Lead, val placeId: String?)
 

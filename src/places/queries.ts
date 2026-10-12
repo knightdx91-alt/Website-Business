@@ -57,6 +57,9 @@ export const SEARCH_GROUPS: SearchGroup[] = [
   { id: "civic", label: "VFW, Legion, Lions & lodges", category: "church", terms: ["VFW post", "American Legion post", "Lions Club", "Masonic lodge", "Ruritan club"] },
   { id: "charity", label: "Food pantries & charities", category: "church", terms: ["food pantry", "food bank", "clothes closet", "ministry center"] },
   { id: "community", label: "Community centers", category: "church", terms: ["community center", "civic center", "community club"] },
+  // Party & event rentals (Oct 2026, owner's ask: VIP Rents): no trade pack yet, so they build on the catch-all with
+  // their own label, seeded rentals and a "check your date" form (rentalKind in packs/general.ts).
+  { id: "party_rentals", label: "Party & event rentals", category: "general", terms: ["bounce house rental", "party rentals", "tent rental", "event rentals", "table and chair rental", "porta potty rental"] },
   { id: "insurance", label: "Insurance agencies", category: "finance", terms: ["insurance agency", "independent insurance agent", "auto insurance agency", "Medicare insurance agent", "seguros de auto"] },
 ];
 
