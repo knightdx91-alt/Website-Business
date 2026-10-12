@@ -942,7 +942,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `cateringNote`) → #catering band + "Request catering" form (event_date, guests, needs); food trucks get "Where to find us" (shared events
   as "This week", `calendarUrl` → Full schedule, else the Facebook link) and a "Book the truck" form (event_date, guests, location);
   `hasForm` is true for both. `deliveryLinks` {doordash, ubereats, grubhub} + gift cards + `rewardsUrl` → #order "Order through" row.
-  Reserve is the hero primary (Order second) when `links.reserve` is set and dine-in. `restaurantBannedPhrases`: no catering / partner /
+  Reserve is the hero primary (Order second) when `links.reserve` is set and dine-in. Edit → Links (web + editform) carries a POS
+  help line under the restaurant links (Oct 2026): Shift4 SkyTab (SkyTab Online's ordering page link from the back office; orders
+  land in the POS), Toast, Square, Clover, and OpenTable / Resy / Tock for reservations; the site only links, never takes orders. `restaurantBannedPhrases`: no catering / partner /
   rewards / gift-card wording unless given. Edit → "Restaurant details".
 - Salons (Oct 2026): `ext.salon.team` [{name, role, days, bookingUrl, line}] → "Meet the team" cards with "Book with <first>" (own link,
   else the shop's); REQUIRED "Confirm the team list" until `teamConfirmed`. `Service.durationMin` ("Haircut | $25 | 45 min" in Edit) shows

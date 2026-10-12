@@ -2103,6 +2103,9 @@ export function editForm(l: EditDetail): EditForm {
       ? [
           url("order", "Online ordering link", links.order || ""),
           url("reserve", "Reservations link", links.reserve || ""),
+          note(
+            "Ask which register (POS) they use; the ordering page comes from it. Shift4 SkyTab: turn on SkyTab Online in the SkyTab back office and paste its ordering page link (orders go straight into the POS). Toast: the Toast Online Ordering page link. Square: the Square Online site link. Clover: the Clover Online Ordering link. The site links to that page; it never takes orders itself. Reservations: OpenTable, Resy or Tock give a reserve link the same way.",
+          ),
         ]
       : []),
     ...(isRt

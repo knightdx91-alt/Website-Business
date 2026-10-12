@@ -1444,7 +1444,8 @@
       </section>` : ""}
       <section class="card"><h2>Links</h2>
         ${isR ? `<label class="field">Online ordering link<input name="order" type="url" value="${esc(r.links.order || "")}" placeholder="https://"></label>
-        <label class="field">Reservations link<input name="reserve" type="url" value="${esc(r.links.reserve || "")}" placeholder="https://"></label>` : ""}
+        <label class="field">Reservations link<input name="reserve" type="url" value="${esc(r.links.reserve || "")}" placeholder="https://"></label>
+        <p class="small muted">Ask which register (POS) they use; the ordering page comes from it. Shift4 SkyTab: turn on SkyTab Online in the SkyTab back office and paste its ordering page link (orders go straight into the POS). Toast: the Toast Online Ordering page link. Square: the Square Online site link. Clover: the Clover Online Ordering link. The site links to that page; it never takes orders itself. Reservations: OpenTable, Resy or Tock give a reserve link the same way.</p>` : ""}
         ${isRt ? `<label class="field">${r.variant === "florist" ? "Online flower order page" : "Online shop (Shopify, Etsy, Facebook shop)"}<input name="shop" type="url" value="${esc(ext.shopUrl || "")}" placeholder="https://"></label>` : ""}
         ${isP ? `<label class="field">Email for artwork<input name="email" type="email" value="${esc(r.email || "")}" placeholder="orders@…"></label>` : ""}
         <label class="field">Online booking link<input name="booking" type="url" value="${esc(r.links.booking || "")}" placeholder="https://"></label>
