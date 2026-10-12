@@ -837,7 +837,8 @@ var LEAD=${JSON.stringify(leadId)},BASE="/l/"+LEAD,FEED=BASE+"/prices.json",SLUG
 // one tank (a slug), rotate (?rotate=1, a passive sign), or pick (the default: every tank as a tile; tap one to open it)
 var MODE=SLUG?"one":(/[?&]rotate=1/.test(location.search)?"rotate":"pick"),TITLE=${JSON.stringify(feed.title)},custIdle=null;
 var SEC=${JSON.stringify(sec)},SECT=${JSON.stringify(W.section)},EMOJI=${JSON.stringify(W.emoji)},EMPTY=${JSON.stringify(W.empty)},FIELDS=${FIELDS},KIND=${JSON.stringify(listKind(record))};
-try{staffTok=localStorage.getItem("staff."+LEAD)||null}catch(e){}
+// the staff token lives only while the staff screen is open: Done, 3 idle minutes or a reload all mean the PIN again
+try{localStorage.removeItem("staff."+LEAD)}catch(e){}
 var $=function(id){return document.getElementById(id)};
 function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function api(path,opts){opts=opts||{};opts.headers=Object.assign({"content-type":"application/json"},opts.headers||{});if(staffTok)opts.headers["x-staff"]=staffTok;return fetch(BASE+path,opts).then(function(r){return r.json().then(function(j){if(!r.ok){if(r.status===401)lock();throw new Error(j.error||("Failed ("+r.status+")"))}return j})})}
@@ -904,9 +905,9 @@ function tryPin(){if(!pin)return;$("pinMsg").className="msg";$("pinMsg").textCon
 $("nfcBtn").onclick=function(){try{var r=new NDEFReader();$("pinMsg").className="msg";$("pinMsg").textContent="Hold the staff tag to the back of the tablet…";r.scan().then(function(){r.onreading=function(ev){var txt="";try{for(var k=0;k<ev.message.records.length;k++){var rec=ev.message.records[k];if(rec.recordType==="text"){txt=new TextDecoder(rec.encoding||"utf-8").decode(rec.data);break}}}catch(e){}var m=/^ua-staff:([a-f0-9]+)/i.exec(txt||"");if(!m){$("pinMsg").className="msg bad";$("pinMsg").textContent="That tag isn't a staff tag.";return}api("/unlock/nfc",{method:"POST",body:JSON.stringify({secret:m[1]})}).then(function(j){gotToken(j.token)}).catch(function(e){$("pinMsg").className="msg bad";$("pinMsg").textContent=e.message})}}).catch(function(e){$("pinMsg").className="msg bad";$("pinMsg").textContent="NFC isn't available: "+e.message})}catch(e){$("pinMsg").className="msg bad";$("pinMsg").textContent="This tablet has no NFC."}};
 $("codeBtn").onclick=function(){$("ulCode").hidden=false;$("codeMsg").textContent="Waiting…";api("/unlock/start",{method:"POST",body:"{}"}).then(function(j){$("codeShow").textContent=j.code.slice(0,3)+" "+j.code.slice(3);stopPoll();pollT=setInterval(function(){api("/unlock/"+j.session).then(function(p){if(p.ok){stopPoll();gotToken(p.token)}else if(p.expired){stopPoll();$("codeMsg").textContent="That code expired. Tap again for a new one."}})},3000)}).catch(function(e){$("codeMsg").textContent=e.message})};
 function stopPoll(){if(pollT){clearInterval(pollT);pollT=null}}
-function gotToken(t){staffTok=t;try{localStorage.setItem("staff."+LEAD,t)}catch(e){}$("unlock").classList.remove("on");$("ulCode").hidden=true;stopPoll();enter()}
+function gotToken(t){staffTok=t;$("unlock").classList.remove("on");$("ulCode").hidden=true;stopPoll();enter()}
 function enter(){staff=true;document.body.classList.remove("customer");document.body.classList.add("staff");$("staff").textContent="Staff ✓";cur=tankName()||null;load().then(function(){if(!data||!data.sections.length)return;if(!cur&&MODE!=="pick")cur=data.sections[0].name;render()});touch()}
-function lock(){staff=false;cur=null;document.body.classList.add("customer");document.body.classList.remove("staff");$("staff").textContent="Staff";["add","more","unlock"].forEach(function(id){$(id).classList.remove("on")});closeScan();load()}
+function lock(){staff=false;staffTok=null;cur=null;document.body.classList.add("customer");document.body.classList.remove("staff");$("staff").textContent="Staff";["add","more","unlock"].forEach(function(id){$(id).classList.remove("on")});closeScan();load()}
 $("lock").onclick=lock;
 function touch(){clearTimeout(idle);idle=setTimeout(function(){if(staff)lock()},180000)}
 document.addEventListener("pointerdown",function(){if(staff)touch()});

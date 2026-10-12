@@ -761,8 +761,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `pinfail.<lead>`), a staff NFC tag (Web NFC `NDEFReader`, text `ua-staff:<nfcSecret>` = hmac(APP_SECRET, nfc.<id>.<client_key>)
   [:16], shown on the board; only NFC tablets), or a 6-digit code the tablet shows (`POST /l/<id>/unlock/start`, polled at
   `GET /l/<id>/unlock/<session>`; the board's `POST /c/…/unlock {code}` approves; pending codes in settings key `unlock.<lead>`,
-  10 min). All three return a staff token `<exp>.<hmac(staff.<id>.<client_key>.<exp>)>` (12 h, header `x-staff`, kept in
-  localStorage; "Revoke old links" ends it). Staff API `/l/<id>/staff/*`: `data` (feed with every item + `catalog`), `adjust`
+  10 min). All three return a staff token `<exp>.<hmac(staff.<id>.<client_key>.<exp>)>` (12 h, header `x-staff`; held only in
+  memory since Oct 2026, owner's rule: Done, the 3-minute idle lock or a reload drop it, so every staff session starts with the
+  PIN / tag / code again; "Revoke old links" ends live ones). Staff API `/l/<id>/staff/*`: `data` (feed with every item + `catalog`), `adjust`
   {section,item,delta} (`adjustQty`: clamp 0–9999, >0 clears Sold out, 0 hides on the page), `set` {qty|soldOut|price|info}
   (`setItem`), `add` {section,name,qty,price?} (`addToTank`: existing row += qty, a known catalog name brings its photo/price/
   card, else new; new section allowed), `photo?section&item` (camera, R2 `owner/<id>/t….jpg`, caption = name, sets every row
