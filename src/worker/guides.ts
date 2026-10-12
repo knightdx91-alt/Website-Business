@@ -322,7 +322,7 @@ export function displayGuide(s: AppSettings): Guide {
         steps: [
           'One tank: the tank name as the heading, the shop name small on the right, and a card per item: photo (or a fish mark when there is none), name, note, the price in big orange type, "n left" under the price when 5 or fewer are left.',
           'Sold-out and zero-count items are gone, exactly like the price page. A tank with nothing in stock says "Sold out for now. Ask us what\'s coming."',
-          "Every tank on one screen (the usual choice): one tile per tank with a photo, how many are in and the first few names; a customer taps a tank to see what's in it, and it goes back to the tiles after a minute and a half. Staff unlock and tap a tank to count or add to it right there.",
+          "Every tank on one screen (the usual choice): one tile per tank with a photo, how many are in and the first few names; a customer taps a tank to see what's in it, and it goes back to the tiles after a minute and a half. Up to nine tanks fit on one screen with nothing to scroll (the tiles resize to fit); from ten up the page scrolls down. Staff unlock and tap a tank to count or add to it right there.",
           "Rotating sign: the same tank cards, a new tank every 10 seconds, with dots at the bottom showing which one is up. For a screen at the register or the door that nobody touches (add ?rotate=1 to the address, or use the footer link).",
           "It shrinks the text so a tank with 15 items still fits with nothing cut off, and goes to two columns on a wide screen.",
           'Bottom left: "Updated" with the time of the last change on the board. Bottom right: a small "Staff" button. Customers tap a fish for its care card; nothing else responds.',

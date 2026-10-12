@@ -1,4 +1,4 @@
-import { promoTerms } from "./referrals.ts";
+import { founderOffer, promoTerms, type FounderOffer } from "./referrals.ts";
 import { notify } from "./notify.ts";
 import {
   isListPlan,
@@ -1553,6 +1553,57 @@ function badgesHtml(s: AppSettings): string {
   return `<ul class="badges">${b.map((x) => `<li>${e(x)}</li>`).join("")}</ul>`;
 }
 
+/** The two discount programs on the company site: the referral program and the founding-customer bonus, from Settings
+ *  (promoRules) and how many founder spots are left (founderOffer). Nothing renders when both are off. */
+function promoHtml(
+  s: AppSettings,
+  offer: FounderOffer,
+  o: { compact?: boolean } = {},
+): string {
+  const r = promoRules(s);
+  const cards: Array<{ tag: string; h: string; p: string }> = [];
+  if (r.referralMonths > 0)
+    cards.push({
+      tag: "Referral program",
+      h: `Refer a business, get ${r.referralMonths} months free`,
+      p: `Know a business that needs a website? When they sign up for a plan of ${r.referralMinMonths} months or more and their first payment goes through, you get ${r.referralMonths} months of your own plan free, taken off your next bills. Up to ${r.referralMaxPerYear} referrals count each year; any more carry over to the next year. Just have them mention your business name when they sign up.`,
+    });
+  if (r.founderSlots > 0 && offer.choices.length) {
+    const picks = offer.choices
+      .map((c) => `${c.name} (${c.price})`)
+      .join(", ");
+    cards.push(
+      offer.slotsLeft > 0
+        ? {
+            tag: "New customers",
+            h: `Founding customers: ${offer.slotsLeft} of ${offer.total} spots left`,
+            p: `Our first ${offer.total} clients pick one extra free with their plan: ${picks}. One per business, picked at sign-up. When the spots are gone, the offer ends.`,
+          }
+        : {
+            tag: "New customers",
+            h: `Our first ${offer.total} founding customers are in`,
+            p: `Each picked a free extra with their plan. Thank you! Those spots are taken, but the referral program is open to every client.`,
+          },
+    );
+  }
+  if (!cards.length) return "";
+  if (o.compact)
+    return `<section class="sec sec--dark" id="offers"><div class="wrap"><div class="offers offers--compact">${cards
+      .map(
+        (c) =>
+          `<div class="offer"><p class="eyebrow">${e(c.tag)}</p><h3>${e(c.h)}</h3></div>`,
+      )
+      .join("")}</div><p class="small" style="margin:14px 0 0"><a href="/pricing#offers">How both offers work</a></p></div></section>`;
+  return `<section class="sec" id="offers"><div class="wrap"><h2>${cards.length > 1 ? "Two ways to pay less" : cards[0]!.tag}</h2>
+<div class="grid offers">${cards
+    .map(
+      (c) =>
+        `<div class="card offer"><p class="eyebrow eyebrow--dark">${e(c.tag)}</p><h3>${e(c.h)}</h3><p>${e(c.p)}</p></div>`,
+    )
+    .join("")}</div>
+<p class="small muted" style="margin-top:14px">Credits aren't cash and can't be transferred. Both offers can change for future sign-ups with 30 days' notice; what you've already earned stays. The full wording is in our <a href="/terms#referrals">terms</a>.</p></div></section>`;
+}
+
 const UNIT_GROUP: Record<string, string> = {
   "one-time": "One-time set-ups",
   month: "Monthly services",
@@ -1761,9 +1812,10 @@ async function home(env: Env, url: URL): Promise<Response> {
   const lowest = lowestOf(s);
   const sent = url.searchParams.get("sent") === "1";
   const missing = url.searchParams.get("missing") === "1";
-  const [ownerPhoto, live] = await Promise.all([
+  const [ownerPhoto, live, offer] = await Promise.all([
     ownerPhotoExists(env),
     liveClients(env),
+    founderOffer(env, s),
   ]);
   const title = `${name} | Website Design for Cullman, AL Businesses`;
   const description = `We build your business a real website first, free, from your Google listing. See it on your phone, then pay only if you want it live${lowest ? `: from ${money(lowest)}/month` : ""} with hosting and updates included. Cullman, Alabama.`;
@@ -1810,6 +1862,7 @@ ${extrasHtml(s, { compact: true })}
     : ""
 }
 
+${promoHtml(s, offer, { compact: true })}
 ${priceListTeaser(s)}
 ${ownerSection(s, ownerPhoto)}
 ${quotes.length > 1 ? `<section class="sec sec--alt"><div class="wrap"><h2>From our clients</h2><div class="grid">${quotes.slice(1, 4).map(quoteHtml).join("")}</div></div></section>` : ""}
@@ -2001,6 +2054,7 @@ ${contactSection(s)}`;
 
 async function pricingPage(env: Env): Promise<Response> {
   const s = await getSettings(env);
+  const offer = await founderOffer(env, s);
   const name = s.companyName || "Underground Associates";
   const lowest = lowestOf(s);
   const title = `Pricing | ${name}`;
@@ -2022,6 +2076,7 @@ ${s.churchAnnualMonthsFree ? `<p class="small muted">Churches and nonprofits: 12
 </div></section>`
     : ""
 }
+${promoHtml(s, offer)}
 ${priceListHtml(s)}
 ${extrasHtml(s)}
 <section class="sec sec--alt" id="compare"><div class="wrap"><h2>Why a monthly plan</h2><p class="lead">A website is never finished: hours change, prices change, photos age. The plan pays for someone to keep it right.</p>${compareHtml(s)}</div></section>
@@ -2058,6 +2113,14 @@ ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</
         "Can I pay by check or bank transfer?",
         "Yes for churches, nonprofits and anyone who prefers an invoice. Everyone else pays by card on the phone, and the card on file is charged each month or year.",
       ],
+      ...(promoRules(s).referralMonths > 0
+        ? [
+            [
+              "Do you have a referral program?",
+              `Yes. When a business you send us signs up for a plan of ${promoRules(s).referralMinMonths} months or more and pays, you get ${promoRules(s).referralMonths} months of your plan free as a credit on your next bills, up to ${promoRules(s).referralMaxPerYear} referrals a year (more carry over). Have them mention your business name when they sign up.`,
+            ] as [string, string],
+          ]
+        : []),
     ],
   )}</div></section>
 ${contactSection(s)}`;
@@ -2574,6 +2637,8 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .trades span{display:block;margin-top:8px;font-size:.9rem;color:var(--muted)}.trades strong{display:block;color:var(--ink);font-size:1rem;line-height:1.25}.trades em{display:block;font-style:normal;font-size:.85rem}.trades b{display:block;color:var(--blue);margin-top:4px}
 .trades a:hover strong{text-decoration:underline}
 .plan__term{color:var(--goldtext)!important;font-weight:700;margin:0!important;font-size:.95rem}.plan__flex{margin:4px 0 0!important;font-size:.9rem}.plan__cta{margin:16px 0 0!important}.plan__see{margin-top:8px!important}
+.offers{display:grid;gap:16px}.grid.offers{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}.offers .offer h3{margin:0 0 6px;font-size:1.2rem}.offers .offer .eyebrow{margin-bottom:6px}
+.offers--compact{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}.offers--compact .offer{padding:18px 20px;border:1px solid rgba(255,255,255,.18);border-radius:14px}.offers--compact h3{color:#fff}
 .badges{list-style:none;padding:0;margin:20px 0 0;display:flex;flex-wrap:wrap;gap:8px}.badges li{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;font-size:.92rem}.badges li::before{content:"✓";color:var(--goldtext);font-weight:800}
 .xrow{margin-top:28px}.xrow h3{font-size:1.2rem}.chips--x li{font-weight:400;display:inline-flex;gap:8px;align-items:baseline}.chips--x b{font-weight:700}.chips--x span{color:var(--goldtext);font-weight:700;font-size:.9rem}
 .xgroup{margin-top:28px;font-size:1.2rem}

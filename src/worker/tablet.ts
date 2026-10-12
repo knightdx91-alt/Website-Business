@@ -740,13 +740,14 @@ export async function serveDisplay(
 <link rel="icon" href="/d/${escHtml(leadId)}/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/brand/logo-192.png">${homescreenHead({ manifestUrl: `/d/${leadId}/manifest.webmanifest${slug ? `?tank=${encodeURIComponent(slug)}` : ""}`, title: tank ? `${record.name} ${tank.name}` : record.name })}
 <style>
 :root{--bg:#0b1324;--ink:#f6f7fb;--muted:#9aa6bf;--gold:#fca311;--card:#141f38;--line:#2b3a5e;--ok:#2bd46f;--bad:#ff6b6b}
-*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--ink);font:clamp(18px,2.6vw,30px)/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--ink);font:clamp(18px,2.6vw,30px)/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none;display:flex;flex-direction:column}
 body.customer{cursor:none}
-header{display:flex;justify-content:space-between;align-items:baseline;padding:2vh 3vw 1vh;gap:2vw}
+header{flex:none;display:flex;justify-content:space-between;align-items:baseline;padding:2vh 3vw 1vh;gap:2vw}
 h1{margin:0;font-size:clamp(28px,5vw,64px);line-height:1.1}
 .shop{color:var(--muted);font-size:.75em;white-space:nowrap}
-main{padding:0 3vw 3vh;height:calc(100% - 12vh);overflow:hidden}
-body.staff main{overflow:auto;height:calc(100% - 22vh);padding-bottom:12vh;font-size:.85em}
+/* main takes what the header leaves; the bottom padding clears the fixed footer (and the staff bar in staff mode) */
+main{padding:0 3vw 7vh;flex:1 1 0;min-height:0;overflow:hidden}
+body.staff main{overflow:auto;padding-bottom:30vh;font-size:.85em}
 body.staff .grid{grid-template-columns:1fr}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,17em),1fr));gap:1.2vmin}
 .it{display:grid;grid-template-columns:auto 1fr auto;gap:1em;align-items:center;background:var(--card);border-radius:1em;padding:.7em 1em}
@@ -783,14 +784,20 @@ body.staff .staffbar{display:flex}
 .list{display:grid;gap:.4em;max-height:50vh;overflow:auto}.list .it{padding:.5em .8em}
 .chip{display:inline-block;font-size:.7em;background:#2b3a5e;border-radius:999px;padding:.15em .6em;color:#fff;margin-left:.4em}
 .chip.ai{background:#4b3a7a}
-/* the picker: one tile per tank, 1–9 fit on a tablet */
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14em),1fr));gap:1.6vmin;align-content:start}
-.tile{background:var(--card);border-radius:1.2em;padding:1em 1.1em;cursor:pointer;display:grid;gap:.35em;align-content:start;min-height:9em;border:2px solid transparent}
+/* the picker: one tile per tank. 1–9 tanks are laid out as a grid that fills the screen (--cols set per count and
+   orientation, every row the same height, the photo takes what is left), so nothing scrolls; from 10 up the tiles keep a
+   fixed shape and the page scrolls down, never sideways. */
+body.pickhome main{display:flex;flex-direction:column}
+.tiles{display:grid;grid-template-columns:repeat(var(--cols,3),1fr);grid-auto-rows:1fr;gap:1.6vmin;flex:1 1 0;min-height:0}
+.tiles.scroll{flex:none;grid-auto-rows:auto;overflow:auto;max-height:100%}
+.tile{background:var(--card);border-radius:1.2em;padding:.8em 1em;cursor:pointer;display:flex;flex-direction:column;gap:.3em;min-width:0;border:2px solid transparent}
 .tile:active{border-color:var(--gold)}
-.tile img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:.8em;background:#1e2b4b}
-.tile .big{display:grid;place-items:center;aspect-ratio:16/9;font-size:2.6em;background:#1e2b4b;border-radius:.3em;opacity:.7}
-.tile .tn{font-weight:800;font-size:1.25em;line-height:1.15}.tile .tc{color:var(--gold);font-weight:700;font-size:.85em}.tile .tl{color:var(--muted);font-size:.72em;line-height:1.3}
-.tile.new{border:2px dashed var(--line);color:var(--muted);place-items:center;font-size:1.1em}
+.tile img,.tile .big{flex:1 1 0;min-height:3.2em;width:100%;object-fit:cover;border-radius:.8em;background:#1e2b4b}
+.tiles.scroll .tile img,.tiles.scroll .tile .big{flex:none;aspect-ratio:16/9}
+.tile .big{display:grid;place-items:center;font-size:2.4em;min-height:1.3em;opacity:.7;border-radius:.3em}
+.tile .tn,.tile .tc,.tile .tl{flex:none;overflow:hidden;text-overflow:ellipsis}
+.tile .tn{font-weight:800;font-size:1.2em;line-height:1.15;white-space:nowrap}.tile .tc{color:var(--gold);font-weight:700;font-size:.85em}.tile .tl{color:var(--muted);font-size:.72em;line-height:1.3;min-height:2.6em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tile.new{border:2px dashed var(--line);color:var(--muted);justify-content:center;align-items:center;font-size:1.1em}
 #back{display:none;white-space:nowrap;flex:none}body.tankview #back{display:inline-block}
 .hint{color:var(--muted);font-size:.7em;margin:0 0 1vh}
 </style></head><body class="customer">
@@ -836,12 +843,16 @@ function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return
 function api(path,opts){opts=opts||{};opts.headers=Object.assign({"content-type":"application/json"},opts.headers||{});if(staffTok)opts.headers["x-staff"]=staffTok;return fetch(BASE+path,opts).then(function(r){return r.json().then(function(j){if(!r.ok){if(r.status===401)lock();throw new Error(j.error||("Failed ("+r.status+")"))}return j})})}
 function tankName(){if(cur)return cur;if(SLUG&&data){for(var k=0;k<data.sections.length;k++)if(data.sections[k].slug===SLUG)return data.sections[k].name}if(MODE==="pick")return "";return data&&data.sections.length?data.sections[i%data.sections.length].name:""}
 function pick(){if(!data)return null;var n=tankName();for(var k=0;k<data.sections.length;k++)if(data.sections[k].name===n)return data.sections[k];return SLUG?{name:"",items:[]}:(MODE==="pick"?null:(data.sections[0]||null))}
-function tankView(on){document.body.classList.toggle("tankview",!!on&&MODE==="pick")}
+function tankView(on){document.body.classList.toggle("tankview",!!on&&MODE==="pick");document.body.classList.toggle("pickhome",!on&&MODE==="pick")}
+// columns for n tiles: wide screens prefer rows of 3 or 4, tall ones 1 to 3 columns; above 9 the grid scrolls
+var COLS_WIDE={1:1,2:2,3:3,4:2,5:3,6:3,7:4,8:4,9:3},COLS_TALL={1:1,2:1,3:1,4:2,5:2,6:2,7:3,8:3,9:3};
+function colsFor(n){var wide=innerWidth>innerHeight;if(n>9)return wide?4:3;return (wide?COLS_WIDE:COLS_TALL)[n]||3}
 // the picker: one tile per tank with its first photo, how many are in, and the first few names
 function renderHome(){var m=$("m"),h=$("h");h.textContent=TITLE;tankView(false);$("dots").innerHTML="";
   var secs=data?data.sections.filter(function(s){return staff||s.items.some(function(it){return !it.soldOut&&it.qty!==0})}):[];
   if(!secs.length&&!staff){m.innerHTML='<p class="empty">'+esc(EMPTY)+'</p>';return}
-  m.innerHTML='<p class="hint">'+(staff?'Tap a '+SEC+' to count, add or change what is in it.':'Tap a '+SEC+' to see what is in it and what it needs.')+'</p><div class="tiles">'+secs.map(function(s){var items=staff?s.items:s.items.filter(function(it){return !it.soldOut&&it.qty!==0});var img=null;items.forEach(function(it){if(!img&&it.image)img=it.image});
+  var n=secs.length+(staff?1:0);
+  m.innerHTML='<p class="hint">'+(staff?'Tap a '+SEC+' to count, add or change what is in it.':'Tap a '+SEC+' to see what is in it and what it needs.')+'</p><div class="tiles'+(n>9?' scroll':'')+'" style="--cols:'+colsFor(n)+'">'+secs.map(function(s){var items=staff?s.items:s.items.filter(function(it){return !it.soldOut&&it.qty!==0});var img=null;items.forEach(function(it){if(!img&&it.image)img=it.image});
     return '<div class="tile" data-tile="'+esc(s.name)+'">'+(img?'<img src="'+esc(img)+'" alt="">':'<div class="big">'+EMOJI+'</div>')+'<div class="tn">'+esc(s.name)+'</div><div class="tc">'+items.length+' in stock</div><div class="tl">'+esc(items.slice(0,3).map(function(it){return it.name}).join(" · ")+(items.length>3?" · …":""))+'</div></div>'}).join("")+(staff?'<div class="tile new" data-tile="__new">+ New '+SEC+'</div>':'')+'</div>';
   if(staff)$("tanks").innerHTML=(data?data.sections:[]).map(function(t){return '<button class="btn small ghost" data-tank="'+esc(t.name)+'">'+esc(t.name)+'</button>'}).join("")+'<button class="btn small ghost" data-tank="__new">+ New '+SEC+'</button>';
   else fit();
@@ -864,8 +875,9 @@ function render(){var s=pick();var m=$("m"),h=$("h"),d=$("dots");
   if(staff){$("tanks").innerHTML=data.sections.map(function(t){return '<button class="btn small'+(t.name===s.name?' go':' ghost')+'" data-tank="'+esc(t.name)+'">'+esc(t.name)+'</button>'}).join("")+'<button class="btn small ghost" data-tank="__new">+ New '+SEC+'</button>'}
   else fit();
   $("m").dataset.items=JSON.stringify(items)}
-function fit(){var m=$("m"),b=document.body;b.style.fontSize="";var px=parseFloat(getComputedStyle(b).fontSize);var n=0;while(m.scrollHeight>m.clientHeight+2&&px>11&&n<40){px=px*0.92;b.style.fontSize=px+"px";n++}}
-window.addEventListener("resize",function(){if(!staff)fit()});
+function over(){var m=$("m"),t=m.querySelector(".tiles");return m.scrollHeight>m.clientHeight+2||(t&&!t.classList.contains("scroll")&&t.scrollHeight>t.clientHeight+2)}
+function fit(){var b=document.body;b.style.fontSize="";var px=parseFloat(getComputedStyle(b).fontSize);var n=0;while(over()&&px>11&&n<40){px=px*0.92;b.style.fontSize=px+"px";n++}}
+window.addEventListener("resize",function(){if(MODE==="pick"&&!cur){render();return}if(!staff)fit()});
 function load(){return (staff?api("/staff/data"):fetch(FEED,{cache:"no-store"}).then(function(r){return r.json()})).then(function(j){data=j;render()}).catch(function(){})}
 load();setInterval(function(){if(!staff&&!$("info").classList.contains("on"))load()},30000);
 setInterval(function(){if(MODE==="rotate"&&!staff&&!$("info").classList.contains("on")){i++;render()}},ROTATE);

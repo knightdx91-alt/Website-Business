@@ -415,6 +415,18 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   board's 📺 links, setting a tablet up (home screen, screen timeout, plugged in, app pinning), mounting, what the shop needs to
   know, selling it (free with the plan; tablets are the shop's own), trouble. `test/worker/guides.test.ts`. Add a guide:
   a builder in guides.ts + `guideById` + a button.
+- Tablet picker layout (Oct 2026, `src/worker/tablet.ts`): the `/d/<id>/` home lays 1–9 tanks out as a grid that fills one screen,
+  stacked, nothing scrolls (`colsFor(n)`: wide screens {1:1,2:2,3:3,4:2,5:3,6:3,7:4,8:4,9:3}, tall {1:1,2:1,3:1,4:2,5:2,6:2,7:3,8:3,9:3}
+  → `--cols` on `.tiles`, `grid-auto-rows:1fr`, each tile a flex column whose photo takes what is left, `body.pickhome main` is a flex
+  column and `main` fills between the header and the fixed footer); `fit()` (`over()` also measures the tile grid) shrinks the font until
+  everything fits. From 10 tiles up (`.tiles.scroll`, 4 or 3 columns) tiles keep a 16:9 photo and the page scrolls down, never
+  sideways. Checked at 1280×800, 1024×600, 800×1280 and the Fold's 1812×2176 (scratchpad `nine2.mjs`, local King Fish given 9 tanks).
+- Offers on the company site (Oct 2026): `promoHtml(s, offer)` in company.ts shows the referral program and the founding-customer
+  bonus from `promoRules(s)` + `founderOffer(env, s)` (spots left, the ticked founder-pick extras with prices): a dark strip on the
+  home page after the plans (`#offers`, links to /pricing#offers) and a full "Two ways to pay less" section on /pricing before the price
+  list strip, plus a pricing FAQ "Do you have a referral program?". Nothing renders when both programs are off; with the spots gone the
+  founder card says so and points at referrals. The founder card needs at least one extra ticked "🎁 Founder pick" in Settings → Extras
+  (live: Get listed everywhere, Google Business Profile setup, Spanish version).
 - 🐠 Show them the Tank board (Oct 2026): a customer-facing page for a shop, like Show plans (light, app bar hidden): web
   `#/showboard/<leadId>` (`viewShowBoard`), Android `ui/ShowBoardScreen.kt` 2.31 (route `showboard/{lead}`), button next to
   "Show them the plans" on retail leads (owner + callers). `GET /api/leads/:id/showboard` = `customerBoardPitch(s, {business,
