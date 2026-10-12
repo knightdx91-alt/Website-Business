@@ -175,9 +175,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Settings → Team). A team member is a caller, or has `users.admin = 1` ("Full access"): their session gets
   role "owner" (everything the owner can do) but keeps their own id and name for notes, texts and sales credit. Login is password-only, so passwords are unique across everyone. The session
   cookie is `<userId>.<exp>.<hmac>` with the user's stored hash in the HMAC, so changing a password
-  or turning a caller off signs them out. Callers may only use the routes in `callerSafe` /
-  non-`ownerOnly()` (leads, previews, call guide, share link, status, call log); everything that costs
-  money or changes a site is owner-only, enforced in `src/worker/index.ts`.
+  or turning a caller off signs them out. **Callers work leads end to end (owner's rule, Oct 2026, Android 2.46):** edit,
+  photos, design, rewrite, publish, domains, sign-ups, Tap to Pay / card sheet, mark paid, board links, Google profile tools,
+  review asks, billing portal. Owner / full access only: Settings (plans, prices, extras, agreement, team, integrations),
+  Find new leads runs, Sales, Inbox, Costs, backup, refunds, deleting a lead, revoking board links and the practice reset
+  (`ownerOnlyAction` in the lead routes + the `ownerOnly()` calls in `src/worker/index.ts`; web `work` vs `owner` in
+  `viewLead`, Android `canWork` vs `isOwner` in LeadScreen). `/meta.tap` is sent to everyone; callers' sign-up rows carry
+  `dueCents` (not the signer email).
 - Call log: `lead_notes` (outcome + note + author) and `leads.follow_up` (YYYY-MM-DD, Cullman time) via
   `POST /api/leads/:id/log`. "No answer" defaults the callback to tomorrow; Sold/Not interested clear it.
   Home shows "Call back today" (due + overdue). A future callback keeps a lead from expiring, capped at 90 days.

@@ -857,7 +857,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   const session = await getSession(env, req);
   if (!session) throw new HttpError(401, "Please log in");
   const isOwner = session.role === "owner";
-  // Callers can work leads (view, call guide, share link, sales status, notes) but nothing that costs money or changes sites.
+  // Callers work leads like the owner (Oct 2026: edits, publish, payments); what stays owner-only is settings, prices, team,
+  // runs, sales, inbox, costs, refunds, deleting leads and the practice reset.
   const ownerOnly = () => {
     if (!isOwner) throw new HttpError(403, "Only the owner can do that");
   };
@@ -936,7 +937,6 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       : contractPreviewPage(env, q);
   }
   if (path === "/tap/status" && m === "GET") {
-    ownerOnly();
     return json(await tapStatus(env));
   }
   if (path === "/tap/setup" && m === "POST") {
@@ -1100,7 +1100,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       },
       /** Firebase client values for the Android app's instant pushes; `server` says whether the Worker can send. */
       fcm: { client: fcmClientConfig(settings), server: !!serviceAccount(env) },
-      tap: isOwner ? await tapStatus(env, settings) : { ready: false },
+      tap: await tapStatus(env, settings),
       extraTerms: isOwner ? settings.addons.map((a) => extraTerms(a)) : [],
       // A to Z by label: the home filter, Find new leads picker and run summaries all show this list.
       categories: SEARCH_GROUPS.map((g) => ({
@@ -1882,26 +1882,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const action = leadMatch[2] ?? "";
     const sub = leadMatch[3];
     const lead: LeadRow = await requireLead(env, id);
-    const callerSafe =
-      (action === "" && m === "GET") ||
-      [
-        "/status",
-        "/share",
-        "/pitch",
-        "/log",
-        "/notes",
-        "/followup",
-        "/signup",
-        "/signups",
-        "/flyer",
-        "/extraslink",
-        "/contact",
-      ].includes(action) ||
-      (action === "/clientlink" && m === "POST") ||
-      (action === "/showboard" && m === "GET") ||
-      (action === "/boardlink" && m === "POST") ||
-      (action === "/flyer.pdf" && m === "GET");
-    if (!callerSafe) ownerOnly();
+    // Callers work leads end to end (edits, publish, payments, links). Only destructive, money-out or training-reset
+    // actions stay with the owner / full access; settings, team, runs, sales, inbox and costs are gated elsewhere.
+    const ownerOnlyAction =
+      (action === "" && m === "DELETE") ||
+      action === "/practice" ||
+      (action === "/clientlink" && m === "DELETE");
+    if (ownerOnlyAction) ownerOnly();
 
     if (action === "" && m === "GET") {
       const signups = await signupsFor(env, id);
@@ -1911,10 +1898,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           latest_signup_paid: signups[0] ? (signups[0].paid ? 1 : 0) : null,
         }),
         notes: await notesFor(env, id),
-        // Callers see that a sign-up exists and whether it's paid, not the signer's email or what is owed.
+        // Callers take payments too, so they see what is owed; only the signer's email stays with the owner.
         signups: isOwner
           ? signups
-          : signups.map(({ signerEmail: _e, dueCents: _d, ...rest }) => rest),
+          : signups.map(({ signerEmail: _e, ...rest }) => rest),
         purchases: await purchasesFor(env, id),
       });
     }

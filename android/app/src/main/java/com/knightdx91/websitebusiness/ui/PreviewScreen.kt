@@ -68,7 +68,7 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
     var sample by remember { mutableStateOf<Boolean?>(null) }
     var sampleBusy by remember { mutableStateOf(false) }
     LaunchedEffect(id) {
-        if (state.meta?.isOwner == true) runCatching { state.api.leadFull(id) }.getOrNull()?.let { d -> if (d.lead.salesStatus != "live") sample = d.sampleStock }
+        if (state.meta != null) runCatching { state.api.leadFull(id) }.getOrNull()?.let { d -> if (d.lead.salesStatus != "live") sample = d.sampleStock }
     }
 
     BackHandler { if (webView?.canGoBack() == true) webView?.goBack() else nav.popBackStack() }
@@ -102,7 +102,7 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
                 FilterChip(selected = desktop, onClick = { desktop = true; webView?.let { w -> w.settings.userAgentString = DESKTOP_UA; w.settings.useWideViewPort = true; w.settings.loadWithOverviewMode = true; w.reload() } }, label = { Text("🖥️ Desktop") })
                 OutlinedButton(onClick = { share(false) }) { Text("💬 Text link") }
                 OutlinedButton(onClick = { share(true) }) { Text("🔗 Copy") }
-                if (state.meta?.isOwner == true) OutlinedButton(onClick = { nav.navigate("edit/$id") }) { Text("✏️ Edit") }
+                if (state.meta != null) OutlinedButton(onClick = { nav.navigate("edit/$id") }) { Text("✏️ Edit") }
                 sample?.let { on ->
                     OutlinedButton(enabled = !sampleBusy, onClick = {
                         sampleBusy = true

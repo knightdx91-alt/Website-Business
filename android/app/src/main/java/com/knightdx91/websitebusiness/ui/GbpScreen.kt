@@ -139,7 +139,7 @@ fun GbpScreen(state: AppState, nav: NavHostController, leadId: String) {
     }
 
     LaunchedEffect(leadId, isOwner) {
-        if (!isOwner) { loading = false; return@LaunchedEffect }
+        if (meta == null) { loading = false; return@LaunchedEffect }
         loading = true
         try {
             lead = state.api.gbpLead(leadId)
@@ -170,7 +170,7 @@ fun GbpScreen(state: AppState, nav: NavHostController, leadId: String) {
         )
     }) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!isOwner) {
+            if (meta == null) {
                 item { Card(Modifier.fillMaxWidth()) { Text("The Google profile tools are for the owner.", Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                 return@LazyColumn
             }

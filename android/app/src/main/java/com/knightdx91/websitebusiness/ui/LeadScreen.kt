@@ -151,6 +151,8 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
     var domDraft by remember { mutableStateOf("") }
     val meta = state.meta
     val isOwner = meta?.isOwner == true
+    /** Every team member works the lead end to end; `isOwner` only guards refunds, deleting, revoking links and the practice reset. */
+    val canWork = meta != null
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
     suspend fun load() {
@@ -164,7 +166,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
     }
     val client = d?.lead?.salesStatus == "sold" || d?.lead?.salesStatus == "live"
     LaunchedEffect(client) { if (client) reviewUrl = runCatching { state.api.companyReviewUrl() }.getOrNull() }
-    val liveOwner = isOwner && d?.lead?.salesStatus == "live"
+    val liveOwner = canWork && d?.lead?.salesStatus == "live"
     LaunchedEffect(liveOwner) {
         if (!liveOwner) return@LaunchedEffect
         try { stats = state.api.siteStats(id); statsError = null } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { statsError = e.message ?: "Couldn't load the visits" }
@@ -317,9 +319,9 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                         Row { StatusChip(l); Spacer(Modifier.weight(1f)); Text(SALES_LABEL[l.salesStatus] ?: l.salesStatus, fontWeight = FontWeight.SemiBold) }
                         Text(listOfNotNull(detail.detail.variantLabel ?: categoryLabel(l.category), l.reason).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
                         l.foundUrl?.let { url -> Text("🔗 Found page: ${l.foundHost ?: url} (not linked from their Google listing)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }) }
-                        if (isOwner && l.salesStatus != "live") TextButton(onClick = { act("webcheck") { val r = state.api.webcheck(id); context.toast(if (r.optBoolean("found")) "Found: ${r.optString("label")}" else "Nothing found beyond their Google listing"); load() } }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text(if (busy == "webcheck") "Searching the web…" else "🔎 Re-check website") }
-                        if (isOwner && detail.website != null && l.salesStatus != "live") TextButton(onClick = { importSite = true }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text("⬇️ Import their website (text + photos)") }
-                        if (isOwner && detail.existingSiteLine != null && l.salesStatus != "live") TextButton(onClick = {
+                        if (canWork && l.salesStatus != "live") TextButton(onClick = { act("webcheck") { val r = state.api.webcheck(id); context.toast(if (r.optBoolean("found")) "Found: ${r.optString("label")}" else "Nothing found beyond their Google listing"); load() } }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text(if (busy == "webcheck") "Searching the web…" else "🔎 Re-check website") }
+                        if (canWork && detail.website != null && l.salesStatus != "live") TextButton(onClick = { importSite = true }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text("⬇️ Import their website (text + photos)") }
+                        if (canWork && detail.existingSiteLine != null && l.salesStatus != "live") TextButton(onClick = {
                             ask = Ask("Not their website", "Remove the text and photos taken from that page, forget the page, and rewrite the site? The Google photo comes back as the main photo.", "Remove", danger = true) {
                                 act("forgetsite") { state.api.forgetSiteImport(id); context.toast("Removed. Rebuilding with fresh text…"); delay(1_500); load() }
                             }
@@ -355,7 +357,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             detail.mapsUrl?.let { u -> OutlinedButton(onClick = { context.openUrl(u) }) { Text("Google listing") } }
                             if (open) OutlinedButton(onClick = { nav.navigate("playbook") }) { Text("💬 Plans & answers") }
                             OutlinedButton(onClick = { nav.navigate("tasks/${l.id}") }) { Text("📝 Task") }
-                            if (isOwner && (l.salesStatus == "sold" || live) && ready) OutlinedButton(onClick = { nav.navigate("gbp/${l.id}") }) { Text("🔎 Google profile") }
+                            if (canWork && (l.salesStatus == "sold" || live) && ready) OutlinedButton(onClick = { nav.navigate("gbp/${l.id}") }) { Text("🔎 Google profile") }
                         }
                     }
                 }
@@ -396,7 +398,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                         Text("Sales status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         when {
                             live -> Text("● Live", color = Good, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
-                            isOwner -> FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            canWork -> FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("new", "shown", "sold", "not_interested").forEach { s ->
                                     FilterChip(selected = l.salesStatus == s, onClick = { if (l.salesStatus != s) setStatus(s) }, label = { Text(SALES_LABEL[s] ?: s) }, enabled = busy == null)
                                 }
@@ -433,7 +435,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             "failed" -> {
                                 Text("Build failed", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
                                 detail.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = muted) }
-                                if (isOwner) OutlinedButton(onClick = { act("retry") { state.api.retryBuild(id); context.toast("Rebuilding…"); delay(1_500); load() } }, enabled = busy == null, modifier = Modifier.padding(top = 6.dp)) { Text("Try again") }
+                                if (canWork) OutlinedButton(onClick = { act("retry") { state.api.retryBuild(id); context.toast("Rebuilding…"); delay(1_500); load() } }, enabled = busy == null, modifier = Modifier.padding(top = 6.dp)) { Text("Try again") }
                                 else Text("The owner can rebuild it.", style = MaterialTheme.typography.bodySmall, color = muted)
                             }
                             "queued", "building" -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
@@ -443,10 +445,10 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             }
                         }
                         if (ready) {
-                            if (!(isOwner && !live)) Text("Design: ${detail.designName}", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 2.dp))
+                            if (!(canWork && !live)) Text("Design: ${detail.designName}", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 2.dp))
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
                                 Button(onClick = { nav.navigate("preview/${l.id}") }) { Text("Preview") }
-                                if (isOwner) OutlinedButton(onClick = { nav.navigate("edit/${l.id}") }) { Text("Edit") }
+                                if (canWork) OutlinedButton(onClick = { nav.navigate("edit/${l.id}") }) { Text("Edit") }
                                 if (!live) OutlinedButton(onClick = { flyer() }) { Text("Leave-behind flyer (QR)") }
                             }
                             if (!live) {
@@ -474,7 +476,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- design (owner, before the site is live) ----
-            if (ready && isOwner && !live) item {
+            if (ready && canWork && !live) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("🎨 Design", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -526,12 +528,12 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             Text(listOfNotNull(s.signerName.ifBlank { null }, s.signerEmail, ago(s.createdAt).ifBlank { null }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = muted)
                             Text(if (s.paid) "✅ Paid" else if (s.invoice) "Invoice: not paid yet" else "⚠️ Payment not finished", color = if (s.paid) Good else Warn, style = MaterialTheme.typography.bodyMedium)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                if (!s.paid && !s.invoice && isOwner && meta?.tapReady == true && s.dueCents >= 50) Button(onClick = { tap(s.id) }, enabled = busy == null) { Text("💳 Take payment by tap · ${money(s.dueCents)}") }
+                                if (!s.paid && !s.invoice && canWork && meta?.tapReady == true && s.dueCents >= 50) Button(onClick = { tap(s.id) }, enabled = busy == null) { Text("💳 Take payment by tap · ${money(s.dueCents)}") }
                                 OutlinedButton(onClick = { nav.navigate(pdfNav("/api/agreements/s/${s.id}.pdf", "Signed agreement")) }) { Text("📄 Signed agreement") }
                                 if (s.paid && isOwner) OutlinedButton(onClick = { refundFor = s.id }, enabled = busy == null) { Text("↩ Refund") }
                             }
-                            if (!s.paid && !s.invoice && isOwner && meta?.tapReady != true && meta?.tapWhy != null && meta.checkoutOnline) Text("💳 Tap to Pay isn't set up yet: Settings → Tap to Pay.", style = MaterialTheme.typography.bodySmall, color = muted)
-                            if (isOwner) {
+                            if (!s.paid && !s.invoice && canWork && meta?.tapReady != true && meta?.tapWhy != null && meta.checkoutOnline) Text("💳 Tap to Pay isn't set up yet: Settings → Tap to Pay.", style = MaterialTheme.typography.bodySmall, color = muted)
+                            if (canWork) {
                                 var paid by remember(s.id, s.paid) { mutableStateOf(s.paid) }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Checkbox(checked = paid, onCheckedChange = { v ->
@@ -575,7 +577,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- client site: visits, printables, their domain (owner, live) ----
-            if (live && isOwner) item {
+            if (live && canWork) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("Client site", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -661,7 +663,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                                 }
                             }, enabled = busy == null) { Text("Revoke old links") }
                         }
-                        if (isOwner) {
+                        if (canWork) {
                             Text(if (detail.sampleStock) "🧪 Sample items are on the price list (preview only; publishing is blocked until they go)." else "Showing it to someone interested? Fill the preview's price page, board and tablet with made-up stock for their kind of business.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 8.dp))
                             if (detail.sampleStock) OutlinedButton(onClick = {
                                 ask = Ask("Remove sample items", "Remove every sample item from the price list? Anything they typed themselves stays.", "Remove") {
@@ -690,7 +692,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                     }
                 }
             }
-            if (client && (reviewUrl != null || isOwner)) item {
+            if (client && (reviewUrl != null || canWork)) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("⭐ Ask for a review", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -703,7 +705,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                     }
                 }
             }
-            if (client && isOwner) item {
+            if (client && canWork) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("💳 Billing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -714,7 +716,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- publish (owner) ----
-            if (ready && isOwner) item {
+            if (ready && canWork) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         val blockers = detail.blockers
@@ -771,7 +773,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- more (owner) ----
-            if (isOwner && (ready || !live)) item {
+            if (canWork && (ready || !live)) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("More", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -781,7 +783,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                                     act("rewrite") { state.api.rewrite(id); context.toast("Rewriting… check back in a minute."); delay(1_500); load() }
                                 }
                             }, enabled = busy == null) { Text("Rewrite text with AI") }
-                            if (!live) OutlinedButton(onClick = {
+                            if (!live && isOwner) OutlinedButton(onClick = {
                                 ask = Ask("Delete lead", "Delete this lead and its preview site?", "Delete", danger = true) {
                                     act("delete") {
                                         state.api.deleteLead(id)

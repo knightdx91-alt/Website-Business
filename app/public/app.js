@@ -604,7 +604,7 @@
     return tapReady() && isAndroid() ? url + (url.includes("?") ? "&" : "?") + "tap=1" : url;
   }
   function tapButtonHtml(x) {
-    if (!isOwner() || x.paid || (x.extras && x.extras.invoice)) return "";
+    if (x.paid || (x.extras && x.extras.invoice)) return "";
     if (!tapReady()) return meta.tap && meta.tap.why && meta.checkout && meta.checkout.online ? `<p class="small muted">💳 Tap to Pay isn't set up yet: <a href="#/settings">Settings → Tap to Pay</a>.</p>` : "";
     return isAndroid()
       ? `<p><button class="btn btn--small btn--primary" type="button" data-tap="${esc(x.id)}">💳 Take payment by tap</button> <span class="small muted">${x.dueCents ? `${money(x.dueCents / 100)} now, renewals on the same card` : ""}</span></p>`
@@ -639,7 +639,7 @@
         <p class="small"><a href="/api/agreements/s/${x.id}" target="_blank" rel="noopener">📄 Signed agreement</a> · <a href="/api/agreements/s/${x.id}.pdf">⬇ PDF</a></p>
         <p class="small muted">${esc(x.signerName)}${x.signerTitle ? ", " + esc(x.signerTitle) : ""} · ${esc(x.signerEmail || "")} · ${ago(x.createdAt)}${x.sentBy ? ` · sent by ${esc(x.sentBy)}` : ""}</p>
         ${tapButtonHtml(x)}
-        ${isOwner() ? `<label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label>` : x.paid ? `<p class="chip chip--good">Paid</p>` : ""}</div>`).join("")}
+        <label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label></div>`).join("")}
       ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)} · <a href="/api/agreements/p/${p.id}" target="_blank" rel="noopener">📄 agreement</a> · <a href="/api/agreements/p/${p.id}.pdf">⬇ PDF</a></li>`).join("")}</ul>` : ""}
       ${plans.length
         ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
@@ -823,12 +823,13 @@
     const dnaName = (k) => { const o = (l.dnaOrder || []).find((x) => x.id === k); const v = o && o.values.find((v) => v.id === (l.dna || {})[k]); return v ? v.name : ""; };
     const lookName = [(l.looks.find((x) => x.id === l.lookBase) || {}).name, ((l.layouts || []).find((x) => x.id === l.layout) || {}).name, dnaName("hero")].filter(Boolean).join(" · ");
     const owner = isOwner();
+    const work = !!meta.me; // every team member works the lead; `owner` only guards delete and the practice reset
     const open = l.salesStatus === "new" || l.salesStatus === "shown";
     $app.innerHTML = `<p><a href="#/">← Leads</a></p>
       <div class="split"><div>
       <section class="card">
         <h1>${esc(r ? r.name : l.name)}</h1>
-        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}${owner && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="webcheck" title="Search the web for a page Google doesn't show">🔎 Re-check website</button>` : ""}</p>${foundLine(l)}
+        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}${work && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="webcheck" title="Search the web for a page Google doesn't show">🔎 Re-check website</button>` : ""}</p>${foundLine(l)}
         ${l.rating ? `<p><span class="stars">★ ${l.rating.toFixed(1)}</span> on Google</p>` : ""}
         <p>${esc(l.address || "")}</p>
         <div id="askbox"></div>
@@ -846,25 +847,25 @@
       <section class="card"><h2>Sales status</h2>
         ${l.salesStatus === "live"
           ? `<p class="chip chip--good">● Live</p>`
-          : owner ? `<div class="tabs">${[["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["not_interested", "Not interested"]].map(([k, t]) => `<button type="button" data-status="${k}" class="${l.salesStatus === k ? "is-on" : ""}">${t}</button>`).join("")}</div>`
+          : work ? `<div class="tabs">${[["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["not_interested", "Not interested"]].map(([k, t]) => `<button type="button" data-status="${k}" class="${l.salesStatus === k ? "is-on" : ""}">${t}</button>`).join("")}</div>`
           : `<p class="chip${l.salesStatus === "sold" ? " chip--good" : ""}">${esc({ new: "New", shown: "Shown", sold: "Sold", not_interested: "Not interested" }[l.salesStatus] || l.salesStatus)}</p><p class="small muted" style="margin:6px 0 0">Log the call below to update it.</p>`}
         ${l.cadence && open && ready ? `<div class="cadence"><p><strong>Day ${Number(l.cadence.day)} since shown</strong> · Next: ${esc(l.cadence.next || "")}</p><div class="btns">${cadenceAction(l, l.cadence.next)}</div></div>` : ""}
       </section>
       <section class="card"><h2>Website</h2>
-        ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p>${owner ? `<button class="btn" data-act="retry">Try again</button>` : `<p class="small muted">The owner can rebuild it.</p>`}` : ""}
+        ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p>${work ? `<button class="btn" data-act="retry">Try again</button>` : `<p class="small muted">The work can rebuild it.</p>`}` : ""}
         ${l.status === "queued" || l.status === "building" ? `<p><span class="spin"></span> Building… this takes about a minute.</p>` : ""}
-        ${ready ? `${owner && l.salesStatus !== "live" ? "" : `<p class="muted small">Design: ${esc(lookName)}</p>`}
+        ${ready ? `${work && l.salesStatus !== "live" ? "" : `<p class="muted small">Design: ${esc(lookName)}</p>`}
           <div class="btns btns--full">
             <a class="btn btn--primary" href="#/preview/${l.id}">Preview</a>
             <a class="btn" href="#/full/${l.id}">Open full screen</a>
-            ${owner ? `<a class="btn" href="#/edit/${l.id}">Edit</a>` : ""}
+            ${work ? `<a class="btn" href="#/edit/${l.id}">Edit</a>` : ""}
             ${l.salesStatus !== "live" ? `<button class="btn" type="button" data-flyer="${l.id}">Leave-behind flyer (QR)</button>` : ""}
           </div>
           ${l.salesStatus !== "live" ? `<div style="margin-top:10px">${shareButtonsHtml()}</div>` : ""}
           ${l.previewOpens ? `<p class="small" style="margin-top:8px">👀 They opened their preview ${l.previewOpens === 1 ? "once" : `${l.previewOpens} times`}, last ${ago(l.previewOpenedAt)}.</p>` : ""}` : ""}
         ${l.liveUrl ? `<p style="margin-top:12px">Live at <a href="${esc(l.liveUrl)}" target="_blank" rel="noopener">${esc(l.liveUrl.replace("https://", ""))}</a></p>` : ""}
       </section>
-      ${ready && owner && l.salesStatus !== "live" ? `<section class="card"><h2>🎨 Design</h2>
+      ${ready && work && l.salesStatus !== "live" ? `<section class="card"><h2>🎨 Design</h2>
         <p class="small muted">Now: ${esc(lookName)}</p>
         <div class="btns btns--full"><button class="btn btn--primary" type="button" data-act="restyle">Try another design</button><button class="btn" type="button" data-act="restructure">Same colors, new structure</button></div>
         ${(l.dnaRecipes || []).length ? `<p class="small" style="margin:12px 0 6px"><strong>Or pick a style</strong> (keeps the colors)</p><div class="row" style="flex-wrap:wrap;gap:6px">${l.dnaRecipes.map((x) => `<button class="btn btn--small" type="button" data-recipe="${esc(x.id)}" title="${esc(x.about)}">${esc(x.name)}</button>`).join("")}</div>` : ""}
@@ -877,15 +878,15 @@
       </section>
       </div><div>
       ${ready ? signupCardHtml(l) : ""}
-      ${l.salesStatus === "live" && owner ? liveCardHtml(l) : ""}
-      ${(l.salesStatus === "live" || l.salesStatus === "sold") && owner && ready ? gbpCardHtml(l) : ""}
+      ${l.salesStatus === "live" && work ? liveCardHtml(l) : ""}
+      ${(l.salesStatus === "live" || l.salesStatus === "sold") && work && ready ? gbpCardHtml(l) : ""}
       ${l.salesStatus === "live" || l.salesStatus === "sold" ? `<section class="card"><h2>🛒 Extras</h2><p class="small muted">Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${meta.checkout && meta.checkout.online ? " online" : ""}. Good for 30 days.</p>
         <div class="btns btns--full"><button class="btn" type="button" data-extraslink>💬 Text “Buy extras” link</button></div></section>` : ""}
       ${l.salesStatus === "live" || l.salesStatus === "sold" ? reviewAskHtml() : ""}
-      ${(l.salesStatus === "live" || l.salesStatus === "sold") && owner ? `<section class="card"><h2>💳 Billing</h2><p class="small muted">Their Stripe billing portal: update the card, see invoices, change or cancel the subscription.</p>
+      ${(l.salesStatus === "live" || l.salesStatus === "sold") && work ? `<section class="card"><h2>💳 Billing</h2><p class="small muted">Their Stripe billing portal: update the card, see invoices, change or cancel the subscription.</p>
         <div class="btns btns--full"><button class="btn" type="button" data-act="portal">Open billing portal</button></div></section>` : ""}
       <div id="logslot-side">${l.salesStatus !== "live" ? logCardHtml(l) : ""}</div>
-      ${ready && owner ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
+      ${ready && work ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
         ${blockers.length ? `<ul class="list small">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul><p class="small muted">Fill these in from Edit.</p>` : `<p class="muted">Everything's confirmed. Publishing puts the site on the internet.</p>`}
         ${(lint.suggestions || []).length ? `<h3 style="margin-top:12px">Good to add (talking points)</h3><ul class="list small">${lint.suggestions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         <div class="btns btns--full">
@@ -897,12 +898,12 @@
         ${owner ? `<p class="small">When a trainee is done: <button class="btn btn--small" type="button" data-practice-reset>🔁 Reset for the next run</button> <span class="muted">refunds their $1, clears the sign-ups, call log and tasks, takes down anything published, forgets board links and photos, and puts fresh sample items back.</span></p>` : `<p class="small muted">When you're done, the owner resets it for the next person.</p>`}</section>` : ""}
       ${ready ? `<section class="card"><h2>📋 ${esc(l.boardName || "Stock board")}</h2>
         <p class="muted small">Their own page for what's in each tank, case, bench or shelf: name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it. Set "What's on it" in Edit → Live price list.</p>
-        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their ${esc((l.boardName || "Stock board").toLowerCase())} link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the ${esc(l.boardName || "Stock board")} page</button>${owner ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
-        ${owner ? `<p class="small" style="margin-top:8px">${l.sampleStock ? `🧪 <strong>Sample items are on the price list</strong> (preview only; publishing is blocked until they go). ` : `Showing it to someone interested? Fill the preview's price page, board and tablet with made-up stock for their kind of business. `}<button class="btn btn--small" type="button" data-samplestock="${l.sampleStock ? "remove" : "add"}">${l.sampleStock ? "Remove sample items" : "🧪 Add sample items (preview only)"}</button></p>` : ""}
+        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their ${esc((l.boardName || "Stock board").toLowerCase())} link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the ${esc(l.boardName || "Stock board")} page</button>${work ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
+        ${work ? `<p class="small" style="margin-top:8px">${l.sampleStock ? `🧪 <strong>Sample items are on the price list</strong> (preview only; publishing is blocked until they go). ` : `Showing it to someone interested? Fill the preview's price page, board and tablet with made-up stock for their kind of business. `}<button class="btn btn--small" type="button" data-samplestock="${l.sampleStock ? "remove" : "add"}">${l.sampleStock ? "Remove sample items" : "🧪 Add sample items (preview only)"}</button></p>` : ""}
         <p class="muted small">A tablet beside a tank, case or shelf shows it live and lets staff update it (the 📺 link on each one in the board). Sell it as the <strong>Price list</strong> plan when they don't want a whole website.</p></section>` : ""}
-      ${owner ? `<section class="card"><h2>More</h2><div class="btns">
+      ${work ? `<section class="card"><h2>More</h2><div class="btns">
         ${ready ? `<button class="btn btn--small" data-act="rewrite">Rewrite text with AI</button>` : ""}
-        ${l.salesStatus !== "live" ? `<button class="btn btn--small btn--danger" data-act="delete">Delete lead</button>` : ""}
+        ${owner && l.salesStatus !== "live" ? `<button class="btn btn--small btn--danger" data-act="delete">Delete lead</button>` : ""}
       </div></section>` : ""}</div></div>`;
     const reload = () => viewLead(id);
     bindLog(l, reload);
@@ -1043,7 +1044,7 @@
       const box = document.getElementById("previewshare");
       if (stale(my)) return;
       const sb = document.getElementById("previewsample");
-      if (sb && owner && l.status === "ready" && l.salesStatus !== "live") {
+      if (sb && l.status === "ready" && l.salesStatus !== "live") {
         const draw = (on) => {
           sb.innerHTML = `<button class="btn btn--small${on ? "" : " btn--line"}" type="button" title="${on ? "Sample items are on the price list (preview only)" : "Fill the price page, board and tablet with made-up stock for their kind of business"}">${on ? "🧪 Remove sample items" : "🧪 Add sample items"}</button>`;
           sb.firstChild.addEventListener("click", async () => {
@@ -4016,7 +4017,7 @@
     try {
       if (h === "#/login") return await viewLogin();
       meta = meta || (await api("/meta"));
-      if (!isOwner() && (/^#\/(edit|gbp)\//.test(h) || h === "#/inbox" || h === "#/sales" || h === "#/costs")) return go("#/");
+      if (!isOwner() && (h === "#/inbox" || h === "#/sales" || h === "#/costs")) return go("#/");
       if ((m = /^#\/lead\/([a-z0-9]+)$/.exec(h))) return await viewLead(m[1]);
       if ((m = /^#\/edit\/([a-z0-9]+)$/.exec(h))) return await viewEdit(m[1]);
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
