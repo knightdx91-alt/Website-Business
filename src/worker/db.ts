@@ -446,7 +446,17 @@ export type PenaltySettings = Pick<
   | "interestRate"
   | "reinstatementFee"
   | "returnedPaymentFee"
+  | "billingEmail"
+  | "supportEmail"
+  | "companyEmail"
 >;
+
+/** Where money questions go: the billing address when set, else the business email. */
+export const billingEmailOf = (s: { billingEmail?: string; companyEmail?: string }) =>
+  (s.billingEmail || s.companyEmail || "").trim();
+/** Where client help goes: the support address when set, else the business email. */
+export const supportEmailOf = (s: { supportEmail?: string; companyEmail?: string }) =>
+  (s.supportEmail || s.companyEmail || "").trim();
 export const lateFeeOf = (s: PenaltySettings) =>
   Math.max(0, Math.round((s.lateFee ?? 15) * 100) / 100);
 export const payoffDiscountOf = (s: PenaltySettings) =>
@@ -541,6 +551,10 @@ export interface AppSettings {
   legalName?: string;
   companyPhone?: string;
   companyEmail?: string;
+  /** Money mail: cancellations, card updates, disputes (Oct 2026; falls back to companyEmail). */
+  billingEmail?: string;
+  /** Client help: change requests, the website footer, notices (falls back to companyEmail). */
+  supportEmail?: string;
   /** Business street address: Stripe's Terminal location for Tap to Pay (a US address is required). */
   companyStreet?: string;
   companyCity?: string;
@@ -642,6 +656,8 @@ export function defaultTerms(
     PenaltySettings,
 ): string {
   const us = s.legalName || s.companyName || "We";
+  const billing = billingEmailOf(s);
+  const support = supportEmailOf(s);
   const late = lateFeeOf(s);
   const min = s.minMonths ?? 12;
   const short = s.shortMonths ?? 6;
@@ -656,7 +672,7 @@ export function defaultTerms(
     min > 0
       ? `4. Your term and early cancellation fee. With the ${terms}, those first months are a minimum. You get them with no setup fee because you're committing to them, and we build your site up front in return. After the minimum, cancel any time with 30 days' notice. If you cancel before the minimum term ends, you owe an early cancellation fee equal to your monthly price times the remaining months of the minimum term. You agree that's a fair estimate of our loss, not a penalty, since we built your site at no charge in return for the term. You can pay it two ways: keep paying monthly until the term ends (your site stays live unless you ask us to take it down), or ${payoffWords(s)} and we close your account at once. If you stop paying instead, the whole fee is due at once; we may charge the card or bank account on file for it, and the late-payment section applies, including collection costs. Month to month has no minimum: cancel any time with 30 days' notice; the setup fee isn't refundable once your site is live. Yearly plans are paid up front for 12 months and aren't refunded after the first 30 days.`
       : "4. Your term. Cancel any time with 30 days' notice. Yearly plans are paid up front for 12 months.",
-    "5. Renewal and how to cancel. Monthly plans continue after any minimum term until you cancel. Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews. To cancel, text or email us or use your billing link; it takes effect at the end of your paid period. Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign.",
+    `5. Renewal and how to cancel. Monthly plans continue after any minimum term until you cancel. Yearly plans renew each year. We'll text and email you at least 30 days before a yearly renewal, and you can cancel before it renews. To cancel, text us${billing ? `, email ${billing}` : " or email us"} or use your billing link; it takes effect at the end of your paid period. Our cancellation and refund policy at undergroundassociates.com/terms is part of this agreement as of the day you sign.`,
     `6. Late payments. If a payment fails we'll tell you and retry the card.${late ? ` If it's still unpaid after 10 days, we add a ${fee(s)} late fee, once per missed payment.` : ""}${interestRateOf(s) ? ` Balances more than 30 days overdue earn interest at ${interestRateOf(s)}% a year.` : ""} Your plan keeps billing while a payment is late. If a payment fails and isn't fixed within 30 days, we may take the site offline until it's caught up. 60 days after a missed payment we may end this agreement, and the whole balance, including the rest of any minimum term, is due.${reinstatementFeeOf(s) ? ` Putting a site back online costs ${money2(reinstatementFeeOf(s))}.` : ""} If we send a balance to collections or court, you also owe our reasonable collection costs and attorney's fees as far as Alabama law allows.`,
     `7. Payment disputes. Contact us before disputing a charge with your bank; we refund billing mistakes in full. A dispute of a charge that was due under this agreement counts as a missed payment: we may take the site offline right away, and you owe the amount${returnedFeeOf(s) ? `, a ${money2(returnedFeeOf(s))} dispute fee` : ""}${reinstatementFeeOf(s) ? " and the reinstatement fee" : ""} once it's resolved.`,
     '8. Your content stays yours. Your business name, logo, photos, the text about your business and your domain belong to you. You confirm you have the right to use any photos, logo or text you send us, and that what you tell us about your business, prices and licenses is true. The templates, designs and code we build with are ours, and we use them for other businesses too. While your plan is active you may use the site as we host it. We may show your site in our portfolio and keep a small "Website by" line in the footer unless you ask us not to.',
@@ -670,7 +686,7 @@ export function defaultTerms(
     "16. Limits. Our total liability to you is limited to what you paid us in the 12 months before the problem. We aren't liable for lost profits, lost sales or other indirect losses. These limits don't apply where the law won't allow them. If someone makes a claim against us because of content, claims or licenses you gave us or approved, or because of your products or services, you'll cover our costs, including reasonable attorney's fees.",
     "17. Things beyond our control. Neither of us is in breach for delays caused by events outside our reasonable control, such as storms, power or internet failures, outages at Cloudflare or Google, or government orders. Payment for service already provided is still due.",
     "18. If a business changes hands. If you sell your business, the new owner can take over this agreement with our OK, which we won't withhold without a good reason; otherwise the agreement ends and the rest of any term is due. We may transfer this agreement to a company that buys ours; your price and terms stay the same.",
-    "19. Texts, emails and notices. You agree we may text and email the number and address you gave us about your account, your site and payments; reply STOP to stop texts. Notices between us go to those contacts and to ours on this agreement; a text or email counts as written notice. Keep your contact details current. Our privacy policy at undergroundassociates.com/privacy applies and is part of this agreement.",
+    `19. Texts, emails and notices. You agree we may text and email the number and address you gave us about your account, your site and payments; reply STOP to stop texts. Notices between us go to those contacts and to ours on this agreement${support ? ` (${support})` : ""}; a text or email counts as written notice. Keep your contact details current. Our privacy policy at undergroundassociates.com/privacy applies and is part of this agreement.`,
     "20. Confidential information. We keep what you tell us about your business private, and you keep our pricing offers and unreleased work private, except what's public or must be disclosed by law.",
     "21. If we disagree. We'll talk first: either of us can ask for a call or meeting, and we'll both try for 30 days to sort it out. After that either of us may go to court. Alabama law applies, and any case is filed in the state courts in Cullman County, Alabama, including small claims court.",
     "22. The whole deal. This agreement, your plan, our refund and privacy policies and any extras you sign for are the whole agreement; anything said in conversation isn't part of it. Changes must be in writing (a text or email from us that you accept counts). If a court strikes one part, the rest stands. Payment, ownership, limits and the sections about leaving survive after this agreement ends.",

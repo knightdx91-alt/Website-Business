@@ -127,6 +127,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       home-screen app and turns web alerts on again at the new address (push subscriptions are per origin). Named in: the
       company site footer ("Team sign-in", nofollow), Settings → Team (web + Android 2.51), training lesson 1 and the glossary guide.
       Stripe's webhook endpoint stays on the workers.dev address (it works on both).
+- [x] Company addresses (Oct 2026, Android 2.52): info@ (business email), post@ (direct / owner's Google), profiles@ (`gbpEmail`,
+      the Manager account clients add on their Google Business Profile), billing@ (`billingEmail`: the agreement's cancel and
+      payment-authorization lines, the /terms cancel sentence) and support@ (`supportEmail`: website footer, the change-request
+      page, the agreement's notices line). `billingEmailOf()` / `supportEmailOf()` in db.ts fall back to the business email;
+      Settings → Your business on web + Android. Google review link set (g.page/r/CbNccE96DmQqEBM/review).
+      The lead page's board card sits up top once the price list has items (`detail().priceListItems`, Android 2.53), else
+      under "More on this lead"; the guide and training say so.
 - [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for
       Google Business Profile API once a client's profile is managed (then build step 2). LLC is Underground Associates LLC
 - [x] Plans & answers screen for callers; 7 page layouts; print/sign and retail packs; more search groups

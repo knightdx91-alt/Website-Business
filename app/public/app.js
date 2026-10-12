@@ -1038,6 +1038,8 @@
       closed: { left: ["head", "step", "practice", "logtop", "status", "website", "notes"], right: ["log"], more: ["signup", "design", "board", "referral", "more"] },
     }[stage];
     C.logtop = `<div id="logslot-top"></div>`;
+    // A shop that uses the inventory system (items on its price list) gets the board card up top, not under More.
+    if ((l.priceListItems || 0) > 0 && LAYOUT.more.includes("board")) { LAYOUT.more = LAYOUT.more.filter((k) => k !== "board"); LAYOUT.right = [...LAYOUT.right, "board"]; }
     const pick = (keys) => keys.map((k) => C[k] || "").join("");
     const moreHtml = pick(LAYOUT.more).trim();
     $app.innerHTML = `<p><a href="#/">← Leads</a></p>
@@ -3785,6 +3787,8 @@
         <label class="field">Legal name <span class="hint">Who signs client agreements</span><input name="legalName" value="${esc(s.legalName || "")}" placeholder="e.g. Underground Associates LLC"></label>
         <div class="row"><label class="field">Business phone<input name="companyPhone" type="tel" value="${esc(s.companyPhone || "")}"></label>
         <label class="field">Business email <span class="hint">Shown everywhere</span><input name="companyEmail" type="email" value="${esc(s.companyEmail || "")}"></label></div>
+        <div class="row"><label class="field">Billing email <span class="hint">Cancellations, card updates, disputes (agreement + terms page). Blank = business email</span><input name="billingEmail" type="email" value="${esc(s.billingEmail || "")}" placeholder="billing@…"></label>
+        <label class="field">Support email <span class="hint">Website footer, change requests, notices. Blank = business email</span><input name="supportEmail" type="email" value="${esc(s.supportEmail || "")}" placeholder="support@…"></label></div>
         <label class="field">Stripe publishable key <span class="hint">From Stripe → Developers → API keys (starts with pk_live_). Lets the Android app take a card typed on the phone. Not a secret.</span><input name="stripePublishableKey" value="${esc(s.stripePublishableKey || "")}" placeholder="pk_live_…" autocomplete="off"></label>
         <label class="field">Business street address <span class="hint">Needed once for Tap to Pay (Stripe registers where in-person payments happen). Not shown to clients.</span><input name="companyStreet" value="${esc(s.companyStreet || "")}" placeholder="123 2nd Ave SW" autocomplete="street-address"></label>
         <div class="row"><label class="field">City<input name="companyCity" value="${esc(s.companyCity || "")}" placeholder="Cullman"></label>
@@ -3919,6 +3923,8 @@
             legalName: v("legalName") || undefined,
             companyPhone: v("companyPhone") || undefined,
             companyEmail: v("companyEmail") || undefined,
+            billingEmail: v("billingEmail") || "",
+            supportEmail: v("supportEmail") || "",
             googleClientId: v("googleClientId") || undefined,
             googleDomain: v("googleDomain").toLowerCase() || undefined,
             ownerEmail: v("ownerEmail").toLowerCase() || undefined,

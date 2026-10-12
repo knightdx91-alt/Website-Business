@@ -332,7 +332,7 @@ export function displayGuide(s: AppSettings): Guide {
         title: "Getting the address",
         numbered: true,
         steps: [
-          'Open the shop\'s lead → 📋 their board card → "Open it here" (or open the link you texted them).',
+          'Open the shop\'s lead → 📋 their board card (up top once the list has items; before that under "More on this lead") → "Open it here" (or open the link you texted them).',
           "Each tank has a 📺 at the right of its name. Tapping it opens that tank's display page; copy the address from the browser bar. It looks like " +
             APP_ORIGIN +
             "/d/<lead>/<tank-name>.",

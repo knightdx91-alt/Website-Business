@@ -59,6 +59,8 @@ data class LeadFull(
     val boardName: String = "Stock board",
     /** Sample items are on the price list (preview only; publishing is blocked until they go). */
     val sampleStock: Boolean = false,
+    /** Items on the live price list; >0 = the shop uses the inventory system, so the board card sits up top. */
+    val priceListItems: Int = 0,
     /** Finish & publish: every blocker with the Edit card that fixes it (empty = Publish works). */
     val checklist: List<ChecklistItem> = emptyList(),
 ) {
@@ -119,6 +121,7 @@ data class LeadFull(
                 siteImportError = j.optJSONObject("siteImport")?.str("error"),
                 boardName = j.optString("boardName").ifBlank { "Stock board" },
                 sampleStock = j.optBoolean("sampleStock"),
+                priceListItems = j.optInt("priceListItems", 0),
                 checklist = j.optJSONArray("checklist").objects().map { ChecklistItem(it.optString("text"), it.optString("card"), it.optString("kind")) },
                 existingSiteLine = j.optJSONObject("existingSite")?.let { x ->
                     val host = runCatching { java.net.URI(x.optString("url")).host?.removePrefix("www.") }.getOrNull() ?: x.optString("url")

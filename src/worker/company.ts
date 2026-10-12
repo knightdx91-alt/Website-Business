@@ -18,6 +18,8 @@ import {
   inventoryAddons,
   generalAddons,
   promoRules,
+  billingEmailOf,
+  supportEmailOf,
 } from "./db.ts";
 import {
   dollars,
@@ -338,7 +340,7 @@ async function changeRequest(
     }
   }
   const body = lead
-    ? `<h1>Request a change</h1><p>Need something updated on the ${e(lead.name ?? "")} website? Hours, prices, photos, a new special? Tell us here and we'll handle it.</p>${note}
+    ? `<h1>Request a change</h1><p>Need something updated on the ${e(lead.name ?? "")} website? Hours, prices, photos, a new special? Tell us here and we'll handle it.${supportEmailOf(s) ? ` Or email <a href="mailto:${e(supportEmailOf(s))}">${e(supportEmailOf(s))}</a>.` : ""}</p>${note}
 <form method="post" class="form"><label>Your name<input name="name" autocomplete="name" required maxlength="200"></label>
 <label>Best phone number <span class="opt">(optional)</span><input name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
 <label>What should we change?<textarea name="message" rows="5" required maxlength="2000"></textarea></label>
@@ -2235,7 +2237,7 @@ async function portfolio(env: Env): Promise<Response> {
 
 function footer(legal: string, s: AppSettings): string {
   return `<footer class="ftr"><div class="wrap">
-<p class="ftr__name">${e(legal)} · ${MARKET_TOWN}, Alabama${s.companyPhone ? ` · <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : ""}${s.companyEmail ? ` · <a href="mailto:${e(s.companyEmail)}">${e(s.companyEmail)}</a>` : ""}</p>
+<p class="ftr__name">${e(legal)} · ${MARKET_TOWN}, Alabama${s.companyPhone ? ` · <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : ""}${supportEmailOf(s) ? ` · <a href="mailto:${e(supportEmailOf(s))}">${e(supportEmailOf(s))}</a>` : ""}</p>
 <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/price-list">Live price list</a><a href="/portfolio">Our work</a><a href="/about">About</a><a href="/cullman-county">Where we work</a><a href="/extras">Clients: add extras</a><a href="/terms">Terms &amp; refunds</a><a href="/privacy">Privacy</a><a href="https://app.undergroundassociates.com/" rel="nofollow">Team sign-in</a>${s.companyFacebookUrl ? `<a href="${e(s.companyFacebookUrl)}" rel="noopener">Facebook</a>` : ""}${s.companyReviewUrl ? `<a href="${e(s.companyReviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</nav>
 <p class="small">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)}</p>
 </div></footer>`;
@@ -2302,7 +2304,7 @@ async function policyPage(
   const name = s.companyName || "Underground Associates";
   const legal = s.legalName || name;
   const phone = s.companyPhone;
-  const email = s.companyEmail;
+  const email = billingEmailOf(s);
   const reach =
     [
       phone ? `call or text <a href="${telHref(phone)}">${e(phone)}</a>` : "",

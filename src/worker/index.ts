@@ -550,6 +550,8 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
     listKind: record ? listKind(record) : null,
     /** Sample items are on the price list (preview only; blocks publishing until removed). */
     sampleStock: record ? hasSampleStock(record) : false,
+    /** Items on the live price list (any kind). >0 = the shop uses the inventory system, so the board card sits up top. */
+    priceListItems: record?.ext.retail?.priceList?.sections?.reduce((n, sec) => n + (sec.items?.length ?? 0), 0) ?? 0,
     /** Their current website: the page our web check found, else the one Google links (never a social page). */
     website:
       l.found_url ||
@@ -1412,6 +1414,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         legalName: z.string().trim().max(120).optional(),
         companyPhone: z.string().trim().max(30).optional(),
         companyEmail: z.string().trim().email().max(120).optional(),
+        billingEmail: z.string().trim().email().max(120).optional().or(z.literal("")),
+        supportEmail: z.string().trim().email().max(120).optional().or(z.literal("")),
         googleClientId: z
           .string()
           .trim()

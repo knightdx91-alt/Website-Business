@@ -97,7 +97,7 @@ test("every signed agreement carries the payment authorization, with the fees fr
   const order = priceSignup(s, "plus", "standard", []);
   const text = contractText(s, order, { business: "Joe's Pizza", kind: "signup" });
   assert.match(text, /HOW YOU PAY\n[^\n]*\n\nPAYMENT AUTHORIZATION\nIf you pay by card or bank account on file, you authorize Underground Associates LLC to charge that card \(credit or debit\) or to debit that bank account by ACH/);
-  assert.match(text, /cancel it by texting or emailing us at least 3 business days before the next charge/);
+  assert.match(text, /cancel it by texting us or emailing (us|billing@[^ ]+) at least 3 business days before the next charge/);
   assert.match(text, /carries a \$15 returned-payment fee/);
   const extras = contractText(s, priceExtras(s, [{ index: 2, qty: 1 }]), { business: "Joe's", kind: "extras" });
   assert.match(extras, /PAYMENT AUTHORIZATION/);

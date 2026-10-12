@@ -777,8 +777,8 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                 }
             }
 
-            // ---- the board (any category) ----
-            if (ready && showMore) item {
+            // ---- the board (any category): up top once the list has items, else under More ----
+            if (ready && (showMore || detail.priceListItems > 0)) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("📋 ${detail.boardName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

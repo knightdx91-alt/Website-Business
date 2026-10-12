@@ -167,6 +167,8 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
     var legalName by mutableStateOf(s.txt("legalName"))
     var companyPhone by mutableStateOf(s.txt("companyPhone"))
     var companyEmail by mutableStateOf(s.txt("companyEmail"))
+    var billingEmail by mutableStateOf(s.txt("billingEmail"))
+    var supportEmail by mutableStateOf(s.txt("supportEmail"))
     var companyStreet by mutableStateOf(s.txt("companyStreet"))
     var companyCity by mutableStateOf(s.txt("companyCity"))
     var companyState by mutableStateOf(s.str("companyState") ?: "AL")
@@ -246,6 +248,8 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         putStr("legalName", legalName)
         putStr("companyPhone", companyPhone)
         putStr("companyEmail", companyEmail)
+        b.put("billingEmail", billingEmail.trim())
+        b.put("supportEmail", supportEmail.trim())
         putStr("googleClientId", googleClientId)
         putStr("googleDomain", googleDomain) { it.lowercase(Locale.US) }
         putStr("ownerEmail", ownerEmail) { it.lowercase(Locale.US) }
@@ -744,6 +748,8 @@ private fun BusinessCard(f: SettingsForm, showsCallerName: Boolean) {
         Field(f.legalName, { f.legalName = it }, "Legal name", hint = "Who signs client agreements", placeholder = "e.g. Underground Associates LLC", caps = KeyboardCapitalization.Words)
         Field(f.companyPhone, { f.companyPhone = it }, "Business phone", keyboard = KeyboardType.Phone)
         Field(f.companyEmail, { f.companyEmail = it }, "Business email", hint = "Shown everywhere", keyboard = KeyboardType.Email)
+        Field(f.billingEmail, { f.billingEmail = it }, "Billing email", hint = "Cancellations, card updates, disputes (agreement + terms page). Blank = business email", keyboard = KeyboardType.Email)
+        Field(f.supportEmail, { f.supportEmail = it }, "Support email", hint = "Website footer, change requests, notices. Blank = business email", keyboard = KeyboardType.Email)
         Field(f.companyStreet, { f.companyStreet = it }, "Business street address", hint = "Needed once for Tap to Pay (Stripe registers where in-person payments happen). Not shown to clients.", placeholder = "123 2nd Ave SW", caps = KeyboardCapitalization.Words)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Field(f.companyCity, { f.companyCity = it }, "City", placeholder = "Cullman", caps = KeyboardCapitalization.Words, modifier = Modifier.weight(2f))
