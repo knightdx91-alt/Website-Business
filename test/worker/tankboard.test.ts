@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseMenuText } from "../../src/generator/menu.ts";
-import { applyClientItems, pricesFeed } from "../../src/worker/tankboard.ts";
+import { applyClientItems, boardPage, pricesFeed } from "../../src/worker/tankboard.ts";
 import type { LeadRow } from "../../src/worker/db.ts";
 import { categoryRecord } from "../fixtures.ts";
 
@@ -74,4 +74,12 @@ test("the Price list agreement says it is not a website plan and has no minimum"
   assert.match(text, /not a website plan/);
   assert.match(text, /no minimum term and no early cancellation fee/);
   assert.match(text, /Monthly: \$29\/month · no setup fee · no minimum/);
+});
+
+test("the board page's inline scripts parse (a missing + once left every board stuck on 'Loading your tanks')", async () => {
+  const record = categoryRecord("retail");
+  const html = await boardPage(record, "/c/token", "lead1").text();
+  const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
+  assert.ok(scripts.length >= 1, "the board has a script");
+  for (const src of scripts) assert.doesNotThrow(() => new Function(src), "board script must be valid JavaScript");
 });

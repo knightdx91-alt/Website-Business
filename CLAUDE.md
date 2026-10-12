@@ -134,6 +134,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       Settings → Your business on web + Android. Google review link set (g.page/r/CbNccE96DmQqEBM/review).
       The lead page's board card sits up top once the price list has items (`detail().priceListItems`, Android 2.53), else
       under "More on this lead"; the guide and training say so.
+      Board page bug (Oct 2026): the sample-items change left a `'>'<label` without its `+` in `boardPage`'s render script, so
+      every board sat on "Loading your tanks" with dead buttons; `test/worker/tankboard.test.ts` now parses the page's inline
+      scripts with `new Function`. Reproduce a board locally: `wrangler dev --local --port 8789 --host …`, copy the lead row into
+      the local D1, log in, `POST /api/leads/<id>/clientlink`, open the link with a trailing slash (the scratchpad `board.mjs`).
 - [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for
       Google Business Profile API once a client's profile is managed (then build step 2). LLC is Underground Associates LLC
 - [x] Plans & answers screen for callers; 7 page layouts; print/sign and retail packs; more search groups
