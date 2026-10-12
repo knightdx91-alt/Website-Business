@@ -3005,7 +3005,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       });
       return json({ url: link, text });
     }
-    if (action === "/practice/reset" && m === "POST") {
+    if (action === "/practice" && sub === "reset" && m === "POST") {
       // The training aid goes back to square one for the next trainee (refunds, sign-ups, notes, tasks, Pages project, uploads, fresh samples).
       const out = await resetPracticeLead(env, lead, session.name);
       await notify(env, {

@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.Inet6Address
+import okhttp3.Dns
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -28,13 +30,15 @@ class Api(context: Context) {
 
         /**
          * One client for the whole app. Connections are pooled and HTTP/2 carries parallel requests over one TLS handshake,
-         * and fast fallback (Happy Eyeballs) tries the server's addresses together, so a dead route costs milliseconds.
+         * and IPv4-first DNS keeps a dead IPv6 route from being tried first, so a dead route costs nothing.
          * Before this (2.16 and earlier) every call opened its own connection, closed it, and could wait 15 s per address
          * in turn: a cold start of the app took up to half a minute on some networks.
          */
         val http: OkHttpClient by lazy {
             OkHttpClient.Builder()
-                .fastFallback(true)
+                // IPv4 first: a dead IPv6 route used to cost a full connect timeout per address (OkHttp 5's fastFallback did
+                // this, but Stripe Terminal 6.0.0 needs OkHttp 4.12 and crashes on 5.x: NoClassDefFoundError okhttp3.internal.Util).
+                .dns(Ipv4First)
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)
@@ -208,3 +212,8 @@ fun JSONArray?.strings(): List<String> {
 }
 
 fun JSONObject.str(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
+
+/** System DNS with IPv4 addresses ahead of IPv6, so a broken IPv6 route never delays the first connection. */
+private object Ipv4First : Dns {
+    override fun lookup(hostname: String) = Dns.SYSTEM.lookup(hostname).sortedBy { it is Inet6Address }
+}

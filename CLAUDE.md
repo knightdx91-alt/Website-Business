@@ -1037,6 +1037,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   finger leaves the box (Compose: `clipToBounds()` + `inBox` in `SignaturePad`, strokes drawn past the edge used to show outside it; web
   esign.ts: points outside the canvas rect end the stroke, a return starts a new one). (4) The service agreement's section 2 now says
   "(see the Timing section above)": the TIMING section sits before SERVICE AGREEMENT and readers looked for it below.
+- Tap to Pay root cause (Oct 2026, Android 2.44): the breadcrumb read "Step: discover · UNEXPECTED_SDK_ERROR · NoClassDefFoundError:
+  okhttp3.internal.Util". Stripe Terminal 6.0.0 declares and uses OkHttp **4.12.0** internals; 2.17's `okhttp:5.1.0` pin (for
+  `fastFallback`) won the resolution and the reader never started. The app is back on `okhttp:4.12.0`; the dead-IPv6 cold-start fix
+  is now `Ipv4First` (a `Dns` that sorts IPv4 ahead of IPv6) in `net/Api.kt`. Don't move OkHttp past what Stripe Terminal's POM
+  names. Also fixed: the lead-action regex splits `/practice/reset` into action `/practice` + sub `reset`, so the reset route
+  matched nothing ("Not found") until it checked `sub`.
 - Tap failure breadcrumbs (Oct 2026, Android 2.43): after the version pin the phone showed Stripe's catch-all "Unexpected failure"
   (`TerminalErrorCode.UNEXPECTED_SDK_ERROR`, raised by the SDK's `TerminalSession.enqueueOperation` when an operation throws; the
   real reason is in `cause`). `TapToPayActivity` now tracks `step` (checks / order / init / support / discover / connect / retrieve /
