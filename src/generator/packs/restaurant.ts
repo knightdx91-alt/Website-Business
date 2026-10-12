@@ -102,17 +102,17 @@ function dataFaq(r: BusinessRecord): Faq[] {
   if (r.variant === "food_truck")
     out.push({ q: "Where will the truck be?", a: r.links.social.facebook ? "We post our stops on our Facebook page. Check there for this week's spots, or give us a call." : `Give us a call at ${r.phone.display} to find out where we'll be this week.` });
   if (m.length) out.push({ q: "What meals do you serve?", a: `We serve ${listJoin(m)}. Check our hours below for today's times.` });
-  if (so.reservable === true)
+  if (so.reservable === true && !counterService(r))
     out.push({ q: "Do you take reservations?", a: r.links.reserve ? "Yes. You can reserve a table online, or call us." : `Yes. Call us at ${r.phone.display} to reserve a table.` });
-  if (so.reservable === false) out.push({ q: "Do you take reservations?", a: "No reservations needed. Just come on in." });
+  if (so.reservable === false && !counterService(r)) out.push({ q: "Do you take reservations?", a: "No reservations needed. Just come on in." });
   if (so.takeout === true && !counterService(r))
     out.push({ q: "Can I order takeout?", a: r.links.order ? "Yes. Order online or call ahead, and we'll have it ready." : `Yes. Call ahead at ${r.phone.display} and we'll have it ready.` });
-  if (so.delivery === true) out.push({ q: "Do you deliver?", a: "Yes, we offer delivery. Call us or order online to check if we deliver to you." });
+  if (so.delivery === true) out.push({ q: "Do you deliver?", a: r.links.order || ext(r).deliveryLinks ? "Yes, we offer delivery. Order online or call us to check if we deliver to you." : `Yes, we offer delivery. Call us at ${r.phone.display} to check if we deliver to you.` });
   if (so.delivery === false) out.push({ q: "Do you deliver?", a: counterService(r) ? "We don't offer delivery right now. Call ahead and swing by; it'll be ready." : "We don't offer delivery right now, but takeout is easy. Call ahead and swing by." });
   if (so.outdoorSeating === true) out.push({ q: "Do you have outdoor seating?", a: "Yes, we have outdoor seating when the weather's nice." });
   if (so.menuForChildren === true) out.push({ q: "Do you have a kids menu?", a: "Yes, we have a kids menu." });
   if (so.servesVegetarianFood === true) out.push({ q: "Do you have vegetarian options?", a: "Yes, we have vegetarian options on the menu." });
-  if (so.wheelchairAccessibleEntrance === true) out.push({ q: "Is the restaurant wheelchair accessible?", a: "Yes, our entrance is wheelchair accessible." });
+  if (so.wheelchairAccessibleEntrance === true) out.push({ q: counterService(r) ? "Is the shop wheelchair accessible?" : "Is the restaurant wheelchair accessible?", a: "Yes, our entrance is wheelchair accessible." });
   if (so.allowsDogs === true) out.push({ q: "Are dogs allowed?", a: "Yes, well-behaved dogs are welcome." });
   return out.slice(0, 6);
 }

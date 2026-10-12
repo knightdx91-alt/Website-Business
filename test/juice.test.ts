@@ -13,7 +13,7 @@ test("nutrition clubs and juice bars get the juice variant", () => {
 });
 
 test("a counter-service shop shows no Dine-in / Takeout chips or takeout FAQ; a restaurant still does", async () => {
-  const so = { dineIn: true, takeout: true, delivery: false, outdoorSeating: true, wheelchairAccessibleEntrance: true };
+  const so = { dineIn: true, takeout: true, delivery: false, reservable: false, outdoorSeating: true, wheelchairAccessibleEntrance: true };
   const juice = restaurantRecord({ name: "Sample Nutrition", variant: "juice", ext: { restaurant: { serviceOptions: so } } });
   assert.ok(counterService(juice));
   const out = await buildSite({ record: juice, copy: sampleCopy(), site: { slug: "t", look: "restaurant.garden_table" }, mode: "preview" });
@@ -23,6 +23,13 @@ test("a counter-service shop shows no Dine-in / Takeout chips or takeout FAQ; a 
   assert.match(home, />Outdoor seating</, "other chips stay");
   assert.doesNotMatch(home, /Can I order takeout\?/);
   assert.match(home, /Do you deliver\?[\s\S]*Call ahead and swing by; it'll be ready/);
+  assert.doesNotMatch(home, /Do you take reservations\?/, "a counter never takes reservations");
+  assert.match(home, /Is the shop wheelchair accessible\?/);
+  assert.doesNotMatch(home, /Is the restaurant wheelchair accessible\?/);
+  const del = restaurantRecord({ variant: "juice", ext: { restaurant: { serviceOptions: { delivery: true, outdoorSeating: true, wheelchairAccessibleEntrance: true, servesVegetarianFood: true } } } });
+  const dh = String((await buildSite({ record: del, copy: sampleCopy(), site: { slug: "t", look: "restaurant.garden_table" }, mode: "preview" })).files.get("index.html"));
+  assert.match(dh, /Do you deliver\?[\s\S]*Yes, we offer delivery\. Call us at/);
+  assert.doesNotMatch(dh, /order online to check/i);
 
   const diner = restaurantRecord({ variant: "diner", ext: { restaurant: { serviceOptions: so } } });
   assert.ok(!counterService(diner));
@@ -30,4 +37,6 @@ test("a counter-service shop shows no Dine-in / Takeout chips or takeout FAQ; a 
   assert.match(d, />Dine-in</);
   assert.match(d, />Takeout</);
   assert.match(d, /Can I order takeout\?/);
+  assert.match(d, /Do you take reservations\?/);
+  assert.match(d, /Is the restaurant wheelchair accessible\?/);
 });
