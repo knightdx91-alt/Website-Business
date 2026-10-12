@@ -19,10 +19,10 @@ android {
         applicationId = "com.knightdx91.websitebusiness"
         minSdk = 26
         targetSdk = 35
-        versionCode = 55
-        versionName = "2.49"
+        versionCode = 56
+        versionName = "2.50"
         // The Worker the app talks to. The Tap to Pay intent:// link may name another origin with ?o=.
-        buildConfigField("String", "BASE_URL", "\"https://website-business.knightdx91.workers.dev\"")
+        buildConfigField("String", "BASE_URL", "\"https://app.undergroundassociates.com\"")
         // Stripe's Tap to Pay library ships arm64 + armeabi-v7a natives (~20 MB each). Every phone that can run
         // Tap to Pay (Android 13+) is arm64, so the sideloaded APK only carries that one.
         ndk { abiFilters += listOf("arm64-v8a") }

@@ -390,7 +390,7 @@ async function sendInvite(
     dueTime: row.due_time,
     leadName: lead?.name ?? null,
     leadUrl: row.lead_id
-      ? `https://website-business.knightdx91.workers.dev/#/lead/${row.lead_id}`
+      ? `https://app.undergroundassociates.com/#/lead/${row.lead_id}`
       : null,
     organizer: {
       name: s.companyName || "Underground Associates",

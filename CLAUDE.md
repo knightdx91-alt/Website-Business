@@ -119,6 +119,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       free Cloudflare Email Routing forwarding, or a Google Workspace mailbox billed to the client by Google (no inbox add-on)
 - [x] Google profile tools step 1 (AI-assisted checklist, posts, review replies)
 - [x] Company website live at undergroundassociates.com (bought on Cloudflare)
+- [x] The team's app address is **https://app.undergroundassociates.com** (Oct 2026, Android 2.50): a third custom domain on the
+      Worker in wrangler.jsonc; anything that isn't a COMPANY_HOST serves the app, so the old
+      website-business.knightdx91.workers.dev address keeps working. `APP_ORIGIN` (board links), the task calendar link and the
+      Android `BASE_URL` point at it. Owner's step: add https://app.undergroundassociates.com as an authorized JavaScript origin on
+      the Google **Web** OAuth client (Cloud project 322487745515), or the Google sign-in button fails there. The team re-adds the
+      home-screen app and turns web alerts on again at the new address (push subscriptions are per origin).
 - [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for
       Google Business Profile API once a client's profile is managed (then build step 2). LLC is Underground Associates LLC
 - [x] Plans & answers screen for callers; 7 page layouts; print/sign and retail packs; more search groups

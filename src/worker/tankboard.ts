@@ -49,7 +49,7 @@ import {
  * a new key (future: a "revoke" button) kills old links.
  */
 
-export const APP_ORIGIN = "https://website-business.knightdx91.workers.dev";
+export const APP_ORIGIN = "https://app.undergroundassociates.com";
 
 async function sign(env: Env, leadId: string, key: string): Promise<string> {
   return hmac(env.APP_SECRET, `client.${leadId}.${key}`);
