@@ -25,6 +25,10 @@ class Api(context: Context) {
     class ApiException(message: String, val status: Int) : IOException(message)
     class Unauthorized : IOException("Please sign in again")
 
+    /** The last failed request, so "Report a problem" can send it along without anyone retyping it. */
+    data class LastError(val at: Long, val method: String, val path: String, val status: Int, val message: String)
+    @Volatile var lastError: LastError? = null
+
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
@@ -63,8 +67,15 @@ class Api(context: Context) {
             val status = res.code
             if (status == 401 && auth) throw Unauthorized()
             if (status >= 400) {
-                val msg = try { JSONObject(text).optString("error", "") } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { "" }
-                throw ApiException(msg.ifBlank { "Server error $status" }, status)
+                val raw = try { JSONObject(text).optString("error", "") } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { "" }
+                // Plain words for the two cases nobody can act on from the message itself.
+                val msg = when {
+                    status >= 500 -> "The app's server hit a problem${if (raw.isNotBlank()) " ($raw)" else ""}. Try again in a moment; if it keeps happening, report it from Settings."
+                    status == 404 && raw.isBlank() -> "That isn't here any more. Go back to Leads and try again."
+                    else -> raw.ifBlank { "Something went wrong ($status)" }
+                }
+                lastError = LastError(System.currentTimeMillis(), method, path, status, msg)
+                throw ApiException(msg, status)
             }
             Response(text, res.headers("Set-Cookie"))
         }

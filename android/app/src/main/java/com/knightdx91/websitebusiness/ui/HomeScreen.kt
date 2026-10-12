@@ -58,6 +58,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import com.knightdx91.websitebusiness.AppState
 import com.knightdx91.websitebusiness.net.Lead
+import com.knightdx91.websitebusiness.net.Queue
+import com.knightdx91.websitebusiness.net.queue
+import com.knightdx91.websitebusiness.net.startDismiss
+import androidx.compose.material3.TextButton
 import kotlinx.coroutines.launch
 
 private val TABS = listOf("new" to "New", "callbacks" to "Callbacks", "activity" to "Activity", "shown" to "Shown", "sold" to "Sold", "live" to "Live")
@@ -71,8 +75,8 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
     var category by rememberSaveable { mutableStateOf("") }
     var search by rememberSaveable { mutableStateOf("") }
     var leads by remember { mutableStateOf<List<Lead>>(emptyList()) }
-    var due by remember { mutableStateOf<List<Lead>>(emptyList()) }
-    var opened by remember { mutableStateOf<List<Lead>>(emptyList()) }
+    var queue by remember { mutableStateOf<Queue?>(null) }
+    var startHidden by rememberSaveable { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val meta = state.meta
@@ -90,12 +94,11 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
                         else -> state.api.leads(sales = tab, category = category.ifBlank { null })
                     }
                 }
-                val dueList = async { state.api.leads(callbacks = "due") }
-                val openedList = async { state.api.leads(opened = "recent") }
+                // The queue (GET /api/queue): every lead that needs something, most urgent first, with its one next step.
+                val q = async { runCatching { state.api.queue() }.getOrNull() }
                 val unread = async { runCatching { state.api.unreadCount() }.getOrDefault(state.unread) }
                 leads = list.await()
-                due = dueList.await()
-                opened = openedList.await()
+                q.await()?.let { queue = it }
                 state.unread = unread.await()
             }
         } catch (e: com.knightdx91.websitebusiness.net.Api.Unauthorized) {
@@ -120,12 +123,14 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
         val q = search.trim().lowercase()
         if (q.isEmpty()) leads else leads.filter { it.name.lowercase().contains(q) || (it.address ?: "").lowercase().contains(q) || phoneDigits(it.phone).contains(q) }
     }
-    val today = remember(due, opened) {
-        val seen = HashSet<String>()
-        val rows = ArrayList<Pair<Lead, String>>()
-        due.forEach { if (seen.add(it.id)) rows.add(it to (if ((it.followUp ?: "") < dayFromNow(0)) "Overdue" else "Callback")) }
-        opened.filter { it.salesStatus == "new" || it.salesStatus == "shown" }.forEach { if (seen.add(it.id)) rows.add(it to "Opened preview${if (it.previewOpens > 1) " ${it.previewOpens}×" else ""}") }
-        rows.take(12)
+    /** Where a queue row's button goes: the call guide / dialer / walk-in guide here, anything else on the lead page itself. */
+    fun stepGo(l: Lead, route: String) {
+        when (route) {
+            "call" -> if (l.ready) nav.navigate("pitch/${l.id}") else context.dial(l.phone)
+            "walkin" -> nav.navigate("walkin/${l.id}")
+            "wait" -> nav.navigate("lead/${l.id}")
+            else -> nav.navigate("lead/${l.id}?step=$route")
+        }
     }
 
     Scaffold(
@@ -146,26 +151,66 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
                     OutlinedButton(onClick = { nav.navigate("add") }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Add a business") }
                     OutlinedButton(onClick = { nav.navigate("route") }) { Text("🗺️ Walk-in route") }
                     OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
+                    OutlinedButton(onClick = { nav.navigate("guide/words") }) { Text("📖 What the words mean") }
                 }
             }
-            if (today.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+            // ---- Start here: a new teammate's first four things, until done or dismissed (per person, on the server) ----
+            val start = meta?.start
+            if (start != null && start.show && !startHidden) item(span = { GridItemSpan(maxLineSpan) }) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
-                        Text("📋 Today: ${today.size} call${if (today.size == 1) "" else "s"}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        today.forEach { (l, why) ->
-                            Row(Modifier.fillMaxWidth().padding(top = 8.dp).clickable { nav.navigate("lead/${l.id}") }, verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(l.name, fontWeight = FontWeight.SemiBold)
-                                    if (l.contact != null) Text("Ask for: ${l.contact}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                AssistChip(onClick = { nav.navigate("lead/${l.id}") }, label = { Text(why) })
-                                Spacer(Modifier.width(6.dp))
-                                Button(onClick = { if (l.ready) nav.navigate("pitch/${l.id}") else context.dial(l.phone) }) { Text("📞") }
+                        val n = start.lessons.count { it.done }
+                        Text("👋 Start here${if (n > 0) " · $n of ${start.lessons.size} done" else ""}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Four things and you know the job. Each one takes a few minutes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        start.lessons.forEachIndexed { i, ls ->
+                            Row(Modifier.fillMaxWidth().padding(top = 6.dp).clickable { if (ls.practice && start.practiceLeadId != null) nav.navigate("lead/${start.practiceLeadId}") else nav.navigate("training") }, verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (ls.done) "✅" else "${i + 1}.", modifier = Modifier.width(28.dp))
+                                Text(ls.title + if (ls.practice) "  (on the practice lead; everything on it is \$1)" else "", style = MaterialTheme.typography.bodyMedium, color = if (ls.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
                             }
+                        }
+                        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { nav.navigate("training") }) { Text("🎓 Open Training") }
+                            TextButton(onClick = { startHidden = true; scope.launch { runCatching { state.api.startDismiss() } }; context.toast("Training is under the buttons above any time.") }) { Text("Not now") }
                         }
                     }
                 }
             }
+            // ---- Up next: the queue, most urgent first, each row with its one action ----
+            queue?.let { q -> item(span = { GridItemSpan(maxLineSpan) }) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("📋 Up next${if (q.rows.isNotEmpty()) " · ${q.rows.size}" else ""}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        val c = q.counts
+                        fun pl(n: Int, one: String, many: String = one + "s") = "$n ${if (n == 1) one else many}"
+                        val bits = listOfNotNull(
+                            c["take_payment"]?.takeIf { it > 0 }?.let { pl(it, "payment") + " to finish" },
+                            c["callback"]?.takeIf { it > 0 }?.let { pl(it, "callback") },
+                            c["opened"]?.takeIf { it > 0 }?.let { pl(it, "opened preview") },
+                            c["follow_up"]?.takeIf { it > 0 }?.let { pl(it, "follow-up") },
+                            c["publish"]?.takeIf { it > 0 }?.let { pl(it, "site") + " to publish" },
+                            c["call"]?.takeIf { it > 0 }?.let { pl(it, "new lead") + " to call" },
+                        )
+                        if (bits.isNotEmpty()) Text(bits.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (q.rows.isEmpty()) Text("Nothing waiting. Pick a New lead below and make a call.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                        q.rows.forEach { row ->
+                            val l = row.lead
+                            val st = row.step
+                            Column(Modifier.fillMaxWidth().padding(top = 10.dp).clickable { nav.navigate("lead/${l.id}") }) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(l.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                    Text("${STEP_ICON[st.key] ?: ""} ${st.title}", style = MaterialTheme.typography.labelLarge, color = when (st.key) { "take_payment", "callback" -> Warn; "opened", "publish" -> Good; else -> MaterialTheme.colorScheme.onSurfaceVariant }, fontWeight = FontWeight.SemiBold)
+                                }
+                                Text(listOfNotNull(st.detail.ifBlank { null }, l.contact?.let { "Ask for: $it" }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(onClick = { stepGo(l, st.route) }) { Text(if (st.route == "call" && l.ready) "📞 Call guide" else "${STEP_ICON[st.key] ?: ""} ${st.action}") }
+                                    if (st.route == "call" && l.ready) OutlinedButton(onClick = { context.dial(l.phone) }) { Text("📞 Call now") }
+                                    OutlinedButton(onClick = { nav.navigate("lead/${l.id}") }) { Text("Open") }
+                                }
+                            }
+                        }
+                    }
+                }
+            } }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(TABS) { (id, label) -> FilterChip(selected = tab == id, onClick = { tab = id }, label = { Text(label) }) }
@@ -204,10 +249,10 @@ fun StatusChip(l: Lead) {
     val (text, color) = when {
         l.salesStatus == "live" -> "● Live" to Good
         l.salesStatus == "not_interested" -> "Not interested" to MaterialTheme.colorScheme.onSurfaceVariant
-        l.status == "queued" -> "Waiting" to MaterialTheme.colorScheme.onSurfaceVariant
-        l.status == "building" -> "Building…" to MaterialTheme.colorScheme.onSurfaceVariant
-        l.status == "failed" -> "Build failed" to MaterialTheme.colorScheme.error
-        else -> "Site ready" to Good
+        l.status == "queued" -> "Queued to build" to MaterialTheme.colorScheme.onSurfaceVariant
+        l.status == "building" -> "Building the preview" to MaterialTheme.colorScheme.onSurfaceVariant
+        l.status == "failed" -> "Preview failed" to MaterialTheme.colorScheme.error
+        else -> "Preview ready" to Good
     }
     Text(text, color = color, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
 }

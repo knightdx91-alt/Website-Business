@@ -150,7 +150,7 @@ suspend fun resizeImage(context: Context, uri: Uri): Triple<ByteArray, Int, Int>
 /** The site editor: every card and field the Worker describes for this business, saved as one set of edits. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun EditScreen(state: AppState, nav: NavHostController, id: String) {
+fun EditScreen(state: AppState, nav: NavHostController, id: String, jumpTo: String? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -248,7 +248,18 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String) {
         if (loading) { Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return@Scaffold }
         error?.let { e -> Column(Modifier.padding(pad).padding(24.dp)) { Text(e, color = MaterialTheme.colorScheme.error); Button(onClick = { scope.launch { loading = true; load(false) } }, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") } }; return@Scaffold }
         // One column on a phone, two side by side on the open Fold or a tablet (cards are at least 420 dp wide).
-        LazyVerticalGrid(columns = GridCells.Adaptive(420.dp), modifier = Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp, 8.dp, 12.dp, 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // A checklist line opened this screen for one card: open that card, close the others, and scroll to it.
+        val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+        var jumped by remember(id) { mutableStateOf(false) }
+        LaunchedEffect(cards, jumpTo) {
+            if (jumped || jumpTo == null || cards.isEmpty()) return@LaunchedEffect
+            val idx = cards.indexOfFirst { it.id == jumpTo || (jumpTo == "approved" && it.id == "approved") || (jumpTo == "es" && it.kind == "spanish") || (jumpTo == "photo" && it.kind == "photo") || (jumpTo == "gallery" && it.kind == "gallery") }
+            if (idx < 0) return@LaunchedEffect
+            cards.forEach { open[it.id] = it.id == cards[idx].id }
+            jumped = true
+            gridState.animateScrollToItem(idx + (if (busy != null) 1 else 0))
+        }
+        LazyVerticalGrid(state = gridState, columns = GridCells.Adaptive(420.dp), modifier = Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp, 8.dp, 12.dp, 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             busy?.let { b -> item(span = { GridItemSpan(maxLineSpan) }) { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(b) } } }
             cards.forEach { card ->
                 item(key = card.id) {

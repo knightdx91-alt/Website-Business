@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.knightdx91.websitebusiness.AppState
 import com.knightdx91.websitebusiness.net.EventItem
+import com.knightdx91.websitebusiness.net.AlertPrefs
+import com.knightdx91.websitebusiness.net.alertPrefs
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,11 +43,13 @@ fun NotificationsScreen(state: AppState, nav: NavHostController) {
     val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<EventItem>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
+    var prefs by remember { mutableStateOf<AlertPrefs?>(null) }
 
     suspend fun load() {
         try {
             val n = state.api.notifications()
             items = n.items
+            prefs = runCatching { state.api.alertPrefs() }.getOrNull()
             state.api.notificationsSeen()
             state.unread = 0
             state.api.prefs.lastAlertAt = maxOf(state.api.prefs.lastAlertAt, n.items.maxOfOrNull { it.at } ?: 0L)
@@ -56,6 +60,7 @@ fun NotificationsScreen(state: AppState, nav: NavHostController) {
     Scaffold(topBar = { TopAppBar(title = { Text("Alerts") }, actions = { IconButton(onClick = { scope.launch { load() } }) { Icon(Icons.Default.Refresh, "Refresh") } }) }) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
+            item { AlertModeCard(state.api, prefs) { prefs = it; scope.launch { load() } } }
             if (items.isEmpty() && error == null) item { Text("Nothing yet. Calls, notes, sales, sign-ups and preview opens from the team show up here.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(items, key = { it.id }) { e ->
                 Card(
@@ -68,6 +73,7 @@ fun NotificationsScreen(state: AppState, nav: NavHostController) {
                     }
                 }
             }
+            item { Column(Modifier.padding(top = 8.dp)) { Text("Something in the app didn't work?", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); ReportProblemButton(state.api, "alerts") } }
         }
     }
 }

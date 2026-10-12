@@ -3862,7 +3862,7 @@
           <label class="field"><span class="sr-only">What they get</span><input name="addon_${i}_about" value="${esc(a.about || "")}" placeholder="One sentence on what they get" maxlength="200"></label>
           ${a.name ? `<details class="more"><summary>Contract terms for this extra</summary><label class="field"><span class="sr-only">Contract terms</span><textarea name="addon_${i}_terms" rows="4" maxlength="1500">${esc(a.terms || (meta.extraTerms || [])[i] || "")}</textarea></label><p class="small muted">Shown in the agreement customers sign when they pick this extra.</p></details>` : `<input type="hidden" name="addon_${i}_terms" value="">`}</div>`).join("")}
         <h2 style="margin-top:18px">Team goals &amp; commission</h2>
-        <label class="field">Daily call goal per person <span class="hint">Shows as a progress bar on the Today card. 0 = off</span><input name="dailyCalls" type="number" min="0" max="500" inputmode="numeric" value="${s.dailyCalls ?? ""}"></label>
+        <label class="field">Daily call goal per person <span class="hint">Shows as a progress bar on the Up next card. 0 = off</span><input name="dailyCalls" type="number" min="0" max="500" inputmode="numeric" value="${s.dailyCalls ?? ""}"></label>
         <label class="field">Commission per sale ($)<input name="commission" type="number" min="0" inputmode="decimal" value="${s.commission ?? ""}"></label>
         <label class="field">Client agreement <span class="hint">Plain-language starting point, not legal advice. Have a lawyer look it over once.</span><textarea name="terms" rows="10">${esc(s.terms || meta.defaultTerms)}</textarea></label>
         <button class="btn btn--small" type="button" id="resetterms">Reset agreement to the standard text</button>

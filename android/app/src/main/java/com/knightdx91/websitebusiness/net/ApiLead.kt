@@ -23,6 +23,9 @@ data class Purchase(val id: String, val items: List<String>, val dueCents: Long,
 
 data class Cadence(val day: Int, val next: String)
 
+/** One line of the Finish & publish checklist: what to fix and the Edit card (editform card id) that fixes it. */
+data class ChecklistItem(val text: String, val card: String, val kind: String)
+
 data class LeadFull(
     val detail: LeadDetail,
     /** The site record's name (the business as the site shows it), else the lead's. */
@@ -56,6 +59,8 @@ data class LeadFull(
     val boardName: String = "Stock board",
     /** Sample items are on the price list (preview only; publishing is blocked until they go). */
     val sampleStock: Boolean = false,
+    /** Finish & publish: every blocker with the Edit card that fixes it (empty = Publish works). */
+    val checklist: List<ChecklistItem> = emptyList(),
 ) {
     val lead get() = detail.lead
 
@@ -114,6 +119,7 @@ data class LeadFull(
                 siteImportError = j.optJSONObject("siteImport")?.str("error"),
                 boardName = j.optString("boardName").ifBlank { "Stock board" },
                 sampleStock = j.optBoolean("sampleStock"),
+                checklist = j.optJSONArray("checklist").objects().map { ChecklistItem(it.optString("text"), it.optString("card"), it.optString("kind")) },
                 existingSiteLine = j.optJSONObject("existingSite")?.let { x ->
                     val host = runCatching { java.net.URI(x.optString("url")).host?.removePrefix("www.") }.getOrNull() ?: x.optString("url")
                     "Read from $host on ${x.optString("fetchedAt")}${if (x.optString("via") == "app") " (phone)" else ""}: ${x.optInt("images")} photos, ${x.optInt("paragraphs")} paragraphs"

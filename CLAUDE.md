@@ -131,6 +131,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       + review link; verify undergroundassociates.com as a Domain property in Search Console and submit /sitemap.xml;
       Chamber of Commerce, Bing Places, Apple Business Connect listings; add `app/public/owner.jpg`
 - [x] Tax & finance pack and churches & nonprofits pack (Oct 2026), 25 looks each. Hand-added businesses can have a typed-in phone
+- [x] Ease-of-use overhaul (Oct 2026): next step per lead, Home queue, three-tap sign-up, agreement "In short", glossary,
+      publish checklist, Settings health strip, alert modes, Start here, Report this, funnel; web + Android 2.49
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
 ## Code map
@@ -171,6 +173,52 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - Share links: `/s/<leadId>.<exp>.<hmac>/` serves a preview without login for 14 days, with a
   "Free preview" banner. "Text preview link" / "Copy preview link" (`shareButtonsHtml` + `bindShareButtons` in app.js)
   show on the lead page, the Preview screen and the call guide. Rotating APP_SECRET revokes all share links and logins.
+- 🧭 Ease of use (Oct 2026, Android 2.49; `src/worker/queue.ts`, `test/worker/queue.test.ts`): twelve changes so a daily user never
+  has to work out what to do next. (1) **Next step**: `nextStepFor()` gives every lead one `{key, title, detail, action, route}` by
+  stage (building / failed → retry; signed unpaid → Take payment; callback due; opened preview in 7 days; Shown → the cadence step
+  that is due (`dueCadenceStep`) or "Follow-ups are done"; Sold → Finish & publish with N to fix, else Publish; Live → ask for a
+  review; New → Call and show the preview). `summary().nextStep` carries it; the web lead page (`nextStepCardHtml`, `stepButton`,
+  `doStep`; `#/lead/<id>/<route>` runs the action) and Android (`NextStepCard` in Common.kt, `doStep` in LeadScreen, route
+  `lead/{id}?step=`) open with it, and show only the stage's cards: the rest fold under "More on this lead" (web `LAYOUT` per
+  stage in viewLead; Android `showMore`). (2) **Home queue**: `GET /api/queue` = `rankQueue()` over every open lead (payments to
+  finish → callbacks → opened previews → follow-ups due → sites to publish → the 5 best untouched New leads; building, waiting,
+  live and closed left out), web `queueHtml` "Up next", Android the same card; the old Today / "Signed, payment not finished" cards
+  are gone. (3) **Three-tap sign-up**: one button "Sign them up: Plus, 12-month" (web `quickSignup` opens the sign-up page with
+  `?billing=standard` in a tab opened on the tap; Android navigates to `signup/<id>?plan=plus`); other plans behind "Change plan or
+  way to pay"; the page and `/plans/options.prefill` prefill the signer name (the lead's "Ask for" contact when it reads like a
+  name, `signupPrefill` in signup.ts) and the known business email (esignHtml `name`). (4) **In short**: `contractSummary()` =
+  five plain lines (today's amount and what renews, the term via `termLine()`, go-live, ownership, late payments) as an IN SHORT
+  section right after the title in `contractText` (so the PDF and the native sections show it) and a "In short" section in the
+  pop-up whose price line the page fills from the live total and whose term line follows the picked way to pay
+  (`data-short-today`, `data-short-billing`). (5) **Glossary**: guide `words` ("📖 What the words mean": sale status vs preview
+  status, the next-step lines, money, website and people words), buttons on Home, Settings and the caller's Settings; status chips
+  now say Queued to build / Building the preview / Preview failed / Preview ready; Show plans says Extras. (6) **Finish & publish
+  checklist**: `publishChecklist(lint, category)` maps every blocker to an Edit card (`cardForTodo` regex table over the to-do
+  titles; confirmations → `confirm`, approval → `approved`, Google photos → `photo`), `detail().checklist`; each line opens
+  `#/edit/<id>/<card>` (web `tagEditCards` tags the editor's cards by heading via `EDIT_CARD_ID`) / `edit/{id}?card=` (Android
+  scrolls the grid to that card and opens only it). When a web Edit card is added, add its heading to `EDIT_CARD_ID`. (7)
+  **Settings health strip**: `GET /api/health` (owner) = `healthItems()` over Stripe key / webhook / publishable key, Tap to Pay,
+  email, Google sign-in, Firebase + VAPID, Brave, review link, address, priced plans → ok / warn / off with one line and the
+  Settings section that fixes it; web `loadHealth()` + "Jump to:" chips (`settingsJumpChips`); Android a Connections card. (8)
+  **Alert modes**: settings key `notif_prefs.<userId>` {mode: all | mine | important} (`ALERT_MODES`, `IMPORTANT_KINDS`), applied
+  in `listEvents` / `unreadCount` / `latestForPush` and to Web Push recipients (`wantsPush`); "mine" = leads this person logged a
+  call on or sent a sign-up for, plus the important kinds; `GET/PUT /api/notifications/prefs`, `/meta.me.alertMode`; web
+  Notifications radios, Android `AlertModeCard` on Alerts and Settings. (9) **Start here**: `/meta.start` {show, lessons (3 +
+  the practice run `full-run`), practiceLeadId}, dismissed per person (`start_dismissed.<userId>`, `POST /api/start/dismiss`);
+  Home card on both apps. (10) **Report this**: migration 0021 `problem_reports`, `POST /api/report` {app, screen, step, message,
+  detail, device, leadId} (anyone; alert kind `problem`, owner / full access only), `GET /api/problems` + `POST /api/problems/:id/
+  done|reopen` (owner); web: `api()` keeps `lastError`, a toast for a failed request carries "Report this", `reportProblem()`
+  asks one question, buttons on Notifications / Settings / the route error card, 5xx and bare 404s are reworded; Android:
+  `Api.lastError`, the same rewording in `Api.call`, `ReportProblemDialog` / `ReportProblemButton` (Alerts, Settings, the lead
+  page's More row); owner reads them in Settings → Problems reported (both apps). (11) Web and Android stay in step (the owner's
+  rule: Brenda works from a laptop, the callers from regular phones). (12) **Funnel**: `salesDashboard().funnel` = `funnel()` over
+  every lead ever (new → shown → signed → paid → live, share of the step before, median days between; paid time = the first
+  "Paid …" call-log note, else the paid sign-up's time), shown on Sales (web `funnel__bar`, Android "From lead to live").
+  Local smoke test of the web app: `npx wrangler dev --local --port 8788 --host website-business.knightdx91.workers.dev` (without
+  `--host`, local dev takes the first custom-domain route and serves the company site), seed leads with `wrangler d1 execute
+  --local`, then a Playwright script like the session's `smoke.mjs` (chromium with `--no-proxy-server`). It caught two older web
+  crashes: `ready` and `copyBtn` weren't defined in the sign-up / referral cards, so the web lead page had been failing on ready
+  and sold leads (everyone was on Android).
 - Roles: the owner (password in `settings.owner_password`) and team members (`users` table, managed in
   Settings → Team). A team member is a caller, or has `users.admin = 1` ("Full access"): their session gets
   role "owner" (everything the owner can do) but keeps their own id and name for notes, texts and sales credit. Login is password-only, so passwords are unique across everyone. The session

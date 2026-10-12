@@ -141,6 +141,19 @@ fun SalesScreen(state: AppState, nav: NavHostController) {
                     }
                 }
             }
+            if (data.funnel.isNotEmpty()) item {
+                SectionCard("From lead to live") {
+                    val top = (data.funnel.firstOrNull()?.count ?: 1).coerceAtLeast(1)
+                    data.funnel.forEachIndexed { i, st ->
+                        Column(Modifier.padding(top = 8.dp)) {
+                            Row { Text(st.label, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f)); Text("${st.count}${st.rate?.let { " · ${Math.round(it * 100)}% of the step before" } ?: ""}", style = MaterialTheme.typography.bodySmall) }
+                            androidx.compose.material3.LinearProgressIndicator(progress = { (st.count.toFloat() / top).coerceIn(0.02f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                            st.medianDays?.let { md -> Text("Typically ${if (md < 1) "the same day" else "${if (md == Math.floor(md)) md.toLong().toString() else md.toString()} day${if (md == 1.0) "" else "s"}"} after ${data.funnel.getOrNull(i - 1)?.label?.lowercase() ?: ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        }
+                    }
+                    Text("Every lead that ever reached each step, and the typical (median) time between steps. A big drop between two steps is where to look.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
             val lostTotal = data.lostReasons.values.sum()
             if (lostTotal > 0) {
                 item {

@@ -187,9 +187,9 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
     Scaffold(bottomBar = { if (showBar) BottomBar(nav, route, state.unread) }) { padding ->
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(state, nav) }
-            composable("lead/{id}") { e -> LeadScreen(state, nav, e.arguments?.getString("id") ?: "") }
+            composable("lead/{id}?step={step}", arguments = listOf(navArgument("step") { type = NavType.StringType; nullable = true; defaultValue = null })) { e -> LeadScreen(state, nav, e.arguments?.getString("id") ?: "", e.arguments?.getString("step")) }
             composable("pitch/{id}") { e -> PitchScreen(state, nav, e.arguments?.getString("id") ?: "") }
-            composable("edit/{id}") { e -> EditScreen(state, nav, e.arguments?.getString("id") ?: "") }
+            composable("edit/{id}?card={card}", arguments = listOf(navArgument("card") { type = NavType.StringType; nullable = true; defaultValue = null })) { e -> EditScreen(state, nav, e.arguments?.getString("id") ?: "", e.arguments?.getString("card")) }
             composable("playbook") { PlaybookScreen(state, nav) }
             composable("training") { TrainingScreen(state, nav) }
             composable("costs") { CostsScreen(state, nav) }

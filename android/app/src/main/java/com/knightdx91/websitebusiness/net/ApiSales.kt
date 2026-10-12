@@ -27,6 +27,9 @@ data class WebsiteOrder(
     val createdAt: Long,
 )
 
+/** One step of the funnel: how many leads ever got here, the share of the step before, and the typical days between. */
+data class FunnelStage(val id: String, val label: String, val count: Int, val rate: Double?, val medianDays: Double?)
+
 /** GET /api/sales (owner only). Money is in dollars, like the web app; `dueCents` is cents. */
 data class SalesData(
     val week: List<SalesRow>,
@@ -40,6 +43,7 @@ data class SalesData(
     val pipelineShown: Int?,
     val pipelineMonthlyIfPlus: Double?,
     val websiteOrders: List<WebsiteOrder>,
+    val funnel: List<FunnelStage> = emptyList(),
 ) {
     companion object {
         private fun rows(j: JSONObject, key: String) = j.optJSONArray(key).objects().map {
@@ -63,6 +67,9 @@ data class SalesData(
                 lostReasons = lost,
                 pipelineShown = pipe?.optInt("shown"),
                 pipelineMonthlyIfPlus = if (pipe == null || pipe.isNull("monthlyIfPlus")) null else pipe.optDouble("monthlyIfPlus"),
+                funnel = j.optJSONArray("funnel").objects().map {
+                    FunnelStage(it.optString("id"), it.optString("label"), it.optInt("count"), if (it.isNull("rate")) null else it.optDouble("rate"), if (it.isNull("medianDays")) null else it.optDouble("medianDays"))
+                },
                 websiteOrders = j.optJSONArray("websiteOrders").objects().map {
                     WebsiteOrder(
                         id = it.optString("id"),

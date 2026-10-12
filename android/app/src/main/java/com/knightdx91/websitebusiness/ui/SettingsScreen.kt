@@ -55,6 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.navigation.NavHostController
 import com.knightdx91.websitebusiness.AppState
+import com.knightdx91.websitebusiness.net.alertPrefs
+import com.knightdx91.websitebusiness.net.health
+import com.knightdx91.websitebusiness.net.problems
+import com.knightdx91.websitebusiness.net.problemDone
 import com.knightdx91.websitebusiness.BuildConfig
 import com.knightdx91.websitebusiness.net.Api
 import com.knightdx91.websitebusiness.net.Caller
@@ -343,6 +347,16 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
     var form by remember { mutableStateOf<SettingsForm?>(null) }
     var callers by remember { mutableStateOf<List<Caller>>(emptyList()) }
     var usage by remember { mutableStateOf<Usage?>(null) }
+    var health by remember { mutableStateOf<List<com.knightdx91.websitebusiness.net.HealthItem>?>(null) }
+    var problems by remember { mutableStateOf<List<com.knightdx91.websitebusiness.net.Problem>>(emptyList()) }
+    var alertPrefsState by remember { mutableStateOf<com.knightdx91.websitebusiness.net.AlertPrefs?>(null) }
+    LaunchedEffect(isOwner) {
+        alertPrefsState = runCatching { state.api.alertPrefs() }.getOrNull()
+        if (isOwner) {
+            health = runCatching { state.api.health() }.getOrNull()
+            problems = runCatching { state.api.problems() }.getOrDefault(emptyList())
+        }
+    }
     var loadError by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var dialog by remember { mutableStateOf<Dlg?>(null) }
@@ -468,6 +482,38 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
         },
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // ---- health strip: is every outside piece connected (owner) ----
+            health?.let { items -> item {
+                val bad = items.count { it.state != "ok" }
+                CollapsibleCard(if (bad > 0) "🔌 Connections · $bad to look at" else "🔌 Connections · all good", defaultOpen = bad > 0) {
+                    items.forEach { h ->
+                        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.Top) {
+                            Text(when (h.state) { "ok" -> "🟢"; "warn" -> "🟠"; else -> "⚪" }, modifier = Modifier.padding(end = 8.dp))
+                            Column { Text(h.label, fontWeight = FontWeight.SemiBold); Text(h.detail + (h.section?.let { " → $it" } ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        }
+                    }
+                    Text("Secrets (Stripe, email, search keys) are set with wrangler, not here. Green is connected; orange works but something is missing; white is off.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                }
+            } }
+            // ---- problems the team reported with "Report a problem" (owner) ----
+            if (problems.any { it.status == "open" }) item {
+                val open = problems.filter { it.status == "open" }
+                CollapsibleCard("🐞 Problems reported · ${open.size} open", defaultOpen = true) {
+                    open.forEach { p ->
+                        Column(Modifier.padding(top = 8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${p.who ?: "Someone"} · ${p.app} · ${p.screen ?: ""} · ${ago(p.at)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { scope.launch { runCatching { state.api.problemDone(p.id) }; problems = problems.map { if (it.id == p.id) it.copy(status = "done") else it } } }) { Text("Done") }
+                            }
+                            p.step?.let { Text("Doing: $it", style = MaterialTheme.typography.bodyMedium) }
+                            Text("Error: ${p.message}", style = MaterialTheme.typography.bodyMedium)
+                            p.leadName?.let { n -> TextButton(onClick = { p.leadId?.let { nav.navigate("lead/$it") } }, contentPadding = PaddingValues(0.dp)) { Text(n) } }
+                            p.device?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        }
+                    }
+                }
+            }
+            item { AlertModeCard(state.api, alertPrefsState) { alertPrefsState = it } }
             item {
                 CollapsibleCard("Signed in", defaultOpen = true) {
                     Text("${meta?.meName ?: prefs.name}${if (isOwner) " · full access" else " · caller"}${if (prefs.email.isNotBlank()) "\n${prefs.email}" else ""}")
@@ -570,6 +616,8 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedButton(onClick = { nav.navigate("playbook") }) { Text("💬 Plans & answers") }
                         OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
+                        OutlinedButton(onClick = { nav.navigate("guide/words") }) { Text("📖 What the words mean") }
+                        ReportProblemButton(state.api, "settings")
                         OutlinedButton(onClick = { nav.navigate("guide/tankboard") }) { Text("📋 Live inventory guide") }
                         OutlinedButton(onClick = { nav.navigate("guide/pricetags") }) { Text("🏷️ QR price tags guide") }
                         OutlinedButton(onClick = { nav.navigate("guide/display") }) { Text("📺 Tablet display guide") }

@@ -17,6 +17,17 @@ data class TeamMember(val id: String, val name: String)
 /** Firebase client values (public) for instant pushes; see push/Push.kt. */
 data class FcmConfig(val appId: String, val apiKey: String, val projectId: String, val senderId: String)
 
+/** The one thing to do next on a lead, as the server words it (src/worker/queue.ts nextStepFor). */
+data class Step(val key: String, val title: String, val detail: String, val action: String, val route: String, val priority: Int) {
+    companion object {
+        fun from(j: JSONObject?): Step? = j?.let { Step(it.optString("key"), it.optString("title"), it.optString("detail"), it.optString("action"), it.optString("route"), it.optInt("priority", 9)) }
+    }
+}
+
+/** The Start-here card for a new teammate: three lessons and the practice run, until done or dismissed. */
+data class StartLesson(val id: String, val title: String, val done: Boolean, val practice: Boolean)
+data class StartInfo(val show: Boolean, val lessons: List<StartLesson>, val practiceLeadId: String?)
+
 data class Meta(
     val meName: String,
     val meRole: String,
@@ -33,6 +44,11 @@ data class Meta(
     val checkoutOnline: Boolean,
     val fcm: FcmConfig? = null,
     val fcmServer: Boolean = false,
+    /** Alert preference: all / mine / important (Settings → Alerts). */
+    val alertMode: String = "all",
+    /** The standard term in months (Settings → Ways to pay), for the one-tap sign-up button's wording. */
+    val minMonths: Int = 12,
+    val start: StartInfo? = null,
 ) {
     val isOwner get() = meRole == "owner"
 
@@ -57,6 +73,11 @@ data class Meta(
                 checkoutOnline = j.optJSONObject("checkout")?.optBoolean("online") ?: false,
                 fcm = j.optJSONObject("fcm")?.optJSONObject("client")?.let { c -> FcmConfig(c.optString("appId"), c.optString("apiKey"), c.optString("projectId"), c.optString("senderId")) },
                 fcmServer = j.optJSONObject("fcm")?.optBoolean("server") ?: false,
+                alertMode = me.optString("alertMode", "all"),
+                minMonths = s.optInt("minMonths", 12),
+                start = j.optJSONObject("start")?.let { st ->
+                    StartInfo(st.optBoolean("show"), st.optJSONArray("lessons").objects().map { StartLesson(it.optString("id"), it.optString("title"), it.optBoolean("done"), it.optBoolean("practice")) }, st.str("practiceLeadId"))
+                },
             )
         }
     }
@@ -96,6 +117,8 @@ data class Lead(
     val lastActivity: Long? = null,
     /** A page the web-presence check found: their unlinked site or a page on a parent company's site. */
     val foundUrl: String? = null,
+    /** The one thing to do next (title, line, button, route), the same on every screen. */
+    val nextStep: Step? = null,
 ) {
     val ready get() = status == "ready"
     val foundHost: String? get() = foundUrl?.let { runCatching { java.net.URI(it).host?.removePrefix("www.") }.getOrNull() }
@@ -132,6 +155,7 @@ data class Lead(
             notes = j.optInt("notes", 0),
             lastActivity = if (j.isNull("lastActivity")) null else j.optLong("lastActivity"),
             foundUrl = j.str("foundUrl"),
+            nextStep = Step.from(j.optJSONObject("nextStep")),
         )
     }
 }

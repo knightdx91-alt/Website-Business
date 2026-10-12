@@ -77,11 +77,11 @@ const LESSONS: Lesson[] = [
     who: "everyone",
     why: "Leads appear two ways. Knowing what the card tells you saves a wasted call.",
     steps: [
-      'Search runs: the owner taps 🔎 Find new leads, picks business types and Run. The app searches Google around Cullman, keeps businesses with no real website, and builds a preview for each one. They land under the New tab with "Site ready".',
+      'Search runs: the owner taps 🔎 Find new leads, picks business types and Run. The app searches Google around Cullman, keeps businesses with no real website, and builds a preview for each one. They land under the New tab with "Preview ready".',
       "By hand: ➕ Add a business. Type the name, pick the result, and the app builds the preview in a few minutes. Use it when you drive past a place or someone mentions one.",
       'The card\'s label matters. "No website" and "Only a social page" are the best leads. "Page on another site" means their only page lives on someone else\'s website (a landlord, a parent company): still a lead, different opener. "Outdated website" means they have one that\'s broken on phones.',
       "A \"🔗 Found page\" line means the app found a page the Google listing doesn't show. Open it before you call so you're not surprised.",
-      "Tabs across the top of Leads: New (untouched), Callbacks (due), Activity (anything somebody has worked, newest first), Shown, Sold, Live, Not interested, All. The Today card above them is your call list for the day.",
+      "Tabs across the top of Leads: New (untouched), Callbacks (due), Activity (anything somebody has worked, newest first), Shown, Sold, Live, Not interested, All. The Up next card above them is your work list for the day: every lead that needs something, most urgent first, each with its one next step.",
     ],
     tryIt:
       "Open the Activity tab and read the last note on three leads. Then search for a business you know and add it (if it's not already in).",
@@ -108,7 +108,7 @@ const LESSONS: Lesson[] = [
       "Open the lead and tap 📞 Call guide. It's written for this business: what their site has, what to point out, what they'll likely ask. Read it once.",
       "Tap Preview and look at the site on the phone and in the desktop view. Know what's on it.",
       "Going in person? Tap 🚶 In-person guide for the walk-in script and the best time of day for that kind of business.",
-      "Want them to see it first? Text preview link sends a link that works 14 days. You get a 👀 alert the moment they open it, the lead's card says \"👀 opened preview\", and it moves up the Today card. Call while it's fresh.",
+      "Want them to see it first? Text preview link sends a link that works 14 days. You get a 👀 alert the moment they open it, the lead's card says \"👀 opened preview\", and it moves up the Up next card. Call while it's fresh.",
       "They're out? Leave-behind flyer prints a page with a QR code to their preview. Leaving one marks the lead Shown and books a callback in 2 days.",
     ],
     tryIt:
@@ -118,7 +118,7 @@ const LESSONS: Lesson[] = [
         q: "You texted a preview link yesterday. How do you know if they looked?",
         options: [
           "Call and ask",
-          'You get a 👀 alert, the card says "opened preview", and the lead moves up the Today card',
+          'You get a 👀 alert, the card says "opened preview", and the lead moves up the Up next card',
           "You can't know",
         ],
         answer: 1,
@@ -177,7 +177,7 @@ const LESSONS: Lesson[] = [
       "No answer and Owner not in set a callback for tomorrow by themselves. Left a flyer and Interested mark the lead Shown and book a callback in 2 days (the flyer carries their preview link). Call back lets you pick the day. Sold and Not interested clear the callback.",
       "Not interested asks why (price, has someone, no need, timing). Pick honestly: it feeds the sales numbers.",
       "Add a one-line note with anything useful: who you spoke to, what they said, what to try next. Everyone on the team gets an alert, and the Activity tab shows it.",
-      "Callbacks show on the Today card on the day they're due. Overdue ones float to the top.",
+      "Callbacks show on the Up next card on the day they're due. Overdue ones float to the top.",
     ],
     tryIt:
       'Log a note on the "Payment test" lead, then find it under the Activity tab and in Alerts.',
@@ -190,7 +190,7 @@ const LESSONS: Lesson[] = [
           "Sold",
         ],
         answer: 1,
-        why: "Reached plus a callback keeps her on the Today card on the right day, and the note tells the next person where you left off.",
+        why: "Reached plus a callback keeps her on the Up next card on the right day, and the note tells the next person where you left off.",
       },
     ],
   },
@@ -266,7 +266,7 @@ const LESSONS: Lesson[] = [
       "Open any Sold or Live lead and read its to-do list. Find where the photo is uploaded.",
     check: [
       {
-        q: 'The "Before you can publish" list says the Google photo must be replaced. What do you do?',
+        q: 'The "Finish & publish" checklist says the Google photo must be replaced. What do you do?',
         options: [
           "Delete the lead",
           "Upload the owner's photo under Edit → Photo, then publish",

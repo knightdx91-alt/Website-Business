@@ -45,6 +45,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavHostController
 import com.knightdx91.websitebusiness.AppState
+import com.knightdx91.websitebusiness.net.ChecklistItem
 import com.knightdx91.websitebusiness.net.Api
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.verticalScroll
@@ -131,9 +133,12 @@ private val STATUS_ASK = mapOf(
     "new" to "Move this lead back to New?",
 )
 
+/** Edit card names for the Finish & publish checklist (editform card ids). */
+private val CARD_NAME = mapOf("confirm" to "Confirm with the owner", "approved" to "Approval", "photo" to "Photo", "gallery" to "Photo gallery", "facts" to "Facts", "links" to "Links", "text" to "Text", "menu" to "Menu", "services" to "Services", "quotes" to "Customer quotes", "design" to "Design", "pricelist" to "Live price list", "restaurant" to "Restaurant details", "retail" to "Shop details", "print" to "Print shop details", "parts" to "Auto parts details", "auto" to "Auto shop details", "finance" to "Tax & finance details", "church" to "Church & nonprofit details", "contractor" to "Contractor details", "landscaping" to "Lawn & landscape details", "cleaning" to "Cleaning details", "salon" to "Salon details", "plans" to "Plans & pricing", "es" to "Spanish page")
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
+fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var d by remember { mutableStateOf<LeadFull?>(null) }
@@ -148,6 +153,11 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
     var importSite by remember { mutableStateOf(false) }
     var referrerPick by remember { mutableStateOf(false) }
     var editingContact by remember { mutableStateOf(false) }
+    /** The cards that aren't this stage's work fold under "More on this lead". */
+    var showMore by rememberSaveable { mutableStateOf(false) }
+    var moreSignup by rememberSaveable { mutableStateOf(false) }
+    var reportOpen by remember { mutableStateOf(false) }
+    var stepDone by rememberSaveable(id) { mutableStateOf(false) }
     var contactDraft by remember { mutableStateOf("") }
     var bestTimeDraft by remember { mutableStateOf("") }
     var reviewUrl by remember { mutableStateOf<String?>(null) }
@@ -279,6 +289,47 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
         context.sms(l.lead.phone, "Hi! Your website report for ${l.name}, ${monthName(t.label)}$from: ${t.views} visits, ${t.calls} people tapped Call, ${t.directions} got directions$requests. Let us know if you'd like anything updated!")
     }
 
+    fun publishAsk() {
+        val l = d?.lead ?: return
+        ask = Ask("Publish", if (l.liveUrl != null) "Publish your changes to the live site?" else "Put this site on the internet now?", "Publish") {
+            act("publish") {
+                val url = state.api.publish(id)
+                context.toast("Published! It can take a minute to appear.")
+                if (url.isNotBlank()) context.openUrl(url)
+                load()
+            }
+        }
+    }
+
+    /** The next-step button (and ?step= from Home's queue): do the one thing this stage needs. */
+    fun doStep(route: String) {
+        val det = d ?: return
+        val l = det.lead
+        when (route) {
+            "call" -> if (l.ready) nav.navigate("pitch/$id") else context.dial(l.phone)
+            "walkin" -> nav.navigate("walkin/$id")
+            "pay" -> {
+                val s = det.detail.signups.firstOrNull { !it.paid && !it.invoice }
+                when {
+                    s == null -> context.toast("Sign them up first; payment comes right after the signature.")
+                    meta?.tapReady == true && s.dueCents >= 50 -> tap(s.id)
+                    else -> context.toast("Tap to Pay isn't ready on this phone (Settings → Tap to Pay). Tick “Payment is set up” once they've paid, or text them the sign-up link again.")
+                }
+            }
+            "text" -> followUp(if (l.nextStep?.action?.contains("last", ignoreCase = true) == true) 2 else 1)
+            "checklist" -> context.toast("The checklist is right below: each line opens the right card in Edit.")
+            "publish" -> if (det.blockers.isEmpty()) publishAsk() else context.toast("Fix the checklist first, then Publish unlocks.")
+            "review" -> {
+                val u = reviewUrl
+                if (u != null) context.sms(l.phone, "$greeting Thanks again for trusting us with the ${det.name} website! If you have a minute, would you leave us a quick Google review? It really helps a small local business: $u")
+                else context.toast(if (isOwner) "Add the Google review link in Settings first." else "The owner hasn't added the review link yet.")
+            }
+            "retry" -> act("retry") { state.api.retryBuild(id); context.toast("Rebuilding…"); delay(1_500); load() }
+            "log" -> context.toast("Log it in the card below.")
+        }
+    }
+    LaunchedEffect(d != null, step) { if (step != null && d != null && !stepDone) { stepDone = true; doStep(step) } }
+
     fun downloadZip() {
         val l = d ?: return
         act("zip") {
@@ -302,6 +353,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
         val open = l.salesStatus == "new" || l.salesStatus == "shown"
         val live = l.salesStatus == "live"
 
+        if (reportOpen) ReportProblemDialog(state.api, "lead", id) { reportOpen = false }
         if (referrerPick) ReferrerPicker(state, excludeId = id, onClose = { referrerPick = false }) { chosen ->
             referrerPick = false
             act("referrer") { state.api.setReferrer(id, chosen); load() }
@@ -374,6 +426,20 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                 }
             }
 
+            // ---- the one next step: title, one line, one button (words from the server) ----
+            l.nextStep?.let { st -> item {
+                NextStepCard(st) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        when (st.route) {
+                            "call" -> { if (ready) Button(onClick = { nav.navigate("pitch/$id") }) { Text("📞 Call guide") }; Button(onClick = { context.dial(l.phone) }) { Text("📞 Call now") } }
+                            "wait" -> OutlinedButton(onClick = {}, enabled = false) { Text(st.action) }
+                            else -> Button(onClick = { doStep(st.route) }, enabled = busy == null) { Text("${STEP_ICON[st.key] ?: "👉"} ${st.action}") }
+                        }
+                        if (st.route != "call" && st.route != "wait" && ready && open) OutlinedButton(onClick = { nav.navigate("pitch/$id") }) { Text("📞 Call guide") }
+                    }
+                }
+            } }
+
             // ---- log this call (first on a phone, so a call can be logged without scrolling) ----
             if (!live) item {
                 Card(Modifier.fillMaxWidth()) {
@@ -402,8 +468,41 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                 }
             }
 
+            // ---- publish (owner) ----
+            if (ready && canWork && (!live || showMore)) item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) {
+                        val blockers = detail.blockers
+                        // Finish & publish: every blocker with the Edit card that fixes it (tap a line to open that card).
+                        val items = detail.checklist.ifEmpty { blockers.map { ChecklistItem(it, "text", "todo") } }
+                        Text(if (items.isNotEmpty()) "🚀 Finish & publish · ${items.size} to fix" else "🚀 Ready to publish", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        if (items.isNotEmpty()) {
+                            items.forEachIndexed { i, it ->
+                                Row(Modifier.fillMaxWidth().padding(top = 6.dp).clickable { nav.navigate("edit/$id?card=${it.card}") }, verticalAlignment = Alignment.Top) {
+                                    Text("${i + 1}.", modifier = Modifier.width(24.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(it.text, style = MaterialTheme.typography.bodyMedium)
+                                        Text("Edit → ${CARD_NAME[it.card] ?: it.card}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                            Text("Each line opens the right card in Edit. Publish unlocks when the list is empty.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 6.dp))
+                        } else Text("Everything's confirmed. Publishing puts the site on the internet.", color = muted)
+                        if (detail.suggestions.isNotEmpty()) {
+                            var tips by remember { mutableStateOf(false) }
+                            TextButton(onClick = { tips = !tips }, contentPadding = PaddingValues(0.dp)) { Text("${if (tips) "▾" else "▸"} Good to add (talking points, ${detail.suggestions.size})") }
+                            if (tips) Bullets(detail.suggestions)
+                        }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
+                            Button(onClick = { publishAsk() }, enabled = blockers.isEmpty() && busy == null, colors = ButtonDefaults.buttonColors(containerColor = Good)) { Text(if (busy == "publish") "Publishing…" else if (l.liveUrl != null) "Republish changes" else "Publish to Cloudflare") }
+                            OutlinedButton(onClick = { downloadZip() }, enabled = blockers.isEmpty() && busy == null) { Text(if (busy == "zip") "Downloading…" else "Download zip") }
+                        }
+                    }
+                }
+            }
+
             // ---- sales status + cadence ----
-            item {
+            if (open || l.salesStatus == "not_interested" || showMore) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("Sales status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -487,7 +586,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- design (owner, before the site is live) ----
-            if (ready && canWork && !live) item {
+            if (ready && canWork && !live && showMore) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("🎨 Design", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -525,7 +624,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- sign-up ----
-            if (ready) item {
+            if (ready && ((!live && l.salesStatus != "not_interested") || showMore)) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         val signups = detail.detail.signups
@@ -569,6 +668,16 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
                         }
                         if (meta != null && meta.plans.isNotEmpty()) {
+                            // Three taps: one button opens the sign-up with the Plus plan on the standard term; the signer's name and email are
+                            // already filled, they read "In short", sign, and pay. Everything else sits behind "Change plan or way to pay".
+                            val priced = meta.plans.filter { it.monthly > 0 && it.id != "list" }
+                            val quick = priced.firstOrNull { it.id == "plus" } ?: priced.getOrNull((priced.size - 1) / 2)
+                            if (signups.isEmpty() && quick != null && !moreSignup) {
+                                Button(onClick = { nav.navigate("signup/${l.id}?plan=${quick.id}") }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("✍️ Sign them up: ${quick.name}, ${meta.minMonths}-month · ${moneyDollars(quick.monthly)}/mo") }
+                                Text("Opens the agreement on this phone. Their name and email are filled in; they read the short version, sign, and pay.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
+                                TextButton(onClick = { moreSignup = true }, contentPadding = PaddingValues(0.dp)) { Text("Change plan or way to pay") }
+                            }
+                            if (signups.isNotEmpty() || quick == null || moreSignup) {
                             Text(if (signups.isNotEmpty()) "Send a new link to change plans." else "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs. No setup fee on the 6- or 12-month plan or yearly; month to month adds a one-time setup fee, applied automatically in the sign-up.", style = MaterialTheme.typography.bodySmall, color = muted)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
                                 OutlinedButton(onClick = { nav.navigate("plans/${l.id}") }) { Text("📋 Show them the plans") }
@@ -581,6 +690,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                                     if (p.id == "plus") Button(onClick = { nav.navigate("signup/${l.id}?plan=${p.id}") }) { Text("${p.name} · ${moneyDollars(p.monthly)}/mo") }
                                     else OutlinedButton(onClick = { nav.navigate("signup/${l.id}?plan=${p.id}") }) { Text("${p.name} · ${moneyDollars(p.monthly)}/mo") }
                                 }
+                            }
                             }
                         } else Text(if (isOwner) "Add your plans and prices in Settings first." else "The owner hasn't set up plans yet.", style = MaterialTheme.typography.bodySmall, color = muted)
                     }
@@ -641,7 +751,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- referrals: who sent them, and the credits a client earned ----
-            detail.detail.referral?.let { r -> if (ready) item {
+            detail.detail.referral?.let { r -> if (ready && showMore) item {
                 ReferralCard(r, l, isOwner, busy == null,
                     onPick = { referrerPick = true },
                     onClear = { act("referrer") { state.api.setReferrer(id, null); load() } },
@@ -668,7 +778,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- the board (any category) ----
-            if (ready) item {
+            if (ready && showMore) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("📋 ${detail.boardName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -698,7 +808,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
             }
 
             // ---- extras, review ask, billing (sold / live) ----
-            if (client) item {
+            if (client && (live || showMore)) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("🛒 Extras", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -712,7 +822,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                     }
                 }
             }
-            if (client && (reviewUrl != null || canWork)) item {
+            if (client && (live || showMore) && (reviewUrl != null || canWork)) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("⭐ Ask for a review", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -725,43 +835,12 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                     }
                 }
             }
-            if (client && canWork) item {
+            if (client && canWork && (live || showMore)) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("💳 Billing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text("Their Stripe billing portal: update the card, see invoices, change or cancel the subscription.", style = MaterialTheme.typography.bodySmall, color = muted)
                         OutlinedButton(onClick = { act("portal") { context.openUrl(state.api.portalUrl(id)) } }, enabled = busy == null, modifier = Modifier.padding(top = 6.dp)) { Text("Open billing portal") }
-                    }
-                }
-            }
-
-            // ---- publish (owner) ----
-            if (ready && canWork) item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp)) {
-                        val blockers = detail.blockers
-                        Text(if (blockers.isNotEmpty()) "Before you can publish" else "Ready to publish", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        if (blockers.isNotEmpty()) {
-                            Bullets(blockers)
-                            Text("Fill these in from Edit.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
-                        } else Text("Everything's confirmed. Publishing puts the site on the internet.", color = muted)
-                        if (detail.suggestions.isNotEmpty()) {
-                            Text("Good to add (talking points)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-                            Bullets(detail.suggestions)
-                        }
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
-                            Button(onClick = {
-                                ask = Ask("Publish", if (l.liveUrl != null) "Publish your changes to the live site?" else "Put this site on the internet now?", "Publish") {
-                                    act("publish") {
-                                        val url = state.api.publish(id)
-                                        context.toast("Published! It can take a minute to appear.")
-                                        if (url.isNotBlank()) context.openUrl(url)
-                                        load()
-                                    }
-                                }
-                            }, enabled = blockers.isEmpty() && busy == null, colors = ButtonDefaults.buttonColors(containerColor = Good)) { Text(if (busy == "publish") "Publishing…" else if (l.liveUrl != null) "Republish changes" else "Publish to Cloudflare") }
-                            OutlinedButton(onClick = { downloadZip() }, enabled = blockers.isEmpty() && busy == null) { Text(if (busy == "zip") "Downloading…" else "Download zip") }
-                        }
                     }
                 }
             }
@@ -792,8 +871,16 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                 }
             }
 
+            // ---- everything that isn't this stage's work folds here ----
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { showMore = !showMore }) { Text(if (showMore) "▴ Less" else "▾ More on this lead (design, board, referrals, extras…)") }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { reportOpen = true }) { Text("🐞 Report a problem") }
+                }
+            }
             // ---- more (owner) ----
-            if (canWork && (ready || !live)) item {
+            if (canWork && (ready || !live) && showMore) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("More", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

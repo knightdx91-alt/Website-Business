@@ -139,6 +139,9 @@ data class PlanOptions(
     val addons: List<AddonInfo>,
     /** Founding-customer bonus while spots are open: the free extras to pick from. */
     val founder: FounderOffer? = null,
+    /** Signer name / email to start the form with (the lead's contact and known business email). */
+    val prefillName: String = "",
+    val prefillEmail: String = "",
     /** The client who referred this lead (the sign-up shows them what the referrer earns). */
     val referredBy: ReferredBy? = null,
 ) {
@@ -169,6 +172,8 @@ data class PlanOptions(
                 payWays = j.optJSONArray("payWays").objects().map { PayWay(it.optString("title"), it.optString("detail")) },
                 priceShort = j.optString("priceShort", "it's a low monthly price"),
                 invoice = j.optBoolean("invoice"),
+                prefillName = j.optJSONObject("prefill")?.optString("name") ?: "",
+                prefillEmail = j.optJSONObject("prefill")?.optString("email") ?: "",
                 founder = j.optJSONObject("founder")?.let { f -> FounderOffer(f.optInt("slotsLeft"), f.optInt("total"), f.optJSONArray("choices").objects().map { c -> FounderChoice(c.optInt("index"), c.optString("name"), c.optString("price"), c.optString("about")) }) },
                 referredBy = j.optJSONObject("referredBy")?.let { r -> ReferredBy(r.optString("id"), r.optString("name"), r.optInt("months")) },
                 addons = j.optJSONArray("addons").objects().map { AddonInfo(it.optString("name"), it.optString("about"), it.optString("price"), it.optString("unit"), it.optDouble("amount", priceInText(it.optString("price"))), it.optString("group", "general")) },

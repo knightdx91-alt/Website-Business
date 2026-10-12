@@ -249,6 +249,9 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
             val d = state.api.lead(leadId)
             lead = d.lead
             if (business.isBlank()) business = d.lead.name
+            // Three-tap sign-up: the signer's name and email start filled from what the team already typed (changeable).
+            if (name.isBlank()) name = o.prefillName
+            if (email.isBlank()) email = o.prefillEmail
             if (o.plans.none { it.id == plan }) plan = (o.plans.firstOrNull { it.id == "plus" } ?: o.plans.firstOrNull())?.id ?: ""
             options = o
         } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "Couldn't load the plans" }
