@@ -122,7 +122,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
           '"In stock · tap if sold out" flips to "Sold out · tap when back". Sold-out items vanish from the website until tapped back. Setting how many to 0 does the same; 5 or fewer shows "n left" on the page.',
           "▲ ▼ move a tank up or down; 🗑 removes an item or a whole tank (it asks first).",
           'Everything saves by itself. The top of the board says "Saved ✓" with the time, or tells them if their signal dropped.',
-          '📺 on a tank opens that tank\'s display page; "All tanks, rotating" in the footer cycles through every tank.',
+          '📺 on a tank opens that tank\'s display page; "Every tank on one screen" in the footer shows every tank as a tile (a customer taps one to open it), and "rotating sign" cycles through them for a screen nobody touches.',
         ],
       },
       {
@@ -322,7 +322,8 @@ export function displayGuide(s: AppSettings): Guide {
         steps: [
           'One tank: the tank name as the heading, the shop name small on the right, and a card per item: photo (or a fish mark when there is none), name, note, the price in big orange type, "n left" under the price when 5 or fewer are left.',
           'Sold-out and zero-count items are gone, exactly like the price page. A tank with nothing in stock says "Sold out for now. Ask us what\'s coming."',
-          "Every tank, rotating: the same card layout, a new tank every 10 seconds, with dots at the bottom showing which one is up.",
+          "Every tank on one screen (the usual choice): one tile per tank with a photo, how many are in and the first few names; a customer taps a tank to see what's in it, and it goes back to the tiles after a minute and a half. Staff unlock and tap a tank to count or add to it right there.",
+          "Rotating sign: the same tank cards, a new tank every 10 seconds, with dots at the bottom showing which one is up. For a screen at the register or the door that nobody touches (add ?rotate=1 to the address, or use the footer link).",
           "It shrinks the text so a tank with 15 items still fits with nothing cut off, and goes to two columns on a wide screen.",
           'Bottom left: "Updated" with the time of the last change on the board. Bottom right: a small "Staff" button. Customers tap a fish for its care card; nothing else responds.',
           'Staff mode (after PIN, NFC tag or phone code): − / + on every item, ⋯ for the exact count, sold out, price, a photo from the tablet camera and the care card (read, redo with AI, or edit by hand), tank chips across the bottom, "+ New tank", and "+ Add" with the shop\'s whole catalog and a search box. New names get a photo prompt and an AI-drafted care card. "▦ Scan": point the camera at a barcode (or use a handheld scanner), type the amount, Put in or Take out; a code nobody has scanned before becomes a new item. Done or 3 idle minutes locks it.',
@@ -336,7 +337,7 @@ export function displayGuide(s: AppSettings): Guide {
           "Each tank has a 📺 at the right of its name. Tapping it opens that tank's display page; copy the address from the browser bar. It looks like " +
             APP_ORIGIN +
             "/d/<lead>/<tank-name>.",
-          'For every tank in turn, use the "All tanks, rotating" link in the board\'s footer: the same address without the tank name on the end.',
+          'For every tank on one screen, use the "Every tank on one screen" link in the board\'s footer: the same address without the tank name on the end. "Rotating sign" next to it is the hands-off version.',
           "The address works without a login (it shows nothing but what the price page shows), so it can be typed into any tablet, phone or TV browser. It is hidden from Google.",
         ],
         note: "The tank part of the address is the tank's name. Rename the tank and the old address shows nothing: set the tablet up again with the new 📺 link.",
@@ -350,7 +351,7 @@ export function displayGuide(s: AppSettings): Guide {
           "Settings → Display → Screen timeout: the longest it allows or \"Never\". The page asks the screen to stay awake too, but the tablet's own setting is what you can trust. Turn brightness down a notch; it's on all day.",
           "Keep it plugged in. A tablet on battery dies by mid-afternoon.",
           'Stop customers tapping out of it: Settings → Security → "App pinning" (Samsung: "Pin windows"; Fire: "Enable Fire for Kids" or just the home-screen icon). Pin Chrome. Hold Back + Overview to unpin.',
-          "Pick the right address for that screen: the one tank it sits on, or the rotating page for a screen at the register or the door.",
+          "Pick the right address for that screen: every tank as tiles for a screen customers can reach, the one tank it sits on, or the rotating sign for a screen at the register or the door.",
         ],
       },
       {
@@ -370,7 +371,7 @@ export function displayGuide(s: AppSettings): Guide {
           "Three ways to unlock: the staff PIN (the board → Tablet & staff → Save PIN), a staff NFC tag (write the text shown on the board onto a $1 NFC sticker with the free NFC Tools app; only tablets with NFC can read it), or the 6-digit code the tablet shows, typed on the board. Revoke old links on the lead ends every tablet session too.",
           "If the screen looks stale, it has probably lost Wi-Fi. Tap it, swipe down to reload, or power it off and on. The page comes back by itself.",
           "Renaming a tank on the board means that tank's screen needs the new 📺 link once. Adding items, prices, photos and sold out never need anything.",
-          "The rotating page always shows every tank, so a new tank joins it on its own.",
+          "The tiles page and the rotating sign always show every tank, so a new tank joins them on its own.",
           "A screen can be moved to another tank by opening that tank's 📺 link on it.",
           'Packaged goods: in staff mode, "▦ Scan" counts them in and out by barcode (tablet camera in Chrome, or a $25 to $40 USB-C / Bluetooth scanner in keyboard mode). Scan, type the amount, Put in or Take out. New codes ask for a name once. The full steps are in the Tank board guide → Barcode scanning.',
         ],

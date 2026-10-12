@@ -783,8 +783,18 @@ body.staff .staffbar{display:flex}
 .list{display:grid;gap:.4em;max-height:50vh;overflow:auto}.list .it{padding:.5em .8em}
 .chip{display:inline-block;font-size:.7em;background:#2b3a5e;border-radius:999px;padding:.15em .6em;color:#fff;margin-left:.4em}
 .chip.ai{background:#4b3a7a}
+/* the picker: one tile per tank, 1–9 fit on a tablet */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14em),1fr));gap:1.6vmin;align-content:start}
+.tile{background:var(--card);border-radius:1.2em;padding:1em 1.1em;cursor:pointer;display:grid;gap:.35em;align-content:start;min-height:9em;border:2px solid transparent}
+.tile:active{border-color:var(--gold)}
+.tile img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:.8em;background:#1e2b4b}
+.tile .big{display:grid;place-items:center;aspect-ratio:16/9;font-size:2.6em;background:#1e2b4b;border-radius:.3em;opacity:.7}
+.tile .tn{font-weight:800;font-size:1.25em;line-height:1.15}.tile .tc{color:var(--gold);font-weight:700;font-size:.85em}.tile .tl{color:var(--muted);font-size:.72em;line-height:1.3}
+.tile.new{border:2px dashed var(--line);color:var(--muted);place-items:center;font-size:1.1em}
+#back{display:none;white-space:nowrap;flex:none}body.tankview #back{display:inline-block}
+.hint{color:var(--muted);font-size:.7em;margin:0 0 1vh}
 </style></head><body class="customer">
-<header><h1 id="h">${escHtml(tank ? tank.name : feed.title)}</h1><span class="shop">${escHtml(record.name)}</span></header>
+<header><button class="staffbtn" id="back" type="button">← All ${escHtml(sec)}s</button><h1 id="h">${escHtml(tank ? tank.name : feed.title)}</h1><span class="shop">${escHtml(record.name)}</span></header>
 <main id="m"><p class="empty">Loading…</p></main>
 <footer><span id="u"></span><span class="dots" id="dots"></span><button class="staffbtn" id="staff" type="button">Staff</button></footer>
 <div class="staffbar"><div class="tanks" id="tanks"></div><div class="row" style="margin:0"><button class="btn go" id="addbtn" type="button">+ Add</button><button class="btn" id="scanbtn" type="button"${scan ? "" : " hidden"}>▦ Scan</button><button class="btn ghost" id="lock" type="button">Done</button></div></div>
@@ -817,16 +827,31 @@ body.staff .staffbar{display:flex}
 <script>
 (function(){
 var LEAD=${JSON.stringify(leadId)},BASE="/l/"+LEAD,FEED=BASE+"/prices.json",SLUG=${JSON.stringify(slug)},data=null,i=0,ROTATE=10000,staffTok=null,staff=false,cur=null,idle=null,pollT=null,pin="";
+// one tank (a slug), rotate (?rotate=1, a passive sign), or pick (the default: every tank as a tile; tap one to open it)
+var MODE=SLUG?"one":(/[?&]rotate=1/.test(location.search)?"rotate":"pick"),TITLE=${JSON.stringify(feed.title)},custIdle=null;
 var SEC=${JSON.stringify(sec)},SECT=${JSON.stringify(W.section)},EMOJI=${JSON.stringify(W.emoji)},EMPTY=${JSON.stringify(W.empty)},FIELDS=${FIELDS},KIND=${JSON.stringify(listKind(record))};
 try{staffTok=localStorage.getItem("staff."+LEAD)||null}catch(e){}
 var $=function(id){return document.getElementById(id)};
 function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function api(path,opts){opts=opts||{};opts.headers=Object.assign({"content-type":"application/json"},opts.headers||{});if(staffTok)opts.headers["x-staff"]=staffTok;return fetch(BASE+path,opts).then(function(r){return r.json().then(function(j){if(!r.ok){if(r.status===401)lock();throw new Error(j.error||("Failed ("+r.status+")"))}return j})})}
-function tankName(){if(cur)return cur;if(SLUG&&data){for(var k=0;k<data.sections.length;k++)if(data.sections[k].slug===SLUG)return data.sections[k].name}return data&&data.sections.length?data.sections[i%data.sections.length].name:""}
-function pick(){if(!data)return null;var n=tankName();for(var k=0;k<data.sections.length;k++)if(data.sections[k].name===n)return data.sections[k];return SLUG?{name:"",items:[]}:(data.sections[0]||null)}
+function tankName(){if(cur)return cur;if(SLUG&&data){for(var k=0;k<data.sections.length;k++)if(data.sections[k].slug===SLUG)return data.sections[k].name}if(MODE==="pick")return "";return data&&data.sections.length?data.sections[i%data.sections.length].name:""}
+function pick(){if(!data)return null;var n=tankName();for(var k=0;k<data.sections.length;k++)if(data.sections[k].name===n)return data.sections[k];return SLUG?{name:"",items:[]}:(MODE==="pick"?null:(data.sections[0]||null))}
+function tankView(on){document.body.classList.toggle("tankview",!!on&&MODE==="pick")}
+// the picker: one tile per tank with its first photo, how many are in, and the first few names
+function renderHome(){var m=$("m"),h=$("h");h.textContent=TITLE;tankView(false);$("dots").innerHTML="";
+  var secs=data?data.sections.filter(function(s){return staff||s.items.some(function(it){return !it.soldOut&&it.qty!==0})}):[];
+  if(!secs.length&&!staff){m.innerHTML='<p class="empty">'+esc(EMPTY)+'</p>';return}
+  m.innerHTML='<p class="hint">'+(staff?'Tap a '+SEC+' to count, add or change what is in it.':'Tap a '+SEC+' to see what is in it and what it needs.')+'</p><div class="tiles">'+secs.map(function(s){var items=staff?s.items:s.items.filter(function(it){return !it.soldOut&&it.qty!==0});var img=null;items.forEach(function(it){if(!img&&it.image)img=it.image});
+    return '<div class="tile" data-tile="'+esc(s.name)+'">'+(img?'<img src="'+esc(img)+'" alt="">':'<div class="big">'+EMOJI+'</div>')+'<div class="tn">'+esc(s.name)+'</div><div class="tc">'+items.length+' in stock</div><div class="tl">'+esc(items.slice(0,3).map(function(it){return it.name}).join(" · ")+(items.length>3?" · …":""))+'</div></div>'}).join("")+(staff?'<div class="tile new" data-tile="__new">+ New '+SEC+'</div>':'')+'</div>';
+  if(staff)$("tanks").innerHTML=(data?data.sections:[]).map(function(t){return '<button class="btn small ghost" data-tank="'+esc(t.name)+'">'+esc(t.name)+'</button>'}).join("")+'<button class="btn small ghost" data-tank="__new">+ New '+SEC+'</button>';
+  else fit();
+  $("u").textContent=data&&data.updatedAt?"Updated "+data.updatedAt:"";
+  $("m").dataset.items="[]"}
 var ALLF=${JSON.stringify(Object.values(KINDS).flatMap((k) => k.fields.map(([key, label]) => [key, label])))};
 function rows(info){if(!info)return[];var out=[],seen={};FIELDS.concat(ALLF).forEach(function(f){if(seen[f[0]])return;var v=info[f[0]];if(typeof v==="string"&&v.trim()){out.push([f[1],v.trim()]);seen[f[0]]=1;seen["l:"+f[1].toLowerCase()]=1}});(info.facts||[]).forEach(function(f){if(f.label&&f.value&&!seen["l:"+f.label.toLowerCase()])out.push([f.label,f.value])});return out}
 function render(){var s=pick();var m=$("m"),h=$("h"),d=$("dots");
+  if(MODE==="pick"&&!cur){renderHome();return}
+  tankView(true);
   if(!s){m.innerHTML='<p class="empty">Nothing on the board yet.'+(staff?' Tap + Add.':'')+'</p>';return}
   if(s.name)h.textContent=s.name;
   var items=staff?s.items:s.items.filter(function(it){return !it.soldOut&&it.qty!==0});
@@ -834,7 +859,7 @@ function render(){var s=pick();var m=$("m"),h=$("h"),d=$("dots");
     var right=staff?'<div class="qty"><button class="btn small" data-adj="-1" data-k="'+k+'">−</button><b>'+(it.qty==null?"–":it.qty)+'</b><button class="btn small go" data-adj="1" data-k="'+k+'">+</button><button class="btn small ghost" data-more="'+k+'">⋯</button></div>':'<div class="pr">'+esc(it.price||"Ask")+left+'</div>';
     var tag=staff&&(it.soldOut||it.qty===0)?'<span class="chip">hidden</span>':'';
     return '<div class="it'+(staff?'':' tap')+'" data-k="'+k+'">'+(it.image?'<img class="ph" src="'+esc(it.image)+'" alt="">':'<div class="ph ph--none">'+EMOJI+'</div>')+'<div><div class="nm">'+esc(it.name)+tag+'</div>'+(it.note||(staff&&it.price)?'<div class="nt">'+esc(staff?(it.price||"no price")+(it.note?" · "+it.note:""):it.note)+'</div>':'')+'</div>'+right+'</div>'}).join("")+'</div>':'<p class="empty">'+(staff?'Nothing in this '+SEC+'. Tap + Add.':esc(EMPTY))+'</p>';
-  d.innerHTML=SLUG||staff||data.sections.length<2?"":data.sections.map(function(_,k){return '<i'+(k===i%data.sections.length?' class="on"':'')+'></i>'}).join("");
+  d.innerHTML=MODE!=="rotate"||staff||data.sections.length<2?"":data.sections.map(function(_,k){return '<i'+(k===i%data.sections.length?' class="on"':'')+'></i>'}).join("");
   $("u").textContent=data.updatedAt?"Updated "+data.updatedAt:"";
   if(staff){$("tanks").innerHTML=data.sections.map(function(t){return '<button class="btn small'+(t.name===s.name?' go':' ghost')+'" data-tank="'+esc(t.name)+'">'+esc(t.name)+'</button>'}).join("")+'<button class="btn small ghost" data-tank="__new">+ New '+SEC+'</button>'}
   else fit();
@@ -843,7 +868,12 @@ function fit(){var m=$("m"),b=document.body;b.style.fontSize="";var px=parseFloa
 window.addEventListener("resize",function(){if(!staff)fit()});
 function load(){return (staff?api("/staff/data"):fetch(FEED,{cache:"no-store"}).then(function(r){return r.json()})).then(function(j){data=j;render()}).catch(function(){})}
 load();setInterval(function(){if(!staff&&!$("info").classList.contains("on"))load()},30000);
-setInterval(function(){if(!SLUG&&!staff&&!$("info").classList.contains("on")){i++;render()}},ROTATE);
+setInterval(function(){if(MODE==="rotate"&&!staff&&!$("info").classList.contains("on")){i++;render()}},ROTATE);
+// a customer who opened a tank and walked away: back to the picker after 90 s
+function custTouch(){clearTimeout(custIdle);if(MODE==="pick"&&!staff&&cur)custIdle=setTimeout(function(){if(!staff){cur=null;$("info").classList.remove("on");render()}},90000)}
+document.addEventListener("pointerdown",custTouch);
+$("back").onclick=function(){cur=null;render()};
+$("m").addEventListener("click",function(e){var t=e.target.closest("[data-tile]");if(!t)return;if(t.dataset.tile==="__new"){var n=prompt("Name the new "+SEC);if(!n||!n.trim())return;cur=n.trim();openAdd();return}cur=t.dataset.tile;render();custTouch()});
 function wake(){if(navigator.wakeLock)navigator.wakeLock.request("screen").catch(function(){})}
 wake();document.addEventListener("visibilitychange",function(){if(!document.hidden)wake()});
 // ---- customer: tap for the care card ----
@@ -863,7 +893,7 @@ $("nfcBtn").onclick=function(){try{var r=new NDEFReader();$("pinMsg").className=
 $("codeBtn").onclick=function(){$("ulCode").hidden=false;$("codeMsg").textContent="Waiting…";api("/unlock/start",{method:"POST",body:"{}"}).then(function(j){$("codeShow").textContent=j.code.slice(0,3)+" "+j.code.slice(3);stopPoll();pollT=setInterval(function(){api("/unlock/"+j.session).then(function(p){if(p.ok){stopPoll();gotToken(p.token)}else if(p.expired){stopPoll();$("codeMsg").textContent="That code expired. Tap again for a new one."}})},3000)}).catch(function(e){$("codeMsg").textContent=e.message})};
 function stopPoll(){if(pollT){clearInterval(pollT);pollT=null}}
 function gotToken(t){staffTok=t;try{localStorage.setItem("staff."+LEAD,t)}catch(e){}$("unlock").classList.remove("on");$("ulCode").hidden=true;stopPoll();enter()}
-function enter(){staff=true;document.body.classList.remove("customer");document.body.classList.add("staff");$("staff").textContent="Staff ✓";cur=tankName();load().then(function(){if(!data||!data.sections.length)return;if(!cur)cur=data.sections[0].name;render()});touch()}
+function enter(){staff=true;document.body.classList.remove("customer");document.body.classList.add("staff");$("staff").textContent="Staff ✓";cur=tankName()||null;load().then(function(){if(!data||!data.sections.length)return;if(!cur&&MODE!=="pick")cur=data.sections[0].name;render()});touch()}
 function lock(){staff=false;cur=null;document.body.classList.add("customer");document.body.classList.remove("staff");$("staff").textContent="Staff";["add","more","unlock"].forEach(function(id){$(id).classList.remove("on")});closeScan();load()}
 $("lock").onclick=lock;
 function touch(){clearTimeout(idle);idle=setTimeout(function(){if(staff)lock()},180000)}
@@ -872,7 +902,7 @@ $("tanks").addEventListener("click",function(e){var b=e.target.closest("[data-ta
 // ---- add ----
 var addName="",addIsNew=false;
 function openAdd(){$("addTank").textContent=cur||"";$("addSearch").value="";$("addNew").hidden=true;$("addQty").hidden=true;addName="";listCatalog("");$("add").classList.add("on");setTimeout(function(){$("addSearch").focus()},50)}
-$("addbtn").onclick=function(){if(!cur){var n=prompt("Name the first "+SEC);if(!n||!n.trim())return;cur=n.trim()}openAdd()};
+$("addbtn").onclick=function(){if(!cur){if(data&&data.sections.length){alert("Tap a "+SEC+" first, or + New "+SEC+".");return}var n=prompt("Name the first "+SEC);if(!n||!n.trim())return;cur=n.trim()}openAdd()};
 $("addCancel").onclick=function(){$("add").classList.remove("on")};
 $("addSearch").addEventListener("input",function(){listCatalog(this.value)});
 function listCatalog(q){var cat=(data&&data.catalog)||[];q=(q||"").trim().toLowerCase();var hits=cat.filter(function(c){return !q||c.name.toLowerCase().indexOf(q)>=0});

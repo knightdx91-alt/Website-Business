@@ -108,3 +108,15 @@ test("barcodes: find by code (current section first), add by code, set/clear, ke
   assert.equal(await lookupBarcode("4006381333931", (async () => new Response("", { status: 404 })) as unknown as typeof fetch), null);
   assert.equal(await lookupBarcode("4006381333931", (async () => { throw new Error("down"); }) as unknown as typeof fetch), null);
 });
+
+test("the tablet display page renders the picker and its script parses", async () => {
+  const record = categoryRecord("retail");
+  record.ext.retail = { ...(record.ext.retail ?? {}), priceList: { kind: "fish", sections: parseMenuText("# Tank 1\nNeon tetra | $2.99\n# Tank 2\nGuppy | $4.49"), lastUpdated: "2026-10-12" } } as never;
+  const row = { id: "lead1", status: "ready", record_json: JSON.stringify(record), client_key: "k" } as unknown as LeadRow;
+  const env = { DB: { prepare: () => ({ bind: () => ({ first: async () => row, all: async () => ({ results: [] }), run: async () => ({}) }) }) } } as never;
+  const { serveDisplay } = await import("../../src/worker/tablet.ts");
+  const html = await (await serveDisplay(env, "lead1", "", "https://example.test")).text();
+  assert.match(html, /← All tanks/);
+  assert.match(html, /MODE=SLUG\?"one"/);
+  for (const m of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new Function(m[1]!), "display script must be valid JavaScript");
+});

@@ -603,7 +603,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:16px}
 <p class="muted" id="staffMsg" style="margin:4px 0 0"></p></div></section>
 <div id="scanOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px"><video id="scanVid" playsinline muted autoplay style="width:100%;max-width:520px;max-height:60vh;border-radius:12px;background:#000"></video><p id="scanMsg" style="color:#fff;margin:0"></p><button class="btn btn--line" id="scanCancel" type="button" style="color:#fff;border-color:#fff">Cancel</button></div>
 ${homescreenPrompt({ appName: record.name, key: base })}
-<footer>📺 means "show this ${escHtml(sec)} on a screen": open that link on a tablet beside it and it shows what's in it, live. <a href="/d/${escHtml(leadId)}/" target="_blank" rel="noopener">Everything, rotating</a>.<br>${escHtml(W.board)} by Underground Associates · Anything odd? Text us.</footer>
+<footer>📺 means "show this ${escHtml(sec)} on a screen": open that link on a tablet beside it and it shows what's in it, live. <a href="/d/${escHtml(leadId)}/" target="_blank" rel="noopener">Every ${escHtml(sec)} on one screen</a> (customers tap a ${escHtml(sec)} to open it; staff add to each one there) · <a href="/d/${escHtml(leadId)}/?rotate=1" target="_blank" rel="noopener">rotating sign</a>.<br>${escHtml(W.board)} by Underground Associates · Anything odd? Text us.</footer>
 <script>
 (function(){
 var BASE=${JSON.stringify(base)};var LEAD=${JSON.stringify(leadId)};var SCAN=${scan ? "true" : "false"};var data=null;var timer=null;var st=document.getElementById("st");var m=document.getElementById("m");

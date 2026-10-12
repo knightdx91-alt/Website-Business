@@ -762,6 +762,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   catalog search and a new-name path (count → photo prompt → AI card), locks after 3 idle minutes or "Done". Board: "Tablet &
   staff" section (Save PIN `PUT /c/…/staffpin`, approve code, NFC text; `/data` carries `staffPinSet`, `nfcText`).
   `test/worker/tablet.test.ts`. Guides and the customer pitch describe it.
+  Tank picker (Oct 2026, owner's rule: a fish shop's tablet shows 1–9 tanks and the customer picks one): `/d/<leadId>/` with no
+  slug is now a **picker**, one tile per tank (first photo, "n in stock", the first three names); a tap opens that tank's card
+  layout with "← All tanks" in the header, and a customer view goes back to the tiles after 90 s idle (`MODE` pick / one /
+  rotate in the page script, `renderHome()`, `tankView()`). Staff unlock from the tiles too, tap a tank to count or add there
+  (+ Add on the tiles says to pick a tank first; "+ New tank" is a tile). The rotating sign is `?rotate=1` (board footer:
+  "Every tank on one screen" · "rotating sign"). `test/worker/tablet.test.ts` renders the page with a fake env and parses its
+  script. Headless walk-through: scratchpad `picker.mjs` against the local dev server.
   Barcodes (Oct 2026): `MenuItem.barcode` / `CatalogEntry.barcode` (`normalizeCode`: letters, digits, `-._`, ≤64). Staff bar
   "▦ Scan": the tablet camera via the browser's `BarcodeDetector` (Chrome on Android; headless/desktop Linux has none, so the
   sheet says to use a handheld USB/Bluetooth scanner, which types the code + Enter into `#scanIn`). `GET /l/<id>/staff/find?
