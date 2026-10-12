@@ -896,6 +896,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   address (`visitExtras()`); salons also put the pay list in the trust row. `links.giftCards` → `giftcard` action (restaurant order row,
   retail What's new, salon closing band). Edit: "Awards & proof" and "Closures, parking & payment" cards; Links → Gift cards link.
   Shared helpers: `factList()` (`.facts` dl), `tiles()` (`.tiles` photo tiles), `FormField.type: "date"`.
+- Juice bars & nutrition clubs (Oct 2026, owner's call on Hanceville Nutrition): restaurant variant `juice` ("Juice & smoothie bar";
+  Google `juice_shop` or a name with juice / smoothie / nutrition / loaded tea / tea bar / shake). `counterService(r)` (juice, coffee,
+  bakery, food truck) drops the Dine-in / Takeout chips from the info strip, the "Can I order takeout?" FAQ and the dine-in /
+  takeout flags from the copy writer's `restaurant_options`; the brief says never to mention dining in, sitting down or takeout,
+  and for `juice` drinks only. Online ordering is still only the owner's `links.order` (nothing until they have one). `runBuild`
+  re-kinds a restaurant left on `other` on a rewrite (like `setAutoVariant`); the four Cullman-area Nutrition leads were rewritten
+  this way. `test/juice.test.ts`.
 - Restaurants (Oct 2026): `MenuItem.image` (an owner gallery photo, picked per item in Edit → Menu → "Dish photos & tags"; kept when the
   menu is retyped; Google photos never) and `MenuItem.tags` (`MENU_TAGS`: popular/new/vegetarian/vegan/gluten_free/spicy) → ≥2 items with a
   photo or the popular tag become "Popular" photo tiles on the home page; tags + a legend on /menu/. `ext.restaurant.catering` (+

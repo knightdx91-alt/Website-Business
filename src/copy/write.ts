@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
+import { counterService } from "../generator/packs/restaurant.ts";
 import { hasAnyHours, hoursSummary } from "../generator/hours.ts";
 import { donationsOn } from "../generator/actions.ts";
 import { autoAmenityLabels, partsCounter } from "../generator/packs/auto.ts";
@@ -74,7 +75,7 @@ function facts(r: BusinessRecord, pack: CategoryPack, primaryTypeLabel?: string)
     hours: hasAnyHours(r.hours) ? hoursSummary(r.hours) : "unknown",
     services: r.services.length ? r.services.map((s) => ({ id: s.id, name: s.name })) : undefined,
     service_area_towns: r.serviceArea?.towns,
-    restaurant_options: so && Object.keys(so).length ? so : undefined,
+    restaurant_options: so && Object.keys(so).length ? (r.category === "restaurant" && counterService(r) ? Object.fromEntries(Object.entries(so).filter(([k]) => k !== "dineIn" && k !== "takeout")) : so) : undefined,
     founded_year: r.foundedYear,
     ownership: r.ownershipTags.length ? r.ownershipTags : undefined,
     licensed: r.licenses.length > 0 || undefined,

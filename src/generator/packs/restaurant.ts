@@ -5,7 +5,11 @@ import { html, raw, type Raw } from "../html.ts";
 import { MENU_TAG_LABEL, type BusinessRecord, type Faq, type MenuItem, type RestaurantExt } from "../types.ts";
 import { fitTitle, type CategoryPack } from "./types.ts";
 
-export const RESTAURANT_VARIANTS = ["food_truck", "bbq", "southern", "diner", "breakfast", "mexican", "pizza", "coffee", "bakery", "cafe", "other"] as const;
+export const RESTAURANT_VARIANTS = ["food_truck", "bbq", "southern", "diner", "breakfast", "mexican", "pizza", "coffee", "bakery", "cafe", "juice", "other"] as const;
+
+/** Counter-service places: you order at the counter and leave, so "Dine-in" / "Takeout" chips, the takeout FAQ and sit-down copy make no sense. */
+const COUNTER_SERVICE = new Set(["juice", "coffee", "bakery", "food_truck"]);
+export const counterService = (r: BusinessRecord): boolean => COUNTER_SERVICE.has(r.variant);
 
 const VARIANT_LABEL: Record<string, string> = {
   food_truck: "Food truck",
@@ -18,6 +22,7 @@ const VARIANT_LABEL: Record<string, string> = {
   coffee: "Coffee",
   bakery: "Bakery",
   cafe: "Cafe",
+  juice: "Juice & smoothie bar",
   other: "Restaurant",
 };
 
@@ -30,6 +35,8 @@ export function restaurantVariant(primaryType: string | undefined, types: string
   if (has("barbecue_restaurant") || /\b(bbq|bar-b-q|barbecue|smokehouse)\b/.test(n)) return "bbq";
   if (has("mexican_restaurant") || /\b(taqueria|cantina|mexican|tacos?)\b/.test(n)) return "mexican";
   if (has("pizza_restaurant") || /\bpizz/.test(n)) return "pizza";
+  // Nutrition clubs (loaded teas and shakes), juice and smoothie bars: counter service, a drinks menu, no dining room talk.
+  if (has("juice_shop") || /\b(juice|smoothies?|nutrition|loaded teas?|tea bar|shakes?)\b/.test(n)) return "juice";
   if (has("coffee_shop") || /\b(coffee|espresso)\b/.test(n)) return "coffee";
   if (has("bakery") || has("donut_shop") || /\b(bakery|donuts?|kolache)\b/.test(n)) return "bakery";
   if (has("breakfast_restaurant") || has("brunch_restaurant") || /\b(pancake|biscuit|waffle)\b/.test(n)) return "breakfast";
@@ -48,6 +55,7 @@ const LOOK_BY_VARIANT: Record<string, string> = {
   coffee: "restaurant.garden_table",
   bakery: "restaurant.garden_table",
   cafe: "restaurant.garden_table",
+  juice: "restaurant.garden_table",
   mexican: "restaurant.color_block",
   pizza: "restaurant.color_block",
   other: "restaurant.color_block",
@@ -68,7 +76,7 @@ const CHIP_LABELS: Array<[keyof RestaurantExt["serviceOptions"], string]> = [
 
 function chips(r: BusinessRecord): string[] {
   const so = ext(r).serviceOptions;
-  return CHIP_LABELS.filter(([k]) => so[k] === true).map(([, l]) => l);
+  return CHIP_LABELS.filter(([k]) => so[k] === true && !(counterService(r) && (k === "dineIn" || k === "takeout"))).map(([, l]) => l);
 }
 
 function meals(r: BusinessRecord): string[] {
@@ -97,10 +105,10 @@ function dataFaq(r: BusinessRecord): Faq[] {
   if (so.reservable === true)
     out.push({ q: "Do you take reservations?", a: r.links.reserve ? "Yes. You can reserve a table online, or call us." : `Yes. Call us at ${r.phone.display} to reserve a table.` });
   if (so.reservable === false) out.push({ q: "Do you take reservations?", a: "No reservations needed. Just come on in." });
-  if (so.takeout === true)
+  if (so.takeout === true && !counterService(r))
     out.push({ q: "Can I order takeout?", a: r.links.order ? "Yes. Order online or call ahead, and we'll have it ready." : `Yes. Call ahead at ${r.phone.display} and we'll have it ready.` });
   if (so.delivery === true) out.push({ q: "Do you deliver?", a: "Yes, we offer delivery. Call us or order online to check if we deliver to you." });
-  if (so.delivery === false) out.push({ q: "Do you deliver?", a: "We don't offer delivery right now, but takeout is easy. Call ahead and swing by." });
+  if (so.delivery === false) out.push({ q: "Do you deliver?", a: counterService(r) ? "We don't offer delivery right now. Call ahead and swing by; it'll be ready." : "We don't offer delivery right now, but takeout is easy. Call ahead and swing by." });
   if (so.outdoorSeating === true) out.push({ q: "Do you have outdoor seating?", a: "Yes, we have outdoor seating when the weather's nice." });
   if (so.menuForChildren === true) out.push({ q: "Do you have a kids menu?", a: "Yes, we have a kids menu." });
   if (so.servesVegetarianFood === true) out.push({ q: "Do you have vegetarian options?", a: "Yes, we have vegetarian options on the menu." });
@@ -349,7 +357,7 @@ ${ctaBand(ctx, ctaActs)}
       about:
         `Two short paragraphs (80-130 words total) introducing the place to a newcomer: what kind of food, the feel of the place, who it's for. Use only facts given. Don't list amenities or options (kids menu, wheelchair access, dogs, reservations, vegetarian choices); the FAQ covers those. Where the owner's story is unknown, stay general and true; do not invent history.${
           ext(r).catering ? " They cater (catering fact given): one sentence may say so, with no prices, headcounts or menus beyond the catering note." : " Never mention catering."
-        }${r.variant === "food_truck" ? " Never state stops, days or locations; the schedule section shows them." : ""}`,
+        }${r.variant === "food_truck" ? " Never state stops, days or locations; the schedule section shows them." : ""}${counterService(r) ? " This is a counter-service shop: never mention dining in, sitting down, tables, a dining room or takeout." : ""}${r.variant === "juice" ? " A juice / smoothie / nutrition-shake bar, not a restaurant: no food, meals or cooking words; drinks only." : ""}`,
       cta: "ctaTitle: 3-7 word invitation to come by or order. ctaLine: one sentence, at most 18 words.",
       metaDescription: "140-155 characters: cuisine + town + one true fact + an action (call, order, visit).",
     },

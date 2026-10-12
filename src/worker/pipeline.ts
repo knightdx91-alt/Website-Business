@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { autoVariant, setAutoVariant } from "../generator/packs/auto.ts";
+import { restaurantVariant } from "../generator/packs/restaurant.ts";
 import { writeCopy } from "../copy/write.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { churchVariant } from "../generator/packs/church.ts";
@@ -432,6 +433,11 @@ export async function runBuild(
     if (lead.rewrite && category === "auto" && record.variant === "general") {
       const detected = autoVariant(place.primaryType, place.types ?? [], record.name);
       if (detected !== "general") setAutoVariant(record, detected);
+    }
+    // Same for restaurants built before a variant existed (the nutrition clubs built as plain restaurants).
+    if (lead.rewrite && category === "restaurant" && record.variant === "other") {
+      const detected = restaurantVariant(place.primaryType, place.types ?? [], record.name);
+      if (detected !== "other") record.variant = detected;
     }
     // Their current website, if they have one: read once (again after 7 days or on a rewrite) and used as facts for the copy.
     const siteUrl =
