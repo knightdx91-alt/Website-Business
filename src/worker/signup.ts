@@ -50,6 +50,8 @@ interface SignupRow {
   created_at: number;
   extras_json: string | null;
   due_cents: number | null;
+  paid_via?: string | null;
+  stripe_subscription?: string | null;
   source: string | null;
   business: string | null;
   phone: string | null;
@@ -88,6 +90,9 @@ export async function signupsFor(env: Env, leadId: string) {
     createdAt: r.created_at,
     extras: r.extras_json ? (JSON.parse(r.extras_json) as OrderExtras) : null,
     dueCents: r.due_cents,
+    // How the first payment came in (tap / card / stripe / invoice / null = marked by hand) and whether renewals run in Stripe.
+    paidVia: r.paid_via ?? null,
+    subscription: !!r.stripe_subscription,
   }));
 }
 

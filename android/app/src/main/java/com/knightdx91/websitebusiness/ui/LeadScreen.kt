@@ -63,6 +63,9 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavHostController
 import com.knightdx91.websitebusiness.AppState
 import com.knightdx91.websitebusiness.net.Api
+import androidx.compose.material3.CardDefaults
+import com.knightdx91.websitebusiness.net.Lead
+import com.knightdx91.websitebusiness.net.Signup
 import com.knightdx91.websitebusiness.net.AppContent
 import com.knightdx91.websitebusiness.net.Content
 import com.knightdx91.websitebusiness.net.DomainInfo
@@ -304,6 +307,9 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
         }
 
         LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // ---- client: the first paid sign-up, so nobody has to scroll to see they're a customer now ----
+            detail.detail.signups.firstOrNull { it.paid }?.let { paidSignup -> item { ClientCard(paidSignup, l) } }
+
             // ---- header: who they are, how to reach them ----
             item {
                 Card(Modifier.fillMaxWidth()) {
@@ -928,4 +934,33 @@ private fun RefundDialog(state: AppState, signupId: String, onDone: () -> Unit, 
         },
         dismissButton = { TextButton(onClick = onClose, enabled = !working) { Text("Cancel") } },
     )
+}
+
+/** "✅ Client · Plus plan": how they paid, what renews, and the next step, at the top of a paying client's lead page. */
+@Composable
+private fun ClientCard(s: Signup, l: Lead) {
+    val how = when (s.paidVia) {
+        "tap" -> "by tap, in person"
+        "card" -> "by card on the phone"
+        "stripe" -> "online"
+        "invoice" -> "by invoice"
+        null -> "marked paid by hand"
+        else -> s.paidVia
+    }
+    val every = if (s.renewsInterval == "year") "yearly" else "monthly"
+    val renewLine = when {
+        l.payTest -> "Practice lead: nothing renews and no real subscription was started."
+        s.subscription && s.renewsCents != null -> "Renews $every at ${money(s.renewsCents)} on the card on file."
+        s.renewsCents != null -> "Renews $every at ${money(s.renewsCents)}; automatic payment isn't set up yet (billing portal or take the card)."
+        else -> null
+    }
+    val next = if (l.salesStatus == "live") "Live at ${l.liveUrl?.removePrefix("https://") ?: "their site"}." else "Next: go over photos, hours and the to-dos with them, then Publish."
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Good.copy(alpha = 0.10f))) {
+        Column(Modifier.padding(14.dp)) {
+            Text("✅ Client · ${s.planName} plan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Good)
+            Text(listOfNotNull(s.billingLabel, (if (s.dueCents > 0) "paid ${money(s.dueCents)} $how" else "paid $how"), "signed ${dateTime(s.createdAt)}").joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
+            renewLine?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
+            Text(next, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
 }

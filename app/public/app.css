@@ -75,6 +75,7 @@ h3 { font-size: 1rem; margin: 0 0 6px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--chip); font-size: .85rem; font-weight: 600; }
 .chip--good { color: var(--good); }
+.card--client { border-left: 5px solid var(--good); }
 .chip--warn { color: var(--warn); }
 .chip--bad { color: var(--bad); }
 .pick { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--line); background: var(--card); font-weight: 700; cursor: pointer; }

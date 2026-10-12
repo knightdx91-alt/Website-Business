@@ -1037,6 +1037,12 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   finger leaves the box (Compose: `clipToBounds()` + `inBox` in `SignaturePad`, strokes drawn past the edge used to show outside it; web
   esign.ts: points outside the canvas rect end the stroke, a return starts a new one). (4) The service agreement's section 2 now says
   "(see the Timing section above)": the TIMING section sits before SERVICE AGREEMENT and readers looked for it below.
+- ✅ Client card (Oct 2026, Android 2.45): the first paid sign-up puts a green "✅ Client · <plan> plan" card at the top of the lead page
+  (web `clientCardHtml` in app.js, `.card--client`; Android `ClientCard` in LeadScreen.kt): way to pay, "paid $X by tap, in person /
+  by card on the phone / online / by invoice / marked paid by hand" (`signupsFor` now returns `paidVia` + `subscription` =
+  stripe_subscription set), signed date, the renewal line ("Renews yearly at $490 on the card on file"; "automatic payment isn't set
+  up yet" when no subscription; the practice lead says nothing renews) and the next step (Publish, or the live address). The Tap
+  screen's "Renews on the same card from null" came from `JSONObject.optString` turning JSON null into "null"; it checks `isNull` now.
 - Tap to Pay root cause (Oct 2026, Android 2.44): the breadcrumb read "Step: discover · UNEXPECTED_SDK_ERROR · NoClassDefFoundError:
   okhttp3.internal.Util". Stripe Terminal 6.0.0 declares and uses OkHttp **4.12.0** internals; 2.17's `okhttp:5.1.0` pin (for
   `fastFallback`) won the resolution and the reader never started. The app is back on `okhttp:4.12.0`; the dead-IPv6 cold-start fix

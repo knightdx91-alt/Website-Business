@@ -363,7 +363,7 @@ class TapToPayActivity : Activity() {
                 val r = a.complete(piId)
                 runOnUiThread {
                     val card = r.optString("card").takeIf { it.isNotBlank() }
-                    val renews = r.optString("renewsOn").takeIf { it.isNotBlank() }
+                    val renews = if (r.isNull("renewsOn")) null else r.optString("renewsOn").takeIf { it.isNotBlank() }
                     val saved = r.optBoolean("cardSaved", true)
                     val lines = mutableListOf<String>()
                     if (card != null) lines.add(card)

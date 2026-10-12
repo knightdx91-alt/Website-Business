@@ -150,6 +150,12 @@ data class Signup(
     val dueCents: Long,
     val extras: List<String>,
     val invoice: Boolean,
+    /** tap / card / stripe / invoice; null = marked paid by hand (or not paid). */
+    val paidVia: String? = null,
+    /** Renewals run as a Stripe subscription. */
+    val subscription: Boolean = false,
+    val renewsCents: Long? = null,
+    val renewsInterval: String? = null,
 )
 
 data class LeadDetail(val lead: Lead, val notes: List<Note>, val signups: List<Signup>, val cadenceNext: String?, val variantLabel: String?) {
@@ -174,6 +180,10 @@ data class LeadDetail(val lead: Lead, val notes: List<Note>, val signups: List<S
                     dueCents = s.optLong("dueCents", 0L),
                     extras = names,
                     invoice = x?.optBoolean("invoice") ?: false,
+                    paidVia = s.str("paidVia"),
+                    subscription = s.optBoolean("subscription"),
+                    renewsCents = x?.optJSONObject("renews")?.optLong("amount"),
+                    renewsInterval = x?.optJSONObject("renews")?.str("interval"),
                 )
             }
             val cadence = j.optJSONObject("cadence")

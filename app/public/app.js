@@ -610,6 +610,24 @@
       ? `<p><button class="btn btn--small btn--primary" type="button" data-tap="${esc(x.id)}">💳 Take payment by tap</button> <span class="small muted">${x.dueCents ? `${money(x.dueCents / 100)} now, renewals on the same card` : ""}</span></p>`
       : `<p class="small muted">💳 Open this in the Android app to take their card by tap.</p>`;
   }
+  /** The "they're a client now" card: the first paid sign-up, how they paid, what renews, and what's next. */
+  function clientCardHtml(l) {
+    const x = (l.signups || []).find((s) => s.paid);
+    if (!x) return "";
+    const how = { tap: "by tap, in person", card: "by card on the phone", stripe: "online", invoice: "by invoice" }[x.paidVia] || (x.paidVia ? esc(x.paidVia) : "marked paid by hand");
+    const renews = x.extras && x.extras.renews;
+    const every = renews ? (renews.interval === "year" ? "yearly" : "monthly") : "";
+    const renewLine = l.payTest ? "Practice lead: nothing renews and no real subscription was started."
+      : x.subscription && renews ? `Renews ${every} at ${money(renews.amount / 100)} on the card on file.`
+      : renews ? `Renews ${every} at ${money(renews.amount / 100)}; automatic payment isn't set up yet (open their billing portal or take the card).`
+      : "";
+    const next = l.salesStatus === "live"
+      ? `Live at <a href="${esc(l.liveUrl || "#")}" target="_blank" rel="noopener">${esc((l.liveUrl || "").replace("https://", ""))}</a>.`
+      : "Next: go over photos, hours and the to-dos with them, then Publish.";
+    return `<section class="card card--client"><h2>✅ Client · ${esc(x.plan.name)} plan</h2>
+      <p>${esc(x.plan.billingLabel || "")}${x.dueCents != null ? ` · paid ${money(x.dueCents / 100)} ${how}` : ` · paid ${how}`} · signed ${new Date(x.createdAt).toLocaleDateString()}</p>
+      ${renewLine ? `<p class="small">${renewLine}</p>` : ""}<p class="small">${next}</p></section>`;
+  }
   function signupCardHtml(l) {
     const plans = meta.settings.plans || [];
     const signed = (l.signups || [])[0];
@@ -823,6 +841,7 @@
           <a class="btn" href="#/tasks/${l.id}">📝 Task</a>
         </div>
       </section>
+      ${clientCardHtml(l)}
       <div id="logslot-top"></div>
       <section class="card"><h2>Sales status</h2>
         ${l.salesStatus === "live"
