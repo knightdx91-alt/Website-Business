@@ -1062,7 +1062,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `PricedOrder.founder`, stored in `signups.extras_json.founder` (+ `referredBy`), shown on the Client card. Agreement: PROMOTIONS
   section (`promoTerms`: founder bonus + referral terms), /terms "Referrals and new-customer offers", Plans & answers objection "Do
   you have a referral program?". Settings → Sales → "🎁 Discounts" (web + Android): founderSlots, referralMonths, referralMaxPerYear,
-  referralMinMonths (0 months = program off). `test/worker/referrals.test.ts`.
+  referralMinMonths (0 months = program off). `test/worker/referrals.test.ts`. Training lesson 13 `discounts` (vars
+  {referralMonths} {referralMax} {referralMin} {founderSlots}) teaches both; the setup fee's rule ("no setup fee on the 6- or
+  12-month plan or yearly; month to month adds the one-time fee, applied automatically in the sign-up") is on every plan card:
+  Show plans + Plans & answers (web `feeNote`, Android ShowPlans / Playbook cards), the lead page's sign-up card, and the
+  sign-up page's plan line (`pickerHtml`). Android 2.48.
 - ✅ Client card (Oct 2026, Android 2.45): the first paid sign-up puts a green "✅ Client · <plan> plan" card at the top of the lead page
   (web `clientCardHtml` in app.js, `.card--client`; Android `ClientCard` in LeadScreen.kt): way to pay, "paid $X by tap, in person /
   by card on the phone / online / by invoice / marked paid by hand" (`signupsFor` now returns `paidVia` + `subscription` =

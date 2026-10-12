@@ -179,7 +179,7 @@ private fun PlanCard(p: PlanOffer, c: Content, o: PlanOptions, leadId: String?, 
             }
             val setup = when {
                 p.setup > 0 -> "${moneyDollars(p.setup)} setup · billed monthly"
-                o.terms.commits.isNotEmpty() -> "No setup fee on ${o.terms.commitWords} plans"
+                o.terms.commits.isNotEmpty() -> "No setup fee on ${o.terms.commitWords} plans" + (if (o.terms.flex > 0 && p.id != "list") " · month to month: ${moneyDollars(o.terms.flex)} setup fee" else "")
                 else -> "Billed monthly"
             }
             Text(setup, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -1,4 +1,4 @@
-import { isListPlan, type AppSettings } from "./db.ts";
+import { isListPlan, promoRules, type AppSettings } from "./db.ts";
 
 /**
  * The in-app training course (🎓 Training on Home; owner and callers): the whole job from a lead appearing to a live site
@@ -419,6 +419,47 @@ const LESSONS: Lesson[] = [
     ],
   },
   {
+    id: "discounts",
+    title: "Referrals and the founding-customer bonus",
+    minutes: 5,
+    who: "everyone",
+    why: "Two offers close deals: a client who sends us a business gets {referralMonths} months free, and our first {founderSlots} clients pick a free extra. Both run themselves once you record them right.",
+    steps: [
+      'Referrals. When a new lead came from a client, open the lead → "🤝 Referrals" → "Add who sent them" and pick the client. The sign-up page then tells the new business that their referrer earns {referralMonths} months free.',
+      "The credit is earned when the new business's first payment goes through on a {referralMin}- or 12-month plan or yearly. Month to month and the Price list plan don't count, and the app notes why on the referrer's call log.",
+      'The credit lands on the client\'s Stripe account by itself and comes off their next bills. A client with no card on file shows "apply by hand on their next invoice": the owner takes it off the invoice and taps "Mark applied".',
+      "Up to {referralMax} credits count in each year of their service. More than that show as banked and are applied by themselves when their next year starts, so nothing is lost.",
+      'Tell clients about it: the Referrals card has "💬 Text them about referrals" with the wording ready. Plans & answers has the answer to "Do you have a referral program?"',
+      'Founding customers. While spots are open (the first {founderSlots} paying clients), the sign-up page and the app\'s sign-up show "🎁 Founding-customer bonus": they pick one of three extras free. It shows as a $0 line on the order and in the agreement. Say it out loud; it\'s a reason to sign today.',
+      'The owner picks the three in Settings → Extras ("🎁 Founder pick") and sets the numbers in Settings → Sales → "🎁 Discounts".',
+      'Month to month: picking it adds the one-time setup fee by itself, and the plan cards and the sign-up page say so. Never promise "no setup fee" unless they take the {referralMin}- or 12-month plan or pay yearly.',
+    ],
+    tryIt:
+      'On the Payment test lead, tap "Add who sent them" and pick any client, then open "📋 Show them the plans" and find the setup-fee line on the cards. Clear the referrer when you\'re done (the practice lead never earns credits).',
+    check: [
+      {
+        q: "A client referred a shop that took the month-to-month plan. What does the client get?",
+        options: [
+          "{referralMonths} months free, like any referral",
+          "Nothing: a referral needs a {referralMin}- or 12-month plan or yearly",
+          "A free extra",
+        ],
+        answer: 1,
+        why: "Month to month can be cancelled next month, so it never earns a referral credit. The app writes that on the referrer's call log so nobody has to explain it twice.",
+      },
+      {
+        q: "A client sends three referrals in their first year. What happens to the third?",
+        options: [
+          "It's lost",
+          "It's banked and applied when their next year of service starts",
+          "It's paid out in cash",
+        ],
+        answer: 1,
+        why: "Up to {referralMax} count each year; the rest wait for the next year. Credits are never cash.",
+      },
+    ],
+  },
+  {
     id: "full-run",
     title: "The full run-through on the practice lead",
     minutes: 15,
@@ -484,6 +525,10 @@ export function trainingCourse(s: AppSettings): { lessons: Lesson[] } {
       list && list.monthly > 0
         ? `the ${list.name} plan at ${money(list.monthly)} a month`
         : "the Price list plan",
+    referralMonths: String(promoRules(s).referralMonths),
+    referralMax: String(promoRules(s).referralMaxPerYear),
+    referralMin: String(promoRules(s).referralMinMonths),
+    founderSlots: String(promoRules(s).founderSlots),
   };
   const fill = (t: string) =>
     t.replace(/\{(\w+)\}/g, (m, k: string) => vars[k] ?? m);

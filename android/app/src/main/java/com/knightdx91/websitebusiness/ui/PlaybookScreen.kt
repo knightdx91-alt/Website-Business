@@ -152,7 +152,7 @@ private fun PlanPitchCard(p: PlanOffer, c: Content, o: PlanOptions) {
             Text("${p.name}: ${moneyDollars(p.monthly)}/month${if (star) " ⭐ most pick this" else ""}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             val setup = when {
                 p.setup > 0 -> "${moneyDollars(p.setup)} setup"
-                o.terms.commits.isNotEmpty() -> "No setup fee on the ${o.terms.commitWords} plan"
+                o.terms.commits.isNotEmpty() -> "No setup fee on the ${o.terms.commitWords} plan" + (if (o.terms.flex > 0 && p.id != "list") " · month to month: ${moneyDollars(o.terms.flex)} setup fee" else "")
                 else -> "No setup fee"
             }
             Text("$setup · billed monthly", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

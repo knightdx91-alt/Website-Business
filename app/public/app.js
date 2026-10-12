@@ -686,7 +686,7 @@
         <label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label></div>`).join("")}
       ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)} · <a href="/api/agreements/p/${p.id}" target="_blank" rel="noopener">📄 agreement</a> · <a href="/api/agreements/p/${p.id}.pdf">⬇ PDF</a></li>`).join("")}</ul>` : ""}
       ${plans.length
-        ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p>
+        ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p><p class="small muted">${feeNote(payTerms(meta.settings))}</p>
           <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> ${ready ? `<a class="btn btn--small" href="#/showboard/${l.id}">📋 Show them the ${esc(l.boardName || "Stock board")}</a> ` : ""}<a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="/api/contract.pdf?lead=${l.id}">⬇ Agreement PDF</a> <a class="btn btn--small" href="/api/ach.pdf?lead=${l.id}">🏦 Payment authorization form</a></p>
           <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div>
           <div id="signuplink"></div>`
@@ -1638,6 +1638,8 @@
   }
   /** "6- or 12-month" */
   const commitWords = (t) => t.commits.length > 1 ? `${t.commits[0]}- or ${t.commits[1]}-month` : `${t.commits[0]}-month`;
+  /** One line every plan card and sign-up card carries: where the setup fee applies (month to month adds it by itself). */
+  const feeNote = (t) => t.commits.length ? `No setup fee on ${commitWords(t)} plans${t.flex ? `; month to month adds a one-time ${money(t.flex)} setup fee, applied automatically in the sign-up` : ""}.` : "One monthly price, no setup fee.";
   function payWays(s, plans, church) {
     const t = payTerms(s, church);
     const out = t.commits.map((m) => [`${m}-month plan`, `The monthly price, no setup fee. After ${m} months, cancel any time with 30 days' notice.`]);
@@ -1685,7 +1687,7 @@
           <h2>${esc(p.name)}</h2>
           <p class="show__tag">${esc(PLAN_TAGLINE[p.id] || "")}</p>
           <p class="show__price"><strong>${money(p.monthly)}</strong><span>/month</span></p>
-          <p class="show__day">${p.setup ? `${money(p.setup)} setup · billed monthly` : t.commits.length ? `No setup fee on ${commitWords(t)} plans` : "Billed monthly"}</p>
+          <p class="show__day">${p.setup ? `${money(p.setup)} setup · billed monthly` : t.commits.length ? `No setup fee on ${commitWords(t)} plans${t.flex && p.id !== "list" ? ` · month to month: ${money(t.flex)} setup fee` : ""}` : "Billed monthly"}</p>
           <ul>${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
           ${leadId ? `<button class="show__choose" data-choose="${esc(p.id)}">Choose ${esc(p.name)}</button>` : ""}
           <p class="show__agree"><a href="/api/contract?${leadId ? `lead=${encodeURIComponent(leadId)}&` : ""}plan=${encodeURIComponent(p.id)}" target="_blank" rel="noopener">Read the agreement</a></p>

@@ -569,7 +569,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                             HorizontalDivider(Modifier.padding(vertical = 6.dp))
                         }
                         if (meta != null && meta.plans.isNotEmpty()) {
-                            Text(if (signups.isNotEmpty()) "Send a new link to change plans." else "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs.", style = MaterialTheme.typography.bodySmall, color = muted)
+                            Text(if (signups.isNotEmpty()) "Send a new link to change plans." else "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs. No setup fee on the 6- or 12-month plan or yearly; month to month adds a one-time setup fee, applied automatically in the sign-up.", style = MaterialTheme.typography.bodySmall, color = muted)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
                                 OutlinedButton(onClick = { nav.navigate("plans/${l.id}") }) { Text("📋 Show them the plans") }
                                 if (ready) OutlinedButton(onClick = { nav.navigate("showboard/${l.id}") }) { Text("📋 Show them the ${detail.boardName}") }
