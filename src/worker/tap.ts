@@ -22,6 +22,7 @@ import {
   type AppSettings,
 } from "./db.ts";
 import { HttpError, newId, now, type Env } from "./env.ts";
+import { z } from "zod";
 import { notify } from "./notify.ts";
 import type { Session } from "./auth.ts";
 
@@ -386,6 +387,50 @@ export async function tapSession(
     receiptEmail: row.signer_email,
     paid: !!row.paid,
   };
+}
+
+const TAP_LOG_KEY = "tap_last_error";
+
+const TapLogBody = z.object({
+  step: z.string().max(40),
+  code: z.string().max(80),
+  message: z.string().max(500),
+  cause: z.string().max(1500).optional(),
+  device: z.string().max(120).optional(),
+  android: z.string().max(40).optional(),
+  app: z.string().max(40).optional(),
+});
+export type TapLogInput = z.infer<typeof TapLogBody>;
+export { TapLogBody };
+
+/**
+ * POST /api/tap/log: the native screen's breadcrumb when a tap fails (which step, Stripe's error code and message, the
+ * SDK's underlying cause, the phone). Kept in one settings key, read back by GET /api/tap/status, because the Worker's
+ * logs can't be tailed from the Claude Code container and the phone shows only "Unexpected failure".
+ */
+export async function tapLog(
+  env: Env,
+  row: TapSignupRow,
+  o: TapLogInput,
+): Promise<{ ok: true }> {
+  await setSetting(
+    env,
+    TAP_LOG_KEY,
+    JSON.stringify({ at: now(), signupId: row.id, leadId: row.lead_id, ...o }),
+  );
+  return { ok: true };
+}
+
+/** GET /api/tap/last (public, read-only, no secrets): the last tap failure the phone reported. */
+export async function tapLastFailure(env: Env): Promise<Record<string, unknown>> {
+  const raw = await getSetting(env, TAP_LOG_KEY);
+  let last: unknown = null;
+  try {
+    last = raw ? JSON.parse(raw) : null;
+  } catch {
+    last = null;
+  }
+  return { last };
 }
 
 /** Stripe Terminal connection token for the reader SDK (never cached; the SDK asks whenever it needs one). */

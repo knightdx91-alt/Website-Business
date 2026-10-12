@@ -193,6 +193,9 @@ import {
   tapAuth,
   tapSession,
   tapStatus,
+  TapLogBody,
+  tapLog,
+  tapLastFailure,
 } from "./tap.ts";
 import {
   DEFAULT_DOMAIN,
@@ -735,6 +738,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   }
   // Instant-push health (public, read-only, no secrets): does the Firebase secret parse, when did the minute cron last tick,
   // and how did the last update announcement go. Settings shows it; it also answers "did the push go out?" without logs.
+  // The last Tap to Pay failure the phone reported (public, read-only, no secrets): step, Stripe code, cause, phone.
+  if (path === "/tap/last" && m === "GET") return json(await tapLastFailure(env));
   if (path === "/push/status" && m === "GET") {
     const [tick, last, announced] = await Promise.all([
       getSetting(env, TICK_KEY),
@@ -822,7 +827,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (
     (path === "/tap/session" ||
       path === "/tap/connection_token" ||
-      path === "/tap/complete") &&
+      path === "/tap/complete" ||
+      path === "/tap/log") &&
     req.headers.has("authorization")
   ) {
     const row = await tapAuth(env, req.headers.get("authorization"));
@@ -830,6 +836,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       return json(await tapSession(env, row));
     if (path === "/tap/connection_token" && m === "POST")
       return json(await connectionToken(env));
+    if (path === "/tap/log" && m === "POST")
+      return json(await tapLog(env, row, await body(req, TapLogBody)));
     if (path === "/tap/complete" && m === "POST") {
       const { paymentIntentId } = await body(
         req,

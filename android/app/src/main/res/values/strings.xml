@@ -41,6 +41,7 @@
     <string name="tapInsecure">Stripe stopped: turn off Developer options, screen recording and any app drawing over other apps, then try again.</string>
     <string name="tapDebugBuild">Tap to Pay only works in the release build of the app.</string>
     <string name="tapDisconnected">The reader disconnected. Try again.</string>
+    <string name="tapWhy">Step: %1$s. Stripe says: %2$s</string>
     <string name="tapRetry">Try again</string>
     <string name="tapCancel">Cancel</string>
     <string name="tapDone">Done</string>

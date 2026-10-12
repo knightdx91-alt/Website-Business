@@ -84,6 +84,8 @@ class TapToPayActivity : Activity() {
     private var paymentIntent: PaymentIntent? = null
     private var finished = false
     private var fixAction: (() -> Unit)? = null
+    /** Where the flow is, for the failure breadcrumb: checks, order, init, support, discover, connect, retrieve, tap, report. */
+    private var step = "checks"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -158,6 +160,7 @@ class TapToPayActivity : Activity() {
 
     private fun loadSession() {
         busy(getString(R.string.tapLoading))
+        step = "order"
         val a = api ?: return
         thread {
             try {
@@ -174,7 +177,7 @@ class TapToPayActivity : Activity() {
                     }
                 }
             } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
-                runOnUiThread { fail(e.message ?: getString(R.string.tapServerError), null, retryable = true) }
+                runOnUiThread { fail(e.message ?: getString(R.string.tapServerError), null, retryable = true, cause = e) }
             }
         }
     }
@@ -183,6 +186,7 @@ class TapToPayActivity : Activity() {
 
     private fun initTerminal() {
         val a = api ?: return
+        step = "init"
         try {
             if (!Terminal.isInitialized()) {
                 Terminal.init(
@@ -217,7 +221,7 @@ class TapToPayActivity : Activity() {
                     .build(),
             )
         } catch (e: TerminalException) {
-            return fail(explain(e), null, retryable = true)
+            return fail(explain(e), null, retryable = true, cause = e)
         }
         val connected = Terminal.getInstance().connectedReader
         if (connected != null) {
@@ -229,11 +233,13 @@ class TapToPayActivity : Activity() {
 
     private fun discover() {
         busy(getString(R.string.tapStartingReader))
+        step = "support"
         val config = DiscoveryConfiguration.TapToPayDiscoveryConfiguration(isSimulated = debuggable())
         val support = Terminal.getInstance().supportsReadersOfType(DeviceType.TAP_TO_PAY_DEVICE, config)
         if (!support.isSupported) {
             return fail(support.error?.let { explain(it) } ?: getString(R.string.tapUnsupported), null)
         }
+        step = "discover"
         discovery = Terminal.getInstance().discoverReaders(
             config,
             object : DiscoveryListener {
@@ -246,7 +252,7 @@ class TapToPayActivity : Activity() {
             object : Callback {
                 override fun onSuccess() {}
                 override fun onFailure(e: TerminalException) {
-                    runOnUiThread { fail(explain(e), null, retryable = true) }
+                    runOnUiThread { fail(explain(e), null, retryable = true, cause = e) }
                 }
             },
         )
@@ -255,6 +261,7 @@ class TapToPayActivity : Activity() {
     private fun connect(reader: Reader) {
         if (Terminal.getInstance().connectedReader != null) return
         busy(getString(R.string.tapConnecting))
+        step = "connect"
         val locationId = session?.optString("locationId").orEmpty()
         val listener = object : TapToPayReaderListener {
             override fun onDisconnect(reason: DisconnectReason) {
@@ -282,7 +289,7 @@ class TapToPayActivity : Activity() {
                 }
 
                 override fun onFailure(e: TerminalException) {
-                    runOnUiThread { fail(explain(e), null, retryable = true) }
+                    runOnUiThread { fail(explain(e), null, retryable = true, cause = e) }
                 }
             },
         )
@@ -294,6 +301,7 @@ class TapToPayActivity : Activity() {
         val secret = session?.optString("clientSecret").orEmpty()
         if (secret.isBlank()) return fail(getString(R.string.tapServerError), null, retryable = true)
         busy(getString(R.string.tapGettingReady))
+        step = "retrieve"
         Terminal.getInstance().retrievePaymentIntent(
             secret,
             object : PaymentIntentCallback {
@@ -302,7 +310,7 @@ class TapToPayActivity : Activity() {
                 }
 
                 override fun onFailure(e: TerminalException) {
-                    runOnUiThread { fail(explain(e), null, retryable = true) }
+                    runOnUiThread { fail(explain(e), null, retryable = true, cause = e) }
                 }
             },
         )
@@ -312,6 +320,7 @@ class TapToPayActivity : Activity() {
         paymentIntent = pi
         if (pi.status == PaymentIntentStatus.SUCCEEDED) return report(pi)
         busy(getString(R.string.tapNow))
+        step = "tap"
         detail.text = getString(R.string.tapHoldCard)
         val collect = CollectPaymentIntentConfiguration.Builder()
             .skipTipping(true)
@@ -334,7 +343,7 @@ class TapToPayActivity : Activity() {
                     e.paymentIntent?.let { paymentIntent = it }
                     runOnUiThread {
                         val canceled = e.errorCode == TerminalErrorCode.CANCELED || e.errorCode == TerminalErrorCode.CANCELED_BY_READER
-                        fail(if (canceled) getString(R.string.tapCanceled) else explain(e), null, retryable = true)
+                        fail(if (canceled) getString(R.string.tapCanceled) else explain(e), null, retryable = true, cause = if (canceled) null else e)
                     }
                 }
             },
@@ -345,6 +354,7 @@ class TapToPayActivity : Activity() {
 
     private fun report(pi: PaymentIntent) {
         busy(getString(R.string.tapSaving))
+        step = "report"
         detail.text = ""
         val a = api ?: return
         val piId = pi.id ?: return fail(getString(R.string.tapServerError), null, retryable = true)
@@ -381,8 +391,12 @@ class TapToPayActivity : Activity() {
         close.text = getString(R.string.tapCancel)
     }
 
-    private fun fail(text: String, fixLabel: String?, retryable: Boolean = false, action: (() -> Unit)? = null) {
+    private fun fail(text: String, fixLabel: String?, retryable: Boolean = false, action: (() -> Unit)? = null, cause: Throwable? = null) {
         status.text = text
+        // Stripe's generic errors ("Unexpected failure") carry the real reason underneath; show it and send it to the server.
+        val why = cause?.let { describe(it) }
+        detail.text = why?.let { getString(R.string.tapWhy, step, it) } ?: ""
+        report(step, text, cause)
         spinner.visibility = View.GONE
         retry.visibility = if (retryable || action != null) View.VISIBLE else View.GONE
         fixAction = action
@@ -418,6 +432,39 @@ class TapToPayActivity : Activity() {
 
     private fun money(cents: Long): String = if (cents % 100 == 0L) "$" + (cents / 100) else String.format("$%.2f", cents / 100.0)
 
+    /** "UNEXPECTED_SDK_ERROR: IllegalStateException: …", the SDK's own words, for the detail line and the server breadcrumb. */
+    private fun describe(t: Throwable): String {
+        val parts = mutableListOf<String>()
+        if (t is TerminalException) {
+            parts.add(t.errorCode.toString())
+            t.apiError?.let { api -> parts.add(listOfNotNull(api.code, api.declineCode, api.message).joinToString(" ")) }
+        }
+        var c: Throwable? = if (t is TerminalException) t.cause else t
+        var n = 0
+        while (c != null && n < 4) {
+            parts.add(c.javaClass.simpleName + (c.message?.let { ": $it" } ?: ""))
+            c = c.cause?.takeIf { it !== c }
+            n++
+        }
+        return parts.filter { it.isNotBlank() }.distinct().joinToString(" · ").take(600)
+    }
+
+    /** Best-effort breadcrumb to the Worker (settings key tap_last_error, shown by GET /api/tap/status). */
+    private fun report(atStep: String, text: String, cause: Throwable?) {
+        val a = api ?: return
+        val body = JSONObject()
+            .put("step", atStep)
+            .put("code", (cause as? TerminalException)?.errorCode?.toString() ?: cause?.javaClass?.simpleName ?: "app")
+            .put("message", text.take(500))
+            .put("cause", cause?.let { describe(it) + " @ " + (it.stackTrace.firstOrNull()?.toString() ?: "") } ?: "")
+            .put("device", (android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL).take(120))
+            .put("android", android.os.Build.VERSION.RELEASE + " / patch " + android.os.Build.VERSION.SECURITY_PATCH)
+            .put("app", BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")")
+        thread {
+            try { a.log(body) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { /* the screen already shows the error */ }
+        }
+    }
+
     /** Stripe's error codes in the owner's words (research/android-tap-to-pay-2026.md §3.5). */
     private fun explain(e: TerminalException): String {
         val decline = e.apiError?.declineCode?.takeIf { it.isNotBlank() }
@@ -434,7 +481,7 @@ class TapToPayActivity : Activity() {
             TerminalErrorCode.CARD_READ_TIMED_OUT -> getString(R.string.tapTimedOut)
             TerminalErrorCode.SESSION_EXPIRED -> getString(R.string.tapSessionExpired)
             TerminalErrorCode.STRIPE_API_CONNECTION_ERROR -> getString(R.string.tapOffline)
-            else -> (e.errorMessage?.takeIf { it.isNotBlank() } ?: e.errorCode.toString())
+            else -> (e.errorMessage?.takeIf { it.isNotBlank() }?.let { "$it (${e.errorCode})" } ?: e.errorCode.toString())
         }
     }
 }

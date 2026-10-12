@@ -1037,6 +1037,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   finger leaves the box (Compose: `clipToBounds()` + `inBox` in `SignaturePad`, strokes drawn past the edge used to show outside it; web
   esign.ts: points outside the canvas rect end the stroke, a return starts a new one). (4) The service agreement's section 2 now says
   "(see the Timing section above)": the TIMING section sits before SERVICE AGREEMENT and readers looked for it below.
+- Tap failure breadcrumbs (Oct 2026, Android 2.43): after the version pin the phone showed Stripe's catch-all "Unexpected failure"
+  (`TerminalErrorCode.UNEXPECTED_SDK_ERROR`, raised by the SDK's `TerminalSession.enqueueOperation` when an operation throws; the
+  real reason is in `cause`). `TapToPayActivity` now tracks `step` (checks / order / init / support / discover / connect / retrieve /
+  tap / report), `explain()` appends the error code to generic messages, `describe()` unrolls the TerminalException's api error +
+  cause chain, the detail line shows "Step: connect. Stripe says: …", and `fail()` POSTs `{step, code, message, cause, device,
+  android, app}` to `POST /api/tap/log` (bearer tap token like the other `/tap/*` routes; `tapLog` → settings key `tap_last_error`).
+  `GET /api/tap/last` (public, read-only; `tapLastFailure`; `/api/tap/status` is the owner-only readiness check) returns it, so a failed tap can be diagnosed from here without
+  `wrangler tail`. `activity_tap.xml` got `fitsSystemWindows` (the Cancel button sat under the gesture bar on the Fold). Stripe
+  Terminal SDK 6.0.0 (7 Oct 2026, the latest) needs `MODIFY_AUDIO_SETTINGS` (present in the merged manifest) and compileSdk 35+.
 - Tap to Pay (Oct 2026, research/android-tap-to-pay-2026.md; `src/worker/tap.ts`, migration 0014 `signups.stripe_payment_intent /
   paid_via / tap_nonce`): in-person card payments on the owner's phone with Stripe Terminal. Android app 2.0 keeps the TWA and adds one
   native Kotlin screen, `tap/TapToPayActivity` (Stripe Terminal SDK 6.0.0, `stripeterminal-taptopay` + `-core`, arm64 only, APK ≈40 MB;

@@ -20,6 +20,9 @@ class TapApi(private val origin: String, private val token: String) {
     fun complete(paymentIntentId: String): JSONObject =
         call("POST", "/api/tap/complete", JSONObject().put("paymentIntentId", paymentIntentId))
 
+    /** A failure breadcrumb for the server (GET /api/tap/last shows it), so a bare "Unexpected failure" can be traced. */
+    fun log(body: JSONObject): JSONObject = call("POST", "/api/tap/log", body)
+
     private fun call(method: String, path: String, body: JSONObject?): JSONObject {
         val conn = URL(origin + path).openConnection() as HttpURLConnection
         try {
