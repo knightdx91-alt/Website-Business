@@ -258,3 +258,40 @@ body.showing .top { display: none; }
 .taskform .row > * { flex: 1 1 120px; }
 .taskform .row select { min-width: 120px; }
 .taskform .field { margin-bottom: 10px; }
+
+/* Ease of use (Oct 2026): next step, queue, checklist, health strip, start here, report */
+.step { border-left: 6px solid var(--primary, #fca311); }
+.step__eyebrow { margin: 0 0 2px; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted, #667); font-weight: 700; }
+.step h2 { margin-top: 0; }
+.step--take_payment, .step--callback { border-left-color: var(--warn); }
+.step--publish, .step--opened { border-left-color: var(--good); }
+.step--failed { border-left-color: var(--bad); }
+.queue li { padding: 10px 0; }
+.checklist { padding-left: 22px; margin: 6px 0; }
+.checklist li { margin: 6px 0; }
+.checklist a { font-weight: 600; }
+.more-cards { margin-top: 8px; }
+.more-cards > summary { cursor: pointer; font-weight: 700; padding: 12px 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 14px; }
+.more-cards[open] > summary { margin-bottom: 14px; }
+.is-jump { outline: 3px solid var(--primary, #fca311); outline-offset: 2px; transition: outline-color 1.5s; }
+.btn--big { font-size: 1.05rem; padding: 14px 18px; width: 100%; }
+.quick { margin: 4px 0 10px; }
+.toast__report { margin-left: 10px; background: var(--primary, #fca311); color: #14213d; border: 0; border-radius: 8px; padding: 6px 10px; font-weight: 700; cursor: pointer; }
+.health__list { list-style: none; padding: 0; margin: 0; }
+.health__item { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.health__item:last-child { border-bottom: 0; }
+.health__dot { flex: none; width: 12px; height: 12px; border-radius: 50%; margin-top: 5px; background: #bbb; }
+.health__dot--ok { background: var(--good); }
+.health__dot--warn { background: var(--warn); }
+.health__dot--off { background: #b8bcc6; }
+.jump { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 14px; }
+.jump .chip { cursor: pointer; border: 0; }
+.start { border-left: 6px solid var(--good); }
+.start__list { padding-left: 20px; margin: 6px 0 10px; }
+.start__list li { margin: 4px 0; }
+.start__list li.is-done { color: var(--muted, #667); }
+.funnel__list { list-style: none; padding: 0; margin: 0; }
+.funnel__list li { padding: 8px 0; }
+.funnel__bar { height: 10px; border-radius: 5px; background: var(--chip); overflow: hidden; margin-top: 4px; }
+.funnel__bar i { display: block; height: 100%; background: var(--primary, #fca311); }
+.linkbtn.small { font-size: .85rem; }

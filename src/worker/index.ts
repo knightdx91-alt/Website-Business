@@ -1159,6 +1159,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       start: {
         show: !startDismissed && startLessons.some((l) => !l.done),
         lessons: startLessons,
+        /** The practice lead's id (Payment test), for the Start-here card's last step; null if it doesn't exist. */
+        practiceLeadId:
+          (
+            await env.DB.prepare(
+              "SELECT id FROM leads WHERE place_id = 'paytest' AND status != 'expired' LIMIT 1",
+            ).first<{ id: string }>()
+          )?.id ?? null,
       },
       team,
       checkout: {

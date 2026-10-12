@@ -59,12 +59,53 @@
   const COST_PER_SITE = { restaurant: 0.04, contractor: 0.1, salon: 0.06, auto: 0.1, landscaping: 0.1, cleaning: 0.1, print: 0.1, retail: 0.06, finance: 0.1, church: 0.06 };
   const MODEL_FACTOR = { "claude-opus-5-5": 1, "claude-sonnet-5-5": 0.5, "claude-haiku-5-5": 0.03 };
 
-  function toast(msg) {
-    $toast.textContent = msg;
+  // The last failed request (path, status, message, time): "Report this" sends it along, so nobody has to describe an error.
+  let lastError = null;
+  function toast(msg, opts = {}) {
+    const text = msg instanceof Error ? msg.message : String(msg);
+    const report = opts.report || (lastError && Date.now() - lastError.at < 5000 && text === lastError.message);
+    $toast.innerHTML = `<span>${esc(text)}</span>${report ? ` <button type="button" class="toast__report" data-toast-report>Report this</button>` : ""}`;
     $toast.hidden = false;
+    const r = $toast.querySelector("[data-toast-report]");
+    if (r) r.addEventListener("click", () => { $toast.hidden = true; reportProblem({ message: text }); });
     clearTimeout(toast.t);
-    toast.t = setTimeout(() => ($toast.hidden = true), 3500);
+    toast.t = setTimeout(() => ($toast.hidden = true), report ? 9000 : 3500);
   }
+
+  /**
+   * "Report this" (Oct 2026): one question (what were you doing?), then the screen, the last error, the browser and the
+   * time go to POST /api/report. The owner reads them in Settings → Problems reported and gets a 🐞 alert.
+   */
+  async function reportProblem(extra = {}) {
+    const step = prompt("What were you trying to do? One line is plenty; the error details go along by themselves.", extra.step || "");
+    if (step === null) return;
+    const err = lastError && Date.now() - lastError.at < 120000 ? lastError : null;
+    const leadId = (/#\/(?:lead|edit|preview|pitch|walkin|gbp|full)\/([a-z0-9]+)/.exec(location.hash) || [])[1];
+    try {
+      await api("/report", { method: "POST", json: {
+        app: "web", screen: (location.hash || "#/").slice(0, 120), step: step.trim().slice(0, 120) || undefined,
+        message: String(extra.message || (err && err.message) || "Something didn't work").slice(0, 1000),
+        detail: JSON.stringify({ error: err, when: new Date().toISOString(), online: navigator.onLine, size: `${innerWidth}×${innerHeight}` }).slice(0, 4000),
+        device: navigator.userAgent.slice(0, 200), leadId,
+      } });
+      toast("Thanks, it's reported. The owner sees it under Settings → Problems reported.");
+    } catch (e) { toast("Couldn't send the report: " + e.message); }
+  }
+  /** A "Copy" button for any text; one delegated click handler below serves every screen. */
+  const copyBtn = (text, label = "Copy") => `<button class="btn btn--small" type="button" data-copytext="${esc(text)}">${label}</button>`;
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-copytext]");
+    if (!b || b.dataset.bound) return;
+    try { await navigator.clipboard.writeText(b.dataset.copytext); toast("Copied"); } catch (err) { toast("Couldn't copy"); }
+  });
+  const reportBtn = (label = "🐞 Report a problem") => `<button class="btn btn--small" type="button" data-report-problem>${label}</button>`;
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-report-problem]"); if (b) reportProblem({}); });
+  window.addEventListener("unhandledrejection", (e) => {
+    const r = e.reason;
+    if (!r || r.status === 401) return;
+    lastError = { message: (r && r.message) || String(r), at: Date.now(), path: r && r.path, status: r && r.status, stack: r && r.stack ? String(r.stack).slice(0, 600) : undefined };
+    toast(lastError.message, { report: true });
+  });
 
   async function api(path, opts = {}) {
     const init = { method: opts.method || "GET", headers: { "x-wb": "1" }, credentials: "same-origin" };
@@ -81,6 +122,8 @@
       // fetch only throws when the request never got through: no signal, airplane mode, server unreachable.
       const err = new Error(NO_CONNECTION);
       err.offline = true;
+      err.path = path;
+      lastError = { message: err.message, at: Date.now(), path, status: 0 };
       throw err;
     }
     if (opts.raw && res.ok) return res;
@@ -91,9 +134,15 @@
       throw new Error("Please log in");
     }
     if (!res.ok) {
-      const err = new Error(data.error || "Something went wrong");
+      // Plain words for the two cases nobody can act on from the message itself.
+      const text = res.status >= 500 ? `The app's server hit a problem${data.error ? ` (${data.error})` : ""}. Try again in a moment; if it keeps happening, report it.`
+        : res.status === 404 && !data.error ? "That isn't here any more. Go back to Leads and try again."
+        : data.error || "Something went wrong";
+      const err = new Error(text);
       err.data = data;
       err.status = res.status;
+      err.path = path;
+      lastError = { message: text, at: Date.now(), path, status: res.status, server: data.error };
       throw err;
     }
     return data;
@@ -305,10 +354,10 @@
   function statusChip(l) {
     if (l.salesStatus === "live") return `<span class="chip chip--good">● Live</span>`;
     if (l.salesStatus === "not_interested") return `<span class="chip">Not interested</span>`;
-    if (l.status === "queued") return `<span class="chip">Waiting</span>`;
-    if (l.status === "building") return `<span class="chip"><span class="spin"></span> Building</span>`;
-    if (l.status === "failed") return `<span class="chip chip--bad">Build failed</span>`;
-    return `<span class="chip chip--good">Site ready</span>`;
+    if (l.status === "queued") return `<span class="chip">Queued to build</span>`;
+    if (l.status === "building") return `<span class="chip"><span class="spin"></span> Building the preview</span>`;
+    if (l.status === "failed") return `<span class="chip chip--bad">Preview failed</span>`;
+    return `<span class="chip chip--good">Preview ready</span>`;
   }
 
   /** "stonebridgewedding.com" from a lead's foundUrl (a page the web-presence check found). */
@@ -351,8 +400,8 @@
     meta = meta || (await api("/meta"));
     if (stale(my)) return;
     if (!document.getElementById("leads")) {
-      $app.innerHTML = `<div class="split"><div>${isOwner() ? "" : `<section class="card"><h2>Hi ${esc(meta.me.name)}</h2><p class="muted small">Open a lead's <strong>Call guide</strong> before you call. After each call, log how it went so callbacks show up here on the right day.</p></section>`}<div id="pushask"></div><div id="today"></div><div id="tasks"></div><div id="unpaid"></div><div id="runs"></div></div><div><section>
-        <div class="btns btns--full" style="margin-bottom:12px">${isOwner() ? `<a class="btn btn--primary" href="#/run">🔎 Find new leads</a>` : ""}<a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a><a class="btn" href="#/training">🎓 Training</a></div>
+      $app.innerHTML = `<div class="split"><div><div id="start">${startHtml()}</div><div id="pushask"></div><div id="today"></div><div id="tasks"></div><div id="runs"></div></div><div><section>
+        <div class="btns btns--full" style="margin-bottom:12px">${isOwner() ? `<a class="btn btn--primary" href="#/run">🔎 Find new leads</a>` : ""}<a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
@@ -370,8 +419,48 @@
         refreshHome();
       });
     }
+    bindStart();
     await pushAsk();
     await refreshHome();
+  }
+
+  /** "Start here" for a new teammate: three lessons and the practice run, until done or dismissed (server-side, per person). */
+  function startHtml() {
+    const st = meta && meta.start;
+    if (!st || !st.show) return "";
+    const n = st.lessons.filter((l) => l.done).length;
+    return `<section class="card start"><h2>👋 Start here${n ? ` · ${n} of ${st.lessons.length} done` : ""}</h2>
+      <p class="small muted">Four things and you know the job. Each one takes a few minutes.</p>
+      <ol class="start__list">${st.lessons.map((l) => `<li class="${l.done ? "is-done" : ""}">${l.done ? "✅" : "▢"} ${l.practice && st.practiceLeadId ? `<a href="#/lead/${esc(st.practiceLeadId)}">${esc(l.title)}</a> <span class="small muted">(on the practice lead; everything on it is $1)</span>` : `<a href="#/training">${esc(l.title)}</a>`}</li>`).join("")}</ol>
+      <div class="btns"><a class="btn btn--primary btn--small" href="#/training">🎓 Open Training</a><a class="btn btn--small" href="#/guide/words">📖 What the words mean</a><button class="btn btn--small" type="button" data-start-dismiss>Not now</button></div></section>`;
+  }
+  function bindStart() {
+    const b = $app.querySelector("[data-start-dismiss]");
+    if (b) b.addEventListener("click", async () => {
+      try { await api("/start/dismiss", { method: "POST" }); if (meta && meta.start) meta.start.show = false; const el = document.getElementById("start"); if (el) el.innerHTML = ""; toast("You'll find Training under the buttons on the right any time."); } catch (err) { toast(err.message); }
+    });
+  }
+
+  /* ---------- the one next step (shared by Home's queue and the lead page) ---------- */
+  const STEP_ICON = { take_payment: "💳", callback: "📅", opened: "👀", follow_up: "🔁", publish: "🚀", call: "📞", building: "⏳", failed: "⚠️", live: "🌐", closed: "✋", cadence_done: "🏁" };
+  const STEP_CLASS = { take_payment: "chip--warn", callback: "chip--warn", opened: "chip--good", publish: "chip--good", failed: "chip--bad" };
+  /**
+   * The button for a step. On the lead page (`onPage`) it acts right there (data-step); on Home it links to the lead page
+   * with the step in the hash (#/lead/<id>/<route>), which runs the same action once the page is up.
+   */
+  function stepButton(l, step, { small = false, onPage = false } = {}) {
+    const cls = `btn${small ? " btn--small" : ""} btn--primary`;
+    const r = step.route;
+    const icon = STEP_ICON[step.key] || "👉";
+    if (r === "call") return l.status === "ready" ? `<a class="${cls}" href="#/pitch/${l.id}">📞 Call guide</a><a class="btn${small ? " btn--small" : ""}" href="${telHref(l.phone)}">📞 Call now</a>` : `<a class="${cls}" href="${telHref(l.phone)}">📞 Call</a>`;
+    if (r === "walkin") return `<a class="${cls}" href="#/walkin/${l.id}">🚶 ${esc(step.action)}</a>`;
+    if (r === "wait") return `<button class="btn${small ? " btn--small" : ""}" type="button" disabled>${esc(step.action)}</button>`;
+    return onPage ? `<button class="${cls}" type="button" data-step="${esc(r)}">${icon} ${esc(step.action)}</button>` : `<a class="${cls}" href="#/lead/${l.id}/${esc(r)}">${icon} ${esc(step.action)}</a>`;
+  }
+  function nextStepCardHtml(l) {
+    const s = l.nextStep;
+    if (!s) return "";
+    return `<section class="card step step--${esc(s.key)}"><p class="step__eyebrow">Next step</p><h2>${STEP_ICON[s.key] || "👉"} ${esc(s.title)}</h2>${s.detail ? `<p class="small">${esc(s.detail)}</p>` : ""}<div class="btns">${stepButton(l, s, { onPage: true })}</div></section>`;
   }
 
   /** "👤 Ask for: Maria · mornings" when the lead has a contact person or best time on file. */
@@ -385,46 +474,21 @@
   const loggedToday = () => { try { return Number(localStorage.getItem(loggedKey()) || 0); } catch (e) { return 0; } };
   const bumpLogged = () => { try { localStorage.setItem(loggedKey(), String(loggedToday() + 1)); } catch (e) { /* storage blocked */ } };
 
-  /** Today's call list: callbacks due, then prospects who just opened their preview, then the best untouched new leads. */
-  function todayHtml(due, opened, fresh) {
-    const weekAgo = Date.now() - 7 * 86400000;
-    const rows = [];
-    const seen = new Set();
-    const add = (l, why, cls) => { if (seen.has(l.id) || rows.length >= 15) return; seen.add(l.id); rows.push({ l, why, cls }); };
-    due.forEach((l) => add(l, l.followUp < dayFromNow(0) ? "Overdue" : "Callback", "chip--warn"));
-    opened.filter((l) => l.salesStatus !== "sold" && l.salesStatus !== "live" && l.previewOpenedAt > weekAgo).forEach((l) => add(l, `Opened preview${l.previewOpens > 1 ? ` ${l.previewOpens}×` : ""} · ${ago(l.previewOpenedAt)}`, "chip--good"));
-    fresh.filter((l) => !l.payTest && l.status === "ready" && l.salesStatus === "new" && (!l.lastContact || l.lastContact < weekAgo)).sort((a, b) => (b.score || 0) - (a.score || 0)).forEach((l) => add(l, "New", ""));
+  /** Home's queue (GET /api/queue): every lead that needs something, most urgent first, each with its one next step. */
+  function queueHtml(q) {
+    const rows = q.rows || [];
+    const c = q.counts || {};
     const goal = Number(meta.settings.dailyCalls) || 0;
     const done = loggedToday();
-    const head = `Today: ${rows.length} call${rows.length === 1 ? "" : "s"}${done ? ` · you've logged ${done} so far today` : ""}`;
-    if (!rows.length && !goal) return "";
-    return `<section class="card due today"><h2>📋 ${esc(head)}</h2>
+    const plural = (n, w, ws) => `${n} ${n === 1 ? w : ws || w + "s"}`;
+    const bits = [c.take_payment ? plural(c.take_payment, "payment", "payments") + " to finish" : "", c.callback ? plural(c.callback, "callback") : "", c.opened ? plural(c.opened, "opened preview") : "", c.follow_up ? plural(c.follow_up, "follow-up") : "", c.publish ? plural(c.publish, "site") + " to publish" : "", c.call ? plural(c.call, "new lead") + " to call" : ""].filter(Boolean);
+    return `<section class="card due today"><h2>📋 Up next${rows.length ? ` · ${rows.length}` : ""}${done ? ` <span class="small muted" style="font-weight:400">· you've logged ${done} today</span>` : ""}</h2>
       ${goal ? `<div class="goal" role="progressbar" aria-valuenow="${Math.min(done, goal)}" aria-valuemin="0" aria-valuemax="${goal}" aria-label="Calls logged today"><i style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></i></div><p class="small muted" style="margin:0 0 6px">${done >= goal ? `Goal of ${goal} reached 🎉` : `${goal - done} more to reach today's goal of ${goal}`}</p>` : ""}
-      ${rows.length ? `<ul class="list">${rows.map(({ l, why, cls }) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a><span class="chip why ${cls}">${esc(why)}</span></div>
-        ${contactLine(l) ? `<p class="small muted" style="margin:2px 0 0">${contactLine(l)}</p>` : ""}
-        <div class="btns" style="margin-top:6px">${l.status === "ready" ? `<a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a><a class="btn btn--small" href="#/walkin/${l.id}">🚶 In-person</a>` : `<a class="btn btn--small btn--primary" href="${telHref(l.phone)}">📞 Call</a>`}</div></li>`).join("")}</ul>`
-        : `<p class="small muted">Nothing due. Pick a New lead below and make a call.</p>`}</section>`;
-  }
-
-  /** Sold leads whose sign-up isn't paid yet: call them, or send the sign-up link again. */
-  function unpaidHtml(sold) {
-    const rows = sold.filter((l) => l.unpaidSignup);
-    if (!rows.length) return "";
-    return `<section class="card due"><h2>✍️ Signed, payment not finished (${rows.length})</h2><p class="small muted">They signed the agreement but didn't finish paying. A quick call usually sorts it out.</p>
-      <ul class="list">${rows.map((l) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a></div>
-        <div class="btns" style="margin-top:6px"><a class="btn btn--small btn--primary" href="${telHref(l.phone)}">📞 Call</a><button class="btn btn--small" type="button" data-resend="${l.id}">Send sign-up link again</button></div></li>`).join("")}</ul></section>`;
-  }
-
-  async function resendSignup(id, btn) {
-    btn.disabled = true;
-    try {
-      const l = await api("/leads/" + id);
-      const last = (l.signups || [])[0];
-      if (!last) { go("#/lead/" + id); return; }
-      const res = await api(`/leads/${id}/signup`, { method: "POST", json: { plan: last.plan.id || "plus" } });
-      const name = l.record ? l.record.name : l.name;
-      location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(`${greeting()} Here's the sign-up link again for the ${name} website (${res.plan} plan), in case the payment step didn't go through: ${res.url}`)}`;
-    } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+      ${bits.length ? `<p class="small muted" style="margin:0 0 6px">${esc(bits.join(" · "))}</p>` : ""}
+      ${rows.length ? `<ul class="list queue">${rows.map(({ lead: l, step }) => `<li><div class="row"><a href="#/lead/${l.id}"><strong>${esc(l.name)}</strong></a><span class="chip why ${STEP_CLASS[step.key] || ""}">${STEP_ICON[step.key] || ""} ${esc(step.title)}</span></div>
+        <p class="small muted" style="margin:2px 0 0">${esc(step.detail)}${contactLine(l) ? ` · ${contactLine(l)}` : ""}</p>
+        <div class="btns" style="margin-top:6px">${stepButton(l, step, { small: true })}<a class="btn btn--small" href="#/lead/${l.id}">Open</a></div></li>`).join("")}</ul>`
+        : `<p class="small muted">Nothing waiting. Pick a New lead below and make a call.</p>`}</section>`;
   }
 
   /** Asks once on the home screen to turn on phone notifications, until done or dismissed. */
@@ -460,13 +524,10 @@
     if (filters.category) q.set("category", filters.category);
     const leadsEl0 = document.getElementById("leads");
     try {
-      const [{ runs }, { leads }, { leads: due }, { leads: opened }, { leads: fresh }, { leads: sold }, { tasks: openTasks }] = await Promise.all([
+      const [{ runs }, { leads }, queue, { tasks: openTasks }] = await Promise.all([
         isOwner() ? api("/runs") : Promise.resolve({ runs: [] }),
         api("/leads?" + q),
-        api("/leads?callbacks=due"),
-        api("/leads?opened=recent"),
-        filters.sales === "new" && !filters.category ? Promise.resolve({ leads: null }) : api("/leads?sales=new"),
-        api("/leads?sales=sold"),
+        api("/queue").catch(() => ({ rows: [], counts: {} })),
         api("/tasks?scope=open").catch(() => ({ tasks: [] })),
       ]);
       if (stale(my)) return;
@@ -476,14 +537,9 @@
       runsEl.innerHTML = runsHtml(runs, false);
       bindRunDismiss(runsEl, () => refreshHome());
       const todayEl = document.getElementById("today");
-      if (todayEl) todayEl.innerHTML = todayHtml(due, opened, fresh || leads);
+      if (todayEl) todayEl.innerHTML = queueHtml(queue);
       const tasksEl = document.getElementById("tasks");
       if (tasksEl) { tasksEl.innerHTML = tasksHomeHtml(openTasks); bindTaskChecks(tasksEl, () => refreshHome()); }
-      const unpaidEl = document.getElementById("unpaid");
-      if (unpaidEl) {
-        unpaidEl.innerHTML = unpaidHtml(sold);
-        unpaidEl.querySelectorAll("[data-resend]").forEach((b) => b.addEventListener("click", () => resendSignup(b.dataset.resend, b)));
-      }
       const empty = {
         new: isOwner() ? "No new leads yet. Tap Find new leads to run a search." : "No new leads right now. Check back after the next run.",
         callbacks: "No callbacks scheduled. Use “Call back…” after a call to schedule one.",
@@ -672,9 +728,18 @@
       try { await api(`/referrals/${b.dataset.refApplied}/applied`, { method: "POST" }); toast("Marked applied"); after(); } catch (e) { toast(e.message); }
     }));
   }
+  /** The default order for the three-tap sign-up: the Plus plan (else the middle one) on the standard term. */
+  function quickSignup(l) {
+    const plans = (meta.settings.plans || []).filter((p) => p.monthly && p.id !== "list");
+    if (!plans.length) return null;
+    const p = plans.find((x) => x.id === "plus") || plans[Math.floor((plans.length - 1) / 2)];
+    const t = payTerms(meta.settings, l.category === "church");
+    return { id: p.id, name: p.name, monthly: p.monthly, billing: "standard", termLabel: t.min ? `${t.min}-month plan` : "monthly" };
+  }
   function signupCardHtml(l) {
     const plans = meta.settings.plans || [];
     const signed = (l.signups || [])[0];
+    const quick = quickSignup(l);
     return `<section class="card" id="signupcard"><h2>${signed ? "Signed up" : "Sign them up"}</h2>
       ${(l.signups || []).map((x) => `<div class="signed"><strong>✍️ ${esc(x.plan.name)}${x.plan.billingLabel ? ` · ${esc(x.plan.billingLabel)}` : ""}</strong>
         <p class="small">${esc(x.plan.billingDetail || `${money(x.plan.monthly)}/month${x.plan.setup ? ` + ${money(x.plan.setup)} setup` : ""}`)}</p>
@@ -686,9 +751,11 @@
         <label class="check"><input type="checkbox" data-paid="${x.id}"${x.paid ? " checked" : ""}> Payment is set up</label></div>`).join("")}
       ${(l.purchases || []).length ? `<h3 style="margin-top:12px">Extras bought later</h3><ul class="list small">${l.purchases.map((p) => `<li>${esc([...p.extras.map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...p.quotes.map((q) => `${q} (quote)`)].join(", "))} · ${money(p.dueCents / 100)} · ${p.paid ? "✅ paid" : "not paid yet"} · ${ago(p.createdAt)} · <a href="/api/agreements/p/${p.id}" target="_blank" rel="noopener">📄 agreement</a> · <a href="/api/agreements/p/${p.id}.pdf">⬇ PDF</a></li>`).join("")}</ul>` : ""}
       ${plans.length
-        ? `<p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p><p class="small muted">${feeNote(payTerms(meta.settings))}</p>
-          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> ${ready ? `<a class="btn btn--small" href="#/showboard/${l.id}">📋 Show them the ${esc(l.boardName || "Stock board")}</a> ` : ""}<a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="/api/contract.pdf?lead=${l.id}">⬇ Agreement PDF</a> <a class="btn btn--small" href="/api/ach.pdf?lead=${l.id}">🏦 Payment authorization form</a></p>
-          <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div>
+        ? `${!signed && quick ? `<div class="quick"><button class="btn btn--primary btn--big" type="button" data-plan="${esc(quick.id)}" data-billing="${quick.billing}" data-open="1">✍️ Sign them up: ${esc(quick.name)}, ${esc(quick.termLabel)} · ${money(quick.monthly)}/mo</button>
+            <p class="small muted" style="margin:6px 0 0">Opens the agreement on this phone. Their name and email are filled in; they read the short version, sign, and pay. Three taps. <button class="linkbtn" type="button" data-signup-more>Change plan or way to pay</button></p></div>` : ""}
+          <div id="signupmore"${!signed && quick ? " hidden" : ""}><p class="small muted">${signed ? "Send a new link to change plans." : "Pick a plan. They choose how to pay (yearly, month to month or the standard term), sign with their name and set up automatic payment, on your phone or theirs."}</p><p class="small muted">${feeNote(payTerms(meta.settings))}</p>
+          <p><a class="btn btn--small" href="#/plans/${l.id}">📋 Show them the plans</a> ${l.status === "ready" ? `<a class="btn btn--small" href="#/showboard/${l.id}">📋 Show them the ${esc(l.boardName || "Stock board")}</a> ` : ""}<a class="btn btn--small" href="/api/contract?lead=${l.id}" target="_blank" rel="noopener">📄 Show them the agreement</a> <a class="btn btn--small" href="/api/contract.pdf?lead=${l.id}">⬇ Agreement PDF</a> <a class="btn btn--small" href="/api/ach.pdf?lead=${l.id}">🏦 Payment authorization form</a></p>
+          <div class="btns btns--full">${plans.map((p) => `<button class="btn${p.id === "plus" ? " btn--primary" : ""}" data-plan="${p.id}">${esc(p.name)} · ${money(p.monthly)}/mo</button>`).join("")}</div></div>
           <div id="signuplink"></div>`
         : isOwner() ? `<p class="small muted">Add your plans and prices in <a href="#/settings">Settings</a> first.</p>` : `<p class="small muted">The owner hasn't set up plans yet.</p>`}
       </section>`;
@@ -727,10 +794,20 @@
         location.href = res.intentUrl;
       } catch (err) { toast(err.message); } finally { b.disabled = false; }
     }));
+    const more = card.querySelector("[data-signup-more]");
+    if (more) more.addEventListener("click", () => { const box = card.querySelector("#signupmore"); box.hidden = !box.hidden; more.textContent = box.hidden ? "Change plan or way to pay" : "Hide the other choices"; });
     card.querySelectorAll("[data-plan]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
+      // The quick button opens the sign-up page straight away (a window opened on the tap itself isn't blocked).
+      const win = b.dataset.open ? window.open("", "_blank") : null;
       try {
         const res = await api(`/leads/${l.id}/signup`, { method: "POST", json: { plan: b.dataset.plan } });
+        if (b.dataset.open) {
+          const url = tapHref(res.url + (res.url.includes("?") ? "&" : "?") + "billing=" + encodeURIComponent(b.dataset.billing || "standard"));
+          if (win) win.location = url; else location.href = url;
+          toast("Hand them the phone to read, sign and pay.");
+          return;
+        }
         const phone = phoneDigits(l);
         const sms = `${greeting()} Here's the sign-up page for your new website (${res.plan} plan) for ${l.record ? l.record.name : l.name}: ${res.url}`;
         card.querySelector("#signuplink").innerHTML = `<div class="linkbox"><p class="small"><strong>${esc(res.plan)}</strong> sign-up link ready (works ${res.expiresInDays} days).</p>
@@ -738,7 +815,7 @@
           <a class="btn" href="sms:+1${phone}?body=${encodeURIComponent(sms)}">Text it</a><button class="btn" type="button" data-copy>Copy</button></div>
           <p class="small muted">“Open here” lets them sign on your phone right now.</p></div>`;
         card.querySelector("[data-copy]").addEventListener("click", async () => { try { await navigator.clipboard.writeText(res.url); toast("Link copied"); } catch (e) { toast("Couldn't copy"); } });
-      } catch (err) { toast(err.message); } finally { b.disabled = false; }
+      } catch (err) { if (win) win.close(); toast(err.message); } finally { b.disabled = false; }
     }));
   }
 
@@ -855,7 +932,10 @@
     draw(false);
   }
 
-  async function viewLead(id) {
+  /** Edit card names for the Finish & publish checklist (editform card ids; the web editor tags its cards the same). */
+  const CARD_NAME = { confirm: "Confirm with the owner", approved: "Text → approved", photo: "Photo", gallery: "Photo gallery", facts: "Facts", links: "Links", text: "Text", menu: "Menu", services: "Services", quotes: "Customer quotes", design: "Design", pricelist: "Live price list", restaurant: "Restaurant details", retail: "Shop details", print: "Print shop details", parts: "Auto parts details", auto: "Auto shop details", finance: "Tax & finance details", church: "Church & nonprofit details", contractor: "Contractor details", landscaping: "Lawn & landscape details", cleaning: "Cleaning details", salon: "Salon details", plans: "Plans & pricing", es: "Spanish page" };
+
+  async function viewLead(id, intent) {
     setNav("home");
     const my = renderSeq;
     const l = await api("/leads/" + id);
@@ -869,9 +949,10 @@
     const owner = isOwner();
     const work = !!meta.me; // every team member works the lead; `owner` only guards delete and the practice reset
     const open = l.salesStatus === "new" || l.salesStatus === "shown";
-    $app.innerHTML = `<p><a href="#/">← Leads</a></p>
-      <div class="split"><div>
-      <section class="card">
+    // Cards by name, then composed by stage: what this lead needs now sits above the fold; the rest folds under "More".
+    const items = l.checklist || blockers.map((b) => ({ text: b, card: "text", kind: "todo" }));
+    const C = {};
+    C.head = `<section class="card">
         <h1>${esc(r ? r.name : l.name)}</h1>
         <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}${work && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="webcheck" title="Search the web for a page Google doesn't show">🔎 Re-check website</button>` : ""}</p>${foundLine(l)}
         ${l.rating ? `<p><span class="stars">★ ${l.rating.toFixed(1)}</span> on Google</p>` : ""}
@@ -885,18 +966,18 @@
           ${open ? `<a class="btn" href="#/playbook">💬 Plans & answers</a>` : ""}
           <a class="btn" href="#/tasks/${l.id}">📝 Task</a>
         </div>
-      </section>
-      ${clientCardHtml(l)}
-      <div id="logslot-top"></div>
-      <section class="card"><h2>Sales status</h2>
+      </section>`;
+    C.step = nextStepCardHtml(l);
+    C.client = clientCardHtml(l);
+    C.status = `<section class="card"><h2>Sales status</h2>
         ${l.salesStatus === "live"
           ? `<p class="chip chip--good">● Live</p>`
           : work ? `<div class="tabs">${[["new", "New"], ["shown", "Shown"], ["sold", "Sold"], ["not_interested", "Not interested"]].map(([k, t]) => `<button type="button" data-status="${k}" class="${l.salesStatus === k ? "is-on" : ""}">${t}</button>`).join("")}</div>`
           : `<p class="chip${l.salesStatus === "sold" ? " chip--good" : ""}">${esc({ new: "New", shown: "Shown", sold: "Sold", not_interested: "Not interested" }[l.salesStatus] || l.salesStatus)}</p><p class="small muted" style="margin:6px 0 0">Log the call below to update it.</p>`}
         ${l.cadence && open && ready ? `<div class="cadence"><p><strong>Day ${Number(l.cadence.day)} since shown</strong> · Next: ${esc(l.cadence.next || "")}</p><div class="btns">${cadenceAction(l, l.cadence.next)}</div></div>` : ""}
-      </section>
-      <section class="card"><h2>Website</h2>
-        ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p>${work ? `<button class="btn" data-act="retry">Try again</button>` : `<p class="small muted">The work can rebuild it.</p>`}` : ""}
+      </section>`;
+    C.website = `<section class="card"><h2>Website</h2>
+        ${l.status === "failed" ? `<p class="chip chip--bad">Build failed</p><p class="small muted">${esc(l.error || "")}</p>${work ? `<button class="btn" data-act="retry">Try again</button>` : `<p class="small muted">The owner can rebuild it.</p>`}` : ""}
         ${l.status === "queued" || l.status === "building" ? `<p><span class="spin"></span> Building… this takes about a minute.</p>` : ""}
         ${ready ? `${work && l.salesStatus !== "live" ? "" : `<p class="muted small">Design: ${esc(lookName)}</p>`}
           <div class="btns btns--full">
@@ -908,47 +989,60 @@
           ${l.salesStatus !== "live" ? `<div style="margin-top:10px">${shareButtonsHtml()}</div>` : ""}
           ${l.previewOpens ? `<p class="small" style="margin-top:8px">👀 They opened their preview ${l.previewOpens === 1 ? "once" : `${l.previewOpens} times`}, last ${ago(l.previewOpenedAt)}.</p>` : ""}` : ""}
         ${l.liveUrl ? `<p style="margin-top:12px">Live at <a href="${esc(l.liveUrl)}" target="_blank" rel="noopener">${esc(l.liveUrl.replace("https://", ""))}</a></p>` : ""}
-      </section>
-      ${ready && work && l.salesStatus !== "live" ? `<section class="card"><h2>🎨 Design</h2>
+      </section>`;
+    C.design = `${ready && work && l.salesStatus !== "live" ? `<section class="card"><h2>🎨 Design</h2>
         <p class="small muted">Now: ${esc(lookName)}</p>
         <div class="btns btns--full"><button class="btn btn--primary" type="button" data-act="restyle">Try another design</button><button class="btn" type="button" data-act="restructure">Same colors, new structure</button></div>
         ${(l.dnaRecipes || []).length ? `<p class="small" style="margin:12px 0 6px"><strong>Or pick a style</strong> (keeps the colors)</p><div class="row" style="flex-wrap:wrap;gap:6px">${l.dnaRecipes.map((x) => `<button class="btn btn--small" type="button" data-recipe="${esc(x.id)}" title="${esc(x.about)}">${esc(x.name)}</button>`).join("")}</div>` : ""}
         <label class="field small" style="margin-top:12px">Colors &amp; fonts<select data-look>${l.looks.map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>
         <p class="small muted" style="margin:8px 0 0">Every part (layout, opening, buttons, services…) can be set by hand in <a href="#/edit/${l.id}">Edit → Design</a>.</p>
-      </section>` : ""}
-      <section class="card"><h2>Calls &amp; notes</h2>
+      </section>` : ""}`;
+    C.notes = `<section class="card"><h2>Calls &amp; notes</h2>
         ${l.followUp && open ? `<div class="row" style="margin-bottom:8px">${followChip(l.followUp)}<button class="linkbtn" data-act="clearfollow" style="flex:none">Clear</button></div>` : ""}
         ${notesHtml(l, 0, true)}
-      </section>
-      </div><div>
-      ${ready ? signupCardHtml(l) + referralCardHtml(l) : ""}
-      ${l.salesStatus === "live" && work ? liveCardHtml(l) : ""}
-      ${(l.salesStatus === "live" || l.salesStatus === "sold") && work && ready ? gbpCardHtml(l) : ""}
-      ${l.salesStatus === "live" || l.salesStatus === "sold" ? `<section class="card"><h2>🛒 Extras</h2><p class="small muted">Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${meta.checkout && meta.checkout.online ? " online" : ""}. Good for 30 days.</p>
-        <div class="btns btns--full"><button class="btn" type="button" data-extraslink>💬 Text “Buy extras” link</button></div></section>` : ""}
-      ${l.salesStatus === "live" || l.salesStatus === "sold" ? reviewAskHtml() : ""}
-      ${(l.salesStatus === "live" || l.salesStatus === "sold") && work ? `<section class="card"><h2>💳 Billing</h2><p class="small muted">Their Stripe billing portal: update the card, see invoices, change or cancel the subscription.</p>
-        <div class="btns btns--full"><button class="btn" type="button" data-act="portal">Open billing portal</button></div></section>` : ""}
-      <div id="logslot-side">${l.salesStatus !== "live" ? logCardHtml(l) : ""}</div>
-      ${ready && work ? `<section class="card"><h2>${blockers.length ? "Before you can publish" : "Ready to publish"}</h2>
-        ${blockers.length ? `<ul class="list small">${blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul><p class="small muted">Fill these in from Edit.</p>` : `<p class="muted">Everything's confirmed. Publishing puts the site on the internet.</p>`}
-        ${(lint.suggestions || []).length ? `<h3 style="margin-top:12px">Good to add (talking points)</h3><ul class="list small">${lint.suggestions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      </section>`;
+    C.signup = ready ? signupCardHtml(l) : "";
+    C.referral = referralCardHtml(l);
+    C.live = l.salesStatus === "live" && work ? liveCardHtml(l) : "";
+    C.gbp = (l.salesStatus === "live" || l.salesStatus === "sold") && work && ready ? gbpCardHtml(l) : "";
+    C.extras = `${l.salesStatus === "live" || l.salesStatus === "sold" ? `<section class="card"><h2>🛒 Extras</h2><p class="small muted">Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${meta.checkout && meta.checkout.online ? " online" : ""}. Good for 30 days.</p>
+        <div class="btns btns--full"><button class="btn" type="button" data-extraslink>💬 Text “Buy extras” link</button></div></section>` : ""}`;
+    C.review = l.salesStatus === "live" || l.salesStatus === "sold" ? reviewAskHtml() : "";
+    C.billing = `${(l.salesStatus === "live" || l.salesStatus === "sold") && work ? `<section class="card"><h2>💳 Billing</h2><p class="small muted">Their Stripe billing portal: update the card, see invoices, change or cancel the subscription.</p>
+        <div class="btns btns--full"><button class="btn" type="button" data-act="portal">Open billing portal</button></div></section>` : ""}`;
+    C.log = `<div id="logslot-side">${l.salesStatus !== "live" ? logCardHtml(l) : ""}</div>`;
+    C.publish = ready && work ? `<section class="card" id="publishcard"><h2>${items.length ? `🚀 Finish &amp; publish · ${items.length} to fix` : "🚀 Ready to publish"}</h2>
+        ${items.length ? `<ol class="checklist">${items.map((it) => `<li><a href="#/edit/${l.id}/${esc(it.card)}">${esc(it.text)}</a><span class="small muted"> → Edit · ${esc(CARD_NAME[it.card] || it.card)}</span></li>`).join("")}</ol><p class="small muted">Each line opens the right card in Edit. Publish unlocks when the list is empty.</p>` : `<p class="muted">Everything's confirmed. Publishing puts the site on the internet.</p>`}
+        ${(lint.suggestions || []).length ? `<details class="more"><summary>Good to add (talking points, ${lint.suggestions.length})</summary><ul class="list small">${lint.suggestions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>` : ""}
         <div class="btns btns--full">
-          <button class="btn btn--good" data-act="publish"${blockers.length ? " disabled" : ""}>${l.liveUrl ? "Republish changes" : "Publish to Cloudflare"}</button>
-          <button class="btn" data-act="zip"${blockers.length ? " disabled" : ""}>Download zip</button>
-        </div></section>` : ""}
-      ${l.payTest ? `<section class="card" style="border:2px solid #fca311"><h2>🎓 Practice lead</h2>
+          <button class="btn btn--good" data-act="publish"${items.length ? " disabled" : ""}>${l.liveUrl ? "Republish changes" : "Publish to Cloudflare"}</button>
+          <button class="btn" data-act="zip"${items.length ? " disabled" : ""}>Download zip</button>
+        </div></section>` : "";
+    C.practice = `${l.payTest ? `<section class="card" style="border:2px solid #fca311"><h2>🎓 Practice lead</h2>
         <p class="small">This is the training aid, not a real business. Take it from New to Live the way you would a real sale: every payment on it is <strong>$1</strong>, it never expires, and it never counts in Sales. The full run-through is the last lesson in Training.</p>
-        ${owner ? `<p class="small">When a trainee is done: <button class="btn btn--small" type="button" data-practice-reset>🔁 Reset for the next run</button> <span class="muted">refunds their $1, clears the sign-ups, call log and tasks, takes down anything published, forgets board links and photos, and puts fresh sample items back.</span></p>` : `<p class="small muted">When you're done, the owner resets it for the next person.</p>`}</section>` : ""}
-      ${ready ? `<section class="card"><h2>📋 ${esc(l.boardName || "Stock board")}</h2>
+        ${owner ? `<p class="small">When a trainee is done: <button class="btn btn--small" type="button" data-practice-reset>🔁 Reset for the next run</button> <span class="muted">refunds their $1, clears the sign-ups, call log and tasks, takes down anything published, forgets board links and photos, and puts fresh sample items back.</span></p>` : `<p class="small muted">When you're done, the owner resets it for the next person.</p>`}</section>` : ""}`;
+    C.board = `${ready ? `<section class="card"><h2>📋 ${esc(l.boardName || "Stock board")}</h2>
         <p class="muted small">Their own page for what's in each tank, case, bench or shelf: name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it. Set "What's on it" in Edit → Live price list.</p>
         <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their ${esc((l.boardName || "Stock board").toLowerCase())} link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the ${esc(l.boardName || "Stock board")} page</button>${work ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
         ${work ? `<p class="small" style="margin-top:8px">${l.sampleStock ? `🧪 <strong>Sample items are on the price list</strong> (preview only; publishing is blocked until they go). ` : `Showing it to someone interested? Fill the preview's price page, board and tablet with made-up stock for their kind of business. `}<button class="btn btn--small" type="button" data-samplestock="${l.sampleStock ? "remove" : "add"}">${l.sampleStock ? "Remove sample items" : "🧪 Add sample items (preview only)"}</button></p>` : ""}
-        <p class="muted small">A tablet beside a tank, case or shelf shows it live and lets staff update it (the 📺 link on each one in the board). Sell it as the <strong>Price list</strong> plan when they don't want a whole website.</p></section>` : ""}
-      ${work ? `<section class="card"><h2>More</h2><div class="btns">
+        <p class="muted small">A tablet beside a tank, case or shelf shows it live and lets staff update it (the 📺 link on each one in the board). Sell it as the <strong>Price list</strong> plan when they don't want a whole website.</p></section>` : ""}`;
+    C.more = `${work ? `<section class="card"><h2>More</h2><div class="btns">
         ${ready ? `<button class="btn btn--small" data-act="rewrite">Rewrite text with AI</button>` : ""}
         ${owner && l.salesStatus !== "live" ? `<button class="btn btn--small btn--danger" data-act="delete">Delete lead</button>` : ""}
-      </div></section>` : ""}</div></div>`;
+      </div></section>` : ""}`;
+    const stage = l.salesStatus === "live" ? "live" : l.salesStatus === "sold" ? "sold" : l.salesStatus === "not_interested" ? "closed" : "open";
+    const LAYOUT = {
+      open:   { left: ["head", "step", "practice", "logtop", "website", "status", "notes"], right: ["signup", "log"], more: ["design", "board", "referral", "more"] },
+      sold:   { left: ["head", "step", "practice", "client", "logtop", "publish", "website", "notes"], right: ["signup", "log"], more: ["status", "design", "referral", "gbp", "extras", "review", "billing", "board", "more"] },
+      live:   { left: ["head", "step", "practice", "client", "live", "website", "notes"], right: ["review", "extras", "billing", "gbp"], more: ["signup", "referral", "board", "publish", "more"] },
+      closed: { left: ["head", "step", "practice", "logtop", "status", "website", "notes"], right: ["log"], more: ["signup", "design", "board", "referral", "more"] },
+    }[stage];
+    C.logtop = `<div id="logslot-top"></div>`;
+    const pick = (keys) => keys.map((k) => C[k] || "").join("");
+    const moreHtml = pick(LAYOUT.more).trim();
+    $app.innerHTML = `<p><a href="#/">← Leads</a></p>
+      <div class="split"><div>${pick(LAYOUT.left)}</div><div>${pick(LAYOUT.right)}
+      ${moreHtml ? `<details class="more-cards" id="morecards"><summary>More on this lead</summary>${moreHtml}</details>` : ""}</div></div>`;
     const reload = () => viewLead(id);
     bindLog(l, reload);
     bindNotes(l, reload);
@@ -1017,7 +1111,7 @@
       try { await api(`/leads/${id}/edits`, { method: "PUT", json: { look: `${lookSel.value}~${l.layout || "classic"}~${code}` } }); toast("Colors changed"); viewLead(id); }
       catch (e) { lookSel.disabled = false; throw e; }
     });
-    if (owner) act("retry", async () => { await api(`/leads/${id}/retry`, { method: "POST" }); toast("Rebuilding…"); setTimeout(() => viewLead(id), 1500); });
+    if (work) act("retry", async () => { await api(`/leads/${id}/retry`, { method: "POST" }); toast("Rebuilding…"); setTimeout(() => viewLead(id), 1500); });
     act("rewrite", async () => {
       if (!confirm("Write new text with AI? Your text edits will be replaced. Facts, photos and menu stay.")) return;
       await api(`/leads/${id}/rewrite`, { method: "POST" });
@@ -1047,6 +1141,19 @@
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     });
+    // The next-step button (and #/lead/<id>/<route> from Home's queue): act on the right card, opening "More" if it's in there.
+    const reveal = (el) => { if (!el) return false; const d = el.closest("details"); if (d) d.open = true; el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.add("is-jump"); setTimeout(() => el.classList.remove("is-jump"), 2500); return true; };
+    const doStep = (route) => {
+      if (route === "pay") { const card = document.getElementById("signupcard"); reveal(card); const tap = card && card.querySelector("[data-tap]"); if (tap) tap.click(); else if (card && !card.querySelector(".signed")) toast("Sign them up first; payment comes right after the signature."); else toast("Tap to Pay needs the Android app; here, tick “Payment is set up” once they've paid, or text them the sign-up link again."); }
+      else if (route === "text") { const f = $app.querySelector("[data-share] + p + details"); if (f) { f.open = true; reveal(f); } else reveal($app.querySelector("[data-share]")) || reveal(document.getElementById("signupcard")); }
+      else if (route === "checklist") reveal(document.getElementById("publishcard"));
+      else if (route === "publish") { const b = $app.querySelector("[data-act=publish]"); if (b && !b.disabled) b.click(); else reveal(document.getElementById("publishcard")); }
+      else if (route === "review") { const b = $app.querySelector("[data-askreview]"); if (b) { reveal(b.closest("section")); b.click(); } else toast(isOwner() ? "Add the Google review link in Settings first." : "The owner hasn't added the review link yet."); }
+      else if (route === "retry") { const b = $app.querySelector("[data-act=retry]"); if (b) b.click(); }
+      else if (route === "log") reveal(document.getElementById("logcard"));
+    };
+    $app.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => doStep(b.dataset.step)));
+    if (intent) { history.replaceState(null, "", `#/lead/${id}`); lastHash = `#/lead/${id}`; setTimeout(() => doStep(intent), 150); }
     if (l.status === "queued" || l.status === "building") pollTimer = setTimeout(() => location.hash === `#/lead/${id}` && viewLead(id), 5000);
   }
 
@@ -1192,7 +1299,24 @@
     }
   }
 
-  async function viewEdit(id) {
+  /** Edit card heading → editform card id, so a checklist line (#/edit/<id>/<card>) can open the right card. */
+  const EDIT_CARD_ID = { "Confirm with the owner": "confirm", "Design": "design", "Facts (only if the owner says so)": "facts", "Links": "links", "Text": "text", "Menu": "menu", "Services": "services", "Services & area": "services", "Customer quotes": "quotes", "Photo": "photo", "Photo gallery": "gallery", "Spanish page": "es", "We're hiring": "hiring", "Events & specials": "events", "Awards & proof": "proof", "Closures, parking & payment": "visit", "Auto parts details": "parts", "Auto shop details": "auto", "Church & nonprofit details": "church", "Commercial cleaning details": "cleaning", "What's included": "cleaning", "Contractor details": "contractor", "Lawn & landscape details": "landscaping", "Live price list & QR labels": "pricelist", "Plans & pricing": "plans", "Print shop details": "print", "Restaurant details": "restaurant", "Shop details": "retail", "Tax & finance details": "finance", "Salon details": "salon", "Massage details": "salon", "Grooming details": "salon", "Their current website": "site" };
+  function tagEditCards(jumpTo) {
+    $app.querySelectorAll("section.card").forEach((card) => {
+      const h = card.querySelector(":scope > h2");
+      const label = h ? h.textContent.trim() : "";
+      const id = EDIT_CARD_ID[label] || (card.querySelector('[name="approved"]') ? "approved" : "");
+      if (id) card.dataset.card = id;
+    });
+    if (!jumpTo) return;
+    const card = $app.querySelector(`[data-card="${jumpTo}"]`) || (jumpTo === "approved" && $app.querySelector('[name="approved"]') && $app.querySelector('[name="approved"]').closest("section"));
+    if (!card) return;
+    const d = card.closest("details") || card.querySelector(":scope > details");
+    if (d) d.open = true;
+    setTimeout(() => { card.scrollIntoView({ behavior: "smooth", block: "start" }); card.classList.add("is-jump"); setTimeout(() => card.classList.remove("is-jump"), 3000); }, 60);
+  }
+
+  async function viewEdit(id, jumpTo) {
     setNav("home");
     const my = renderSeq;
     const l = await api("/leads/" + id);
@@ -1502,6 +1626,7 @@
         go("#/lead/" + id);
       } catch (err) { toast(err.message); } finally { btn.disabled = false; }
     });
+    tagEditCards(jumpTo);
   }
 
   /* ---------- call guide ---------- */
@@ -1698,7 +1823,7 @@
       <section class="show__box"><h2>Ways to pay</h2><div class="show__ways">
         ${payWays(s, plans, church).map(([h, d]) => `<div><h3>${esc(h)}</h3><p>${d}</p></div>`).join("")}
       </div></section>
-      ${[["general", "Add-ons"], ["inventory", "Inventory add-ons"]].map(([g, h]) => { const list = (s.addons || []).filter((a) => addonGroup(a) === g); return list.length ? `<section class="show__box"><h2>${h}</h2>${g === "inventory" ? `<p class="show__fine" style="margin-top:0">For the live price list: with the ${esc((plans.find((p) => p.id === "list") || { name: "Price list" }).name)} plan or any website plan.</p>` : ""}<ul class="show__addons">${list.map((a) => `<li><span>${esc(a.name)}${a.about ? `<small>${esc(a.about)}</small>` : ""}</span><strong>${esc(addonPrice(a))}</strong></li>`).join("")}</ul></section>` : ""; }).join("")}
+      ${[["general", "Extras"], ["inventory", "Inventory add-ons"]].map(([g, h]) => { const list = (s.addons || []).filter((a) => addonGroup(a) === g); return list.length ? `<section class="show__box"><h2>${h}</h2>${g === "inventory" ? `<p class="show__fine" style="margin-top:0">For the live price list: with the ${esc((plans.find((p) => p.id === "list") || { name: "Price list" }).name)} plan or any website plan.</p>` : ""}<ul class="show__addons">${list.map((a) => `<li><span>${esc(a.name)}${a.about ? `<small>${esc(a.about)}</small>` : ""}</span><strong>${esc(addonPrice(a))}</strong></li>`).join("")}</ul></section>` : ""; }).join("")}
       <p class="show__fine">You see your website before you pay anything, and nothing goes live until you say so. Cancel with 30 days' notice${t.commits.length ? ` once your ${commitWords(t)} plan's months are up` : ""}.</p>
     </div>`;
     $app.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", async () => {
@@ -3011,7 +3136,6 @@
     if (stale(my)) return;
     const r = l.record;
     const phone = phoneDigits(l);
-    const copyBtn = (text, label = "Copy") => `<button class="btn btn--small" type="button" data-copytext="${esc(text)}">${label}</button>`;
     const render = (st) => {
       if (stale(my)) return;
       const done = GBP_CHECKS.filter(([k]) => st.checks[k]).length;
@@ -3085,6 +3209,7 @@
       bind();
     };
     const bind = () => {
+      $app.querySelectorAll("[data-copytext]").forEach((b) => b.dataset.bound = "1");
       $app.querySelectorAll("[data-copytext]").forEach((b) => b.addEventListener("click", async () => {
         try { await navigator.clipboard.writeText(b.dataset.copytext); toast("Copied"); } catch (e) { toast("Couldn't copy"); }
       }));
@@ -3300,6 +3425,8 @@
         <section class="card"><h2>This month</h2>${table(d.month)}</section>
         ${pipe ? `<section class="card"><h2>In the pipeline</h2><p class="bignum">${money(pipe.monthlyIfPlus ?? pipe.shown * plusPlan.monthly)}<span class="small muted"> / month if they all buy ${esc(plusPlan.name)}</span></p>
           <p class="small muted">${pipe.shown} lead${pipe.shown === 1 ? "" : "s"} shown × ${money(plusPlan.monthly)} (${esc(plusPlan.name)}).</p></section>` : ""}
+        ${(d.funnel || []).length ? `<section class="card funnel"><h2>From lead to live</h2><ol class="funnel__list">${d.funnel.map((st, i) => { const top = d.funnel[0].count || 1; return `<li><div class="row"><strong>${esc(st.label)}</strong><span>${st.count}${st.rate != null ? ` <span class="small muted">· ${Math.round(st.rate * 100)}% of the step before</span>` : ""}</span></div><div class="funnel__bar"><i style="width:${Math.max(2, Math.round((st.count / top) * 100))}%"></i></div>${st.medianDays != null ? `<p class="small muted" style="margin:2px 0 0">Typically ${st.medianDays < 1 ? "the same day" : `${st.medianDays} day${st.medianDays === 1 ? "" : "s"}`} after ${esc(d.funnel[i - 1].label.toLowerCase())}</p>` : ""}</li>`; }).join("")}</ol>
+          <p class="small muted" style="margin:8px 0 0">Every lead that ever reached each step, and the typical (median) time between steps. A big drop between two steps is where to look.</p></section>` : ""}
         ${lostTotal ? `<section class="card"><h2>Why they said no</h2><div class="chips">${LOST_REASONS.map(([k, t]) => (lost[k] ? `<span class="chip">${esc(t)} <strong>${lost[k]}</strong></span>` : "")).join("")}</div>
           <p class="small muted" style="margin:8px 0 0">From the reason picked when logging Not interested.</p></section>` : ""}
       </div>
@@ -3356,7 +3483,7 @@
         <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
       <section class="card"><h2>📖 Guides</h2>
         <p class="small muted">How to set up and sell what we offer, with the exact buttons to tap. Prices in the guides come from Settings.</p>
-        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/training">🎓 Training course</a></div></section>
+        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/training">🎓 Training course</a>${reportBtn()}</div></section>
       <section class="card"><h2>💵 Costs & usage</h2>
         <p class="small muted">Every outside service the app depends on: what it costs, what we've used this month, when it renews and what stops if it lapses. For whoever minds the bills.</p>
         <div class="btns btns--full"><a class="btn btn--primary" href="#/costs">💵 Open Costs & usage</a><a class="btn" href="#/guide/costs">📖 The guide</a></div></section>
@@ -3575,19 +3702,83 @@
     });
   }
 
+  /** Chips under the health strip that open a folded section of the business form (Plans & prices, Team sign-in…). */
+  function settingsJumpChips() {
+    const form = $app.querySelector("form#sf");
+    const heads = form ? [...form.querySelectorAll(":scope > h2")] : [];
+    const cards = [...$app.querySelectorAll("section.card > h2")];
+    const all = [...heads, ...cards];
+    if (!all.length) return;
+    const el = document.getElementById("health");
+    const nav = document.createElement("nav");
+    nav.className = "jump";
+    nav.setAttribute("aria-label", "Jump to a section");
+    nav.innerHTML = `<span class="small muted">Jump to:</span> ` + all.map((h, i) => `<button type="button" class="chip" data-jump="${i}">${esc(h.textContent.replace(/[▾▴]/g, "").trim())}</button>`).join(" ");
+    el.after(nav);
+    nav.querySelectorAll("[data-jump]").forEach((b) => b.addEventListener("click", () => openSettingsSection(all[Number(b.dataset.jump)])));
+  }
+  function openSettingsSection(h) {
+    if (!h) return;
+    const body = h.nextElementSibling;
+    if (body && body.hidden) h.click();
+    h.scrollIntoView({ behavior: "smooth", block: "start" });
+    const card = h.closest("section, form");
+    if (card) { card.classList.add("is-jump"); setTimeout(() => card.classList.remove("is-jump"), 2500); }
+  }
+  /** The health strip: every outside piece (Stripe, Tap to Pay, email, Google sign-in, alerts…) and what to do when one's off. */
+  async function loadHealth() {
+    const el = document.getElementById("health");
+    if (!el) return;
+    try {
+      const { items } = await api("/health");
+      if (!document.getElementById("health")) return;
+      const bad = items.filter((i) => i.state !== "ok").length;
+      const dot = (st) => `<span class="health__dot health__dot--${st}" aria-hidden="true"></span>`;
+      el.innerHTML = `<section class="card health"><h2>${bad ? `🔌 Connections · ${bad} to look at` : "🔌 Connections · all good"}</h2>
+        <ul class="health__list">${items.map((i) => `<li class="health__item health__item--${i.state}">${dot(i.state)}<div><strong>${esc(i.label)}</strong><span class="small muted"> · ${esc(i.detail)}</span>${i.state !== "ok" && i.section ? ` <button type="button" class="linkbtn small" data-health-section="${esc(i.section)}">Open ${esc(i.section)}</button>` : ""}</div></li>`).join("")}</ul>
+        <p class="small muted" style="margin:8px 0 0">Secrets (Stripe, email, search keys) are set with wrangler, not here. Green means connected and working; yellow works but something is missing; grey is off.</p></section>`;
+      el.querySelectorAll("[data-health-section]").forEach((b) => b.addEventListener("click", () => {
+        const want = b.dataset.healthSection.toLowerCase();
+        const h = [...$app.querySelectorAll("form#sf > h2, section.card > h2")].find((x) => x.textContent.toLowerCase().includes(want));
+        openSettingsSection(h);
+      }));
+    } catch (err) { el.innerHTML = `<p class="small muted">Couldn't check connections: ${esc(err.message)}</p>`; }
+  }
+  /** Problems the team reported with "Report this": screen, step, the error, the phone; Done hides them. */
+  async function loadProblems() {
+    const el = document.getElementById("problems");
+    if (!el) return;
+    try {
+      const { problems } = await api("/problems");
+      if (!document.getElementById("problems")) return;
+      const open = problems.filter((p) => p.status === "open");
+      if (!problems.length) { el.innerHTML = ""; return; }
+      const row = (p) => `<li class="${p.status === "done" ? "muted" : ""}"><div class="row"><strong>${esc(p.who || "Someone")}</strong> <span class="small muted">· ${esc(p.app)} · ${esc(p.screen || "")} · ${ago(p.at)}</span>${p.status === "open" ? `<button class="btn btn--small" type="button" data-problem-done="${esc(p.id)}" style="flex:none">Done</button>` : ""}</div>
+        <p class="small" style="margin:4px 0 0">${p.step ? `<strong>Doing:</strong> ${esc(p.step)}<br>` : ""}<strong>Error:</strong> ${esc(p.message)}${p.leadName ? ` · <a href="#/lead/${esc(p.leadId)}">${esc(p.leadName)}</a>` : ""}</p>
+        ${p.detail || p.device ? `<details class="more"><summary class="small">Details</summary><pre class="small" style="white-space:pre-wrap;word-break:break-word">${esc(p.device || "")}\n${esc(p.detail || "")}</pre></details>` : ""}</li>`;
+      el.innerHTML = `<section class="card"><h2>🐞 Problems reported${open.length ? ` · ${open.length} open` : ""}</h2>
+        <ul class="list">${open.map(row).join("")}</ul>
+        ${problems.length > open.length ? `<details class="more"><summary>Handled (${problems.length - open.length})</summary><ul class="list">${problems.filter((p) => p.status === "done").slice(0, 20).map(row).join("")}</ul></details>` : ""}</section>`;
+      el.querySelectorAll("[data-problem-done]").forEach((b) => b.addEventListener("click", async () => {
+        b.disabled = true;
+        try { await api(`/problems/${b.dataset.problemDone}/done`, { method: "POST" }); loadProblems(); } catch (err) { toast(err.message); b.disabled = false; }
+      }));
+    } catch (err) { el.innerHTML = ""; }
+  }
+
   async function viewSettings() {
     setNav("settings");
     const my = renderSeq;
     meta = await api("/meta");
     if (stale(my)) return;
     if (!isOwner()) {
-      $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}</div>`;
+      $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}<section class="card"><h2>Help</h2><div class="btns btns--full"><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a>${reportBtn()}</div><p class="small muted">Something didn't work? Report it and the owner sees the screen, the step and the error.</p></section></div>`;
       return bindDevice();
     }
     const [{ last30Days: u }, { callers }] = await Promise.all([api("/usage"), api("/callers")]);
     if (stale(my)) return;
     const s = meta.settings;
-    $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">
+    $app.innerHTML = `<h1>Settings</h1><div id="health"><p class="small muted"><span class="spin"></span> Checking what's connected…</p></div><div id="problems"></div><div class="grid grid--2">
       <form id="sf" class="card settings-form"><h2>Your business</h2>
         <label class="field">Company name <span class="hint">What clients see</span><input name="companyName" value="${esc(s.companyName || "")}" placeholder="e.g. Underground Associates"></label>
         <label class="field">Legal name <span class="hint">Who signs client agreements</span><input name="legalName" value="${esc(s.legalName || "")}" placeholder="e.g. Underground Associates LLC"></label>
@@ -3686,6 +3877,9 @@
       ${deviceCard()}
     </div>`;
     collapsibleSections();
+    settingsJumpChips();
+    loadHealth();
+    loadProblems();
     bindCallers();
     bindDevice();
     $app.querySelector("#resetterms").addEventListener("click", () => {
@@ -3779,7 +3973,7 @@
   }
 
   /* ---------- notifications ---------- */
-  const NOTIF_ICON = { costs: "💵", note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎", preview_open: "👀", task: "📝" };
+  const NOTIF_ICON = { problem: "🐞", costs: "💵", note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎", preview_open: "👀", task: "📝" };
 
   async function refreshNotifCount() {
     try {
@@ -4011,7 +4205,7 @@
   async function viewNotifications() {
     setNav("notifications");
     const my = renderSeq;
-    const data = await api("/notifications");
+    const [data, prefs] = await Promise.all([api("/notifications"), api("/notifications/prefs").catch(() => null)]);
     const ps = await pushState().catch(() => ({ supported: false }));
     if (stale(my)) return;
     const on = ps.supported && ps.permission === "granted" && ps.sub;
@@ -4026,12 +4220,18 @@
       return `${head}<li class="notif${i.unread ? " notif--new" : ""}">${href ? `<a href="${href}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
     }).join("");
     $app.innerHTML = `<h1>Notifications</h1>
+      ${prefs ? `<section class="card"><h2>What you get alerted about</h2><div class="checks">${prefs.modes.map((m) => `<label class="check"><input type="radio" name="alertmode" value="${esc(m.id)}"${prefs.mode === m.id ? " checked" : ""}> <strong>${esc(m.label)}</strong> <span class="small muted">${esc(m.about)}</span></label>`).join("")}</div>
+        <p class="small muted" style="margin:6px 0 0">Applies to this list, the badge and phone alerts, on the web and in the Android app.</p></section>` : ""}
       <section class="card"><h2>Phone notifications</h2>
         ${!ps.supported ? `<p class="small muted">This browser can't show phone notifications. Use the installed app or Chrome on Android.</p>`
           : on ? `<p class="small">✅ On for this phone. You'll get a notification whenever someone else adds or changes something on a lead.</p><div class="btns"><button class="btn btn--small" id="ptest">Send a test</button><button class="btn btn--small" id="poff">Turn off on this phone</button></div>`
           : `<p class="small muted">Get a notification on this phone when a prospect opens their preview, someone adds a note, logs a call, sets a callback, makes a sale${isOwner() ? ", a client signs up, or a website gets a message" : " or a client signs up"}.</p><button class="btn btn--primary" id="pon">🔔 Turn on phone notifications</button>`}
       </section>
-      <ul class="list notifs">${rows || `<li class="muted">Nothing yet. When someone else adds a note, logs a call, sets a callback, makes a sale, or a client signs up, it shows here.</li>`}</ul>`;
+      <ul class="list notifs">${rows || `<li class="muted">Nothing yet. When someone else adds a note, logs a call, sets a callback, makes a sale, or a client signs up, it shows here.</li>`}</ul>
+      <p class="small muted">Something in the app didn't work? ${reportBtn("🐞 Report a problem")}</p>`;
+    $app.querySelectorAll('input[name="alertmode"]').forEach((r) => r.addEventListener("change", async () => {
+      try { await api("/notifications/prefs", { method: "PUT", json: { mode: r.value } }); toast("Saved"); refreshNotifCount(); } catch (err) { toast(err.message); }
+    }));
     const pon = $app.querySelector("#pon");
     if (pon) pon.addEventListener("click", async () => { pon.disabled = true; try { await turnOnPush(); toast("Phone notifications are on"); viewNotifications(); } catch (err) { toast(err.message); pon.disabled = false; } });
     const ptest = $app.querySelector("#ptest");
@@ -4083,8 +4283,8 @@
       if (h === "#/login") return await viewLogin();
       meta = meta || (await api("/meta"));
       if (!isOwner() && (h === "#/inbox" || h === "#/sales" || h === "#/costs")) return go("#/");
-      if ((m = /^#\/lead\/([a-z0-9]+)$/.exec(h))) return await viewLead(m[1]);
-      if ((m = /^#\/edit\/([a-z0-9]+)$/.exec(h))) return await viewEdit(m[1]);
+      if ((m = /^#\/lead\/([a-z0-9]+)(?:\/(text|pay|checklist|publish|review|retry|log))?$/.exec(h))) return await viewLead(m[1], m[2]);
+      if ((m = /^#\/edit\/([a-z0-9]+)(?:\/([a-z]+))?$/.exec(h))) return await viewEdit(m[1], m[2]);
       if ((m = /^#\/preview\/([a-z0-9]+)$/.exec(h))) return await viewPreview(m[1]);
       if ((m = /^#\/full\/([a-z0-9]+)(?:\/(es))?$/.exec(h))) return viewFull(m[1], m[2]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
@@ -4108,7 +4308,7 @@
       return await viewHome();
     } catch (err) {
       if (err.status !== 401) {
-        $app.innerHTML = `<div class="card offline"><p>${esc(err.message)}</p><button class="btn btn--primary" id="reload">Try again</button></div>`;
+        $app.innerHTML = `<div class="card offline"><p>${esc(err.message)}</p><div class="btns"><button class="btn btn--primary" id="reload">Try again</button>${reportBtn("🐞 Report this")}</div></div>`;
         $app.querySelector("#reload").addEventListener("click", () => render());
       }
     }
