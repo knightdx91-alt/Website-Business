@@ -3527,7 +3527,8 @@
 
   function callersCard(callers) {
     return `<section class="card"><h2>Team</h2>
-      <p class="small muted"><strong>Callers</strong> can see leads, previews and call guides, text preview links, log calls and set callbacks. They can't run searches, edit or publish sites, delete leads, or see settings, spending or the inbox.<br><strong>Full access</strong> can do everything you can, under their own name.</p>
+      <p class="small muted"><strong>Callers</strong> work leads end to end: calls, previews, edits, sign-ups, payments, publishing. <strong>Full access</strong> adds Settings, runs, Sales, Inbox and Costs.</p>
+      <p class="small">Everyone signs in at <strong>https://app.undergroundassociates.com</strong> (laptop or any phone browser; add it to the home screen), or installs the Android app from Settings → Android app.</p>
       <ul class="list">${callers.length ? callers.map((c) => `<li><div class="row"><strong>${esc(c.name)}</strong><span class="chip${c.admin ? " chip--good" : ""}" style="flex:none">${c.admin ? "Full access" : "Caller"}</span>${c.disabled ? `<span class="chip" style="flex:none">Turned off</span>` : ""}</div>
         <p class="small muted" style="margin:2px 0 0">${c.email ? `✉️ ${esc(c.email)}${c.googleOnly ? " · Google sign-in only" : ""}` : "No Google address yet"}</p>
         <div class="btns" style="margin-top:6px">

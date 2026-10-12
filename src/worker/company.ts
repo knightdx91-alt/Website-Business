@@ -2236,7 +2236,7 @@ async function portfolio(env: Env): Promise<Response> {
 function footer(legal: string, s: AppSettings): string {
   return `<footer class="ftr"><div class="wrap">
 <p class="ftr__name">${e(legal)} · ${MARKET_TOWN}, Alabama${s.companyPhone ? ` · <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : ""}${s.companyEmail ? ` · <a href="mailto:${e(s.companyEmail)}">${e(s.companyEmail)}</a>` : ""}</p>
-<nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/price-list">Live price list</a><a href="/portfolio">Our work</a><a href="/about">About</a><a href="/cullman-county">Where we work</a><a href="/extras">Clients: add extras</a><a href="/terms">Terms &amp; refunds</a><a href="/privacy">Privacy</a>${s.companyFacebookUrl ? `<a href="${e(s.companyFacebookUrl)}" rel="noopener">Facebook</a>` : ""}${s.companyReviewUrl ? `<a href="${e(s.companyReviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</nav>
+<nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/price-list">Live price list</a><a href="/portfolio">Our work</a><a href="/about">About</a><a href="/cullman-county">Where we work</a><a href="/extras">Clients: add extras</a><a href="/terms">Terms &amp; refunds</a><a href="/privacy">Privacy</a><a href="https://app.undergroundassociates.com/" rel="nofollow">Team sign-in</a>${s.companyFacebookUrl ? `<a href="${e(s.companyFacebookUrl)}" rel="noopener">Facebook</a>` : ""}${s.companyReviewUrl ? `<a href="${e(s.companyReviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</nav>
 <p class="small">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)}</p>
 </div></footer>`;
 }

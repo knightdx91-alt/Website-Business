@@ -38,6 +38,7 @@ const LESSONS: Lesson[] = [
     why: "Every call and visit comes down to one sentence. Know it cold before you learn any screen.",
     steps: [
       "We build a website for a local business that doesn't have one, before we ever talk to them. They see it finished, not a mock-up.",
+      "Where you work: the app at app.undergroundassociates.com (a laptop or any phone browser; add it to the home screen) or the Android app (Settings → Android app). Same leads, same buttons.",
       "They pay a monthly plan that covers hosting, updates and fixes: {basic}, {plus} or {pro}. Most pick {plusName}. No setup fee on a 6- or 12-month plan.",
       'The line: "We already built your website. Want to see it? If you like it, it\'s live this week, from {fromMonthly}."',
       'Say prices the way the bill arrives: per month. "{plus}", not "a few dollars a day". Per-day math sounds like a trick and makes people do arithmetic instead of listening.',

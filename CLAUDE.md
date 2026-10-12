@@ -104,7 +104,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
 - [x] Site generator core + restaurant and contractor packs (`src/generator`), Places
       search/qualify (`src/places`), Claude copy writer (`src/copy`). Tested on real
       Cullman leads: 19 restaurant and 16 contractor leads found.
-- [x] Cloudflare app: live at https://website-business.knightdx91.workers.dev
+- [x] Cloudflare app: live at https://app.undergroundassociates.com (also https://website-business.knightdx91.workers.dev)
       (Worker API + queue pipeline, D1/R2 storage, phone PWA, Pages publish, form inbox)
 - [x] Packs for salons, auto, landscaping, cleaning (now 25 looks per category, all AA-checked).
       Real Cullman leads found: 14 salon, 20 auto, 11 landscaping, 6 cleaning.
@@ -124,7 +124,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       website-business.knightdx91.workers.dev address keeps working. `APP_ORIGIN` (board links), the task calendar link and the
       Android `BASE_URL` point at it. Owner's step: add https://app.undergroundassociates.com as an authorized JavaScript origin on
       the Google **Web** OAuth client (Cloud project 322487745515), or the Google sign-in button fails there. The team re-adds the
-      home-screen app and turns web alerts on again at the new address (push subscriptions are per origin).
+      home-screen app and turns web alerts on again at the new address (push subscriptions are per origin). Named in: the
+      company site footer ("Team sign-in", nofollow), Settings → Team (web + Android 2.51), training lesson 1 and the glossary guide.
+      Stripe's webhook endpoint stays on the workers.dev address (it works on both).
 - [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for
       Google Business Profile API once a client's profile is managed (then build step 2). LLC is Underground Associates LLC
 - [x] Plans & answers screen for callers; 7 page layouts; print/sign and retail packs; more search groups
@@ -375,8 +377,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   now says so after ~9 s instead of staying blank). `requireGoogle` (Settings checkbox "Turn passwords off") makes `/auth/login` refuse
   passwords; the owner's password login keeps working until then (and `/auth/setup` always). Team rows take an email
   (`POST/PUT /api/callers` `email`; add form: email and/or password). Owner's one-time Google Cloud setup: OAuth consent
-  screen (Internal, Workspace) → credentials: a **Web application** client (authorized JavaScript origin
-  https://website-business.knightdx91.workers.dev; paste its ID into Settings) and an **Android** client (package
+  screen (Internal, Workspace) → credentials: a **Web application** client (authorized JavaScript origins
+  https://app.undergroundassociates.com and https://website-business.knightdx91.workers.dev; paste its ID into Settings) and an **Android** client (package
   `com.knightdx91.websitebusiness`, the signing SHA-1 above; no ID to paste). The owner's Google address goes in Settings →
   "Owner's Google address" (the owner session still needs `owner_password` set, which it is). `test/worker/google.test.ts`.
   Done Oct 2026 (Cloud project 322487745515): Web client `…-39uoftmq9b43htr4k6thsebt0k7pded6` is in Settings (`googleClientId`);

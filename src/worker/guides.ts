@@ -692,6 +692,7 @@ export function wordsGuide(s: AppSettings): Guide {
           "Caller: a team member who works leads end to end (calls, previews, sign-ups, payments, publishing) but can't change Settings or prices.",
           "Ask for: the person at the business to ask for, and the best time to catch them. Typed on the lead page.",
           "Alerts (the bell): what other people did on leads. Settings → Alerts lets you choose Everything, My leads or Important only.",
+          "The app: app.undergroundassociates.com in any browser (add it to the home screen), or the Android app. The old workers.dev address still works.",
         ],
       },
     ],

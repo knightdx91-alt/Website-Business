@@ -981,7 +981,8 @@ private fun TeamCard(
     var newPassword by remember { mutableStateOf("") }
     var newAdmin by remember { mutableStateOf(false) }
     CollapsibleCard("Team") {
-        Hint("Callers can see leads, previews and call guides, text preview links, log calls and set callbacks. They can't run searches, edit or publish sites, delete leads, or see settings, spending or the inbox.\nFull access can do everything you can, under their own name.")
+        Hint("Callers work leads end to end: calls, previews, edits, sign-ups, payments, publishing. Full access adds Settings, runs, Sales, Inbox and Costs.")
+        Hint("Everyone signs in at https://app.undergroundassociates.com (laptop or any phone browser), or installs this app from Settings → Android app.", Modifier.padding(top = 6.dp))
         if (callers.isEmpty()) Hint("No callers yet.", Modifier.padding(top = 8.dp))
         callers.forEach { c ->
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
