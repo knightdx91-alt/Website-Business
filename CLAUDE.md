@@ -896,6 +896,21 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   address (`visitExtras()`); salons also put the pay list in the trust row. `links.giftCards` → `giftcard` action (restaurant order row,
   retail What's new, salon closing band). Edit: "Awards & proof" and "Closures, parking & payment" cards; Links → Gift cards link.
   Shared helpers: `factList()` (`.facts` dl), `tiles()` (`.tiles` photo tiles), `FormField.type: "date"`.
+- 🔄 Import from their Google page (Oct 2026, owner's ask; Android 2.54): a lead-header button next to "Re-check website" (web
+  `data-act="googleimport"`, Android `LeadScreen` + `Api.googleImport`) = `POST /api/leads/:id/googleimport` (owner + callers; 409
+  on the practice lead or before the first build; 502 "Couldn't read their Google page" when Places fails): one Place Details call
+  (`BASE_FIELDS` + `RESTAURANT_FLAGS` for restaurants + `GOOGLE_IMPORT_FIELDS` paymentOptions / parkingOptions /
+  accessibilityOptions, same price tier as the reviews we already fetch), `refreshFromPlace(record, place)` in
+  `src/worker/google-import.ts` updates phone and hours (never when the owner confirmed them), rating / count, `typeLabel`,
+  restaurant service options (merged), `visit.paymentMethods` ("Credit cards", "Debit cards", "Tap to pay", or just "Cash only")
+  and `visit.parking` when the owner left them blank, and a Facebook / Instagram link Google carries as the website; stamps
+  `record.googleImportedAt` (`detail().googleImportedAt`, web shows "Refreshed from their Google page <date>"); then `place_json`,
+  the `rating` / `review_count` columns and `fetched_at` are updated, `pitch_json` cleared, `rewrite = 1` + a build, so the copy
+  follows Google's newest summary and reviews and the Google hero is the newest photo (`heroFromPlace` only replaces a Google
+  hero). Returns `{changed: [words]}` for the toast and the alert. Google photos are still never stored or re-hosted (Places
+  terms); the owner's own photos come through "Import their website" or the Edit uploads. `test/worker/google-import.test.ts`.
+  Local check: run wrangler dev with `--var GOOGLE_PLACES_API_KEY:"$GOOGLE_PLACES_API_KEY"` (the `.dev.vars` key is a placeholder);
+  the rebuild then fails on the placeholder Claude key, which is fine for checking the import itself.
 - Kind of business (Oct 2026, owner's call on Barbee Truck Sales, a car dealer built as a food truck): Edit → "Kind of business"
   (web card with "🔁 Rebuild as this kind", `data-eact="rekind"`, `EDIT_CARD_ID` `kind`; editform card `kind` with select `category`
   from `KIND_OPTIONS`, so Android's Edit has it with no app build: a saved value different from the lead's category rebuilds after the

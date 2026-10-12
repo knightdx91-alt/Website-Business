@@ -51,7 +51,7 @@ const FLAG_KEYS = [
   "outdoorSeating", "liveMusic", "menuForChildren", "goodForGroups", "allowsDogs",
 ] as const;
 
-function restaurantExt(p: Place): RestaurantExt {
+export function restaurantExt(p: Place): RestaurantExt {
   const so: RestaurantExt["serviceOptions"] = {};
   for (const k of FLAG_KEYS) if (typeof p[k] === "boolean") so[k] = p[k] as boolean;
   const access = p.accessibilityOptions as { wheelchairAccessibleEntrance?: boolean } | undefined;

@@ -241,3 +241,5 @@ suspend fun Api.refund(signupId: String, chargeId: String, amountCents: Long, ca
 
 /** "Re-check website" (owner): one web search for a page Google's listing doesn't show. {found, label, foundUrl}. */
 suspend fun Api.webcheck(id: String): JSONObject = postJson("/leads/$id/webcheck")
+/** Import from their Google page: the listing's latest facts + a rewrite. Returns {changed: [..]}. */
+suspend fun Api.googleImport(id: String): JSONObject = postJson("/leads/$id/googleimport")

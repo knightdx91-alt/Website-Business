@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { restaurantVariant } from "../src/generator/packs/restaurant.ts";
-import { guessCategory, isDealerName } from "../src/places/qualify.ts";
-import { placeToRecord } from "../src/places/to-record.ts";
-import { carryOver } from "../src/worker/pipeline.ts";
-import { restaurantRecord } from "./fixtures.ts";
-import type { Place } from "../src/places/client.ts";
+import { restaurantVariant } from "../../src/generator/packs/restaurant.ts";
+import { guessCategory, isDealerName } from "../../src/places/qualify.ts";
+import { placeToRecord } from "../../src/places/to-record.ts";
+import { carryOver } from "../../src/worker/pipeline.ts";
+import { restaurantRecord } from "../fixtures.ts";
+import type { Place } from "../../src/places/client.ts";
 
 const place = (name: string, primaryType: string, types: string[] = [primaryType]): Place =>
   ({ id: "x", displayName: { text: name }, primaryType, types, formattedAddress: "1 Main St, Cullman, AL 35055", addressComponents: [], location: { latitude: 34.17, longitude: -86.84 }, nationalPhoneNumber: "(256) 555-0100", internationalPhoneNumber: "+1 256-555-0100" }) as unknown as Place;

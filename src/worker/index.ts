@@ -21,6 +21,7 @@ import { designId, LOOKS, parseDesign } from "../generator/themes.ts";
 import { menuToText } from "../generator/menu.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import { packFor } from "../generator/packs/index.ts";
+import { GOOGLE_IMPORT_FIELDS, refreshFromPlace } from "./google-import.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import {
   groupById,
@@ -173,8 +174,7 @@ import {
   updateLead,
   type LeadRow,
   type RunRow,
-  promoRules,
-} from "./db.ts";
+  promoRules, isPayTest } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
 import {
   HttpError,
@@ -568,6 +568,7 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
           : null;
       })(),
     siteImport: record?.siteImport ?? null,
+    googleImportedAt: record?.googleImportedAt ?? null,
     existingSite: record?.existingSite
       ? {
           url: record.existingSite.url,
@@ -2863,6 +2864,37 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         });
       }
       return json({ ok: true });
+    }
+    // "Import from their Google page": the listing's latest hours, phone, rating, type, payment / parking info and social
+    // link into the record (never over what the owner confirmed), then a rewrite so the words follow Google's newest
+    // summary and reviews and the main photo is the newest Google photo. Costs one Place Details call + the copy.
+    if (action === "/googleimport" && m === "POST") {
+      if (isPayTest(lead)) throw new HttpError(409, "The practice lead has no Google page");
+      if (!lead.record_json) throw new HttpError(409, "This site hasn't been built yet");
+      const place = await getPlace(
+        env.GOOGLE_PLACES_API_KEY,
+        lead.place_id,
+        [...(lead.category === "restaurant" ? RESTAURANT_FLAGS : []), ...GOOGLE_IMPORT_FIELDS],
+      ).catch((e: unknown) => {
+        throw new HttpError(502, `Couldn't read their Google page: ${e instanceof Error ? e.message : String(e)}`);
+      });
+      await addUsage(env, { places: 1 });
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      const changed = refreshFromPlace(record, place);
+      await updateLead(env, id, {
+        place_json: JSON.stringify(place),
+        record_json: JSON.stringify(record),
+        rating: place.rating ?? lead.rating,
+        review_count: place.userRatingCount ?? lead.review_count,
+        fetched_at: now(),
+        pitch_json: null,
+        rewrite: 1,
+        status: "queued",
+        error: null,
+      });
+      await env.JOBS.send({ type: "build", leadId: id });
+      await siteUpdated(env, session, lead, [`refreshed from their Google page${changed.length ? ` (${changed.join(", ")})` : ""}: rewriting`]);
+      return json({ ok: true, changed });
     }
     // "Re-check website": run the web-presence search for this lead now (owner). Updates the card when a page is found.
     if (action === "/webcheck" && m === "POST") {

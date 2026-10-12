@@ -33,6 +33,8 @@ export interface Place {
   photos?: PlacePhoto[];
   priceLevel?: string;
   editorialSummary?: { text: string };
+  paymentOptions?: { acceptsCreditCards?: boolean; acceptsDebitCards?: boolean; acceptsCashOnly?: boolean; acceptsNfc?: boolean };
+  parkingOptions?: Record<string, boolean | undefined>;
   reviews?: Array<{ text?: { text: string }; rating?: number }>;
   [flag: string]: unknown;
 }

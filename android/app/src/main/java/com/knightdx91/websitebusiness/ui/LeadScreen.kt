@@ -101,6 +101,7 @@ import com.knightdx91.websitebusiness.net.publish
 import com.knightdx91.websitebusiness.net.removeDomain
 import com.knightdx91.websitebusiness.net.restyle
 import com.knightdx91.websitebusiness.net.webcheck
+import com.knightdx91.websitebusiness.net.googleImport
 import com.knightdx91.websitebusiness.net.retryBuild
 import com.knightdx91.websitebusiness.net.rewrite
 import com.knightdx91.websitebusiness.net.setLook
@@ -383,6 +384,11 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                         Text(listOfNotNull(detail.detail.variantLabel ?: categoryLabel(l.category), l.reason).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
                         l.foundUrl?.let { url -> Text("🔗 Found page: ${l.foundHost ?: url} (not linked from their Google listing)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }) }
                         if (canWork && l.salesStatus != "live") TextButton(onClick = { act("webcheck") { val r = state.api.webcheck(id); context.toast(if (r.optBoolean("found")) "Found: ${r.optString("label")}" else "Nothing found beyond their Google listing"); load() } }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text(if (busy == "webcheck") "Searching the web…" else "🔎 Re-check website") }
+                        if (canWork && l.salesStatus != "live") TextButton(onClick = { act("googleimport") {
+                            val r = state.api.googleImport(id); val ch = r.optJSONArray("changed")
+                            val words = (0 until (ch?.length() ?: 0)).joinToString(", ") { ch!!.getString(it) }
+                            context.toast(if (words.isNotEmpty()) "Updated: $words. Rewriting…" else "Nothing new on Google. Rewriting with the latest summary…"); delay(1_500); load()
+                        } }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text(if (busy == "googleimport") "Reading their Google page…" else "🔄 Import from their Google page") }
                         if (canWork && detail.website != null && l.salesStatus != "live") TextButton(onClick = { importSite = true }, enabled = busy == null, contentPadding = PaddingValues(0.dp)) { Text("⬇️ Import their website (text + photos)") }
                         if (canWork && detail.existingSiteLine != null && l.salesStatus != "live") TextButton(onClick = {
                             ask = Ask("Not their website", "Remove the text and photos taken from that page, forget the page, and rewrite the site? The Google photo comes back as the main photo.", "Remove", danger = true) {
