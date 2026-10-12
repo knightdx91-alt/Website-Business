@@ -144,9 +144,11 @@ private class PlanForm(val id: String, name: String, setup: String, monthly: Str
     val legend get() = when (id) { "basic" -> "Plan 1"; "plus" -> "Plan 2 (recommended)"; else -> "Plan 3" }
 }
 
-private class AddonForm(name: String, price: String, unit: String, about: String, terms: String, group: String = "general") {
+private class AddonForm(name: String, price: String, unit: String, about: String, terms: String, group: String = "general", founderPick: Boolean = false) {
     val key = nextRowKey++
     var group by mutableStateOf(group)
+    /** Founding customers may pick this extra free (one-time / each extras only). */
+    var founderPick by mutableStateOf(founderPick)
     var name by mutableStateOf(name)
     var price by mutableStateOf(price)
     var unit by mutableStateOf(unit)
@@ -197,6 +199,10 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
     var interestRate by mutableStateOf(numText(s, "interestRate", "8"))
     var reinstatementFee by mutableStateOf(numText(s, "reinstatementFee", "49"))
     var returnedPaymentFee by mutableStateOf(numText(s, "returnedPaymentFee", "15"))
+    var founderSlots by mutableStateOf(numText(s, "founderSlots", "5"))
+    var referralMonths by mutableStateOf(numText(s, "referralMonths", "2"))
+    var referralMaxPerYear by mutableStateOf(numText(s, "referralMaxPerYear", "2"))
+    var referralMinMonths by mutableStateOf(numText(s, "referralMinMonths", "6"))
     val addons: SnapshotStateList<AddonForm> = mutableStateListOf()
     var dailyCalls by mutableStateOf(numText(s, "dailyCalls", ""))
     var commission by mutableStateOf(numText(s, "commission", ""))
@@ -216,7 +222,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         }
         // Existing extras show their own terms, else the standard terms for that extra (the web textarea does the same, so saving keeps them).
         s.optJSONArray("addons").objects().forEachIndexed { i, a ->
-            addons.add(AddonForm(a.txt("name"), numText(a, "price", ""), a.str("unit") ?: "one-time", a.txt("about"), a.str("terms") ?: extraTerms.getOrNull(i) ?: "", a.str("group") ?: (if (INVENTORY_EXTRA.containsMatchIn(a.txt("name"))) "inventory" else "general")))
+            addons.add(AddonForm(a.txt("name"), numText(a, "price", ""), a.str("unit") ?: "one-time", a.txt("about"), a.str("terms") ?: extraTerms.getOrNull(i) ?: "", a.str("group") ?: (if (INVENTORY_EXTRA.containsMatchIn(a.txt("name"))) "inventory" else "general"), a.optBoolean("founderPick")))
         }
     }
 
@@ -282,6 +288,10 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         putNum("interestRate", interestRate, "Interest on overdue balances")
         putNum("reinstatementFee", reinstatementFee, "Reinstatement fee")
         putNum("returnedPaymentFee", returnedPaymentFee, "Returned payment / dispute fee")
+        putNum("founderSlots", founderSlots, "Founding-customer spots")
+        putNum("referralMonths", referralMonths, "Referral: months free")
+        putNum("referralMaxPerYear", referralMaxPerYear, "Referral: max per year")
+        putNum("referralMinMonths", referralMinMonths, "Referral: minimum plan")
         b.put("invoiceForAll", invoiceForAll)
         putNum("annualMonthsFree", annualMonthsFree, "Yearly: months free")
         putNum("churchAnnualMonthsFree", churchAnnualMonthsFree, "Churches & nonprofits: yearly months free")
@@ -294,6 +304,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
             if (a.about.isNotBlank()) o.put("about", a.about.trim())
             if (a.terms.isNotBlank()) o.put("terms", a.terms.trim())
             o.put("group", a.group)
+            if (a.founderPick) o.put("founderPick", true)
             addonsArr.put(o)
         }
         b.put("addons", addonsArr)
@@ -784,6 +795,11 @@ private fun FeesCard(f: SettingsForm) {
         Field(f.interestRate, { f.interestRate = it }, "Interest on overdue balances (% a year)", hint = "After 30 days overdue · Alabama allows up to 8 in a written contract · 0 = none", keyboard = KeyboardType.Decimal)
         Field(f.reinstatementFee, { f.reinstatementFee = it }, "Reinstatement fee (\$)", hint = "To put a site back online after non-payment · 0 = none", keyboard = KeyboardType.Decimal)
         Field(f.returnedPaymentFee, { f.returnedPaymentFee = it }, "Returned payment / dispute fee (\$)", hint = "A bank debit that bounces or a charge they dispute · 0 = none", keyboard = KeyboardType.Decimal)
+        SubHead("🎁 Discounts")
+        Field(f.founderSlots, { f.founderSlots = it }, "Founding-customer spots", hint = "The first N paying clients pick one extra free (tick 🎁 Founder pick on the extras) · 0 = off", keyboard = KeyboardType.Number)
+        Field(f.referralMonths, { f.referralMonths = it }, "Referral: months free", hint = "Per business a client refers, once its first payment is in · 0 = program off", keyboard = KeyboardType.Number)
+        Field(f.referralMaxPerYear, { f.referralMaxPerYear = it }, "Referral: max per year", hint = "Credits that count in each year of their service; the rest bank for later years", keyboard = KeyboardType.Number)
+        Field(f.referralMinMonths, { f.referralMinMonths = it }, "Referral: minimum plan (months)", hint = "6 = the 6- or 12-month plan or yearly; month to month never counts", keyboard = KeyboardType.Number)
         SubHead("Team goals & commission")
         Field(f.dailyCalls, { f.dailyCalls = it }, "Daily call goal per person", hint = "Shows as a progress bar on the Today card. 0 = off", keyboard = KeyboardType.Number)
         Field(f.commission, { f.commission = it }, "Commission per sale (\$)", keyboard = KeyboardType.Decimal)
@@ -841,6 +857,7 @@ private fun ExtrasCard(f: SettingsForm) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
                 FilterChip(selected = a.group != "inventory", onClick = { a.group = "general" }, label = { Text("Extras") })
                 FilterChip(selected = a.group == "inventory", onClick = { a.group = "inventory" }, label = { Text("Inventory add-on") })
+                FilterChip(selected = a.founderPick, onClick = { a.founderPick = !a.founderPick }, label = { Text("🎁 Founder pick") }, enabled = a.unit == "one-time" || a.unit == "each")
             }
             Field(a.about, { a.about = it }, "What they get", placeholder = "One sentence on what they get", caps = KeyboardCapitalization.Sentences)
             Row(verticalAlignment = Alignment.CenterVertically) {

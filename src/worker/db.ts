@@ -4,6 +4,8 @@ import { today } from "./env.ts";
 export interface LeadRow {
   id: string;
   place_id: string;
+  /** The client (lead id) who sent them, for the referral program. */
+  referred_by?: string | null;
   run_id: string | null;
   category: string;
   name: string | null;
@@ -135,9 +137,40 @@ export interface AddOn {
   terms?: string;
   /** "inventory" = part of the live price list system (listed together everywhere); unset = general, or guessed from the name. */
   group?: AddOnGroup;
+  /** One of the extras a founding customer (the first `founderSlots` clients) may pick free. One-time / each extras only. */
+  founderPick?: boolean;
 }
 
 export type AddOnGroup = "general" | "inventory";
+
+/** The two discount programs, with the owner's defaults (Oct 2026). 0 months or 0 slots turns a program off. */
+export function promoRules(s: Partial<AppSettings>): {
+  founderSlots: number;
+  referralMonths: number;
+  referralMaxPerYear: number;
+  referralMinMonths: number;
+} {
+  return {
+    founderSlots: s.founderSlots ?? 5,
+    referralMonths: s.referralMonths ?? 2,
+    referralMaxPerYear: s.referralMaxPerYear ?? 2,
+    referralMinMonths: s.referralMinMonths ?? 6,
+  };
+}
+
+/** The extras a founding customer may pick from (ticked in Settings → Extras; monthly and per-job extras can't be the free pick). */
+export function founderChoices(
+  s: Pick<AppSettings, "addons">,
+): Array<{ index: number; addon: AddOn }> {
+  return (s.addons ?? [])
+    .map((addon, index) => ({ index, addon }))
+    .filter(
+      ({ addon }) =>
+        addon.founderPick &&
+        addon.name &&
+        (addon.unit === "one-time" || addon.unit === "each"),
+    );
+}
 export const ADDON_GROUP_LABEL: Record<AddOnGroup, string> = {
   general: "Extras",
   inventory: "Inventory add-ons",
@@ -551,6 +584,13 @@ export interface AppSettings {
   reinstatementFee?: number;
   /** Fee for a bank debit that comes back unpaid or a card charge the bank disputes (0 = none). */
   returnedPaymentFee?: number;
+  /** Founding-customer bonus: the first N paying clients pick one free extra (see founderChoices). Default 5. */
+  founderSlots?: number;
+  /** Referral program: months free per qualifying referral (default 2), credited per year at most this many times
+   * (default 2; the rest bank for later years), when the referred business takes a plan of at least this many months (6). */
+  referralMonths?: number;
+  referralMaxPerYear?: number;
+  referralMinMonths?: number;
   /** Stripe publishable key (pk_live_…; not a secret) for the Android app's native card entry. */
   stripePublishableKey?: string;
   /** Firebase (Phone alerts): the public client values the Android app initialises with. All four or nothing. */

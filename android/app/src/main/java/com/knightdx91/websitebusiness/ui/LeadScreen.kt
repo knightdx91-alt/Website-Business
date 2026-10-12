@@ -63,6 +63,12 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavHostController
 import com.knightdx91.websitebusiness.AppState
 import com.knightdx91.websitebusiness.net.Api
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import com.knightdx91.websitebusiness.net.markReferralApplied
+import com.knightdx91.websitebusiness.net.setReferrer
+import com.knightdx91.websitebusiness.net.ReferralInfo
 import androidx.compose.material3.CardDefaults
 import com.knightdx91.websitebusiness.net.Lead
 import com.knightdx91.websitebusiness.net.Signup
@@ -140,6 +146,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
     var busy by remember { mutableStateOf<String?>(null) }
     var ask by remember { mutableStateOf<Ask?>(null) }
     var importSite by remember { mutableStateOf(false) }
+    var referrerPick by remember { mutableStateOf(false) }
     var editingContact by remember { mutableStateOf(false) }
     var contactDraft by remember { mutableStateOf("") }
     var bestTimeDraft by remember { mutableStateOf("") }
@@ -295,6 +302,10 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
         val open = l.salesStatus == "new" || l.salesStatus == "shown"
         val live = l.salesStatus == "live"
 
+        if (referrerPick) ReferrerPicker(state, excludeId = id, onClose = { referrerPick = false }) { chosen ->
+            referrerPick = false
+            act("referrer") { state.api.setReferrer(id, chosen); load() }
+        }
         if (importSite) detail?.website?.let { site ->
             SiteImportDialog(state.api, id, site) { changed -> importSite = false; if (changed) scope.launch { load() } }
         }
@@ -629,6 +640,15 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String) {
                 }
             }
 
+            // ---- referrals: who sent them, and the credits a client earned ----
+            detail.detail.referral?.let { r -> if (ready) item {
+                ReferralCard(r, l, isOwner, busy == null,
+                    onPick = { referrerPick = true },
+                    onClear = { act("referrer") { state.api.setReferrer(id, null); load() } },
+                    onApplied = { creditId -> act("refapplied") { state.api.markReferralApplied(creditId); context.toast("Marked applied"); load() } },
+                    onText = { context.sms(l.phone, r.inviteText) })
+            } }
+
             // ---- the practice lead (training aid) ----
             if (l.payTest) item {
                 Card(Modifier.fillMaxWidth(), border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)) {
@@ -961,8 +981,83 @@ private fun ClientCard(s: Signup, l: Lead) {
         Column(Modifier.padding(14.dp)) {
             Text("✅ Client · ${s.planName} plan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Good)
             Text(listOfNotNull(s.billingLabel, (if (s.dueCents > 0) "paid ${money(s.dueCents)} $how" else "paid $how"), "signed ${dateTime(s.createdAt)}").joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
+            s.founder?.let { Text("🎁 Founding customer: $it free with the plan.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
             renewLine?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
             Text(next, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
         }
     }
+}
+
+/** "🤝 Referrals": who sent this lead (any client), and for a client the credits they earned by referring others. */
+@Composable
+private fun ReferralCard(r: ReferralInfo, l: Lead, isOwner: Boolean, enabled: Boolean, onPick: () -> Unit, onClear: () -> Unit, onApplied: (String) -> Unit, onText: () -> Unit) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val client = l.salesStatus == "sold" || l.salesStatus == "live"
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            Text("🤝 Referrals", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Referred by: ${r.referredBy?.second ?: "nobody yet"}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onPick, enabled = enabled) { Text(if (r.referredBy != null) "Change" else "Add who sent them") }
+                if (r.referredBy != null) TextButton(onClick = onClear, enabled = enabled) { Text("Clear") }
+            }
+            Text(
+                if (r.referredBy != null) "When this plan's first payment goes through on a ${r.minMonths}- or 12-month plan, ${r.referredBy.second} gets ${r.months} months free."
+                else "A client who sends us a business gets ${r.months} months free once that business pays for a ${r.minMonths}- or 12-month plan (up to ${r.maxPerYear} a year; the rest bank for the next year).",
+                style = MaterialTheme.typography.bodySmall, color = muted,
+            )
+            if (client) {
+                Text("Credits they earned", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
+                if (r.credits.isEmpty()) Text("None yet. Tell them about it:", style = MaterialTheme.typography.bodySmall, color = muted)
+                r.credits.forEach { c ->
+                    val status = when (c.status) {
+                        "applied" -> "✅ applied" + (c.appliedAt?.let { " " + dateTime(it) } ?: "")
+                        "by_hand" -> "✋ apply by hand on their next invoice"
+                        else -> "🏦 banked for the next referral year"
+                    }
+                    Text("${c.referredName} · ${c.months} months · $status", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                    c.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = muted) }
+                    if (c.status == "by_hand" && isOwner) TextButton(onClick = { onApplied(c.id) }, enabled = enabled, contentPadding = PaddingValues(0.dp)) { Text("Mark applied") }
+                }
+                if (r.credits.isNotEmpty()) Text("${r.usedThisYear} of ${r.maxPerYear} used this referral year" + (r.nextYearAt?.let { "; the next year starts ${dateTime(it)}" } ?: "") + ".", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
+                OutlinedButton(onClick = onText, enabled = enabled, modifier = Modifier.padding(top = 6.dp)) { Text("💬 Text them about referrals") }
+            }
+        }
+    }
+}
+
+/** Pick the client who sent this lead: every Sold / Live lead, searchable. */
+@Composable
+private fun ReferrerPicker(state: AppState, excludeId: String, onClose: () -> Unit, onPick: (String) -> Unit) {
+    var rows by remember { mutableStateOf<List<Lead>?>(null) }
+    var q by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try {
+            val sold = state.api.leads(sales = "sold")
+            val live = state.api.leads(sales = "live")
+            rows = (sold + live).filter { it.id != excludeId && !it.payTest }.distinctBy { it.id }.sortedBy { it.name.lowercase() }
+        } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = e.message ?: "Couldn't load the clients" }
+    }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Which client sent them?") },
+        text = {
+            Column {
+                OutlinedTextField(q, { q = it }, label = { Text("Search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                val list = rows
+                when {
+                    error != null -> Text(error ?: "", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                    list == null -> Text("Loading…", modifier = Modifier.padding(top = 8.dp))
+                    list.isEmpty() -> Text("No clients yet (a referrer has to be Sold or Live).", modifier = Modifier.padding(top = 8.dp))
+                    else -> Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                        list.filter { q.isBlank() || it.name.contains(q, ignoreCase = true) }.forEach { c ->
+                            TextButton(onClick = { onPick(c.id) }, modifier = Modifier.fillMaxWidth()) { Text(c.name, modifier = Modifier.fillMaxWidth()) }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onClose) { Text("Cancel") } },
+    )
 }

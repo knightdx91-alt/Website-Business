@@ -1,3 +1,4 @@
+import { promoTerms } from "./referrals.ts";
 import type { PricedOrder } from "./checkout.ts";
 import {
   isListPlan,
@@ -218,6 +219,8 @@ export function contractText(
       );
     out.push("", "PAYMENT AUTHORIZATION", paymentAuthText(s));
     out.push("", "TIMING", TIMING_TEXT);
+    const promos = promoTerms(s, order.founder);
+    if (promos.length) out.push("", "PROMOTIONS", ...promos);
     const terms = serviceTerms(s);
     out.push("", "SERVICE AGREEMENT", terms.text);
     if (terms.also.length) out.push("", ALSO_HEADING, ...terms.also);
@@ -287,6 +290,9 @@ export function contractSectionsHtml(
     );
     parts.push(sec("Payment authorization", para(paymentAuthText(s))));
     parts.push(sec("Timing", para(TIMING_TEXT)));
+    // The founder line depends on what they pick, so the pop-up words it conditionally; the signed copy names the extra.
+    const promos = promoTerms(s, "the free extra listed in Your order (if one is)");
+    if (promos.length) parts.push(sec("Promotions", para(promos.join("\n"))));
     const terms = serviceTerms(s);
     parts.push(sec("Service agreement", para(terms.text)));
     if (terms.also.length)

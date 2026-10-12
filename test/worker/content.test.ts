@@ -39,13 +39,15 @@ test("plan copy (taglines, pitch, questions, every-plan list) matches app.js", (
 test("playbook objections match app.js, with the prices and terms from Settings filled in", () => {
   const s = { companyName: "Underground Associates", minMonths: 12, shortMonths: 6, flexSetup: 299, annualMonthsFree: 2 };
   const list = playbookObjections(s, SUGGESTED_PLANS);
-  assert.equal(list.length, 19);
+  assert.equal(list.length, 20);
   for (const [q, a] of list) {
     inAppJs("objection", q);
     // Static answers are in app.js verbatim; the dynamic ones are checked by their fixed sentences below.
-    if (!/\$|6-month|12 months|Underground/.test(a)) inAppJs("objection answer", a);
+    if (!/\$|6-month|12 months|Underground|referral/.test(a)) inAppJs("objection answer", a);
   }
   const by = (q: string) => list.find(([x]) => x.startsWith(q))![1];
+  assert.match(by("“Do you have a referral program?”"), /^Yes\. When a business you refer signs up for a 6- or 12-month plan .* you get 2 months of your plan free, up to 2 referrals a year/);
+  inAppJs("referral", "Just have them mention your business name when they sign up.");
   assert.equal(by("“It's too expensive.”"), "I hear you. Basic is $49 a month, with no setup fee on the 6- or 12-month plan. If it brings you one customer a month, it pays for itself. Want to start there? You can move up any time.");
   assert.equal(by("“I don't want a contract.”"), "No problem. There's a 6-month plan, same price and still no setup fee. Or go month to month: same monthly price, a one-time $299 setup fee, and cancel any time with 30 days' notice.");
   assert.match(by("“Is this a scam?”"), /^Fair question\. Underground Associates is a local company here in Cullman\. You can see your site/);
@@ -138,7 +140,7 @@ const settings = (over: Partial<AppSettings> = {}): AppSettings => ({
 test("GET /api/content carries every block the app needs, filled from Settings", () => {
   const c = appContent(settings());
   assert.equal(c.planTagline.plus, PLAN_TAGLINE.plus);
-  assert.equal(c.playbookObjections.length, 19);
+  assert.equal(c.playbookObjections.length, 20);
   assert.match(c.playbookObjections[2]![1], /Basic is \$49 a month/);
   assert.deepEqual(c.churchYearly, { free: 4, payFor: 8, plans: [{ name: "Basic", year: "$392" }, { name: "Plus", year: "$712" }, { name: "Pro", year: "$1192" }] });
   assert.equal(appContent(settings({ churchAnnualMonthsFree: 0 })).churchYearly, null);

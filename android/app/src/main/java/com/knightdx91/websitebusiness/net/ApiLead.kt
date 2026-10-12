@@ -183,6 +183,12 @@ suspend fun Api.publish(id: String): String = postJson("/leads/$id/publish").opt
 
 suspend fun Api.setPaid(id: String, signupId: String, paid: Boolean): JSONObject = postJson("/leads/$id/paid", JSONObject().put("signupId", signupId).put("paid", paid))
 
+/** Referral program: who sent this lead (a Sold / Live client's id), or null to clear it. */
+suspend fun Api.setReferrer(id: String, referrerId: String?): JSONObject = putJson("/leads/$id/referrer", JSONObject().put("leadId", referrerId ?: JSONObject.NULL))
+
+/** The owner applied a by-hand referral credit on the client's invoice. */
+suspend fun Api.markReferralApplied(creditId: String): JSONObject = postJson("/referrals/$creditId/applied")
+
 /** A 30-day "Buy extras" link for a sold/live client. */
 suspend fun Api.extrasLink(id: String): String = postJson("/leads/$id/extraslink").optString("url")
 

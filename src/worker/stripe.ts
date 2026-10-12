@@ -1,4 +1,5 @@
 import { notify } from "./notify.ts";
+import { onPlanPaid } from "./referrals.ts";
 import { getLead, updateLead } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
 import { completeTap } from "./tap.ts";
@@ -109,6 +110,9 @@ async function planPaid(
 ): Promise<void> {
   if (!leadId || leadId === "web") return;
   await updateLead(env, leadId, { follow_up: null });
+  await onPlanPaid(env, leadId).catch((err) =>
+    console.error("referral credit", err),
+  );
   await env.DB.prepare(
     "INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, 'Stripe', NULL, 'Paid through Stripe', ?)",
   )

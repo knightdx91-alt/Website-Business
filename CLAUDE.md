@@ -1041,6 +1041,28 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   finger leaves the box (Compose: `clipToBounds()` + `inBox` in `SignaturePad`, strokes drawn past the edge used to show outside it; web
   esign.ts: points outside the canvas rect end the stroke, a return starts a new one). (4) The service agreement's section 2 now says
   "(see the Timing section above)": the TIMING section sits before SERVICE AGREEMENT and readers looked for it below.
+- 🎁 Discount programs (Oct 2026, owner's rules; `src/worker/referrals.ts`, migration 0020 `leads.referred_by` + `referral_credits`;
+  Android 2.47). **Referrals:** a client who sends us a business gets `referralMonths` (2) months of their own plan free once the
+  referred business's first payment is in on a plan of ≥ `referralMinMonths` (6) months (standard / short / yearly; never month to
+  month or the Price list plan: `referralQualifies`). At most `referralMaxPerYear` (2) credits count per referral year (365-day
+  windows from the referrer's first paid sign-up, `creditYear`); the rest stay `banked` and the daily cron (`applyBankedReferrals`)
+  applies them when a year with room starts. A credit is a Stripe customer-balance credit of months × the referrer's monthly price
+  (`stripePost customers/<id>/balance_transactions`, idempotency `refcredit:<id>`), taken off their next invoices; a referrer with
+  no Stripe customer gets a `by_hand` credit the owner applies on the invoice and marks applied (`POST /api/referrals/:id/applied`).
+  Hooks: `onPlanPaid(env, leadId, signupId?)` from `activatePlan` (tap / card sheet), the webhook's `planPaid`, and the "Payment is
+  set up" tick. Who referred a lead: `PUT /api/leads/:id/referrer {leadId|null}` (owner + callers; only a Sold / Live client,
+  `setReferrer`), shown on the sign-up page ("Referred by X … they get 2 months free"), the native sign-up and the agreement.
+  `detail().referral` (`referralSummary`: referredBy, credits, usedThisYear, nextYearAt, inviteText) feeds the lead page's "🤝
+  Referrals" card (web `referralCardHtml`, Android `ReferralCard` + `ReferrerPicker`), with "💬 Text them about referrals"
+  (`referralInvite`). **Founding customers:** the first `founderSlots` (5) paying clients pick one free extra from the ones ticked
+  "🎁 Founder pick" in Settings → Extras (`AddOn.founderPick`, one-time / each only, `founderChoices`); `founderOffer()` counts
+  paying clients (plus unpaid picks under 7 days) for `slotsLeft`; the sign-up page (`pickerHtml` founder radios, form field
+  `founder`), the native sign-up (`FounderRow`, `createSignup(founder)`) and `/api/plans/options` (`founder`, `referredBy`) offer it
+  while spots are open; `priceSignup({founder})` adds a $0 "Free: X (founding customer)" line (filtered out of Stripe line items),
+  `PricedOrder.founder`, stored in `signups.extras_json.founder` (+ `referredBy`), shown on the Client card. Agreement: PROMOTIONS
+  section (`promoTerms`: founder bonus + referral terms), /terms "Referrals and new-customer offers", Plans & answers objection "Do
+  you have a referral program?". Settings → Sales → "🎁 Discounts" (web + Android): founderSlots, referralMonths, referralMaxPerYear,
+  referralMinMonths (0 months = program off). `test/worker/referrals.test.ts`.
 - ✅ Client card (Oct 2026, Android 2.45): the first paid sign-up puts a green "✅ Client · <plan> plan" card at the top of the lead page
   (web `clientCardHtml` in app.js, `.card--client`; Android `ClientCard` in LeadScreen.kt): way to pay, "paid $X by tap, in person /
   by card on the phone / online / by invoice / marked paid by hand" (`signupsFor` now returns `paidVia` + `subscription` =

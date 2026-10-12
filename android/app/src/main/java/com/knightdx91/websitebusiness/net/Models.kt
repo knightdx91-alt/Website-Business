@@ -156,9 +156,44 @@ data class Signup(
     val subscription: Boolean = false,
     val renewsCents: Long? = null,
     val renewsInterval: String? = null,
+    /** The extra a founding customer got free, when one was picked. */
+    val founder: String? = null,
 )
 
-data class LeadDetail(val lead: Lead, val notes: List<Note>, val signups: List<Signup>, val cadenceNext: String?, val variantLabel: String?) {
+data class ReferralCredit(val id: String, val referredName: String, val months: Int, val status: String, val appliedAt: Long?, val note: String?, val createdAt: Long)
+
+/** What the lead page shows about the referral program for one lead (as the referred business and as a referrer). */
+data class ReferralInfo(
+    val referredBy: Pair<String, String>?,
+    val months: Int,
+    val maxPerYear: Int,
+    val minMonths: Int,
+    val credits: List<ReferralCredit>,
+    val usedThisYear: Int,
+    val nextYearAt: Long?,
+    val inviteText: String,
+) {
+    companion object {
+        fun from(j: JSONObject?): ReferralInfo? {
+            if (j == null) return null
+            val by = j.optJSONObject("referredBy")
+            return ReferralInfo(
+                referredBy = by?.let { it.optString("id") to it.optString("name") },
+                months = j.optInt("months"),
+                maxPerYear = j.optInt("maxPerYear"),
+                minMonths = j.optInt("minMonths"),
+                credits = j.optJSONArray("credits").objects().map { c ->
+                    ReferralCredit(c.optString("id"), c.optJSONObject("referred")?.optString("name") ?: "", c.optInt("months"), c.optString("status"), if (c.isNull("appliedAt")) null else c.optLong("appliedAt"), c.str("note"), c.optLong("createdAt"))
+                },
+                usedThisYear = j.optInt("usedThisYear"),
+                nextYearAt = if (j.isNull("nextYearAt")) null else j.optLong("nextYearAt"),
+                inviteText = j.optString("inviteText"),
+            )
+        }
+    }
+}
+
+data class LeadDetail(val lead: Lead, val notes: List<Note>, val signups: List<Signup>, val cadenceNext: String?, val variantLabel: String?, val referral: ReferralInfo? = null) {
     companion object {
         fun from(j: JSONObject): LeadDetail {
             val notes = j.optJSONArray("notes").objects().map { Note(it.optString("id"), it.optString("author"), it.str("outcome"), it.optString("body"), it.optLong("createdAt")) }
@@ -184,10 +219,11 @@ data class LeadDetail(val lead: Lead, val notes: List<Note>, val signups: List<S
                     subscription = s.optBoolean("subscription"),
                     renewsCents = x?.optJSONObject("renews")?.optLong("amount"),
                     renewsInterval = x?.optJSONObject("renews")?.str("interval"),
+                    founder = x?.str("founder"),
                 )
             }
             val cadence = j.optJSONObject("cadence")
-            return LeadDetail(Lead.from(j), notes, signups, cadence?.str("next") ?: cadence?.str("label"), j.str("variantLabel"))
+            return LeadDetail(Lead.from(j), notes, signups, cadence?.str("next") ?: cadence?.str("label"), j.str("variantLabel"), ReferralInfo.from(j.optJSONObject("referral")))
         }
     }
 }

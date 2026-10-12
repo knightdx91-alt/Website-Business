@@ -24,6 +24,7 @@ import {
 import { HttpError, newId, now, type Env } from "./env.ts";
 import { z } from "zod";
 import { notify } from "./notify.ts";
+import { onPlanPaid } from "./referrals.ts";
 import type { Session } from "./auth.ts";
 
 /** The Android app's package; the page opens `intent://tap…;package=<this>` so Chrome hands off to it. */
@@ -675,6 +676,10 @@ async function activatePlan(
       row.id,
     )
     .run();
+  // Referral program: the business that sent them earns its credit now that the first payment is in.
+  await onPlanPaid(env, row.lead_id, row.id).catch((err) =>
+    console.error("referral credit", err),
+  );
   const renewText =
     subscription && recurring.length
       ? ` Renews ${recurring[0]!.interval === "year" ? "yearly" : "monthly"}${renewsOn ? ` from ${renewsOn}` : ""} on the same card.`
@@ -1120,3 +1125,6 @@ export async function refundSignup(
     message,
   };
 }
+
+/** The pinned-version Stripe POST, for the referral credits (customer balance transactions). */
+export { stripe as stripePost };

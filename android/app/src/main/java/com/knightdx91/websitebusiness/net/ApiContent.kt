@@ -120,6 +120,10 @@ data class PlanOffer(val id: String, val name: String, val monthly: Double, val 
 
 data class PayWay(val title: String, val detail: String)
 
+data class FounderChoice(val index: Int, val name: String, val price: String, val about: String)
+data class FounderOffer(val slotsLeft: Int, val total: Int, val choices: List<FounderChoice>)
+data class ReferredBy(val id: String, val name: String, val months: Int)
+
 data class PlanTerms(val min: Int, val short: Int, val commits: List<Int>, val commitWords: String, val flex: Double, val free: Int)
 
 data class AddonInfo(val name: String, val about: String, val price: String, val unit: String, /** The raw price in dollars (0 for "priced per job"). */ val amount: Double = 0.0, /** "inventory" = a piece of the live price list, listed under its own heading. */ val group: String = "general")
@@ -133,6 +137,10 @@ data class PlanOptions(
     val priceShort: String,
     val invoice: Boolean,
     val addons: List<AddonInfo>,
+    /** Founding-customer bonus while spots are open: the free extras to pick from. */
+    val founder: FounderOffer? = null,
+    /** The client who referred this lead (the sign-up shows them what the referrer earns). */
+    val referredBy: ReferredBy? = null,
 ) {
     /** The middle plan to lead with: Plus, else the one in the middle. */
     val middle: PlanOffer? get() = plans.firstOrNull { it.id == "plus" } ?: plans.getOrNull(plans.size / 2) ?: plans.firstOrNull()
@@ -161,6 +169,8 @@ data class PlanOptions(
                 payWays = j.optJSONArray("payWays").objects().map { PayWay(it.optString("title"), it.optString("detail")) },
                 priceShort = j.optString("priceShort", "it's a low monthly price"),
                 invoice = j.optBoolean("invoice"),
+                founder = j.optJSONObject("founder")?.let { f -> FounderOffer(f.optInt("slotsLeft"), f.optInt("total"), f.optJSONArray("choices").objects().map { c -> FounderChoice(c.optInt("index"), c.optString("name"), c.optString("price"), c.optString("about")) }) },
+                referredBy = j.optJSONObject("referredBy")?.let { r -> ReferredBy(r.optString("id"), r.optString("name"), r.optInt("months")) },
                 addons = j.optJSONArray("addons").objects().map { AddonInfo(it.optString("name"), it.optString("about"), it.optString("price"), it.optString("unit"), it.optDouble("amount", priceInText(it.optString("price"))), it.optString("group", "general")) },
             )
         }

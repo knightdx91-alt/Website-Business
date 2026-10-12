@@ -626,7 +626,51 @@
       : "Next: go over photos, hours and the to-dos with them, then Publish.";
     return `<section class="card card--client"><h2>✅ Client · ${esc(x.plan.name)} plan</h2>
       <p>${esc(x.plan.billingLabel || "")}${x.dueCents != null ? ` · paid ${money(x.dueCents / 100)} ${how}` : ` · paid ${how}`} · signed ${new Date(x.createdAt).toLocaleDateString()}</p>
+      ${x.extras && x.extras.founder ? `<p class="small">🎁 Founding customer: <strong>${esc(x.extras.founder)}</strong> free with the plan.</p>` : ""}
       ${renewLine ? `<p class="small">${renewLine}</p>` : ""}<p class="small">${next}</p></section>`;
+  }
+  /** Who sent this lead (any client can be the referrer) and, for a client, the credits they earned by referring others. */
+  function referralCardHtml(l) {
+    const r = l.referral;
+    if (!r) return "";
+    const client = l.salesStatus === "sold" || l.salesStatus === "live";
+    const phone = phoneDigits(l);
+    const status = (c) => c.status === "applied" ? `✅ applied${c.appliedAt ? " " + new Date(c.appliedAt).toLocaleDateString() : ""}` : c.status === "by_hand" ? "✋ apply by hand on their next invoice" : "🏦 banked for the next referral year";
+    return `<section class="card" id="referralcard"><h2>🤝 Referrals</h2>
+      <p class="small">Referred by: <strong>${r.referredBy ? esc(r.referredBy.name) : "nobody yet"}</strong> <button class="btn btn--small" type="button" data-ref-pick>${r.referredBy ? "Change" : "Add who sent them"}</button>${r.referredBy ? ` <button class="btn btn--small" type="button" data-ref-clear>Clear</button>` : ""}</p>
+      <div id="refpicker" hidden><label class="field">Which client sent them? <select data-ref-select><option value="">Loading…</option></select></label></div>
+      <p class="small muted">${r.referredBy ? `When this plan's first payment goes through on a ${r.minMonths}- or 12-month plan, ${esc(r.referredBy.name)} gets ${r.months} months free.` : `A client who sends us a business gets ${r.months} months free once that business pays for a ${r.minMonths}- or 12-month plan (up to ${r.maxPerYear} a year; the rest bank for the next year).`}</p>
+      ${client ? `<h3>Credits they earned</h3>${r.credits.length ? `<ul class="list small">${r.credits.map((c) => `<li>${esc(c.referred.name)} · ${c.months} months · ${status(c)}${c.status === "by_hand" && isOwner() ? ` <button class="btn btn--small" type="button" data-ref-applied="${esc(c.id)}">Mark applied</button>` : ""}${c.note ? `<br><span class="muted">${esc(c.note)}</span>` : ""}</li>`).join("")}</ul><p class="small muted">${r.usedThisYear} of ${r.maxPerYear} used this referral year${r.nextYearAt ? `; the next year starts ${new Date(r.nextYearAt).toLocaleDateString()}` : ""}.</p>` : `<p class="small muted">None yet. Tell them about it:</p>`}
+      <div class="btns btns--full"><a class="btn" href="sms:+1${phone}?body=${encodeURIComponent(r.inviteText)}">💬 Text them about referrals</a>${copyBtn(r.inviteText, "Copy")}</div>` : ""}
+    </section>`;
+  }
+  function bindReferral(l, after) {
+    const card = document.getElementById("referralcard");
+    if (!card) return;
+    const box = card.querySelector("#refpicker");
+    const sel = card.querySelector("[data-ref-select]");
+    const pick = card.querySelector("[data-ref-pick]");
+    if (pick) pick.addEventListener("click", async () => {
+      box.hidden = !box.hidden;
+      if (box.hidden || sel.dataset.loaded) return;
+      try {
+        const [a, b] = await Promise.all([api("/leads?sales=sold"), api("/leads?sales=live")]);
+        const rows = [...(a.leads || []), ...(b.leads || [])].filter((x) => x.id !== l.id && !x.payTest).sort((x, y) => (x.name || "").localeCompare(y.name || ""));
+        sel.innerHTML = `<option value="">Pick a client…</option>` + rows.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
+        sel.dataset.loaded = "1";
+      } catch (e) { toast(e.message); }
+    });
+    if (sel) sel.addEventListener("change", async () => {
+      if (!sel.value) return;
+      try { await api(`/leads/${l.id}/referrer`, { method: "PUT", json: { leadId: sel.value } }); toast("Saved"); after(); } catch (e) { toast(e.message); }
+    });
+    const clear = card.querySelector("[data-ref-clear]");
+    if (clear) clear.addEventListener("click", async () => {
+      try { await api(`/leads/${l.id}/referrer`, { method: "PUT", json: { leadId: null } }); after(); } catch (e) { toast(e.message); }
+    });
+    card.querySelectorAll("[data-ref-applied]").forEach((b) => b.addEventListener("click", async () => {
+      try { await api(`/referrals/${b.dataset.refApplied}/applied`, { method: "POST" }); toast("Marked applied"); after(); } catch (e) { toast(e.message); }
+    }));
   }
   function signupCardHtml(l) {
     const plans = meta.settings.plans || [];
@@ -877,7 +921,7 @@
         ${notesHtml(l, 0, true)}
       </section>
       </div><div>
-      ${ready ? signupCardHtml(l) : ""}
+      ${ready ? signupCardHtml(l) + referralCardHtml(l) : ""}
       ${l.salesStatus === "live" && work ? liveCardHtml(l) : ""}
       ${(l.salesStatus === "live" || l.salesStatus === "sold") && work && ready ? gbpCardHtml(l) : ""}
       ${l.salesStatus === "live" || l.salesStatus === "sold" ? `<section class="card"><h2>🛒 Extras</h2><p class="small muted">Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${meta.checkout && meta.checkout.online ? " online" : ""}. Good for 30 days.</p>
@@ -909,6 +953,7 @@
     bindLog(l, reload);
     bindNotes(l, reload);
     bindSignup(l, reload);
+    bindReferral(l, reload);
     bindContact(l);
     bindFlyer();
     if (l.salesStatus === "live" && owner) bindLive(l);
@@ -1797,6 +1842,8 @@
         "The monthly covers hosting, security, keeping it working on new phones, and your changes. You never get hit with a surprise bill to fix something. If you pay for the year, you get 2 months free."],
       ["“I'm not interested.”",
         `No problem at all. I built this one for you either way, so can I text you the link in case you change your mind? (If they say no, thank them and log “Not interested”. Never push past a second no.)`],
+      ["“Do you have a referral program?”",
+        `Yes. When a business you refer signs up for a ${s.referralMinMonths ?? 6}- or 12-month plan and their first payment goes through, you get ${s.referralMonths ?? 2} months of your plan free, up to ${s.referralMaxPerYear ?? 2} referrals a year; more than that carry over to the next year. Just have them mention your business name when they sign up.`],
     ];
   }
 
@@ -3589,6 +3636,11 @@
         <label class="field" style="flex:1 1 120px">Reinstatement fee ($) <span class="hint">To put a site back online after non-payment · 0 = none</span><input name="reinstatementFee" type="number" min="0" max="500" step="0.01" inputmode="decimal" value="${s.reinstatementFee ?? 49}"></label>
         <label class="check" style="flex:1 1 100%"><input type="checkbox" name="invoiceForAll"${s.invoiceForAll !== false ? " checked" : ""}> Offer “Pay by check or bank transfer (we'll send an invoice)” to every client, not only churches</label>
         <label class="field" style="flex:1 1 120px">Returned payment / dispute fee ($) <span class="hint">A bank debit that bounces or a charge they dispute · 0 = none</span><input name="returnedPaymentFee" type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${s.returnedPaymentFee ?? 15}"></label>
+        <h3 style="flex-basis:100%;margin:10px 0 0">🎁 Discounts</h3>
+        <label class="field" style="flex:1 1 120px">Founding-customer spots <span class="hint">The first N paying clients pick one extra free (tick "Founder pick" on the extras below) · 0 = off</span><input name="founderSlots" type="number" min="0" max="1000" inputmode="numeric" value="${s.founderSlots ?? 5}"></label>
+        <label class="field" style="flex:1 1 120px">Referral: months free <span class="hint">Per business a client refers, once its first payment is in · 0 = program off</span><input name="referralMonths" type="number" min="0" max="12" inputmode="numeric" value="${s.referralMonths ?? 2}"></label>
+        <label class="field" style="flex:1 1 120px">Referral: max per year <span class="hint">Credits that count in each year of their service; the rest bank for later years</span><input name="referralMaxPerYear" type="number" min="0" max="24" inputmode="numeric" value="${s.referralMaxPerYear ?? 2}"></label>
+        <label class="field" style="flex:1 1 120px">Referral: minimum plan (months) <span class="hint">The referred business must take a plan this long (6 = the 6- or 12-month plan or yearly; month to month never counts)</span><input name="referralMinMonths" type="number" min="1" max="24" inputmode="numeric" value="${s.referralMinMonths ?? 6}"></label>
       </div>
       <section class="card" style="margin-top:14px"><h2>📄 Preview the agreement</h2>
         <p class="small muted">See the exact agreement a client would sign with the numbers above. Uses what's saved, so tap Save first after changing anything.</p>
@@ -3602,11 +3654,12 @@
       <div class="row" style="flex-wrap:wrap">
         <label class="field" style="flex:1 1 120px">Churches &amp; nonprofits: yearly months free <span class="hint">4 = 12 months for the price of 8</span><input name="churchAnnualMonthsFree" type="number" min="0" max="6" inputmode="numeric" value="${s.churchAnnualMonthsFree ?? 4}"></label></div>
         <h2 style="margin-top:18px">Extras</h2>
-        <p class="small muted">Shown on the sign-up page, the website and in call guides. Leave a name blank to remove it. "Inventory add-ons" are listed together as the live price list's pieces.</p>
+        <p class="small muted">Shown on the sign-up page, the website and in call guides. Leave a name blank to remove it. "Inventory add-ons" are listed together as the live price list's pieces. "🎁 Founder pick" marks an extra the first clients may choose free (Discounts, above).</p>
         ${[...s.addons, { name: "", price: "", unit: "one-time" }].map((a, i) => `<div class="addon"><div class="row"><label class="field" style="flex:2"><span class="sr-only">Extra ${i + 1}</span><input name="addon_${i}_name" value="${esc(a.name)}" placeholder="New extra" maxlength="60"></label>
           <label class="field"><span class="sr-only">Price</span><input name="addon_${i}_price" type="number" min="0" inputmode="decimal" value="${a.price}" placeholder="$"></label>
           <label class="field"><span class="sr-only">Per</span><select name="addon_${i}_unit">${Object.entries(UNIT_LABEL).map(([k, v]) => `<option value="${k}"${a.unit === k ? " selected" : ""}>${k === "quote" ? "quote per job" : v.trim().replace("/", "per ")}</option>`).join("")}</select></label>
-          <label class="field"><span class="sr-only">Group</span><select name="addon_${i}_group" title="Where it is listed"><option value="general"${a.name && addonGroup(a) !== "inventory" ? " selected" : ""}>Extras</option><option value="inventory"${a.name && addonGroup(a) === "inventory" ? " selected" : ""}>Inventory add-ons</option></select></label></div>
+          <label class="field"><span class="sr-only">Group</span><select name="addon_${i}_group" title="Where it is listed"><option value="general"${a.name && addonGroup(a) !== "inventory" ? " selected" : ""}>Extras</option><option value="inventory"${a.name && addonGroup(a) === "inventory" ? " selected" : ""}>Inventory add-ons</option></select></label>
+          <label class="check" style="flex:1 1 150px" title="Founding customers pick one of the ticked extras free (one-time or per-item extras only)"><input type="checkbox" name="addon_${i}_founder"${a.founderPick ? " checked" : ""}> 🎁 Founder pick</label></div>
           <label class="field"><span class="sr-only">What they get</span><input name="addon_${i}_about" value="${esc(a.about || "")}" placeholder="One sentence on what they get" maxlength="200"></label>
           ${a.name ? `<details class="more"><summary>Contract terms for this extra</summary><label class="field"><span class="sr-only">Contract terms</span><textarea name="addon_${i}_terms" rows="4" maxlength="1500">${esc(a.terms || (meta.extraTerms || [])[i] || "")}</textarea></label><p class="small muted">Shown in the agreement customers sign when they pick this extra.</p></details>` : `<input type="hidden" name="addon_${i}_terms" value="">`}</div>`).join("")}
         <h2 style="margin-top:18px">Team goals &amp; commission</h2>
@@ -3650,7 +3703,7 @@
         const addons = [];
         for (let i = 0; f.elements[`addon_${i}_name`]; i++) {
           const name = v(`addon_${i}_name`);
-          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value, group: f.elements[`addon_${i}_group`] ? f.elements[`addon_${i}_group`].value : undefined, about: v(`addon_${i}_about`) || undefined, terms: v(`addon_${i}_terms`) || undefined });
+          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value, group: f.elements[`addon_${i}_group`] ? f.elements[`addon_${i}_group`].value : undefined, about: v(`addon_${i}_about`) || undefined, terms: v(`addon_${i}_terms`) || undefined, founderPick: f.elements[`addon_${i}_founder`] && f.elements[`addon_${i}_founder`].checked ? true : undefined });
         }
         if (plans.some((p) => !p.monthly)) return toast("Give every plan a monthly price");
         const terms = v("terms");
@@ -3698,6 +3751,10 @@
             interestRate: n(v("interestRate")),
             reinstatementFee: n(v("reinstatementFee")),
             returnedPaymentFee: n(v("returnedPaymentFee")),
+            founderSlots: n(v("founderSlots")),
+            referralMonths: n(v("referralMonths")),
+            referralMaxPerYear: n(v("referralMaxPerYear")),
+            referralMinMonths: n(v("referralMinMonths")),
             invoiceForAll: !!(f.elements.invoiceForAll && f.elements.invoiceForAll.checked),
             annualMonthsFree: n(v("annualMonthsFree")),
             churchAnnualMonthsFree: n(v("churchAnnualMonthsFree")),

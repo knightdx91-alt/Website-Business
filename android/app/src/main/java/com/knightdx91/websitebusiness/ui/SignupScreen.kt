@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import com.knightdx91.websitebusiness.net.FounderChoice
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -220,6 +221,8 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
     var moreExtras by remember { mutableStateOf(false) }
     val picks = rememberSaveable(saver = PICKS_SAVER) { mutableStateMapOf<Int, Int>() }
 
+    /** The free extra a founding customer picked (index into the extras), while spots are open. */
+    var founder by rememberSaveable { mutableStateOf<Int?>(null) }
     var business by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf("") }
     var title by rememberSaveable { mutableStateOf("") }
@@ -279,7 +282,7 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
             try {
                 val sig = withContext(Dispatchers.Default) { signaturePng(strokes.toList(), padSize.width, padSize.height) }
                 if (sig.length > 200_000) throw IllegalStateException("The signature image is too large; clear it and sign again")
-                val r = state.api.createSignup(leadId, p.id, billing, pickList, business.trim(), cleanName(name), title.trim(), email.trim(), sig)
+                val r = state.api.createSignup(leadId, p.id, billing, pickList, business.trim(), cleanName(name), title.trim(), email.trim(), sig, founder)
                 signed = r
                 agreementOpen = false
             } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't save the sign-up") } finally { signing = false }
@@ -485,6 +488,19 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
                         invExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
                     }
                 }
+                o.founder?.takeIf { it.slotsLeft > 0 && it.choices.isNotEmpty() }?.let { f -> item {
+                    SectionCard("🎁 Founding-customer bonus") {
+                        Text("You're one of our first ${f.total} clients: pick one of these free with your plan${if (f.slotsLeft <= 2) " (${f.slotsLeft} spot${if (f.slotsLeft == 1) "" else "s"} left)" else ""}.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        f.choices.forEach { c -> FounderRow(c, founder == c.index) { founder = if (founder == c.index) null else c.index } }
+                        Text(if (founder == null) "Nothing picked yet (that's fine)." else "Added free: ${f.choices.firstOrNull { it.index == founder }?.name ?: ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } }
+                o.referredBy?.let { r -> item {
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFEEF3FF))) {
+                        Text("🤝 Referred by ${r.name}. Once this plan's first payment goes through, they get ${r.months} month${if (r.months == 1) "" else "s"} free.", modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium)
+                    }
+                } }
                 item {
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Navy)) {
                         Column(Modifier.padding(16.dp)) {
@@ -565,6 +581,23 @@ private fun WayCard(label: String, detail: String, selected: Boolean, onClick: (
 }
 
 /** One extra: checkbox, name · price, the one-line description, and a quantity stepper for per-item extras. */
+@Composable
+private fun FounderRow(c: FounderChoice, on: Boolean, onClick: () -> Unit) {
+    Card(
+        Modifier.fillMaxWidth().padding(bottom = 8.dp).selectable(selected = on, role = Role.RadioButton, onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = if (on) Color(0xFFFFF7E6) else MaterialTheme.colorScheme.surface),
+        border = androidx.compose.foundation.BorderStroke(if (on) 2.dp else 1.dp, if (on) Orange else MaterialTheme.colorScheme.outline),
+    ) {
+        Row(Modifier.padding(start = 4.dp, end = 12.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.Top) {
+            RadioButton(selected = on, onClick = null, modifier = Modifier.padding(top = 4.dp))
+            Column(Modifier.weight(1f).padding(top = 10.dp, bottom = 6.dp)) {
+                Row { Text(c.name, fontWeight = FontWeight.Bold); Text(" · ${c.price} → free") }
+                if (c.about.isNotBlank()) Text(c.about, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
 @Composable
 private fun ExtraRow(a: AddonInfo, qty: Int?, onChange: (Int?) -> Unit) {
     val on = qty != null

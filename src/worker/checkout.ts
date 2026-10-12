@@ -9,6 +9,7 @@ import {
   type Billing,
   type BillingOption,
   type Plan,
+  founderChoices,
 } from "./db.ts";
 import { HttpError, type Env } from "./env.ts";
 
@@ -46,6 +47,8 @@ export interface PricedOrder {
   quotes: string[];
   /** They pay by check or bank transfer against an invoice we send; nothing is charged online. */
   invoice?: boolean;
+  /** The extra a founding customer picked free (its name), when one was. */
+  founder?: string;
 }
 
 const MAX_QTY = 20;
@@ -54,6 +57,12 @@ const MAX_QTY = 20;
 export const INVOICE_BILLING = "invoice";
 
 /** Reads extra picks from a form: x_<index> = "on" (and q_<index> = quantity for per-item extras). */
+/** The founding-customer pick from a form: founder=<extra index>, or nothing. */
+export function founderFromForm(form: FormData | null): number | null {
+  const v = String(form?.get("founder") ?? "").trim();
+  return /^\d{1,3}$/.test(v) ? Number(v) : null;
+}
+
 export function picksFromForm(form: FormData | null, addons: AddOn[]): Pick[] {
   const out: Pick[] = [];
   addons.forEach((a, i) => {
@@ -128,7 +137,12 @@ export function priceSignup(
   planId: string,
   billing: string,
   picks: Pick[],
-  opts: { category?: string; invoice?: boolean } = {},
+  opts: {
+    category?: string;
+    invoice?: boolean;
+    /** Index of the extra a founding customer picked free; ignored unless Settings marks it as a founder pick. */
+    founder?: number | null;
+  } = {},
 ): PricedOrder {
   const plan = s.plans.find((p) => p.id === planId);
   if (!plan) throw new HttpError(400, "That plan isn't available");
@@ -159,6 +173,20 @@ export function priceSignup(
     });
   const x = extraLines(s.addons, picks, interval);
   lines.push(...x.lines);
+  // Founding-customer bonus: one free extra, shown on the order at $0 (never sent to Stripe as a line).
+  const fp =
+    opts.founder != null && opts.founder >= 0
+      ? founderChoices(s).find((c) => c.index === opts.founder)?.addon
+      : undefined;
+  const freed = fp && !picks.some((pk) => pk.index === opts.founder);
+  if (fp && freed) {
+    lines.push({
+      name: `Free: ${fp.name} (founding customer)`,
+      amount: 0,
+      qty: 1,
+    });
+    x.extras.push({ name: fp.name, qty: 1, price: "free (founding customer)" });
+  }
   return {
     plan,
     option: option as BillingOption & { id: Billing },
@@ -167,6 +195,7 @@ export function priceSignup(
     extras: x.extras,
     quotes: x.quotes,
     ...(invoice ? { invoice: true } : {}),
+    ...(fp && freed ? { founder: fp.name } : {}),
   };
 }
 
@@ -226,7 +255,7 @@ export function checkoutParams(o: {
     ...(subscription
       ? { subscription_data: { metadata: o.metadata } }
       : { payment_intent_data: { metadata: o.metadata } }),
-    line_items: o.order.lines.map((l) => ({
+    line_items: o.order.lines.filter((l) => l.amount > 0).map((l) => ({
       quantity: l.qty,
       price_data: {
         currency: "usd",
@@ -303,6 +332,14 @@ export interface PickerOptions {
   category?: string;
   /** Offer "Pay by check or bank transfer (we'll send an invoice)" as a way to pay. */
   invoice?: boolean;
+  /** Founding-customer bonus still open: the free extras to pick from and how many spots are left. */
+  founder?: {
+    slotsLeft: number;
+    total: number;
+    choices: Array<{ index: number; name: string; price: string; about: string }>;
+  } | null;
+  /** The client who referred them (shown so they know the referrer earns the credit), with the program's numbers. */
+  referredBy?: { name: string; months: number } | null;
 }
 
 /**
@@ -400,7 +437,20 @@ ${o.showPlans === false ? `<input type="hidden" name="plan" value="${plan.id}" i
 ${invExtras && listFirst ? `<fieldset><legend>Inventory add-ons <span style="font-weight:400;color:#545b68">(optional)</span></legend>${invExtras}</fieldset>` : ""}
 ${topExtras || moreExtras ? `<fieldset><legend>Add extras <span style="font-weight:400;color:#545b68">(optional)</span></legend>${topExtras}${moreExtras ? `<details><summary>More extras</summary>${moreExtras}</details>` : ""}</fieldset>` : ""}
 ${invExtras && !listFirst ? `<fieldset><legend>Inventory add-ons <span style="font-weight:400;color:#545b68">(optional, for the live price list)</span></legend>${invExtras}</fieldset>` : ""}
-<div class="total" aria-live="polite"><span id="pk-today"></span><br><small id="pk-then"></small></div>
+${
+  o.founder && o.founder.slotsLeft > 0 && o.founder.choices.length
+    ? `<fieldset id="pk-founder"><legend>🎁 Founding-customer bonus</legend><p style="margin:0 0 8px;color:#545b68">You're one of our first ${o.founder.total} clients: pick one of these free with your plan${o.founder.slotsLeft <= 2 ? ` (${o.founder.slotsLeft} spot${o.founder.slotsLeft === 1 ? "" : "s"} left)` : ""}.</p>${o.founder.choices
+        .map(
+          (c) =>
+            `<label class="opt"><input type="radio" name="founder" value="${c.index}"><span><strong>${e(c.name)}</strong> · <s>${e(c.price)}</s> <b>free</b>${c.about ? `<small>${e(c.about)}</small>` : ""}</span></label>`,
+        )
+        .join("")}<label class="opt"><input type="radio" name="founder" value="" checked><span>No thanks</span></label></fieldset>`
+    : ""
+}${
+  o.referredBy
+    ? `<p class="pk-ref" style="margin:0 0 16px;padding:12px;border-radius:12px;background:#eef3ff;color:#16181d">🤝 Referred by <strong>${e(o.referredBy.name)}</strong>. Once your plan's first payment goes through, they get ${o.referredBy.months} month${o.referredBy.months === 1 ? "" : "s"} free. Thanks for coming through them.</p>`
+    : ""
+}<div class="total" aria-live="polite"><span id="pk-today"></span><br><small id="pk-then"></small></div>
 </div>
 <script>(function(){var d=${JSON.stringify(data).replace(/</g, "\\u003c")};var f=document.getElementById("pk").closest("form");
 function v(n){var x=f.querySelector('[name="'+n+'"]:checked:enabled')||f.querySelector('input[type=hidden][name="'+n+'"]');return x?x.value:""}

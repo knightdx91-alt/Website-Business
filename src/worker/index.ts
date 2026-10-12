@@ -80,6 +80,14 @@ import {
   removeSampleStock,
 } from "./sample-stock.ts";
 import { resetPracticeLead } from "./practice.ts";
+import {
+  applyBankedReferrals,
+  founderOffer,
+  markReferralApplied,
+  onPlanPaid,
+  referralSummary,
+  setReferrer,
+} from "./referrals.ts";
 import { serveDisplay, serveDisplayMeta, serveStation } from "./tablet.ts";
 import {
   addCaller,
@@ -155,6 +163,7 @@ import {
   updateLead,
   type LeadRow,
   type RunRow,
+  promoRules,
 } from "./db.ts";
 import { applyEdits, EditsSchema } from "./edits.ts";
 import {
@@ -877,6 +886,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     });
   }
   // Refunds from the app: what was charged, then refund part or all and optionally end the plan (owner only).
+  const creditMatch = /^\/referrals\/([a-z0-9]+)\/applied$/.exec(path);
+  if (creditMatch && m === "POST") {
+    ownerOnly();
+    return json(await markReferralApplied(env, creditMatch[1]!, session.name));
+  }
   const refundMatch = /^\/signups\/([a-z0-9]+)\/refund$/.exec(path);
   if (refundMatch) {
     ownerOnly();
@@ -1054,7 +1068,20 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     const leadId = url.searchParams.get("lead");
     const forLead = leadId ? await getLead(env, leadId) : null;
     if (leadId && !forLead) throw new HttpError(404, "Lead not found");
-    return json(plansOptions(settings, forLead?.category));
+    const referrer = forLead?.referred_by
+      ? await getLead(env, forLead.referred_by)
+      : null;
+    return json({
+      ...plansOptions(settings, forLead?.category),
+      founder: await founderOffer(env, settings),
+      referredBy: referrer
+        ? {
+            id: referrer.id,
+            name: referrer.name ?? "",
+            months: promoRules(settings).referralMonths,
+          }
+        : null,
+    });
   }
   if (path === "/meta" && m === "GET") {
     const settings = await getSettings(env);
@@ -1333,6 +1360,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
               about: z.string().trim().max(200).optional(),
               terms: z.string().trim().max(1500).optional(),
               group: z.enum(["general", "inventory"]).optional(),
+              founderPick: z.boolean().optional(),
             }),
           )
           .max(24)
@@ -1343,6 +1371,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         dailyCalls: z.number().int().min(0).max(200).optional(),
         /** Months free for churches and nonprofits paying yearly. */
         churchAnnualMonthsFree: z.number().int().min(0).max(11).optional(),
+        /** Discount programs: founding-customer spots and the referral rules (0 turns a program off). */
+        founderSlots: z.number().int().min(0).max(1000).optional(),
+        referralMonths: z.number().int().min(0).max(12).optional(),
+        referralMaxPerYear: z.number().int().min(0).max(24).optional(),
+        referralMinMonths: z.number().int().min(1).max(24).optional(),
       }),
     );
     const before = await getSettings(env);
@@ -1903,7 +1936,25 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           ? signups
           : signups.map(({ signerEmail: _e, ...rest }) => rest),
         purchases: await purchasesFor(env, id),
+        referral: await referralSummary(env, lead),
       });
+    }
+    // Referral program: who sent this lead (a Sold / Live client), set or cleared by anyone on the team.
+    if (action === "/referrer" && m === "PUT") {
+      const { leadId } = await body(
+        req,
+        z.object({ leadId: z.string().regex(/^[a-z0-9]+$/).nullable() }),
+      );
+      const out = await setReferrer(env, lead, leadId, session.name);
+      await notify(env, {
+        kind: "status",
+        actor: session,
+        leadId: lead.id,
+        text: out.referredBy
+          ? `${session.name} noted ${lead.name} was referred by ${out.referredBy.name}`
+          : `${session.name} cleared who referred ${lead.name}`,
+      });
+      return json(out);
     }
     // Who to ask for and when to catch them (callers too).
     if (action === "/contact" && m === "PUT") {
@@ -1992,6 +2043,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           email: z.string().trim().max(120),
           signature: z.string().max(300_000),
           consent: z.boolean(),
+          founder: z.number().int().min(0).max(999).nullable().optional(),
         }),
       );
       const settings = await getSettings(env);
@@ -2063,6 +2115,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       )
         .bind(paid ? 1 : 0, signupId, id)
         .run();
+      if (paid)
+        await onPlanPaid(env, id, signupId).catch((err) =>
+          console.error("referral credit", err),
+        );
       await notify(env, {
         kind: "paid",
         actor: session,
@@ -3686,6 +3742,9 @@ async function handleScheduled(
   await expireStaleLeads(env);
   await pruneOldRows(env);
   await reconcileTaps(env);
+  await applyBankedReferrals(env).catch((err) =>
+    console.error("banked referrals", err),
+  );
   await costAlerts(env, await getSettings(env)).catch((err) =>
     console.error("cost alerts", err),
   );

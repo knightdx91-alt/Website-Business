@@ -1,3 +1,4 @@
+import { promoTerms } from "./referrals.ts";
 import { notify } from "./notify.ts";
 import {
   isListPlan,
@@ -16,6 +17,7 @@ import {
   addonGroup,
   inventoryAddons,
   generalAddons,
+  promoRules,
 } from "./db.ts";
 import {
   dollars,
@@ -2390,6 +2392,22 @@ ${s.addons.length ? `<p>Extras: ${s.addons.map((a) => `${e(a.name)} (${e(addonPr
         "Service agreement",
         `<p>This is the agreement you accept when you sign up:</p><div class="terms">${e(terms)}</div>`,
       ),
+      ...(promoTerms(s, null).length || promoRules(s).founderSlots > 0
+        ? [
+            sec(
+              "Referrals and new-customer offers",
+              ul(
+                [
+                  ...promoTerms(s, null),
+                  promoRules(s).founderSlots > 0
+                    ? `Founding-customer bonus: our first ${promoRules(s).founderSlots} clients pick one extra free with their plan (one per business, not exchangeable for cash or credit). Once the spots are gone, the offer ends.`
+                    : "",
+                ].filter(Boolean),
+              ),
+              "referrals",
+            ),
+          ]
+        : []),
       sec(
         "Limits",
         `<p>We work to keep your site online and correct, but we can't promise it will never be down or error-free, and no one can guarantee search rankings, visitors or sales. To the extent the law allows, we aren't liable for lost profits or indirect damages, and our total liability to you is limited to what you paid us in the 12 months before the problem.</p>`,

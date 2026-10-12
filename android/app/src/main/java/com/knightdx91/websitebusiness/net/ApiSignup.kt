@@ -86,6 +86,8 @@ suspend fun Api.createSignup(
     title: String,
     email: String,
     signature: String,
+    /** The free extra a founding customer picked (its index in the extras list), or null. */
+    founder: Int? = null,
 ): SignupResult {
     val body = JSONObject()
         .put("plan", plan)
@@ -97,6 +99,7 @@ suspend fun Api.createSignup(
         .put("email", email)
         .put("signature", signature)
         .put("consent", true)
+        .put("founder", founder ?: JSONObject.NULL)
     return SignupResult.from(postJson("/leads/$leadId/signups", body))
 }
 

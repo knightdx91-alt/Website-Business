@@ -1,3 +1,4 @@
+import { allowedFounderPick, founderOffer } from "./referrals.ts";
 import { notify } from "./notify.ts";
 import { shareToken, signupToken } from "./auth.ts";
 import {
@@ -11,6 +12,7 @@ import {
   priceSignup,
   type Pick,
   type PricedOrder,
+  founderFromForm,
 } from "./checkout.ts";
 import {
   addonPrice,
@@ -24,6 +26,8 @@ import {
   type BillingOption,
   type LeadRow,
   type Plan,
+  promoRules,
+  type AppSettings,
 } from "./db.ts";
 import { HttpError, localDate, newId, now, type Env } from "./env.ts";
 import { escHtml, page } from "./page.ts";
@@ -178,6 +182,17 @@ function payBlock(
 }
 
 /** Saves a signed order and, with online checkout set up, returns the Stripe URL to send them to. */
+/** The referrer line for the sign-up page: who sent this lead and what they earn. */
+async function referredByFor(
+  env: Env,
+  lead: LeadRow,
+  s: AppSettings,
+): Promise<{ name: string; months: number } | null> {
+  if (!lead.referred_by) return null;
+  const r = await getLead(env, lead.referred_by);
+  return r ? { name: r.name ?? "a client", months: promoRules(s).referralMonths } : null;
+}
+
 export async function saveOrder(
   env: Env,
   req: Request,
@@ -208,7 +223,8 @@ export async function saveOrder(
   const { plan, option } = o.order;
   const invoice = !!o.order.invoice;
   // The payment-test lead: $1 due whatever was picked, and no Stripe Checkout (tap or the card sheet only).
-  const payTest = o.leadId !== "web" && isPayTest(await getLead(env, o.leadId));
+  const leadRow = o.leadId !== "web" ? await getLead(env, o.leadId) : null;
+  const payTest = o.leadId !== "web" && isPayTest(leadRow);
   if (payTest) o.order = { ...o.order, dueToday: 100 };
   const dueCents = o.order.dueToday;
   const {
@@ -250,6 +266,8 @@ export async function saveOrder(
         quotes: o.order.quotes,
         renews: o.order.renews,
         ...(invoice ? { billing: INVOICE_BILLING, invoice: true } : {}),
+        ...(o.order.founder ? { founder: o.order.founder } : {}),
+        ...(leadRow?.referred_by ? { referredBy: leadRow.referred_by } : {}),
       }),
       o.order.dueToday,
       o.source,
@@ -378,6 +396,10 @@ export async function serveSignup(
     }
     const name = signed.name;
     const picks = picksFromForm(form, settings.addons);
+    const founder = allowedFounderPick(
+      await founderOffer(env, settings),
+      founderFromForm(form),
+    );
     let order: PricedOrder;
     try {
       order = priceSignup(
@@ -385,7 +407,7 @@ export async function serveSignup(
         String(form?.get("plan") ?? planId),
         String(form?.get("billing") ?? "standard"),
         picks,
-        pricing,
+        { ...pricing, founder },
       );
     } catch (err) {
       if (!(err instanceof HttpError)) throw err;
@@ -548,7 +570,7 @@ ${
   paidNow
     ? ""
     : `<form class="card" method="post"><h2>${already ? "Sign again" : "Sign up"}</h2>
-${pickerHtml(settings, { planId, esc: escHtml, showPlans: false, category: lead.category, invoice: allowInvoice, billing: /^(short|standard|flex|annual|invoice)$/.test(new URL(req.url).searchParams.get("billing") ?? "") ? new URL(req.url).searchParams.get("billing")! : undefined })}
+${pickerHtml(settings, { planId, esc: escHtml, showPlans: false, category: lead.category, invoice: allowInvoice, founder: await founderOffer(env, settings), referredBy: await referredByFor(env, lead, settings), billing: /^(short|standard|flex|annual|invoice)$/.test(new URL(req.url).searchParams.get("billing") ?? "") ? new URL(req.url).searchParams.get("billing")! : undefined })}
 <label>Your title <span class="muted small" style="font-weight:400">(optional)</span><input type="text" name="title" placeholder="Owner" maxlength="60"></label>
 <label>Email for receipts<input type="email" name="email" autocomplete="email" required maxlength="120"></label>
 <div style="position:absolute;left:-9999px" aria-hidden="true"><label>Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
@@ -1106,6 +1128,8 @@ export interface AppSignupInput {
   email: string;
   signature: string;
   consent: boolean;
+  /** Index of the free extra a founding customer picked (the app offers it while spots are open). */
+  founder?: number | null;
 }
 
 /**
@@ -1162,6 +1186,10 @@ export async function appSignup(
   let order = priceSignup(settings, input.plan, input.billing, picks, {
     category: lead.category,
     invoice: allowInvoice,
+    founder: allowedFounderPick(
+      await founderOffer(env, settings),
+      input.founder ?? null,
+    ),
   });
   if (isPayTest(lead)) order = { ...order, dueToday: 100 };
   const terms = contractText(settings, order, { business, kind: "signup" });

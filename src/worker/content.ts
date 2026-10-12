@@ -516,6 +516,10 @@ export function playbookObjections(
       "“I'm not interested.”",
       "No problem at all. I built this one for you either way, so can I text you the link in case you change your mind? (If they say no, thank them and log “Not interested”. Never push past a second no.)",
     ],
+    [
+      "“Do you have a referral program?”",
+      `Yes. When a business you refer signs up for a ${s.referralMinMonths ?? 6}- or 12-month plan and their first payment goes through, you get ${s.referralMonths ?? 2} months of your plan free, up to ${s.referralMaxPerYear ?? 2} referrals a year; more than that carry over to the next year. Just have them mention your business name when they sign up.`,
+    ],
   ];
 }
 
