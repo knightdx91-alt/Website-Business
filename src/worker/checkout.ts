@@ -340,6 +340,8 @@ export interface PickerOptions {
   } | null;
   /** The client who referred them (shown so they know the referrer earns the credit), with the program's numbers. */
   referredBy?: { name: string; months: number } | null;
+  /** Extras to tick already (indexes into Settings → Extras), e.g. from the website's Extras page "Add at sign-up". */
+  picks?: number[];
 }
 
 /**
@@ -393,9 +395,13 @@ export function pickerHtml(s: AppSettings, o: PickerOptions): string {
   const invoiceOpt = o.invoice
     ? `<label class="opt"><input type="radio" name="billing" value="${INVOICE_BILLING}"${picked === INVOICE_BILLING ? " checked" : ""}><span><strong>Pay by check or bank transfer</strong><small data-bdetail="${INVOICE_BILLING}">We'll send an invoice for the ${e(standard.label)} at the monthly price, no setup fee. Nothing is charged online.</small></span></label>`
     : "";
+  const picks = new Set(o.picks ?? []);
   const extraOpt = (a: AddOn, i: number) =>
-    `<label class="opt"><input type="checkbox" name="x_${i}"><span><strong>${e(a.name)}</strong> · <span class="pk-price">${e(addonPrice(a))}</span>${a.about ? `<small>${e(a.about)}</small>` : ""}${a.unit === "quote" ? "<small>We'll call you with a price.</small>" : ""}</span>${a.unit === "each" ? `<input class="qty" type="number" name="q_${i}" min="1" max="${MAX_QTY}" value="1" aria-label="How many">` : ""}</label>`;
-  const featured = new Set<number>();
+    `<label class="opt"><input type="checkbox" name="x_${i}"${picks.has(i) ? " checked" : ""}><span><strong>${e(a.name)}</strong> · <span class="pk-price">${e(addonPrice(a))}</span>${a.about ? `<small>${e(a.about)}</small>` : ""}${a.unit === "quote" ? "<small>We'll call you with a price.</small>" : ""}</span>${a.unit === "each" ? `<input class="qty" type="number" name="q_${i}" min="1" max="${MAX_QTY}" value="1" aria-label="How many">` : ""}</label>`;
+  // Pre-ticked extras show up top so nobody has to open "More extras" to see what they asked for.
+  const featured = new Set<number>(
+    [...picks].filter((i) => s.addons[i] && addonGroup(s.addons[i]) !== "inventory"),
+  );
   s.addons.forEach((a, i) => {
     if (
       featured.size < MAX_FEATURED &&

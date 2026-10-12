@@ -213,6 +213,9 @@ export async function serveCompany(
   }
   if (path === "/extras" && (req.method === "GET" || req.method === "POST"))
     return extrasRequest(env, req, url);
+  if (path === "/add-ons" && req.method === "GET") return addOnsPage(env);
+  if (path === "/addons" || path === "/add-ons/" || path === "/extras-list")
+    return Response.redirect(`${ORIGIN}/add-ons`, 301);
   if (path === "/robots.txt")
     return new Response(
       `User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`,
@@ -223,6 +226,7 @@ export async function serveCompany(
     const urls = [
       "/",
       "/pricing",
+      "/add-ons",
       "/price-list",
       "/portfolio",
       "/about",
@@ -477,12 +481,12 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
       );
     }
   }
-  const body = `<p class="note" style="margin:0 0 18px">Already a client? You don't need to sign up again. <a href="/extras">Add extras to your website here</a>.</p>
+  const body = `<p class="note" style="margin:0 0 18px">Already a client? You don't need to sign up again. <a href="/extras${url.search && picksFromUrl(url, s).length ? `?pick=${picksFromUrl(url, s).join(",")}` : ""}">Add extras to your website here</a>.</p>
 <h1>Get started</h1>
 <p class="lead">Pick your plan and we'll start building your site. You'll still look it over and approve every detail before it goes live.</p>
 ${note}
 <form method="post" class="form light">
-${pickerHtml(s, { planId, esc: e, showPlans: false })}
+${pickerHtml(s, { planId, esc: e, showPlans: false, picks: picksFromUrl(url, s) })}
 <h2 style="font-size:1.3rem;margin-top:8px">About your business</h2>
 <label>Business name<input name="business" required maxlength="120" autocomplete="organization"></label>
 <label>What kind of business?<select name="kind" style="min-height:50px;border-radius:10px;border:2px solid #3b4a6b;padding:10px;font:inherit"><option value="">Choose one</option>${BUSINESS_TYPES.map((t) => `<option>${e(t)}</option>`).join("")}<option>Something else</option></select></label>
@@ -742,15 +746,17 @@ async function extrasRequest(
       );
     }
   }
+  const ticked = new Set(picksFromUrl(url, s));
+  const tick = (i: number) => (ticked.has(i) ? " checked" : "");
   const body = `<p class="eyebrow" style="color:var(--goldtext)">Already a client?</p>
 <h1>Add extras to your website</h1>
 <p class="lead">Tell us what you'd like to add. We'll send a link made just for your account to the email we have on file for your business, where you can read the agreement for your extras, sign it and pay. You won't be signed up for a new plan.</p>
 ${note}
 <form method="post" class="form light">
 <fieldset style="border:0;padding:0;margin:0 0 6px"><legend style="font-weight:700;margin-bottom:8px">What would you like to add?</legend>
-${s.addons.map((a, i) => (addonGroup(a) === "inventory" ? "" : `<label class="xopt"><input type="checkbox" name="x_${i}"><span><strong>${e(a.name)}</strong> · ${e(addonPrice(a))}${a.about ? `<small>${e(a.about)}</small>` : ""}</span></label>`)).join("")}
+${s.addons.map((a, i) => (addonGroup(a) === "inventory" ? "" : `<label class="xopt"><input type="checkbox" name="x_${i}"${tick(i)}><span><strong>${e(a.name)}</strong> · ${e(addonPrice(a))}${a.about ? `<small>${e(a.about)}</small>` : ""}</span></label>`)).join("")}
 </fieldset>
-${inventoryAddons(s.addons).length ? `<fieldset style="border:0;padding:0;margin:0 0 6px"><legend style="font-weight:700;margin-bottom:8px">Inventory add-ons <span class="opt">(for the live price list)</span></legend>${s.addons.map((a, i) => (addonGroup(a) !== "inventory" ? "" : `<label class="xopt"><input type="checkbox" name="x_${i}"><span><strong>${e(a.name)}</strong> · ${e(addonPrice(a))}${a.about ? `<small>${e(a.about)}</small>` : ""}</span></label>`)).join("")}</fieldset>` : ""}
+${inventoryAddons(s.addons).length ? `<fieldset style="border:0;padding:0;margin:0 0 6px"><legend style="font-weight:700;margin-bottom:8px">Inventory add-ons <span class="opt">(for the live price list)</span></legend>${s.addons.map((a, i) => (addonGroup(a) !== "inventory" ? "" : `<label class="xopt"><input type="checkbox" name="x_${i}"${tick(i)}><span><strong>${e(a.name)}</strong> · ${e(addonPrice(a))}${a.about ? `<small>${e(a.about)}</small>` : ""}</span></label>`)).join("")}</fieldset>` : ""}
 <label>Business name<input name="business" required maxlength="120" autocomplete="organization"></label>
 <label>Your name<input name="name" required maxlength="100" autocomplete="name"></label>
 <label>Phone <span class="opt">(the one on your account, if you can)</span><input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
@@ -759,7 +765,7 @@ ${inventoryAddons(s.addons).length ? `<fieldset style="border:0;padding:0;margin
 <div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
 <button class="btn" type="submit">Send my request</button>
 </form>
-<p class="small muted" style="margin-top:20px">Not a client yet? <a href="/start">Get started</a> or <a href="/#contact">get a free preview</a>.</p>`;
+<p class="small muted" style="margin-top:20px">Want to read about each extra first? <a href="/add-ons">See every extra with prices</a>. Not a client yet? <a href="/start">Get started</a> or <a href="/#contact">get a free preview</a>.</p>`;
   return policyShell(name, s.legalName || name, "Add extras", body, {
     phone: s.companyPhone,
     ga: s.gaMeasurementId,
@@ -1618,10 +1624,8 @@ function extrasHtml(s: AppSettings, o: { compact?: boolean } = {}): string {
     const lowest = priced.length
       ? Math.min(...priced.map((a) => a.price))
       : null;
-    const names = s.addons
-      .slice(0, 3)
-      .map((a) => a.name.replace(/^"|"$/g, "").toLowerCase());
-    return `<p class="xline">${s.addons.length} add-ons for any plan${lowest ? `, from ${money(lowest)}` : ""}: ${e(names.join(", "))} and more. <a href="/pricing#extras">See all extras</a>.</p>`;
+    const pop = generalAddons(s.addons).slice(0, 6);
+    return `<div class="xstrip"><div><h3>Extras for any plan</h3><p>${s.addons.length} add-ons${lowest ? ` from ${money(lowest)}` : ""}, at sign-up or any time later.</p></div><ul class="chips">${pop.map((a) => `<li><a href="/add-ons#x${s.addons.indexOf(a)}">${e(a.name)}</a></li>`).join("")}</ul><a class="btn" href="/add-ons">See all extras</a></div>`;
   }
   const groups = new Map<string, typeof s.addons>();
   for (const a of generalAddons(s.addons))
@@ -1631,10 +1635,101 @@ function extrasHtml(s: AppSettings, o: { compact?: boolean } = {}): string {
   const invHtml = inv.length
     ? `<div class="xinv" id="inventory-addons"><h3 class="xgroup">Inventory add-ons</h3><p>The pieces of the <a href="/price-list">live price list</a>, for the ${list ? e(list.name) : "Price list"} plan or any website plan. The price page, the board, the tablet display page and your first sheet of QR tags are included; these are the extras around them.</p><ul class="xlist">${inv.map((a) => `<li><div class="xlist__row"><b>${e(a.name)}</b><span>${e(addonPrice(a))}</span></div>${a.about ? `<p>${e(a.about)}</p>` : ""}</li>`).join("")}</ul></div>`
     : "";
-  return `<section class="sec" id="extras"><div class="wrap"><h2>Extras</h2><p class="lead">Add any of these to any plan, at sign-up or later. Already a client? <a href="/extras">Add extras here</a>.</p>
+  return `<section class="sec" id="extras"><div class="wrap"><h2>Extras</h2><p class="lead">Add any of these to any plan, at sign-up or later. <a href="/add-ons">See each extra with an Add button</a>. Already a client? <a href="/extras">Add extras here</a>.</p>
 <div class="xcols">${[...groups.entries()].map(([unit, list]) => `<div><h3 class="xgroup">${e(UNIT_GROUP[unit] ?? unit)}</h3><ul class="xlist">${list.map((a) => `<li><div class="xlist__row"><b>${e(a.name)}</b><span>${e(addonPrice(a))}</span></div>${a.about ? `<p>${e(a.about)}</p>` : ""}</li>`).join("")}</ul></div>`).join("")}</div>
 ${invHtml}
 </div></section>`;
+}
+
+/** ?pick=3,7 → the valid extra indexes (the Extras page's "Add" buttons). */
+function picksFromUrl(url: URL, s: AppSettings): number[] {
+  return [
+    ...new Set(
+      (url.searchParams.get("pick") ?? "")
+        .split(",")
+        .filter((x) => /^\d{1,3}$/.test(x))
+        .map(Number)
+        .filter((n) => n < s.addons.length),
+    ),
+  ];
+}
+
+/** /add-ons: every extra on one page, grouped, each with "Add to my order" (new customers) and "Add to my site" (clients). */
+async function addOnsPage(env: Env): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const offer = await founderOffer(env, s).catch(() => null);
+  const freeForFounders = new Set(
+    offer && offer.slotsLeft > 0 ? offer.choices.map((c) => c.index) : [],
+  );
+  const title = `Extras & add-ons | ${name}`;
+  const description = `Every extra you can add to a ${name} website plan, with prices: ${s.addons
+    .slice(0, 4)
+    .map((a) => a.name)
+    .join(", ")} and more. Add them at sign-up or any time later.`;
+  const groups: Array<{ id: string; title: string; intro: string; items: number[] }> = [];
+  const general = s.addons
+    .map((a, i) => ({ a, i }))
+    .filter(({ a }) => addonGroup(a) !== "inventory");
+  for (const unit of ["one-time", "month", "each", "quote"]) {
+    const items = general.filter(({ a }) => a.unit === unit).map(({ i }) => i);
+    if (items.length)
+      groups.push({
+        id: `g-${unit}`,
+        title: UNIT_GROUP[unit] ?? unit,
+        intro:
+          unit === "one-time"
+            ? "Paid once, done once."
+            : unit === "month"
+              ? "Added to your monthly bill. Stop any time with 30 days' notice."
+              : unit === "each"
+                ? "Priced per item. Pick how many at checkout."
+                : "Every job is different, so we look at yours and send a price first. Nothing is charged until you say yes.",
+        items,
+      });
+  }
+  const others = general
+    .filter(({ a }) => !["one-time", "month", "each", "quote"].includes(a.unit))
+    .map(({ i }) => i);
+  if (others.length)
+    groups.push({ id: "g-other", title: "More extras", intro: "", items: others });
+  const inv = s.addons
+    .map((a, i) => ({ a, i }))
+    .filter(({ a }) => addonGroup(a) === "inventory")
+    .map(({ i }) => i);
+  if (inv.length)
+    groups.push({
+      id: "g-inventory",
+      title: "Inventory add-ons",
+      intro: `For shops using the <a href="/price-list">live price list</a>. The price page, the board, the tablet display page and your first sheet of QR tags already come with it; these are the pieces around them.`,
+      items: inv,
+    });
+  const card = (i: number) => {
+    const a = s.addons[i]!;
+    return `<li class="xcard" id="x${i}"><div class="xcard__top"><h3>${e(a.name)}</h3><p class="xcard__price">${e(addonPrice(a))}</p></div>
+${freeForFounders.has(i) ? `<p class="xcard__tag">🎁 Free for our first ${offer?.total ?? 5} clients (pick one)</p>` : ""}${a.about ? `<p>${e(a.about)}</p>` : ""}${a.unit === "quote" ? `<p class="xcard__note">We'll call you with a price before anything is charged.</p>` : ""}
+<div class="xcard__act"><a class="btn" href="/start?pick=${i}">Add to my order</a><a class="xcard__client" href="/extras?pick=${i}">Already a client? Add it to your site</a></div></li>`;
+  };
+  const body = `<section class="sec sec--head"><div class="wrap"><p class="eyebrow eyebrow--dark">Extras &amp; add-ons</p><h1>Add more to your website, any time.</h1>
+<p class="lead">Every plan already includes the site, hosting, security and the changes you ask for. These are extras you can add on: at sign-up, or later once your site is live. Prices are the same either way.</p>
+<div class="xhow"><div class="card"><h3>New to us?</h3><p>Tap <strong>Add to my order</strong> on any extra. It's ticked for you on the sign-up form, next to your plan. You can add or remove more there.</p><p style="margin-top:12px"><a class="btn btn--line" href="/pricing">See the plans first</a></p></div>
+<div class="card"><h3>Already a client?</h3><p>Tap <strong>Add it to your site</strong>. We email a link to the address on your account where you sign for the extra and pay. Your plan doesn't change.</p><p style="margin-top:12px"><a class="btn btn--line" href="/extras">Add extras to my site</a></p></div></div>
+${groups.length > 1 ? `<nav class="xjump" aria-label="Jump to"><span>Jump to:</span>${groups.map((g) => `<a href="#${g.id}">${e(g.title)}</a>`).join("")}</nav>` : ""}
+</div></section>
+${groups
+  .map(
+    (g, n) =>
+      `<section class="sec${n % 2 ? "" : " sec--alt"}" id="${g.id}"><div class="wrap"><h2>${e(g.title)}</h2>${g.intro ? `<p class="lead">${g.intro}</p>` : ""}<ul class="xcards">${g.items.map(card).join("")}</ul></div></section>`,
+  )
+  .join("")}
+<section class="sec"><div class="wrap narrow"><h2>Not sure what you need?</h2><p class="lead">Tell us about your business and we'll say which extras are worth it and which aren't. Most businesses start with none.</p><p>${s.companyPhone ? `<a class="btn" href="${telHref(s.companyPhone)}">Call or text ${e(s.companyPhone)}</a> ` : ""}<a class="btn btn--line" href="/#contact">Send us a message</a></p><p class="small muted" style="margin-top:14px">Terms for each extra are in the agreement you read before signing. <a href="/terms">Terms &amp; refunds</a>.</p></div></section>`;
+  return marketingPage(s, {
+    path: "/add-ons",
+    title,
+    description,
+    body,
+    ld: pageLd(s, "/add-ons", title, description),
+  });
 }
 
 function waysToPayHtml(s: AppSettings): string {
@@ -2251,7 +2346,7 @@ function header(
 ): string {
   const link = (href: string, label: string, cls = "") =>
     `<a href="${href}"${path === href ? ` aria-current="page"` : ""}${cls ? ` class="${cls}"` : ""}>${label}</a>`;
-  return `<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/"><img src="/brand/logo-192.png" alt="" width="40" height="40">${e(name)}</a><nav class="hdr__nav" aria-label="Main">${link("/portfolio", "Our work")}${link("/pricing", `Pricing${from ? ` <small>from ${money(from)}/mo</small>` : ""}`, "hdr__plans")}${link("/about", "About", "hdr__about")}${
+  return `<header class="hdr"><div class="wrap hdr__in"><a class="brand" href="/"><img src="/brand/logo-192.png" alt="" width="40" height="40">${e(name)}</a><nav class="hdr__nav" aria-label="Main">${link("/portfolio", "Our work")}${link("/pricing", `Pricing${from ? ` <small>from ${money(from)}/mo</small>` : ""}`, "hdr__plans")}${link("/add-ons", "Extras", "hdr__extras")}${link("/about", "About", "hdr__about")}${
     phone
       ? `<a class="hdr__call" href="${telHref(phone)}">Call</a>`
       : `<a class="hdr__call" href="/#contact">Contact</a>`
@@ -2301,7 +2396,7 @@ async function portfolio(env: Env): Promise<Response> {
 function footer(legal: string, s: AppSettings): string {
   return `<footer class="ftr"><div class="wrap">
 <p class="ftr__name">${e(legal)} · ${MARKET_TOWN}, Alabama${s.companyPhone ? ` · <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>` : ""}${supportEmailOf(s) ? ` · <a href="mailto:${e(supportEmailOf(s))}">${e(supportEmailOf(s))}</a>` : ""}</p>
-<nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/price-list">Live price list</a><a href="/portfolio">Our work</a><a href="/about">About</a><a href="/cullman-county">Where we work</a><a href="/extras">Clients: add extras</a><a href="/terms">Terms &amp; refunds</a><a href="/privacy">Privacy</a><a href="https://app.undergroundassociates.com/" rel="nofollow">Team sign-in</a>${s.companyFacebookUrl ? `<a href="${e(s.companyFacebookUrl)}" rel="noopener">Facebook</a>` : ""}${s.companyReviewUrl ? `<a href="${e(s.companyReviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</nav>
+<nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/add-ons">Extras &amp; add-ons</a><a href="/price-list">Live price list</a><a href="/portfolio">Our work</a><a href="/about">About</a><a href="/cullman-county">Where we work</a><a href="/extras">Clients: add extras</a><a href="/terms">Terms &amp; refunds</a><a href="/privacy">Privacy</a><a href="https://app.undergroundassociates.com/" rel="nofollow">Team sign-in</a>${s.companyFacebookUrl ? `<a href="${e(s.companyFacebookUrl)}" rel="noopener">Facebook</a>` : ""}${s.companyReviewUrl ? `<a href="${e(s.companyReviewUrl)}" rel="noopener">Review us on Google</a>` : ""}</nav>
 <p class="small">© ${FOUNDED}–${new Date().getFullYear()} ${e(legal)}</p>
 </div></footer>`;
 }
@@ -2572,7 +2667,7 @@ h1{font-size:clamp(2.2rem,7vw,3.8rem)}h2{font-size:clamp(1.6rem,4.5vw,2.4rem)}h3
 .hdr__nav a{white-space:nowrap}.hdr__plans small{font-weight:400;color:#dfe4ee;font-size:.82rem}
 .about__in{display:flex;gap:22px;align-items:center}.about__photo{width:128px;height:128px;border-radius:50%;object-fit:cover;flex:none;border:3px solid var(--gold)}
 .about h2{font-size:clamp(1.5rem,4.5vw,2.1rem)}.about .lead{margin-bottom:6px}@media (max-width:520px){.about__in{flex-direction:column;align-items:flex-start;gap:14px}.about__photo{width:96px;height:96px}}
-@media (max-width:520px){.hdr__plans{display:none}.brand{font-size:.98rem;line-height:1.15}.hdr__nav{gap:12px}.hdr__call{padding:8px 14px}}
+@media (max-width:520px){.hdr__plans small{display:none}.brand{font-size:.98rem;line-height:1.15}.hdr__in{flex-wrap:wrap;gap:6px 0;padding-top:8px;padding-bottom:8px}.hdr__nav{width:100%;justify-content:space-between;gap:10px}.hdr__call{padding:8px 14px}}
 .btn--line{background:transparent;color:var(--navy);border:2px solid var(--navy)}
 .examples span em{display:block;font-style:normal;font-size:.85rem;color:var(--muted);margin-top:2px}.examples span b{display:block;color:var(--blue);margin-top:4px;font-size:.92rem}
 @media (min-width:760px){.examples--full{grid-template-columns:repeat(4,1fr)}}
@@ -2660,7 +2755,16 @@ details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer
 .work img{display:block;width:100%;height:auto;aspect-ratio:1/1.4;object-fit:cover;object-position:top;border-radius:14px;border:1px solid var(--line);box-shadow:0 6px 18px rgba(20,33,61,.1);background:#fff}
 .work span{display:block;margin-top:8px;font-size:.9rem}.work strong{display:block;color:var(--ink)}.work span a{color:var(--blue);text-decoration:none}.work span a:hover{text-decoration:underline}
 .work__more{margin:18px 0 0;color:var(--muted)}.work__more span{font-weight:700;color:var(--ink)}.work__more a{white-space:nowrap}
-.xline{margin:18px 0 0;color:var(--muted)}.paynote{margin:16px 0 0;color:var(--muted);font-size:.95rem}
+.xline{margin:18px 0 0;color:var(--muted)}
+.xstrip{margin:28px 0 0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px}.xstrip h3{margin:0 0 4px}.xstrip p{margin:0;color:var(--muted)}.xstrip .chips{margin:0}.xstrip .btn{justify-self:start}
+@media (min-width:860px){.xstrip{grid-template-columns:1fr 1.6fr auto;align-items:center}}
+.xhow{display:grid;gap:16px;margin-top:24px}@media (min-width:760px){.xhow{grid-template-columns:1fr 1fr}}
+.xjump{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin-top:24px}.xjump span{font-weight:700}.xjump a{background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:700;color:var(--navy);text-decoration:none}.xjump a:hover{border-color:var(--navy)}
+.xcards{list-style:none;padding:0;margin:20px 0 0;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.xcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:8px;scroll-margin-top:84px}.xcard:target{border:2px solid var(--gold);padding:19px}
+.xcard__top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}.xcard h3{margin:0;font-size:1.15rem}.xcard p{margin:0;color:var(--muted)}
+.xcard .xcard__price{color:var(--goldtext);font-weight:800;white-space:nowrap;text-align:right}.xcard .xcard__tag{color:var(--navy);font-weight:700}.xcard .xcard__note{font-size:.92rem}
+.xcard__act{margin-top:auto;padding-top:10px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}.xcard__act .btn{min-height:46px;padding:10px 18px;font-size:1rem}.xcard__client{font-size:.95rem;color:var(--navy)}.paynote{margin:16px 0 0;color:var(--muted);font-size:.95rem}
 .cols{list-style:none;padding:0;margin:0;display:grid;gap:8px 24px;grid-template-columns:repeat(2,1fr)}@media (min-width:760px){.cols{grid-template-columns:repeat(3,1fr)}}.cols a{color:var(--navy);font-weight:700;text-decoration:none}.cols a:hover{text-decoration:underline}
 .ftr nav{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0}.ftr__name{color:#fff;margin:0}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}`;

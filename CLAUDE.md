@@ -1328,6 +1328,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   Business` per line; real clients only, nothing shows until typed), `siteTowns` (comma list → county page, footer,
   areaServed). `liveClients()` (sold + live) replaces the first badge from 3 up. No FAQPage schema (Google dropped FAQ
   rich results 7 May 2026), no aggregateRating. Owner photo: add `app/public/owner.jpg` (square); until then the UA badge.
+- Company site, Extras page (Oct 2026, owner's ask: extras were hard to find): `/add-ons` (`addOnsPage` in company.ts; `/addons` and
+  `/extras-list` redirect) lists every extra from Settings as a card grouped by unit (one-time / monthly / per item / priced per job,
+  then Inventory add-ons), with "Jump to" chips, a "🎁 Free for our first N clients" tag on open founder picks, and two actions per
+  card: **Add to my order** → `/start?pick=<i>` (new customers; `PickerOptions.picks` pre-ticks it and lifts it out of "More
+  extras") and "Already a client? Add it to your site" → `/extras?pick=<i>` (the client request form pre-ticks it; `picksFromUrl`).
+  Linked from the header ("Extras", shown on phones too: under 520 px the nav wraps to a second row and Pricing drops its "from"
+  note instead of hiding), the footer ("Extras & add-ons"), the home page strip (`extrasHtml` compact: six chips + "See all
+  extras"), the /pricing extras section and the /extras form; in the sitemap. `/extras` stays the existing-client request form.
 - Company site, price list (Oct 2026): `/price-list` (`priceListPage` in company.ts; `/tank-board` and `/live-price-list` redirect):
   the live price list + Tank board + QR tags + tablet display for shops with daily-changing stock. Hero, 3 steps, the four
   pieces, what customers get / what you do / who it's for, What it costs (the Price list plan line, included with site plans,
