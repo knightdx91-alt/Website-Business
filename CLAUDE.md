@@ -896,6 +896,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   address (`visitExtras()`); salons also put the pay list in the trust row. `links.giftCards` → `giftcard` action (restaurant order row,
   retail What's new, salon closing band). Edit: "Awards & proof" and "Closures, parking & payment" cards; Links → Gift cards link.
   Shared helpers: `factList()` (`.facts` dl), `tiles()` (`.tiles` photo tiles), `FormField.type: "date"`.
+- D1 caps a LIKE pattern at 50 bytes (Oct 2026): "The app's server hit a problem" on Cullman First Congregational came from
+  `siteUpdated()` (index.ts), whose alert-folding query matched `text LIKE '<person> updated <business>\'s website%'`; the
+  pattern was 53 bytes, D1 answered "LIKE or GLOB pattern too complex", and every design change / edit on a lead with a long
+  name 500ed once one such alert row existed (the preview had already been re-rendered, so the toast lied about the design).
+  It compares with `substr(text, 1, length(?1)) = ?1` now. Rule: worker SQL uses LIKE only with short literal patterns, never
+  one bound from data (`test/worker/sql-like.test.ts` scans `src/worker/*.ts` for both). Reproduce such a report: copy the
+  live lead row into the local D1 (scratchpad `church-live.sql`), log in on the 8791 dev server, replay the page's calls.
 - 🔄 Import from their Google page (Oct 2026, owner's ask; Android 2.54): a lead-header button next to "Re-check website" (web
   `data-act="googleimport"`, Android `LeadScreen` + `Api.googleImport`) = `POST /api/leads/:id/googleimport` (owner + callers; 409
   on the practice lead or before the first build; 502 "Couldn't read their Google page" when Places fails): one Place Details call

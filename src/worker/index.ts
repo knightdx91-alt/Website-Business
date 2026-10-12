@@ -642,15 +642,12 @@ async function siteUpdated(
   what: string[],
 ): Promise<void> {
   const prefix = `${session.name} updated ${lead.name}'s website`;
+  // substr(), not LIKE: D1 caps a LIKE pattern at 50 bytes, and a long business name ("Cullman First
+  // Congregational") took the prefix past it, so every edit on that lead failed with "pattern too complex".
   const recent = await env.DB.prepare(
-    "SELECT id, text FROM events WHERE lead_id = ? AND kind = 'status' AND actor_id IS ? AND created_at > ? AND text LIKE ? ORDER BY created_at DESC LIMIT 1",
+    "SELECT id, text FROM events WHERE lead_id = ?2 AND kind = 'status' AND actor_id IS ?3 AND created_at > ?4 AND substr(text, 1, length(?1)) = ?1 ORDER BY created_at DESC LIMIT 1",
   )
-    .bind(
-      lead.id,
-      session.userId,
-      now() - SITE_UPDATE_COLLAPSE_MS,
-      `${prefix}%`,
-    )
+    .bind(prefix, lead.id, session.userId, now() - SITE_UPDATE_COLLAPSE_MS)
     .first<{ id: string; text: string }>();
   const parts = new Set<string>();
   const old = /\((.*)\)$/.exec(recent?.text ?? "");
