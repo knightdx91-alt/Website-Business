@@ -210,7 +210,9 @@ export function qualify(places: Place[], opts: QualifyOptions = {}): QualifiedLe
 const TYPE_CATEGORY: Array<[RegExp, CategoryId]> = [
   [/restaurant|cafe|coffee|bakery|meal_|food|bar_and_grill|diner|deli|ice_cream|donut|sandwich|pizza|steak|barbecue/, "restaurant"],
   [/hair|barber|beauty|nail|pet_care|pet_groom|spa$|massage/, "salon"],
-  [/car_repair|auto|tire|transmission|oil_change|car_dealer|car_wash/, "auto"],
+  // Dealers sell vehicles, not repairs: the general pack labels them from Google's own type (schema AutoDealer, a Lot board).
+  [/_dealer$|dealer/, "general"],
+  [/car_repair|auto|tire|transmission|oil_change|car_wash/, "auto"],
   [/plumb|electric|roofing|contractor|hvac|heating|painter|locksmith|moving|handyman|excavat|septic|welder|garage_door|gutter|flooring|drywall|insulation/, "contractor"],
   [/hardware_store|home_improvement_store|lumber/, "retail"],
   [/^(accounting|insurance_agency)$/, "finance"],
@@ -218,9 +220,15 @@ const TYPE_CATEGORY: Array<[RegExp, CategoryId]> = [
   [/florist|clothing_store|gift_shop|furniture_store|thrift_store|flea_market|home_goods_store|shoe_store|garden_center|pet_store/, "retail"],
 ];
 
+/** "Barbee Truck Sales", "Smith Motors", "Cullman Used Cars": a lot that sells vehicles (or trailers, tractors, boats), not a food truck or a repair shop. */
+export function isDealerName(n: string): boolean {
+  return /\b(truck|trailer|tractor|equipment|car|auto|rv|boat|golf cart|powersports?|motorcycle|atv|used|vehicle)s?\b.*\b(sales?|dealers?|dealership)\b|\bdealers?(hip)?\b|\bmotors\b|\bpre-?owned\b|\bused (cars|trucks|autos)\b/.test(n.toLowerCase());
+}
+
 /** Best-guess template for a Places result (the owner can change it before adding). */
 export function guessCategory(p: Place): CategoryId | null {
   const n = (p.displayName?.text ?? "").toLowerCase();
+  if (isDealerName(n)) return "general";
   if (/\b(collision|body shop|paint (&|and) body|detail|wrecker|towing|small engine|mower repair|auto glass|autoglass|windshield|muffler|exhaust|auto ?parts|parts store|parts (&|and) supply)/.test(n)) return "auto";
   if (/\b(lawn|landscap|mowing|sod|irrigation)/.test(n)) return "landscaping";
   if (/\b(clean|maid|janitor|(pressure|power|soft) ?wash)/.test(n)) return "cleaning";
@@ -230,7 +238,7 @@ export function guessCategory(p: Place): CategoryId | null {
   if (/\b(paint|concrete|fenc|pest|termite|remodel|appliance|tree|stump|septic|excavat|dirt work|grading|dozer|backhoe|land clearing|garage door|gutter|weld|fabricat|flooring|floors?\b|carpet|drywall|sheetrock)/.test(n)) return "contractor";
   if (/\b(church|chapel|iglesia|tabernacle|parish|vfw|american legion|lions club|ruritan|masonic|food pantry|food bank|community center)\b/.test(n)) return "church";
   if (/\b(tax(es)?|impuestos|accounting|accountants?|bookkeep\w*|c\.?p\.?a\.?s?|insurance|seguros|financial (planning|advisors?|services))\b/.test(n)) return "finance";
-  if (/\b(food truck|truck|grill|bbq|cafe|kitchen|diner|taco|pizza|seafood|catfish|hibachi|wings?|chinese|sushi|buffet)\b/.test(n)) return "restaurant";
+  if (/\b(food truck|grill|bbq|cafe|kitchen|diner|taco|pizza|seafood|catfish|hibachi|wings?|chinese|sushi|buffet)\b/.test(n)) return "restaurant";
   for (const t of [p.primaryType ?? "", ...(p.types ?? [])]) {
     for (const [re, cat] of TYPE_CATEGORY) if (re.test(t)) return cat;
   }

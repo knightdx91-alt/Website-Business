@@ -238,8 +238,7 @@ import {
   runSearch,
   importSitePhotos,
   forgetSiteImport,
-  requeueStuck,
-} from "./pipeline.ts";
+  requeueStuck, recategorizeLead } from "./pipeline.ts";
 import { servePreview } from "./preview.ts";
 import {
   costAlerts,
@@ -528,6 +527,8 @@ async function chargeAi(
     ),
   });
 }
+
+const CATEGORY_IDS = ["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail", "finance", "church", "general"] as const;
 
 function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
   const record = l.record_json
@@ -2987,12 +2988,14 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         await updateLead(env, id, { rewrite: 1, status: "queued" });
         await env.JOBS.send({ type: "build", leadId: id });
       }
-      await siteUpdated(
-        env,
-        session,
-        lead,
-        editWords(edits as Parameters<typeof editWords>[0]),
-      );
+      // The "Kind of business" select (Android's Edit): a different kind rebuilds the whole site after the edits above are saved.
+      const kind = values.category;
+      const words = editWords(edits as Parameters<typeof editWords>[0]);
+      if (typeof kind === "string" && kind !== lead.category && (CATEGORY_IDS as readonly string[]).includes(kind)) {
+        await recategorizeLead(env, (await getLead(env, id))!, kind as CategoryId);
+        words.push(`kind of business changed to ${packFor(kind as CategoryId).label.toLowerCase()}: rebuilding`);
+      }
+      await siteUpdated(env, session, lead, words);
       return json({
         ...detail((await getLead(env, id))!),
         warnings: built.warnings,
@@ -3338,6 +3341,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await siteUpdated(env, session, lead, [
         "imported website text and photos removed",
       ]);
+      return json({ ok: true });
+    }
+    if (action === "/recategorize" && m === "POST") {
+      const { category } = await body(req, z.object({ category: z.enum(CATEGORY_IDS) }));
+      if (category === lead.category) throw new HttpError(409, "That is already its kind");
+      await recategorizeLead(env, lead, category);
+      await siteUpdated(env, session, lead, [`kind of business changed to ${packFor(category).label.toLowerCase()}: rebuilding`]);
       return json({ ok: true });
     }
     if (action === "/rewrite" && m === "POST") {

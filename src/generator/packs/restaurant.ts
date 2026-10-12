@@ -31,7 +31,8 @@ export function restaurantVariant(primaryType: string | undefined, types: string
   const all = [primaryType ?? "", ...types];
   const has = (t: string) => all.includes(t);
   const n = name.toLowerCase();
-  if (has("food_truck") || /\b(food truck|truck|trailer|on wheels|street eats)\b/.test(n)) return "food_truck";
+  // "Truck" alone is a food truck only when nothing says sales, repair or parts (Barbee Truck Sales is a dealer, not a taco truck).
+  if (has("food_truck") || (/\b(food truck|truck|trailer|on wheels|street eats)\b/.test(n) && !/\b(sales?|dealers?|dealership|repair|parts|tires?|accessor\w*|motors|service|wash)\b/.test(n))) return "food_truck";
   if (has("barbecue_restaurant") || /\b(bbq|bar-b-q|barbecue|smokehouse)\b/.test(n)) return "bbq";
   if (has("mexican_restaurant") || /\b(taqueria|cantina|mexican|tacos?)\b/.test(n)) return "mexican";
   if (has("pizza_restaurant") || /\bpizz/.test(n)) return "pizza";

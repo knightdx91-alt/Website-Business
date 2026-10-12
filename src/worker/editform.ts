@@ -267,6 +267,20 @@ const sel = (
 });
 const h3 = (text: string): Field => ({ type: "heading", text });
 const AUTO_KIND_OPTIONS = Object.entries(AUTO_VARIANT_LABELS) as Array<[string, string]>;
+/** The site templates, worded as on Add a business (web `PACKS`). */
+export const KIND_OPTIONS: Array<[string, string]> = [
+  ["restaurant", "Restaurant, cafe, bakery, juice bar or food truck"],
+  ["contractor", "Contractor or home service"],
+  ["salon", "Salon, barber, nails, massage or pet grooming"],
+  ["auto", "Auto repair, body shop, detailing, towing, parts or small engine"],
+  ["landscaping", "Landscaping or lawn care"],
+  ["cleaning", "Cleaning or pressure washing"],
+  ["finance", "Tax preparer, accountant, insurance or financial advisor"],
+  ["church", "Church, VFW/Legion/Lions/lodge, food pantry or community center"],
+  ["print", "Print shop, sign shop, screen printing or embroidery"],
+  ["retail", "Shop: boutique, gifts, florist, antiques, thrift, feed, furniture, pet or fish store"],
+  ["general", "Something else: car lot, gym, clinic, daycare, studio, any local business"],
+];
 const note = (text: string): Field => ({ type: "note", text });
 const url = (
   name: string,
@@ -600,6 +614,17 @@ export function editForm(l: EditDetail): EditForm {
       ),
     );
   }
+  card(
+    "kind",
+    "Kind of business",
+    [
+      sel("category", "Kind of business", cat, KIND_OPTIONS),
+      note(
+        "Change this when the site was built as the wrong kind (a truck dealer built as a food truck). Saving with a different kind rebuilds the whole site: the sections and text are redone for the new kind; the name, phone, hours, links, the photos you added, awards and the price list stay.",
+      ),
+    ],
+    { collapsed: true },
+  );
   card("design", "Design", designFields, { kind: "design", collapsed: true });
   if (r.category !== "retail") {
     // The live price list for any business (the shops card carries its own copy of these fields).

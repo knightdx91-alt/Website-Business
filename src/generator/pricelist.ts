@@ -74,7 +74,7 @@ export function listKind(r: BusinessRecord): ListKind {
   const text = `${r.name} ${r.typeLabel ?? ""}`;
   if (r.category === "retail" && r.variant === "pet") return "fish";
   if (r.category === "restaurant") return "food";
-  if (/dealer|motors\b|auto sales|car sales|trailer|equipment|tractor|rv\b|boat|golf cart|powersports/i.test(text)) return "vehicles";
+  if (/dealer|motors\b|auto sales|car sales|truck sales|used (cars|trucks)|pre-?owned|trailer|equipment|tractor|rv\b|boat|golf cart|powersports/i.test(text)) return "vehicles";
   if (r.category === "auto" || /parts|tire|wheel/i.test(text)) return "parts";
   if (r.category === "landscaping" || /nursery|garden|greenhouse|plant/i.test(`${r.name} ${r.typeLabel ?? ""}`)) return "plants";
   if (/aquar|fish|reptile|pet/i.test(`${r.name} ${r.typeLabel ?? ""}`)) return "fish";

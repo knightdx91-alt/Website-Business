@@ -414,6 +414,56 @@ export async function renderPreview(
   });
 }
 
+/** Owner-given facts that stay true whatever kind of site is built: contact, links, photos they sent, proof, the price list. */
+export function carryOver(fresh: BusinessRecord, old: BusinessRecord): BusinessRecord {
+  fresh.name = old.name;
+  fresh.phone = old.phone;
+  fresh.smsEnabled = old.smsEnabled;
+  if (old.email) fresh.email = old.email;
+  if (old.hours) fresh.hours = old.hours;
+  if (old.foundedYear) fresh.foundedYear = old.foundedYear;
+  if (old.ownershipTags?.length) fresh.ownershipTags = old.ownershipTags;
+  fresh.links = { ...fresh.links, ...old.links, social: { ...fresh.links.social, ...old.links.social } };
+  const theirs = (i: { source?: string } | undefined) => !!i && i.source !== "google";
+  if (theirs(old.media.logo)) fresh.media.logo = old.media.logo;
+  if (theirs(old.media.hero)) fresh.media.hero = old.media.hero;
+  fresh.media.gallery = (old.media.gallery ?? []).filter(theirs);
+  for (const k of ["proof", "closures", "visit", "hiring", "seo", "existingSite", "siteImport", "events", "offers", "testimonials"] as const) {
+    const v = old[k];
+    if (v !== undefined && !(Array.isArray(v) && v.length === 0)) (fresh as unknown as Record<string, unknown>)[k] = v;
+  }
+  if (old.reputation?.displayMode === "owner_stated") fresh.reputation = old.reputation;
+  if (old.ext.retail?.priceList) fresh.ext.retail = { ...(fresh.ext.retail ?? {}), priceList: old.ext.retail.priceList } as typeof fresh.ext.retail;
+  fresh.confirmed = old.confirmed.filter((c) => c === "site_photos" || c === "name" || c === "phone" || c === "address" || c === "hours");
+  return fresh;
+}
+
+/** The owner picked a different kind of business in Edit: start the record over from Google's data with the new pack, keep what
+ *  the owner gave us (carryOver), pick a design from the new category and rebuild the site with new copy. */
+export async function recategorizeLead(
+  env: Env,
+  lead: LeadRow,
+  category: CategoryId,
+): Promise<void> {
+  if (!lead.place_json) throw new Error("This lead has no Google data to rebuild from");
+  const place = JSON.parse(lead.place_json) as Place;
+  const fresh = placeToRecord(place, category);
+  if (lead.record_json) carryOver(fresh, JSON.parse(lead.record_json) as BusinessRecord);
+  const look = await chooseLook(env, fresh, lead.id);
+  await updateLead(env, lead.id, {
+    category,
+    record_json: JSON.stringify(fresh),
+    copy_json: null,
+    lint_json: null,
+    pitch_json: null,
+    look,
+    rewrite: 1,
+    status: "queued",
+    error: null,
+  });
+  await env.JOBS.send({ type: "build", leadId: lead.id });
+}
+
 export async function runBuild(
   env: Env,
   job: Extract<Job, { type: "build" }>,

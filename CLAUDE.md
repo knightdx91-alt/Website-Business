@@ -896,6 +896,17 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   address (`visitExtras()`); salons also put the pay list in the trust row. `links.giftCards` → `giftcard` action (restaurant order row,
   retail What's new, salon closing band). Edit: "Awards & proof" and "Closures, parking & payment" cards; Links → Gift cards link.
   Shared helpers: `factList()` (`.facts` dl), `tiles()` (`.tiles` photo tiles), `FormField.type: "date"`.
+- Kind of business (Oct 2026, owner's call on Barbee Truck Sales, a car dealer built as a food truck): Edit → "Kind of business"
+  (web card with "🔁 Rebuild as this kind", `data-eact="rekind"`, `EDIT_CARD_ID` `kind`; editform card `kind` with select `category`
+  from `KIND_OPTIONS`, so Android's Edit has it with no app build: a saved value different from the lead's category rebuilds after the
+  other edits are applied). `POST /api/leads/:id/recategorize {category}` (owner + callers) = `recategorizeLead()` in pipeline.ts:
+  `placeToRecord(place, category)` + `carryOver(fresh, old)` (name, phone, texts, email, hours, founded year, ownership, links,
+  owner/site photos [never Google's], proof, closures, visit, hiring, seo, existing site, events, offers, quotes, the price list,
+  and only the generic confirmations), a look from the new category (`chooseLook`), copy / lint / pitch cleared, `rewrite = 1`,
+  status queued, build job. Dealers: `isDealerName()` in qualify.ts (truck/car/trailer… + sales/dealer, "Motors", pre-owned) →
+  `general` before any other name rule, `TYPE_CATEGORY` sends `*dealer*` types to `general` (was `auto`, the repair pack), the
+  restaurant name rule lost bare "truck", `restaurantVariant` won't call a sales/repair/parts "truck" a food truck, and
+  `listKind` reads "truck sales" / "used cars" as `vehicles`. Barbee was switched by SQL the same way. `test/rekind.test.ts`.
 - Juice bars & nutrition clubs (Oct 2026, owner's call on Hanceville Nutrition): restaurant variant `juice` ("Juice & smoothie bar";
   Google `juice_shop` or a name with juice / smoothie / nutrition / loaded tea / tea bar / shake). `counterService(r)` (juice, coffee,
   bakery, food truck) drops the Dine-in / Takeout chips from the info strip, the "Can I order takeout?" FAQ and the dine-in /

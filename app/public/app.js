@@ -1302,7 +1302,7 @@
   }
 
   /** Edit card heading → editform card id, so a checklist line (#/edit/<id>/<card>) can open the right card. */
-  const EDIT_CARD_ID = { "Confirm with the owner": "confirm", "Design": "design", "Facts (only if the owner says so)": "facts", "Links": "links", "Text": "text", "Menu": "menu", "Services": "services", "Services & area": "services", "Customer quotes": "quotes", "Photo": "photo", "Photo gallery": "gallery", "Spanish page": "es", "We're hiring": "hiring", "Events & specials": "events", "Awards & proof": "proof", "Closures, parking & payment": "visit", "Auto parts details": "parts", "Auto shop details": "auto", "Church & nonprofit details": "church", "Commercial cleaning details": "cleaning", "What's included": "cleaning", "Contractor details": "contractor", "Lawn & landscape details": "landscaping", "Live price list & QR labels": "pricelist", "Plans & pricing": "plans", "Print shop details": "print", "Restaurant details": "restaurant", "Shop details": "retail", "Tax & finance details": "finance", "Salon details": "salon", "Massage details": "salon", "Grooming details": "salon", "Their current website": "site" };
+  const EDIT_CARD_ID = { "Confirm with the owner": "confirm", "Design": "design", "Facts (only if the owner says so)": "facts", "Links": "links", "Text": "text", "Menu": "menu", "Services": "services", "Services & area": "services", "Customer quotes": "quotes", "Photo": "photo", "Photo gallery": "gallery", "Spanish page": "es", "We're hiring": "hiring", "Events & specials": "events", "Awards & proof": "proof", "Closures, parking & payment": "visit", "Auto parts details": "parts", "Auto shop details": "auto", "Church & nonprofit details": "church", "Commercial cleaning details": "cleaning", "What's included": "cleaning", "Contractor details": "contractor", "Lawn & landscape details": "landscaping", "Live price list & QR labels": "pricelist", "Kind of business": "kind", "Plans & pricing": "plans", "Print shop details": "print", "Restaurant details": "restaurant", "Shop details": "retail", "Tax & finance details": "finance", "Salon details": "salon", "Massage details": "salon", "Grooming details": "salon", "Their current website": "site" };
   function tagEditCards(jumpTo) {
     $app.querySelectorAll("section.card").forEach((card) => {
       const h = card.querySelector(":scope > h2");
@@ -1386,6 +1386,9 @@
         <p class="small muted">Optional. Dated things in the owner's words: an event, a sale, a coupon, a deadline, a distribution day. One per line as <b>date | title | time | details | link</b>. Dates are YYYY-MM-DD; write <b>2026-11-01..2026-11-30</b> for something that runs for a while. Past items drop off the site on their own.</p>
         <label class="field">Coming up<textarea name="events" rows="4" placeholder="2026-10-25 | Trunk or Treat | 5–7 PM | Candy, games and hot dogs in the parking lot.&#10;2026-11-01..2026-11-30 | $20 off any brake job | | Mention this website.">${esc(eventLines(r.events))}</textarea></label>
       </section>
+      <section class="card"><h2>Kind of business</h2><label class="field">Kind<select name="category">${PACKS.map(([k, t]) => `<option value="${k}"${k === l.category ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+        <p class="small muted">Change this when the site was built as the wrong kind (a truck dealer built as a food truck). Rebuilding redoes the sections and text for the new kind; the name, phone, hours, links, the photos you added, awards and the price list stay.</p>
+        <button class="btn btn--small" type="button" data-eact="rekind">🔁 Rebuild as this kind</button></section>
       <section class="card"><h2>Design</h2><label class="field">Colors &amp; fonts<select name="lookBase">${l.looks
         .map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}>${esc(x.name)}</option>`)
         .join("")}</select></label>
@@ -1508,6 +1511,18 @@
       const busy = (t) => { b.disabled = true; b.textContent = t; };
       const idle = () => { if (b.isConnected) { b.disabled = false; b.textContent = label; } };
       try {
+        if (act === "rekind") {
+          const cat = form.elements.category.value;
+          if (cat === l.category) return toast("That's already its kind");
+          const name = (PACKS.find(([k]) => k === cat) || [])[1] || cat;
+          if (!confirm(`Rebuild ${r.name}'s site as "${name}"? The sections and text are redone for the new kind (a few minutes). Photos, links and owner facts stay.`)) return;
+          busy("Rebuilding…");
+          await api(`/leads/${id}/recategorize`, { method: "POST", json: { category: cat } });
+          dirty = false;
+          toast("Rebuilding as " + name);
+          go(`#/lead/${id}`);
+          return;
+        }
         if (act === "upload") {
           const file = $app.querySelector("#photo").files[0];
           if (!file) return toast("Choose a photo first");
