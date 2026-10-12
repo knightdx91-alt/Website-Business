@@ -21,7 +21,7 @@ import { designId, LOOKS, parseDesign } from "../generator/themes.ts";
 import { menuToText } from "../generator/menu.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import { packFor } from "../generator/packs/index.ts";
-import { GOOGLE_IMPORT_FIELDS, refreshFromPlace } from "./google-import.ts";
+import { galleryFromPlace, GOOGLE_IMPORT_FIELDS, refreshFromPlace } from "./google-import.ts";
 import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
 import {
   groupById,
@@ -2881,6 +2881,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await addUsage(env, { places: 1 });
       const record = JSON.parse(lead.record_json) as BusinessRecord;
       const changed = refreshFromPlace(record, place);
+      const photos = galleryFromPlace(record, place);
+      if (photos) changed.push(`${photos} Google photo${photos === 1 ? "" : "s"} (preview only)`);
       await updateLead(env, id, {
         place_json: JSON.stringify(place),
         record_json: JSON.stringify(record),
@@ -3153,16 +3155,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         throw new HttpError(409, "This site hasn't finished building yet");
       const key = leadMatch[3];
       const record = JSON.parse(lead.record_json) as BusinessRecord;
+      // "google" removes every preview-only Google photo at once; "google-3" one of them; anything else is an owner file.
       const gone = record.media.gallery.filter((p) =>
-        p.src.startsWith(`/assets/owner/${key}.`),
+        key === "google" ? p.source === "google" : p.src.startsWith(`/assets/owner/${key}.`) || p.src.startsWith(`/assets/img/${key}.`),
       );
       record.media.gallery = record.media.gallery.filter(
         (p) => !gone.includes(p),
       );
       for (const p of gone)
-        await env.BUCKET.delete(
-          `owner/${id}/${p.src.slice("/assets/owner/".length)}`,
-        );
+        if (p.src.startsWith("/assets/owner/"))
+          await env.BUCKET.delete(
+            `owner/${id}/${p.src.slice("/assets/owner/".length)}`,
+          );
       await renderPreview(
         env,
         lead,

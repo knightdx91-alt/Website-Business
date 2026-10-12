@@ -163,7 +163,8 @@ export function lintSite(input: LintInput): LintResult {
   for (const f of ["name", "phone", "address"] as const) if (!r.confirmed.includes(f)) blockers.push(`Owner hasn't confirmed ${f}`);
   if (r.hours && !r.confirmed.includes("hours")) blockers.push("Owner hasn't confirmed hours");
   if (!copy.approved) blockers.push("Owner hasn't approved the site text");
-  const images = [r.media.hero, r.media.logo, ...r.media.gallery].filter(Boolean);
+  // Google gallery photos show in the preview only (the gallery leaves them out when publishing); a Google hero or logo would print.
+  const images = [r.media.hero, r.media.logo].filter(Boolean);
   if (images.some((i) => i!.source === "google")) blockers.push("Google photos must be replaced with owner, stock or AI photos before publishing");
 
   return { errors: [...new Set(errors)], publishBlockers: [...new Set(blockers)], warnings: [...new Set(warnings)] };

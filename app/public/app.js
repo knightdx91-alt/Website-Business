@@ -1268,7 +1268,7 @@
   }
   function galleryCardHtml(id, r) {
     return `<section class="card" id="card-gallery"><h2>Photo gallery</h2>
-        <p class="small muted">Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site.</p>
+        <p class="small muted">Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site.</p>${r.media.gallery.some((p) => p.source === "google") ? `<p class="small muted">${r.media.gallery.filter((p) => p.source === "google").length} of these came from their Google listing (Import from their Google page). They show in the preview only and are left out of the live site. <button class="linkbtn" type="button" data-eact="delphoto" data-photo="google">Remove all Google photos</button></p>` : ""}
         ${r.media.gallery.length ? `<ul class="thumbs" style="grid-template-columns:1fr">${r.media.gallery.map((p) => { const key = photoKey(p.src); return `<li style="text-align:left"><div class="row" style="align-items:flex-start"><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy" style="width:88px;flex:none"><div style="flex:1;min-width:0"><div class="row"><label class="field">Caption<input name="gcap_${esc(key)}" maxlength="80" value="${esc(p.caption || "")}" placeholder="Patio"></label><label class="field">Town<input name="gtown_${esc(key)}" maxlength="40" value="${esc(p.town || "")}" placeholder="Hanceville"></label></div>
             <label class="field">Before/after<select name="gpair_${esc(key)}"><option value="">Not a “before” photo</option>${r.media.gallery.filter((o) => o !== p).map((o) => { const ok = photoKey(o.src); return `<option value="${esc(ok)}"${p.pairWith === ok ? " selected" : ""}>This is the BEFORE of: ${esc(o.caption || o.alt || ok)}</option>`; }).join("")}</select></label>
             <button class="linkbtn" type="button" data-eact="delphoto" data-photo="${esc(key)}">Remove</button></div></div></li>`; }).join("")}</ul>
@@ -1545,7 +1545,7 @@
           toast(files.length === 1 ? "Photo added" : `${files.length} photos added`);
           await refreshCards("card-gallery");
         } else if (act === "delphoto") {
-          if (!confirm("Remove this photo from the site?")) return;
+          if (!confirm(b.dataset.photo === "google" ? "Remove every Google photo from the gallery?" : "Remove this photo from the site?")) return;
           await api(`/leads/${id}/gallery/${b.dataset.photo}`, { method: "DELETE" });
           toast("Photo removed");
           await refreshCards("card-gallery");

@@ -907,8 +907,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `record.googleImportedAt` (`detail().googleImportedAt`, web shows "Refreshed from their Google page <date>"); then `place_json`,
   the `rating` / `review_count` columns and `fetched_at` are updated, `pitch_json` cleared, `rewrite = 1` + a build, so the copy
   follows Google's newest summary and reviews and the Google hero is the newest photo (`heroFromPlace` only replaces a Google
-  hero). Returns `{changed: [words]}` for the toast and the alert. Google photos are still never stored or re-hosted (Places
-  terms); the owner's own photos come through "Import their website" or the Edit uploads. `test/worker/google-import.test.ts`.
+  hero). Returns `{changed: [words]}` for the toast and the alert. **All the listing's photos** (owner's follow-up ask): `galleryFromPlace()`
+  puts every Place photo (up to the 10 Places returns, minus the one used as the Google hero, never for churches) into the gallery
+  after the owner's photos as `source: "google"` images at `/assets/img/google-<n>.jpg` (n = the index in `place.photos`), which the
+  preview route proxies live like the hero (`googleHero(…, index)`, names refreshed on failure); a second import replaces them. They
+  are **preview only**: `gallery()` already leaves Google photos out in publish mode and now adds the suggested to-do "Send us your own
+  photos" under the grid in previews, and `lintSite` blocks publishing only on a Google hero / logo (not gallery photos, which simply
+  don't print). Edit → Photo gallery says how many came from Google with "Remove all Google photos" (`DELETE /gallery/google`; a
+  single one is `/gallery/google-<n>`; the route deletes R2 files only for owner photos). Nothing from Google is ever stored or
+  re-hosted (Places terms); the owner's own photos still come through "Import their website" or the Edit uploads. `test/worker/google-import.test.ts`.
   Local check: run wrangler dev with `--var GOOGLE_PLACES_API_KEY:"$GOOGLE_PLACES_API_KEY"` (the `.dev.vars` key is a placeholder);
   the rebuild then fails on the placeholder Claude key, which is fine for checking the import itself.
 - Kind of business (Oct 2026, owner's call on Barbee Truck Sales, a car dealer built as a food truck): Edit → "Kind of business"

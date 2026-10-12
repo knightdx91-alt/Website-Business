@@ -653,6 +653,7 @@ ${pairs.length ? html`<ul class="pairs">${pairs.map(
     }</li>`,
   )}</ul>` : ""}
 ${rest.length ? html`<ul class="gallery${pairs.length ? " gallery--more" : ""}">${rest.map((p) => html`<li>${cap(p) ? html`<figure>${imageTag(p)}<figcaption>${cap(p)}</figcaption></figure>` : imageTag(p)}</li>`)}</ul>` : ""}
+${photos.some((p) => p.source === "google") ? todo(ctx, "Send us your own photos", "The photos in this gallery come from your Google listing and show in this preview only. The live site uses your own photos (or stock): text us 5 to 10 phone photos of your place, your work and your team.") : ""}
 </div></section>`;
 }
 

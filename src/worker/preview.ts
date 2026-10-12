@@ -16,8 +16,9 @@ async function googleHero(
   env: Env,
   leadId: string,
   place: Place,
+  index = 0,
 ): Promise<Response> {
-  const name = place.photos?.[0]?.name;
+  const name = place.photos?.[index]?.name;
   const tryFetch = async (photoName: string) => {
     const { bytes, contentType: type } = await fetchPhoto(
       env.GOOGLE_PLACES_API_KEY,
@@ -51,12 +52,12 @@ async function googleHero(
   await addUsage(env, { places: 1 });
   if (!res.ok) return new Response("Photo unavailable", { status: 404 });
   const fresh = (await res.json()) as Pick<Place, "photos">;
-  if (!fresh.photos?.length)
+  if (!fresh.photos?.[index])
     return new Response("Photo unavailable", { status: 404 });
   await updateLead(env, leadId, {
     place_json: JSON.stringify({ ...place, photos: fresh.photos }),
   });
-  return tryFetch(fresh.photos[0]!.name);
+  return tryFetch(fresh.photos[index]!.name);
 }
 
 export async function servePreview(
@@ -90,10 +91,12 @@ export async function servePreview(
     });
   }
 
-  if (path === "assets/img/hero.jpg") {
+  // The Google hero and, after "Import from their Google page", the listing's other photos: proxied live for the preview only.
+  const gphoto = path === "assets/img/hero.jpg" ? 0 : Number(path.match(/^assets\/img\/google-(\d{1,2})\.jpg$/)?.[1] ?? -1);
+  if (gphoto >= 0) {
     const lead = await getLead(env, leadId);
     if (!lead?.place_json) return new Response("Not found", { status: 404 });
-    return googleHero(env, leadId, JSON.parse(lead.place_json) as Place);
+    return googleHero(env, leadId, JSON.parse(lead.place_json) as Place, gphoto);
   }
 
   if (path.startsWith("assets/owner/")) {

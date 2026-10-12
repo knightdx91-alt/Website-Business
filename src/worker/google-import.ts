@@ -1,7 +1,12 @@
 import { hoursFromPlaces, restaurantExt } from "../places/to-record.ts";
 import type { Place } from "../places/client.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
-import type { BusinessRecord } from "../generator/types.ts";
+import type { BusinessRecord, Image } from "../generator/types.ts";
+
+/** Preview-only Google gallery photos live at /assets/img/google-<n>.jpg (n = the index in place.photos); the preview route
+ *  proxies them live, nothing is stored, and publish mode leaves them out. */
+export const GOOGLE_GALLERY_PREFIX = "/assets/img/google-";
+export const isGooglePhoto = (p: { source?: string } | undefined): boolean => !!p && p.source === "google";
 
 /** Extra Place Details fields the Google import reads (same price tier as the reviews we already fetch). */
 export const GOOGLE_IMPORT_FIELDS = ["paymentOptions", "parkingOptions", "accessibilityOptions"];
@@ -27,6 +32,33 @@ function flags(obj: unknown, table: Array<[string, string]>): string[] {
   const out = table.filter(([k]) => o[k] === true).map(([, l]) => l);
   // "Cash only" says it all; the card lines would contradict it.
   return out.includes("Cash only") ? ["Cash only"] : out;
+}
+
+/** Every photo on the Google listing (up to the 10 Places returns) as preview-only gallery photos, after the owner's own.
+ *  Replaces any Google photos imported before; skips the one already used as the hero; never for churches (people, children). */
+export function galleryFromPlace(record: BusinessRecord, place: Place): number {
+  const own = record.media.gallery.filter((p) => !isGooglePhoto(p));
+  if (record.category === "church") {
+    record.media.gallery = own;
+    return 0;
+  }
+  const photos = place.photos ?? [];
+  const start = record.media.hero?.source === "google" ? 1 : 0;
+  const room = Math.max(0, 24 - own.length);
+  const imgs: Image[] = photos.slice(start, start + room).map((photo, k) => {
+    const w = Math.min(photo.widthPx, 1600);
+    const author = photo.authorAttributions?.[0];
+    return {
+      src: `${GOOGLE_GALLERY_PREFIX}${start + k}.jpg`,
+      alt: "",
+      source: "google",
+      width: w,
+      height: Math.round((w / photo.widthPx) * photo.heightPx),
+      attribution: author ? { name: author.displayName, uri: author.uri } : undefined,
+    };
+  });
+  record.media.gallery = [...own, ...imgs];
+  return imgs.length;
 }
 
 /** "Import from their Google page": pull the listing's latest facts into the record without touching anything the owner

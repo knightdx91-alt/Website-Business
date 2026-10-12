@@ -41,3 +41,36 @@ test("Google import refreshes the listing's facts but never what the owner confi
   assert.ok(refreshFromPlace(noFb, place()).includes("Facebook page"));
   assert.equal(noFb.links.social.facebook, "https://www.facebook.com/samplesmokehouse");
 });
+
+test("the Google import puts every listing photo in the gallery for the preview only; publish leaves them out", async () => {
+  const { galleryFromPlace } = await import("../../src/worker/google-import.ts");
+  const { buildSite } = await import("../../src/generator/render.ts");
+  const { sampleCopy } = await import("../fixtures.ts");
+  const photos = Array.from({ length: 6 }, (_, i) => ({ name: `places/x/photos/p${i}`, widthPx: 4000, heightPx: 3000, authorAttributions: [{ displayName: "A Fan", uri: "https://maps.google.com/u" }] }));
+  const r = restaurantRecord({ media: { gallery: [{ src: "/assets/owner/g1.jpg", alt: "Plate", source: "owner" }] } });
+  r.media.hero = { src: "/assets/img/hero.jpg", alt: "", source: "google" };
+  assert.equal(galleryFromPlace(r, place({ photos } as never)), 5, "the hero photo is skipped");
+  assert.equal(r.media.gallery.length, 6);
+  assert.equal(r.media.gallery[0]!.src, "/assets/owner/g1.jpg", "owner photos stay first");
+  assert.equal(r.media.gallery[1]!.src, "/assets/img/google-1.jpg");
+  assert.equal(r.media.gallery[5]!.src, "/assets/img/google-5.jpg");
+  assert.equal(r.media.gallery[1]!.width, 1600);
+  assert.equal(r.media.gallery[1]!.height, 1200);
+  assert.equal(galleryFromPlace(r, place({ photos } as never)), 5, "a second import replaces, never doubles");
+  assert.equal(r.media.gallery.length, 6);
+  const church = restaurantRecord({ category: "church" as never });
+  assert.equal(galleryFromPlace(church, place({ photos } as never)), 0);
+
+  const site = { slug: "t", look: "restaurant.garden_table" };
+  const prev = String((await buildSite({ record: r, copy: sampleCopy(), site, mode: "preview" })).files.get("index.html"));
+  assert.equal((prev.match(/\/assets\/img\/google-\d\.jpg/g) ?? []).length, 5, "the preview shows them");
+  assert.match(prev, /Send us your own photos/);
+  const pubRecord = { ...r, confirmed: ["name", "phone", "address", "hours"] as never, media: { ...r.media, hero: { src: "/assets/owner/h.jpg", alt: "front", source: "owner" } } };
+  const pub = await buildSite({ record: pubRecord, copy: sampleCopy({ approved: true }), site: { ...site, origin: "https://x.pages.dev" }, mode: "publish" }).catch((e: Error) => e);
+  const html = pub instanceof Error ? "" : String(pub.files.get("index.html"));
+  assert.ok(!(pub instanceof Error) || !/Google photos must be replaced/.test(pub.message), "Google gallery photos never block publishing");
+  if (!(pub instanceof Error)) {
+    assert.doesNotMatch(html, /\/assets\/img\/google-/, "and never print on the live site");
+    assert.match(html, /\/assets\/owner\/g1\.jpg/, "the owner photo stays");
+  }
+});
