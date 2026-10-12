@@ -391,7 +391,7 @@ class TapToPayActivity : Activity() {
         close.text = getString(R.string.tapCancel)
     }
 
-    private fun fail(text: String, fixLabel: String?, retryable: Boolean = false, action: (() -> Unit)? = null, cause: Throwable? = null) {
+    private fun fail(text: String, fixLabel: String?, retryable: Boolean = false, cause: Throwable? = null, action: (() -> Unit)? = null) {
         status.text = text
         // Stripe's generic errors ("Unexpected failure") carry the real reason underneath; show it and send it to the server.
         val why = cause?.let { describe(it) }
