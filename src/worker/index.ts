@@ -1508,14 +1508,16 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
               name: z.string().trim().min(1).max(40),
               setup: z.number().min(0).max(100_000),
               monthly: z.number().min(0).max(10_000),
-              includes: z.string().trim().max(500),
+              // The Price list plan's includes text runs past 500 characters, and there are four plans since Oct 2026:
+              // the old limits made every Settings save fail ("plans: Too big"), found through Report a problem.
+              includes: z.string().trim().max(2000),
               payLink: PAY_LINK.optional(),
               payLinkFlex: PAY_LINK.optional(),
               payLinkAnnual: PAY_LINK.optional(),
               payLinkShort: PAY_LINK.optional(),
             }),
           )
-          .max(3),
+          .max(4),
         minMonths: z.number().int().min(0).max(36).optional(),
         shortMonths: z.number().int().min(0).max(36).optional(),
         flexSetup: z.number().min(0).max(10_000).optional(),
