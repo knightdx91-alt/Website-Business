@@ -1495,7 +1495,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   certification path not found" while the owner's worked. `res/xml/network_security_config.xml` (manifest
   `networkSecurityConfig`) trusts the system store PLUS public CA certs in `res/raw/ca_*.pem`: GTS Root R1/R3/R4 + the WE1 / WR1
   intermediates (from pki.goog, verified against the roots), ISRG X1/X2, GlobalSign R3 / ECC R4 / R46 / E46 (roots copied from the
-  build machine's /etc/ssl/certs). No pinning, user CAs still untrusted. When Cloudflare moves to a new intermediate, the roots
+  build machine's /etc/ssl/certs). No pinning. 2.62 alone didn't fix Chris's phone while SSL Labs showed a complete chain trusted
+  by every Android version, so 2.63 also trusts user-installed CAs (`<certificates src="user"/>`): HTTPS-inspecting antivirus / ad
+  blockers / VPNs / work profiles re-sign traffic with a user CA that Chrome accepts and apps (API 24+) refuse by default. When Cloudflare moves to a new intermediate, the roots
   still cover it; refresh WE1/WR1 before Feb 2029. An `SSLException` anywhere on `Api.http` becomes `Api.SECURE_FAIL` (date/time,
   try mobile data, report it) and the raw text goes in `Api.lastSecureError` → the problem report's `detail.tls`. Certificate
   history: certspotter.com's API (crt.sh was down); the container's proxy re-signs TLS, so `openssl s_client` here never shows the
