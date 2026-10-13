@@ -222,12 +222,15 @@ export async function designFor(
   env: Env,
   record: BusinessRecord,
   leadId: string,
-  o: { place?: Place; current?: string; client?: Anthropic } = {},
+  o: { place?: Place; current?: string; client?: Anthropic; brief?: string } = {},
 ): Promise<{ look: string; notes?: DesignNotes }> {
   if (!env.ANTHROPIC_API_KEY) return { look: await chooseLook(env, record, leadId, o.current) };
   const pack = packFor(record.category);
+  // An owner's style request opens every category's looks, so a client's look in any category is off limits too.
   const rows = await env.DB.prepare(
-    "SELECT look, sales_status FROM leads WHERE category = ? AND look IS NOT NULL AND status != 'expired' AND id != ?",
+    o.brief
+      ? "SELECT look, sales_status FROM leads WHERE look IS NOT NULL AND status != 'expired' AND id != ?2 AND (category = ?1 OR sales_status IN ('sold','live'))"
+      : "SELECT look, sales_status FROM leads WHERE category = ?1 AND look IS NOT NULL AND status != 'expired' AND id != ?2",
   )
     .bind(record.category, leadId.split(":")[0])
     .all<{ look: string; sales_status: string }>();
@@ -235,8 +238,9 @@ export async function designFor(
     const client = o.client ?? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
     const r = await directDesign(client, {
       record,
-      looks: pack.looks,
+      looks: o.brief ? Object.keys(LOOKS) : pack.looks,
       preferred: pack.defaultLook(record),
+      brief: o.brief,
       used: rows.results.map((x) => x.look),
       taken: [
         ...rows.results.filter((x) => x.sales_status === "sold" || x.sales_status === "live").map((x) => x.look),

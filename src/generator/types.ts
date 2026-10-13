@@ -639,6 +639,8 @@ export interface DesignNotes {
   at: string;
   /** Anything the validator changed about the model's answer ("look x → y"), for the log. */
   fixes?: string[];
+  /** The owner's style request this design answers ("hippie", "bright and happy kids' world"), when one was typed. */
+  asked?: string;
 }
 
 export interface OwnerProof {

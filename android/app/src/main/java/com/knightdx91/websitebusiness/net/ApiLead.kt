@@ -14,7 +14,7 @@ data class DnaValue(val id: String, val name: String)
 data class DnaKnob(val id: String, val letter: String, val label: String, val values: List<DnaValue>)
 
 /** Why the site looks the way it does, from the art director ("A chalkboard menu board": "Your reviews are all about…"). */
-data class DesignNotes(val concept: String, val why: String)
+data class DesignNotes(val concept: String, val why: String, /** The owner's style request this design answers, when one was typed. */ val asked: String? = null)
 
 /** A named page structure ("Photo first", "Menu board"…) that `POST /restyle {recipe}` keeps the colors for. */
 data class DnaRecipe(val id: String, val name: String, val about: String)
@@ -115,7 +115,7 @@ data class LeadFull(
                     DnaKnob(k.optString("id"), k.optString("letter"), k.optString("label"), k.optJSONArray("values").objects().map { DnaValue(it.optString("id"), it.optString("name")) })
                 },
                 dnaRecipes = j.optJSONArray("dnaRecipes").objects().map { DnaRecipe(it.optString("id"), it.optString("name"), it.optString("about")) },
-                designNotes = j.optJSONObject("designNotes")?.let { DesignNotes(it.optString("concept"), it.optString("why")) },
+                designNotes = j.optJSONObject("designNotes")?.let { DesignNotes(it.optString("concept"), it.optString("why"), if (it.isNull("asked")) null else it.optString("asked").ifBlank { null }) },
                 dna = dna,
                 layout = j.str("layout"),
                 lookBase = j.str("lookBase"),
@@ -176,10 +176,12 @@ suspend fun Api.addDomain(id: String, domain: String): DomainInfo = DomainInfo.f
 suspend fun Api.removeDomain(id: String) { deleteJson("/leads/$id/domain") }
 
 /** A new look + layout + structure (nothing given), the same colors with a new structure, or a named structure (recipe). */
-suspend fun Api.restyle(id: String, recipe: String? = null, structureOnly: Boolean = false): JSONObject {
+suspend fun Api.restyle(id: String, recipe: String? = null, structureOnly: Boolean = false, brief: String? = null, rewrite: Boolean = false): JSONObject {
     val b = JSONObject()
     if (recipe != null) b.put("recipe", recipe)
     if (structureOnly) b.put("structureOnly", true)
+    // "Describe the style they want": the art director follows the words (any category's looks), optionally rewriting the text to match.
+    if (!brief.isNullOrBlank()) { b.put("brief", brief.trim()); if (rewrite) b.put("rewrite", true) }
     return postJson("/leads/$id/restyle", if (b.length() == 0) null else b)
 }
 

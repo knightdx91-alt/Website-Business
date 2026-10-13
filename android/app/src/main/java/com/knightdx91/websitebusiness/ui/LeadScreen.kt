@@ -598,12 +598,32 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                     Column(Modifier.padding(14.dp)) {
                         Text("🎨 Design", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text("Now: ${detail.designName}", style = MaterialTheme.typography.bodySmall, color = muted)
-                        detail.designNotes?.let { n -> Text("✨ ${n.concept}. ${n.why}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
+                        detail.designNotes?.let { n -> Text("✨ ${n.asked?.let { "Asked for “$it”: " } ?: ""}${n.concept}. ${n.why}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
                         if (l.salesStatus == "sold") Text("🔒 Sold: this design is ${l.name}'s alone now. No other business gets these colors.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
                             Button(onClick = { act("design") { state.api.restyle(id); context.toast("New design ready"); load() } }, enabled = busy == null) { Text("Try another design") }
                             OutlinedButton(onClick = { act("design") { state.api.restyle(id, structureOnly = true); context.toast("New structure ready"); load() } }, enabled = busy == null) { Text("Same colors, new structure") }
                         }
+                        // "Describe the style they want": any words ("hippie", "a kids' play world"); the art director picks from every category's looks.
+                        var brief by rememberSaveable { mutableStateOf("") }
+                        var briefRewrite by rememberSaveable { mutableStateOf(true) }
+                        Text("Or describe the style they want", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 10.dp))
+                        OutlinedTextField(value = brief, onValueChange = { brief = it.take(200) }, placeholder = { Text("e.g. hippie, bright and happy kids' play world") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            STYLE_IDEAS.forEach { idea -> FilterChip(selected = brief == idea, onClick = { brief = idea }, label = { Text(idea) }) }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = briefRewrite, onCheckedChange = { briefRewrite = it })
+                            Text("Also rewrite the words to match", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Button(onClick = {
+                            act("design") {
+                                val r = state.api.restyle(id, brief = brief, rewrite = briefRewrite)
+                                val concept = r.optString("concept").ifBlank { "New design" }
+                                context.toast(if (r.optBoolean("rewriting")) "$concept ready. Rewriting the words to match (about a minute)…" else "$concept ready")
+                                load()
+                            }
+                        }, enabled = busy == null && brief.isNotBlank()) { Text("✨ Design it") }
                         if (busy == "design") Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("Rebuilding the preview…", style = MaterialTheme.typography.bodySmall, color = muted) }
                         if (detail.dnaRecipes.isNotEmpty()) {
                             Text("Or pick a style (keeps the colors)", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 10.dp))
@@ -1158,3 +1178,6 @@ private fun ReferrerPicker(state: AppState, excludeId: String, onClose: () -> Un
         confirmButton = { TextButton(onClick = onClose) { Text("Cancel") } },
     )
 }
+
+/** Starting points for "Describe the style they want" (web STYLE_IDEAS in app.js); the art director takes any words. */
+private val STYLE_IDEAS = listOf("Hippie, groovy 70s", "Bright and happy, a kids' play world", "Clean and businesslike", "Rustic country", "Bold and modern", "Elegant and upscale", "Beachy and relaxed", "Vintage diner")

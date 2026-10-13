@@ -588,7 +588,8 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?:
           paragraphs: record.existingSite.paragraphs.length,
         }
       : null,
-    looks: pack.looks.map((id) => {
+    // A look borrowed from another category (an owner's style request) stays in the pickers, so a save never resets it.
+    looks: [...new Set([...(l.look && !pack.looks.includes(parseDesign(l.look).look) && LOOKS[parseDesign(l.look).look] ? [parseDesign(l.look).look] : []), ...pack.looks])].map((id) => {
       const owner = o.sold ? lookOwner(o.sold, id) : undefined;
       return { id, name: LOOKS[id]?.name ?? id, ...(owner ? { soldTo: owner.name } : {}) };
     }),
@@ -600,7 +601,7 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?:
     dnaOrder: DNA_ORDER,
     dnaRecipes: RECIPES[l.category as CategoryId] ?? [],
     /** The art director's concept and reason for this design, when it picked it (null for hand-rolled or older designs). */
-    designNotes: record?.designNotes ? { concept: record.designNotes.concept, why: record.designNotes.why, at: record.designNotes.at } : null,
+    designNotes: record?.designNotes ? { concept: record.designNotes.concept, why: record.designNotes.why, at: record.designNotes.at, asked: record.designNotes.asked ?? null } : null,
     dna: l.look ? (parseDesign(l.look).dna ?? LEGACY_DNA) : null,
     layout: l.look ? layoutOf(l.look) : null,
     lookBase: l.look ? parseDesign(l.look).look : null,
@@ -3129,8 +3130,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         ? ((await req.json().catch(() => ({}))) as {
             recipe?: string;
             structureOnly?: boolean;
+            /** What the owner asked for ("hippie", "bright and happy kids' world"); the art director follows it. */
+            brief?: string;
+            /** Also rewrite the words in that style (keeps the new design). */
+            rewrite?: boolean;
           })
         : {};
+      const brief = typeof want.brief === "string" ? want.brief.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+      if (brief && !env.ANTHROPIC_API_KEY)
+        throw new HttpError(409, "Designing from a description needs the Claude key on the server");
       const recipe = want.recipe
         ? (RECIPES[record.category] ?? []).find((r) => r.id === want.recipe)
         : undefined;
@@ -3151,15 +3159,23 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         const d = await designFor(env, record, `${id}:${Date.now()}`, {
           place: lead.place_json ? (JSON.parse(lead.place_json) as Place) : undefined,
           current: lead.look ?? undefined,
+          brief: brief || undefined,
         });
+        if (brief && !d.notes) throw new HttpError(502, "The designer couldn't answer just now. Try again in a minute.");
         look = d.look;
         if (d.notes) record.designNotes = d.notes;
         else delete record.designNotes;
       }
       if (recipe || want.structureOnly) delete record.designNotes; // the concept no longer matches a hand-rolled structure
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), look);
-      await siteUpdated(env, session, lead, ["new design"]);
-      return json({ ok: true, look });
+      // The words follow the request too: the rebuild keeps this design and hands its tone notes to the copywriter.
+      const rewriting = !!(brief && want.rewrite && !recipe && !want.structureOnly);
+      if (rewriting) {
+        await updateLead(env, id, { rewrite: 1, status: "queued" });
+        await env.JOBS.send({ type: "build", leadId: id });
+      }
+      await siteUpdated(env, session, lead, [brief ? `new design: "${brief}"` : "new design", ...(rewriting ? ["text rewritten"] : [])]);
+      return json({ ok: true, look, rewriting, concept: record.designNotes?.concept ?? null });
     }
     // The site editor as data for the Android app: cards + fields in, field values out (same edits as the web editor).
     if (action === "/editform" && m === "GET") {

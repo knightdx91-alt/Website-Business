@@ -23,7 +23,7 @@ import type { BusinessRecord, CategoryId, DesignNotes } from "../generator/types
 
 export const DEFAULT_DESIGN_MODEL = "claude-opus-5-5";
 /** Bump when the rules or the catalog wording change in a way worth noting in `DesignNotes.model`. */
-export const DESIGN_PROMPT_VERSION = 1;
+export const DESIGN_PROMPT_VERSION = 2;
 
 const Schema = z.object({
   look: z.string().max(60).describe("The look id from LOOKS, spelled exactly (e.g. restaurant.pit_plank)."),
@@ -56,6 +56,7 @@ What a good pick does:
 - Keep it buildable: centered text only on one-column openings (stack, cover, statement, banner, billboard); a marquee address line never with a utility top bar or a proof band; poster type only with short headlines.
 - The phone view is what the owner sees first. Vary it on purpose with the phone, trust and heads knobs (how the opening's buttons sit, how the trust line reads, how section headings look), so two neighbors never share the same phone chrome; "bar" (buttons only in the bottom bar) suits trades and shops with a strong name, "link" suits calm pages, "natural" suits short labels.
 - A paying client's design is theirs: never their look, and not their layout or opening either while others fit.
+- When the business carries an "owner's style request" (the salesperson typed what the owner asked for, like "hippie", "bright and happy, a kids' play world", "clean and businesslike"), that request wins over everything above except buildability, the taken list and the photo facts. The catalog then holds looks from every category: pick the one whose colors and fonts carry that feeling best, wherever it comes from, and set the knobs that push it further (rounded or pill buttons, motifs, tone, scale, centered openings for playful requests; quiet spacing and serif or plain sans for businesslike ones). Say in "concept" and "why" how the pick answers the request, and put the request's tone in "copyNotes" so the words match.
 Return only ids that exist in the catalog, spelled exactly. The "why" is for a salesperson talking to the owner: plain words, specific to this business, no design jargon.`;
 
 /* ---------- describing the catalog ---------- */
@@ -113,11 +114,12 @@ function describeLook(l: LookDef): string {
 }
 
 /** The catalog a category's picks come from, as text the director reads: looks, layouts, recipes and every knob. */
-export function catalogFor(category: CategoryId): string {
-  const looks = Object.values(LOOKS).filter((l) => l.category === category);
+export function catalogFor(category: CategoryId, o: { allLooks?: boolean } = {}): string {
+  // With an owner's style request the looks come from every category (a "kids' play world" look may live under retail).
+  const looks = Object.values(LOOKS).filter((l) => o.allLooks || l.category === category);
   const knobs = DNA_KNOB_IDS.map((k) => `${k} (${DNA_LABELS[k].label}): ${(DNA_KNOBS[k] as readonly string[]).map((v) => `${v}=${(DNA_LABELS[k].values as Record<string, string>)[v]}`).join(", ")}`);
   return [
-    "LOOKS (colors + fonts; id · name: description)",
+    o.allLooks ? "LOOKS from every category (colors + fonts; id · name: description)" : "LOOKS (colors + fonts; id · name: description)",
     ...looks.map(describeLook),
     "",
     "LAYOUTS (page skeleton; id · name: description)",
@@ -146,6 +148,8 @@ export interface DirectorInput {
   reviews: string[];
   editorialSummary?: string;
   hints: DnaHints;
+  /** What the owner asked for, typed by the salesperson ("hippie", "bright and happy kids' world"); opens the catalog to every look. */
+  brief?: string;
   /** Seeds the knobs the director leaves open (the lead id, or lead id + time for a restyle). */
   seed: string;
   model?: string;
@@ -190,6 +194,7 @@ function businessText(i: DirectorInput): string {
     i.editorialSummary ? `google's summary: ${i.editorialSummary}` : "",
     i.reviews.length ? `what reviews praise (background only):\n${i.reviews.slice(0, 5).map((t, n) => `  [${n + 1}] ${t.slice(0, 300)}`).join("\n")}` : "",
     `hints: ${i.hints.noPhoto ? "no owner photo, so open without one (statement, billboard or banner)" : "owner photo available"}${i.hints.proof ? "; owner proof given, show the proof band" : ""}`,
+    i.brief ? `OWNER'S STYLE REQUEST (wins over the category's usual style): "${i.brief}"` : "",
     cur ? `replacing: ${LOOKS[cur.look]?.name ?? cur.look} with a ${cur.dna?.hero ?? "stack"} opening (the owner wants something clearly different)` : "",
     takenNames.length ? `taken (never): ${takenNames.join(", ")}` : "",
     usedNames.length ? `in use nearby (prefer others): looks ${usedNames.join(", ")}${openings.length ? `; openings ${openings.join(", ")}` : ""}` : "",
@@ -281,7 +286,7 @@ export async function directDesign(client: Anthropic, i: DirectorInput): Promise
     system: [
       { type: "text", text: SYSTEM },
       // The catalog is the same for every business in a category, so it is cached across a run.
-      { type: "text", text: `<catalog category="${i.record.category}">\n${catalogFor(i.record.category)}\n</catalog>`, cache_control: { type: "ephemeral" } },
+      { type: "text", text: `<catalog category="${i.record.category}"${i.brief ? ' looks="all"' : ""}>\n${catalogFor(i.record.category, { allLooks: !!i.brief })}\n</catalog>`, cache_control: { type: "ephemeral" } },
     ],
     messages: [{ role: "user", content: `<business>\n${businessText(i)}\n</business>\n\nPick the design for this business.` }],
     betas: ["server-side-fallback-2026-07-01"],
@@ -300,6 +305,7 @@ export async function directDesign(client: Anthropic, i: DirectorInput): Promise
     model: `${model}/v${DESIGN_PROMPT_VERSION}`,
     at: new Date().toISOString().slice(0, 16).replace("T", " "),
     fixes: fixes.length ? fixes : undefined,
+    ...(i.brief ? { asked: i.brief } : {}),
   };
   return { design, notes, usage: { input: res.usage.input_tokens, output: res.usage.output_tokens }, model, raw };
 }

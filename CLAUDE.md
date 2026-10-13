@@ -1502,6 +1502,16 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   try mobile data, report it) and the raw text goes in `Api.lastSecureError` → the problem report's `detail.tls`. Certificate
   history: certspotter.com's API (crt.sh was down); the container's proxy re-signs TLS, so `openssl s_client` here never shows the
   real chain (SSL Labs' API does).
+- ✨ Describe the style they want (Oct 2026, owner's ask; Android 2.64): the lead page's Design card has a text box "Or describe the
+  style they want" + idea chips (`STYLE_IDEAS` in app.js and LeadScreen.kt: Hippie, Bright and happy kids' play world, Clean and
+  businesslike, Rustic country…) + "Also rewrite the words to match" (on by default) + "✨ Design it" = `POST /restyle {brief, rewrite}`
+  (≤200 chars). `designFor(…, {brief})` hands the art director `DirectorInput.brief`: the catalog becomes every category's 275 looks
+  (`catalogFor(cat, {allLooks})`, ~24k tokens, cached per category; ~10–15¢ a request), the business text leads with "OWNER'S STYLE
+  REQUEST (wins over the category's usual style)", the SYSTEM rule says the request beats category conventions but not buildability,
+  the taken list or the photo facts, and `taken` then includes paying clients' looks from every category. `DesignNotes.asked` keeps
+  the request ("Asked for "…":" before the concept on both apps). With `rewrite` the route sets `rewrite = 1` and queues a build, which
+  keeps the new look and passes the director's `copyNotes` (the request's tone) to the copywriter. A look borrowed from another
+  category is listed first in `detail().looks`, so the Edit pickers keep it. Prompt version 2. `test/art-director.test.ts` (last test).
 - Tap the tank to pay (Oct 2026, plan only, NOT built): one NFC sticker + QR per tank opens that tank's page, the customer pays
   on the phone (Stripe Connect to the shop's own account, tax, minimum order), the receipt lists every fish with its tank, the
   cashier scans it on the tablet and ticks lines per tank. Write-up: https://ua-tank-pay.knightdx91.workers.dev (Worker

@@ -935,7 +935,10 @@
   /** Edit card names for the Finish & publish checklist (editform card ids; the web editor tags its cards the same). */
   const CARD_NAME = { confirm: "Confirm with the owner", approved: "Text → approved", photo: "Photo", gallery: "Photo gallery", facts: "Facts", links: "Links", text: "Text", menu: "Menu", services: "Services", quotes: "Customer quotes", design: "Design", pricelist: "Live price list", restaurant: "Restaurant details", retail: "Shop details", print: "Print shop details", parts: "Auto parts details", auto: "Auto shop details", finance: "Tax & finance details", church: "Church & nonprofit details", contractor: "Contractor details", landscaping: "Lawn & landscape details", cleaning: "Cleaning details", salon: "Salon details", plans: "Plans & pricing", es: "Spanish page" };
 
-  async function viewLead(id, intent) {
+  // Starting points for "Describe the style they want" (the art director takes any words).
+const STYLE_IDEAS = ["Hippie, groovy 70s", "Bright and happy, a kids' play world", "Clean and businesslike", "Rustic country", "Bold and modern", "Elegant and upscale", "Beachy and relaxed", "Vintage diner"];
+
+async function viewLead(id, intent) {
     setNav("home");
     const my = renderSeq;
     const l = await api("/leads/" + id);
@@ -992,9 +995,13 @@
       </section>`;
     C.design = `${ready && work && l.salesStatus !== "live" ? `<section class="card"><h2>🎨 Design</h2>
         <p class="small muted">Now: ${esc(lookName)}</p>
-        ${l.designNotes ? `<p class="small" style="margin:0 0 10px">✨ <strong>${esc(l.designNotes.concept)}.</strong> ${esc(l.designNotes.why)}</p>` : ""}
+        ${l.designNotes ? `<p class="small" style="margin:0 0 10px">✨ ${l.designNotes.asked ? `Asked for “${esc(l.designNotes.asked)}”: ` : ""}<strong>${esc(l.designNotes.concept)}.</strong> ${esc(l.designNotes.why)}</p>` : ""}
         ${l.salesStatus === "sold" ? `<p class="small" style="margin:0 0 10px">🔒 Sold: this design is ${esc(l.name)}'s alone now. No other business gets these colors, and any open preview that shared them was given a new design.</p>` : ""}
         <div class="btns btns--full"><button class="btn btn--primary" type="button" data-act="restyle">Try another design</button><button class="btn" type="button" data-act="restructure">Same colors, new structure</button></div>
+        <form id="briefForm" style="margin-top:12px"><label class="field small" style="margin:0"><strong>Or describe the style they want</strong><input name="brief" maxlength="200" placeholder="e.g. hippie, bright and happy kids' play world" autocomplete="off"></label>
+          <div class="row" style="flex-wrap:wrap;gap:6px;margin:6px 0">${STYLE_IDEAS.map((x) => `<button class="btn btn--small" type="button" data-brief="${esc(x)}">${esc(x)}</button>`).join("")}</div>
+          <label class="small" style="display:flex;gap:6px;align-items:center;margin:4px 0 8px"><input type="checkbox" name="rewrite" checked style="width:auto;min-height:0"> Also rewrite the words to match</label>
+          <button class="btn btn--primary" type="submit">✨ Design it</button></form>
         ${(l.dnaRecipes || []).length ? `<p class="small" style="margin:12px 0 6px"><strong>Or pick a style</strong> (keeps the colors)</p><div class="row" style="flex-wrap:wrap;gap:6px">${l.dnaRecipes.map((x) => `<button class="btn btn--small" type="button" data-recipe="${esc(x.id)}" title="${esc(x.about)}">${esc(x.name)}</button>`).join("")}</div>` : ""}
         <label class="field small" style="margin-top:12px">Colors &amp; fonts<select data-look>${l.looks.map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}${x.soldTo && x.id !== l.lookBase ? " disabled" : ""}>${esc(x.name)}${x.soldTo ? ` (sold: ${esc(x.soldTo)})` : ""}</option>`).join("")}</select></label>
         ${(l.looks || []).some((x) => x.soldTo) ? `<p class="small muted" style="margin:6px 0 0">Looks marked "sold" belong to a client now and can't be used for anyone else.</p>` : ""}
@@ -1100,6 +1107,22 @@
       card.querySelector("[data-out=not_interested]").click();
     });
     act("portal", () => openPortal(id));
+    const bf = $app.querySelector("#briefForm");
+    if (bf) {
+      bf.querySelectorAll("[data-brief]").forEach((b) => b.addEventListener("click", () => { bf.brief.value = b.dataset.brief; bf.brief.focus(); }));
+      bf.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const brief = bf.brief.value.trim();
+        if (!brief) { toast("Type the style they want first"); bf.brief.focus(); return; }
+        const btn = bf.querySelector("[type=submit]");
+        btn.disabled = true; btn.textContent = "Designing…";
+        try {
+          const r = await api(`/leads/${id}/restyle`, { method: "POST", json: { brief, rewrite: bf.rewrite.checked } });
+          toast(r.rewriting ? `${r.concept || "New design"} ready. Rewriting the words to match (about a minute)…` : `${r.concept || "New design"} ready`);
+          viewLead(id);
+        } catch (err) { btn.disabled = false; btn.textContent = "✨ Design it"; throw err; }
+      });
+    }
     act("restyle", async () => { await api(`/leads/${id}/restyle`, { method: "POST" }); toast("New design ready"); viewLead(id); });
     act("googleimport", async () => { const r = await api(`/leads/${id}/googleimport`, { method: "POST" }); toast(r.changed.length ? "Updated: " + r.changed.join(", ") + ". Rewriting…" : "Nothing new on Google. Rewriting with the latest summary…"); setTimeout(() => viewLead(id), 1500); });
     act("webcheck", async () => { const r = await api(`/leads/${id}/webcheck`, { method: "POST" }); toast(r.found ? `Found: ${r.label}` : "Nothing found beyond their Google listing"); viewLead(id); });

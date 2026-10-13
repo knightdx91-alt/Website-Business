@@ -152,3 +152,32 @@ test("directDesign sends the cached catalog and the business facts, and returns 
   assert.ok(parseDesign(res.design).dna, "a full dna id");
   assert.notDeepEqual(parseDesign(res.design).dna, LEGACY_DNA);
 });
+
+test("an owner's style request opens every category's looks, leads the brief and is kept on the notes", async () => {
+  const all = catalogFor("contractor", { allLooks: true });
+  assert.match(all, /LOOKS from every category/);
+  for (const id of ["general.playtime ·", "salon.bubblegum ·", "restaurant.pit_plank ·", "church.hymnal ·"]) assert.ok(all.includes(id), id);
+  // A contractor asking for "a kids' play world" can get the general pack's Playtime look.
+  const record = categoryRecord("contractor");
+  const allLooks = Object.keys((await import("../src/generator/themes.ts")).LOOKS);
+  const out = settlePick(pick({ look: "general.playtime", alsoGood: [], layout: "classic", recipe: "", knobs: [] }), input({ record, looks: allLooks, preferred: packFor("contractor").looks[0], brief: "bright and happy kids' play world" }));
+  assert.equal(parseDesign(out.design).look, "general.playtime");
+  // Without the request the same pick falls back inside the category.
+  const plain = settlePick(pick({ look: "general.playtime", alsoGood: [], layout: "classic", recipe: "", knobs: [] }), input({ record, looks: packFor("contractor").looks, preferred: packFor("contractor").looks[0] }));
+  assert.notEqual(parseDesign(plain.design).look, "general.playtime");
+  // A client's look stays theirs even across categories.
+  const taken = settlePick(pick({ look: "general.playtime", alsoGood: ["salon.bubblegum"], layout: "classic", recipe: "", knobs: [] }), input({ record, looks: allLooks, taken: ["general.playtime~classic"], brief: "kids" }));
+  assert.equal(parseDesign(taken.design).look, "salon.bubblegum");
+
+  const calls: Array<Record<string, unknown>> = [];
+  const client = {
+    beta: { messages: { parse: async (req: Record<string, unknown>) => { calls.push(req); return { stop_reason: "end_turn", parsed_output: pick({ look: "general.playtime", alsoGood: [], layout: "classic", recipe: "", knobs: [] }), content: [], usage: { input_tokens: 24000, output_tokens: 200 } }; } } },
+  } as unknown as Anthropic;
+  const res = await directDesign(client, input({ record, looks: allLooks, brief: "Hippie, groovy 70s" }));
+  const system = calls[0]!.system as Array<{ text: string }>;
+  assert.match(system[0]!.text, /owner's style request/);
+  assert.match(system[1]!.text, /<catalog category="contractor" looks="all">/);
+  assert.match((calls[0]!.messages as Array<{ content: string }>)[0]!.content, /OWNER'S STYLE REQUEST \(wins over the category's usual style\): "Hippie, groovy 70s"/);
+  assert.equal(res.notes.asked, "Hippie, groovy 70s");
+  assert.equal(parseDesign(res.design).look, "general.playtime");
+});
