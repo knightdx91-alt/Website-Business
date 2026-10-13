@@ -112,7 +112,82 @@ each new feature now costs about 1.6× what it would on one client. Worth knowin
 
 ## 4. What the outside evidence says
 
-(Filled from the two research passes; see §7 for sources.)
+### 4.1 The market (what the incumbents charge, how they sell, why customers leave them)
+
+| Player | Price and term | How they sell | What customers complain about |
+|---|---|---|---|
+| Thryv | $99/mo self-serve starter; $399/mo signature; 6-month to 2-year terms reported | Phone "business advisors" plus outside reps | Trustpilot 2.6/5 (58% one-star): trials that became contracts, no cancel button, invoices after cancelling, promises not delivered |
+| Hibu | Custom quotes, about $449/mo in listings; 6–12-month terms plus a setup fee | Territory field reps cold-calling and visiting ($54k base, ~$102k year-one target, 12 weeks of training) | 109 BBB complaints in three years: refused to end contracts, duplicate listings, broken links |
+| Townsquare Interactive | About $300–400/mo on 6-month agreements | 120+ inside reps cold-calling nationwide | 45% one-star: balance owed on early exit, domain not under the client's control, slow changes, generic sites |
+| GoDaddy / Web.com design services | $500 one-time build plus hosting; "$500 to $5,000" | Inbound | Renewal price jumps |
+| "$0 down" subscription agencies | $99–199/mo, 6–12-month minimums, early exit = remaining months | Referrals and inbound; one such business for sale shows 38 clients at ~$269/mo, 76% margins, grown on referrals | Not researched |
+| Freelancers / small agencies | $500–1,500 entry, $3,000–8,000 local agency, one-time | Inbound | |
+
+Where Underground Associates sits: $49–149 a month with no setup fee on a six- or twelve-month term is a third to a
+quarter of Thryv Signature and Townsquare, at parity with Thryv's $99 self-serve tier, and at the bottom of the "$0
+down" agency band. The incumbents' complaint columns are the pitch: trial-to-contract surprises, cancellation friction,
+slow changes and domain lock-in are exactly what the agreement already promises against (own domain and content, exit
+copy, changes by request, cancel at the end of the term).
+
+### 4.2 Benchmarks (each with its source and caveat)
+
+| Metric | Number | Source |
+|---|---|---|
+| Cold-call live-answer rate per dial | 5.4% average, 13.3% top quartile | Gong, 300M+ B2B calls, 2024 (vendor) |
+| Dials per live conversation | 19 average, 8 top quartile | Gong |
+| Meeting booked per conversation | 4.6% average, 16.7% top quartile | Gong |
+| Attempts to reach a prospect | about 8 (5 for top performers) | Cognism 2025, RAIN Group (secondary) |
+| Call windows | 4–5 PM and 8–10 AM best, mid-day and Monday worst (Oldroyd); 10–11 AM Tuesday (Cognism). By trade: restaurants Tue–Thu 2–4:30 PM, trades 7–8 AM or 4:30–6 PM, salons Tue–Wed 9–10 AM (unattributed, treat as hypotheses) | Ooma/Oldroyd, Cognism, MapsLeads |
+| Door-to-door close rate | 1–3% of doors, 5–8% for the best; 20–40 conversations per 100 doors | ecanvasser, no dataset cited |
+| Local web design, proposal to close within 30 days | 8–35% across three resellers; cycles of 30–90 days | SEOReseller webinar (vendor) |
+| Preview-first ("spec site") lift | No independent evidence; vendors assert it. Our own funnel is the best data there is | |
+
+At Gong's averages a caller needs roughly 400 dials per booked meeting; at top-quartile rates about 45. The preview
+and the opened-preview beacon are the lever most reps lack: the prospect sees the product before the meeting.
+
+### 4.3 Retention
+
+- Price band drives churn: median monthly customer churn is 6.1% under $25 of revenue per account and 2.2% above $500
+  (ChartMogul). At $49–149 the natural rate is 3–5% a month unless the company behaves like a higher-priced vendor.
+- GoDaddy keeps about 85% of customers a year and 90% of those past three years; Thryv says a second paid product cuts a
+  customer's churn by as much as half; Townsquare's top cancellation reason is "the client went out of business".
+- About a third of subscription churn is involuntary (failed cards), per Recurly's network data. Stripe's card updater
+  and retry settings fix most of it for free.
+- Agency clients' top exit reason is "dissatisfaction with delivery" (48%, Setup 2025). A small subscription-website
+  agency for sale reports three-year average tenure, all referral-sourced.
+- The arithmetic on the $89 plan: 5% monthly churn → 20 months → $1,780 per client; 3% → $2,970; 2% → $4,450;
+  GoDaddy-like retention → about $6,600. The twelve-month minimum sets a $1,068 floor.
+
+### 4.4 Outreach rules in plain words (get one lawyer read; this is research, not advice)
+
+- Federal: business-to-business calls are exempt from the Do Not Call registry and most of the Telemarketing Sales Rule,
+  but a cell phone an owner uses for both the shop and home can count as residential; honor "don't call again" on an
+  internal list within ten business days and keep it five years; human-dialed calls need no consent, autodialed or
+  prerecorded calls and texts to cells do.
+- Alabama: the Alabama Telemarketing Act requires a license ($500 a year per seller plus $50 per salesperson); selling by
+  phone without one is a felony. The business-to-business exemption is narrow and does not fit. The exemption that fits
+  the current motion is "the call books a face-to-face meeting and the sale is completed in person": no pitch to a close
+  on the phone, no payment collector sent. Closing on the phone and texting a checkout link sits outside it. The license
+  is cheaper than the argument.
+- Texting: anything sent by software from a 10-digit number needs A2P 10DLC registration; texts sent one at a time by a
+  human from their own phone after the owner asked for the link (which is what the app does today) are the compliant
+  pattern. Since April 2025 any reasonable "stop" must be honored within ten business days. There is no business
+  exemption for texting; treat every cell number as a consumer number and keep one suppression list shared by calls and
+  texts. Cadence texts to someone who never asked for them are the risk.
+
+### 4.5 Channels others use with this buyer
+
+- Cullman Area Chamber basic membership is $250; member-to-member discount programs and chamber-sponsored mini-site
+  programs exist elsewhere.
+- Free "website workday" events run by SBDCs (Wallace State's SBDC is in Hanceville) where owners bring logins and leave
+  with a site. The app can build the site live in the room.
+- Toast pays non-customer local partners $500 per referred restaurant; Clover and Square pay processing credits for
+  merchant referrals. These are the opening to trade leads with their local reps.
+- BNI reports $62k of closed business per US member a year (self-reported). Facebook groups work only as help-first.
+
+### 4.6 What a four-person sales operation should run on
+
+(From the second research pass; added below when it reports.)
 
 ## 5. Recommendations, in order
 
@@ -178,4 +253,18 @@ five are about getting the existing pipeline worked; nothing new is sold until t
 
 ## 7. Sources
 
-(Appended from the research passes.)
+Market, benchmarks, churn, rules and channels (read in full unless marked snippet): Thryv pricing and Trustpilot; Thryv
+Q1 and Q4 2025 earnings transcripts; Hibu websites and pricing pages, Trustpilot and BBB complaints, a Hibu outside-sales
+job posting; Townsquare Interactive site, Trustpilot, Radio Ink and an investor write-up, an inside-sales job posting;
+Network Solutions web design services; GoDaddy plan listings (snippet); Wix Studio partner program and revenue share;
+Duda pricing; Squarespace Circle; a "$0 down" agency page and an Acquire.com listing of a 38-client subscription agency;
+2026 website-cost roundups; Gong "300M calls" study; Cognism cold-calling and call-timing posts; Ooma on Oldroyd's call
+timing study; MapsLeads trade windows (unattributed); RAIN Group prospecting research; ecanvasser door-to-door ratios;
+Prospeo on sales cycles; an SEOReseller webinar on close rates; PitchSites and two "spec site" posts; ChartMogul churn
+benchmarks and the 2023 retention report; Recurly churn benchmarks (July 2026); GoDaddy's 2025 10-K; the 2026 "agency
+trust gap" survey; FTC Telemarketing Sales Rule guidance; 47 CFR 64.1200; National Law Review on business numbers and
+the TCPA (Miholich); Kelley Drye on the April 2025 revocation rules, the vacated one-to-one consent rule and the Seventh
+Circuit text ruling; Alabama Attorney General on the Alabama Telemarketing Act; Ala. Code § 8-19A-4 and § 8-19C-2;
+Twilio's A2P 10DLC and SMS compliance guides; the Cullman Area Chamber membership tiers; chamber discount and mini-site
+programs (Bonita Springs, Rose Hill); an SBA/SBDC "website workday" event; Clover and Square referral terms; Toast Local
+Partner FAQ (snippet); BNI 2025 mid-year report; direct-mail response benchmarks (ANA via directmail.io).
