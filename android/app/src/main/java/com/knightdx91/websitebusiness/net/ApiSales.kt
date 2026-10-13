@@ -9,7 +9,7 @@ import java.net.URL
 /** One row of the week / month table: calls logged by one person. */
 data class SalesRow(val person: String, val calls: Int, val reached: Int, val interested: Int, val sold: Int)
 
-data class CommissionOwed(val person: String, val sales: Int, val amount: Double)
+data class CommissionOwed(val person: String, val sales: Int, val amount: Double, val bonus: Double? = null, val residual: Double? = null)
 
 data class SalesClient(val id: String, val name: String, val status: String, val plan: String?, val monthly: Double, val paid: Boolean, val seller: String?)
 
@@ -58,7 +58,7 @@ data class SalesData(
                 week = rows(j, "week"),
                 month = rows(j, "month"),
                 commission = j.optDouble("commission", 0.0),
-                commissionOwed = j.optJSONArray("commissionOwed").objects().map { CommissionOwed(it.optString("person"), it.optInt("sales"), it.optDouble("amount", 0.0)) },
+                commissionOwed = j.optJSONArray("commissionOwed").objects().map { CommissionOwed(it.optString("person"), it.optInt("sales"), it.optDouble("amount", 0.0), if (it.has("bonus")) it.optDouble("bonus") else null, if (it.has("residual")) it.optDouble("residual") else null) },
                 clients = j.optJSONArray("clients").objects().map {
                     SalesClient(it.optString("id"), it.optString("name", ""), it.optString("status"), it.str("plan"), it.optDouble("monthly", 0.0), it.optBoolean("paid"), it.str("seller"))
                 },

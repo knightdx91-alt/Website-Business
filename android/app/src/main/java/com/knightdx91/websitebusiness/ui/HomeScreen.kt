@@ -150,6 +150,7 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { nav.navigate("add") }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Add a business") }
                     OutlinedButton(onClick = { nav.navigate("route") }) { Text("🗺️ Walk-in route") }
+                    OutlinedButton(onClick = { nav.navigate("commission") }) { Text("💰 What I'd earn") }
                     OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
                     OutlinedButton(onClick = { nav.navigate("guide/words") }) { Text("📖 What the words mean") }
                 }

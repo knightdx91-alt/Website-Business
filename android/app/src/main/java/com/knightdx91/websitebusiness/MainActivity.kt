@@ -192,6 +192,7 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
             composable("edit/{id}?card={card}", arguments = listOf(navArgument("card") { type = NavType.StringType; nullable = true; defaultValue = null })) { e -> EditScreen(state, nav, e.arguments?.getString("id") ?: "", e.arguments?.getString("card")) }
             composable("playbook") { PlaybookScreen(state, nav) }
             composable("training") { TrainingScreen(state, nav) }
+            composable("commission") { com.knightdx91.websitebusiness.ui.CommissionScreen(state, nav) }
             composable("costs") { CostsScreen(state, nav) }
             composable("guide/{id}") { e -> GuideScreen(state, nav, e.arguments?.getString("id") ?: "tankboard") }
             composable("showboard/{lead}") { e -> ShowBoardScreen(state, nav, e.arguments?.getString("lead") ?: "") }

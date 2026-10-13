@@ -118,10 +118,9 @@ fun SalesScreen(state: AppState, nav: NavHostController) {
             item {
                 SectionCard("Commission this month") {
                     when {
-                        data.commission <= 0.0 -> Text("Set a commission per sale in Settings.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        data.commissionOwed.isEmpty() -> Text("No caller sales yet this month.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        data.commissionOwed.isEmpty() -> Text("No commission earned yet this month.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         else -> data.commissionOwed.forEach { c ->
-                            Text("${c.person}: ${c.sales} sale${if (c.sales == 1) "" else "s"} × ${moneyDollars(data.commission)} = ${moneyDollars(c.amount)}", modifier = Modifier.padding(top = 4.dp))
+                            Text("${c.person}: ${moneyDollars(c.amount)} (${c.sales} sale${if (c.sales == 1) "" else "s"}" + (if (c.bonus != null) ": ${moneyDollars(c.bonus)} up front + ${moneyDollars(c.residual ?: 0.0)} from earlier clients)" else ")"), modifier = Modifier.padding(top = 4.dp))
                         }
                     }
                 }

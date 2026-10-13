@@ -1,5 +1,6 @@
 package com.knightdx91.websitebusiness.ui
 
+import androidx.compose.runtime.mutableStateMapOf
 import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
@@ -122,6 +123,20 @@ private fun numText(j: JSONObject, key: String, default: String): String {
 private fun truthy(j: JSONObject, key: String): Boolean = !j.isNull(key) && j.optDouble(key, 0.0) != 0.0
 
 /** Blank → null (left out of the JSON, like `undefined`); a number → Long or Double; anything else is an error. */
+/** Settings → Commission fields: key, label, default (the same defaults as DEFAULT_COMMISSION on the server). */
+private val COMMISSION_FIELDS = listOf(
+    Triple("bonusMonths", "Up-front bonus (months of the price)", "1"),
+    Triple("residualPct", "Each later payment (%)", "10"),
+    Triple("residualCapMonths", "Later payments stop after (months, 0 = never)", "24"),
+    Triple("setupPct", "Month-to-month setup fee (%)", "20"),
+    Triple("oneTimePct", "One-time & per-item extras (%)", "20"),
+    Triple("quotePct", "Priced-per-job extras (% of what we charge)", "20"),
+    Triple("openerPct", "Opener's share of the up-front money (%)", "40"),
+    Triple("openerDays", "A lead stays the opener's for (days)", "30"),
+    Triple("clawbackDays", "Clawback window (days)", "60"),
+    Triple("teamPoolPct", "Team pool (% of what clients pay)", "15"),
+)
+
 private fun numOrNull(text: String, label: String): Number? {
     val t = text.trim()
     if (t.isEmpty()) return null
@@ -214,6 +229,12 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
     val addons: SnapshotStateList<AddonForm> = mutableStateListOf()
     var dailyCalls by mutableStateOf(numText(s, "dailyCalls", ""))
     var commission by mutableStateOf(numText(s, "commission", ""))
+    // Settings → Commission (src/worker/commission.ts); blank fields keep the defaults.
+    private val cpJson = s.optJSONObject("commissionPlan") ?: JSONObject()
+    val cp = mutableStateMapOf<String, String>().apply {
+        COMMISSION_FIELDS.forEach { (k, _, def) -> put(k, if (cpJson.has(k)) cpJson.optDouble(k).let { if (it == Math.floor(it)) it.toLong().toString() else it.toString() } else def) }
+    }
+    var cpOwnerEarns by mutableStateOf(cpJson.optBoolean("ownerEarns", false))
     var terms by mutableStateOf(s.txt("terms").ifEmpty { defaultTerms })
     var cap by mutableStateOf(numText(s, "defaultCap", "50"))
     var model by mutableStateOf(s.txt("copyModel"))
@@ -321,7 +342,10 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
             addonsArr.put(o)
         }
         b.put("addons", addonsArr)
-        putNum("commission", commission, "Commission per sale")
+        val cpObj = JSONObject()
+        COMMISSION_FIELDS.forEach { (k, label, _) -> numOrNull(cp[k] ?: "", label)?.let { cpObj.put(k, it) } }
+        cpObj.put("ownerEarns", cpOwnerEarns)
+        b.put("commissionPlan", cpObj)
         val t = terms.trim()
         if (t.isNotEmpty() && t != meta.defaultTerms) b.put("terms", t)
         return b
@@ -625,6 +649,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedButton(onClick = { nav.navigate("playbook") }) { Text("💬 Plans & answers") }
                         OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
+                        OutlinedButton(onClick = { nav.navigate("commission") }) { Text("💰 Commission calculator") }
                         OutlinedButton(onClick = { nav.navigate("guide/words") }) { Text("📖 What the words mean") }
                         ReportProblemButton(state.api, "settings")
                         OutlinedButton(onClick = { nav.navigate("guide/tankboard") }) { Text("📋 Live inventory guide") }
@@ -863,7 +888,13 @@ private fun FeesCard(f: SettingsForm) {
         Field(f.referralMinMonths, { f.referralMinMonths = it }, "Referral: minimum plan (months)", hint = "6 = the 6- or 12-month plan or yearly; month to month never counts", keyboard = KeyboardType.Number)
         SubHead("Team goals & commission")
         Field(f.dailyCalls, { f.dailyCalls = it }, "Daily call goal per person", hint = "Shows as a progress bar on the Today card. 0 = off", keyboard = KeyboardType.Number)
-        Field(f.commission, { f.commission = it }, "Commission per sale (\$)", keyboard = KeyboardType.Decimal)
+        SubHead("💰 Commission")
+        Text("What everyone earns on a sale. Settings → More → 💰 Commission calculator shows any combination with these numbers.", style = MaterialTheme.typography.bodySmall)
+        COMMISSION_FIELDS.forEach { (k, label, _) -> Field(f.cp[k] ?: "", { f.cp[k] = it }, label, keyboard = KeyboardType.Decimal) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Checkbox(f.cpOwnerEarns, { f.cpOwnerEarns = it })
+            Text("The owner earns commission on their own sales (off = the owner's share stays in the company)")
+        }
     }
 }
 

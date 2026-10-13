@@ -401,7 +401,7 @@
     if (stale(my)) return;
     if (!document.getElementById("leads")) {
       $app.innerHTML = `<div class="split"><div><div id="start">${startHtml()}</div><div id="pushask"></div><div id="today"></div><div id="tasks"></div><div id="runs"></div></div><div><section>
-        <div class="btns btns--full" style="margin-bottom:12px">${isOwner() ? `<a class="btn btn--primary" href="#/run">🔎 Find new leads</a>` : ""}<a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a></div>
+        <div class="btns btns--full" style="margin-bottom:12px">${isOwner() ? `<a class="btn btn--primary" href="#/run">🔎 Find new leads</a>` : ""}<a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a><a class="btn" href="#/commission">💰 What I'd earn</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
@@ -2087,6 +2087,114 @@
   }
 
   /** 🎓 Training: the course from /api/training (one source with the Android app), progress saved per person. */
+  /* ---------- commission calculator ---------- */
+  // Exactly what a sale pays each person: plan + way to pay + extras, split or not, owner or not. The server prices the
+  // order with the same code that charges the client (POST /api/commission/quote); the rules live in Settings → Commission.
+  async function viewCommission() {
+    setNav("home");
+    const my = renderSeq;
+    $app.innerHTML = `<section class="card"><h2>💰 Commission calculator</h2><p class="muted">Loading…</p></section>`;
+    let d;
+    try { d = await api("/commission"); } catch (err) { if (stale(my)) return; $app.innerHTML = `<section class="card"><p class="bad">${esc(err.message || NO_CONNECTION)}</p></section>`; return; }
+    if (stale(my)) return;
+    const c = (cents) => (cents < 0 ? "no end" : "$" + (cents / 100).toFixed(2));
+    const R = d.rules;
+    const first = d.plans[0];
+    const st = { plan: first.id, billing: (first.options.find((o) => o.id === "standard") || first.options[0]).id, picks: {}, founder: "", church: false, quote: "", who: "solo", owner: "none" };
+    const planOf = () => d.plans.find((p) => p.id === st.plan) || first;
+    const founders = d.addons.filter((a) => a.founderPick && a.unit !== "month" && a.unit !== "quote");
+    const unitWord = { month: "a month", each: "each", "one-time": "once", quote: "priced per job" };
+    const extraRow = (a) => `<label class="check" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="checkbox" data-pick="${a.index}"> <span style="flex:1 1 180px">${esc(a.name)} <span class="muted small">· ${esc(a.priceText)}</span></span>${a.unit === "each" ? `<input type="number" min="1" max="20" value="1" data-qty="${a.index}" style="width:64px" aria-label="How many">` : ""}</label>`;
+    $app.innerHTML = `<section class="card"><h2>💰 Commission calculator</h2>
+      <p class="small muted">Pick what the client is buying. It shows what each person gets, using the same prices the client is charged. The rules are set by the owner in Settings → Commission.</p>
+      <form id="cf" class="settings-form" onsubmit="return false">
+        <div class="row"><label class="field">Plan<select name="plan">${d.plans.map((p) => `<option value="${esc(p.id)}">${esc(p.name)} · $${p.monthly}/month</option>`).join("")}</select></label>
+        <label class="field">Way to pay<select name="billing"></select></label></div>
+        <label class="check" id="cf-church" hidden><input type="checkbox" name="church"> Church or nonprofit (ministry yearly rate)</label>
+        <h3 style="margin:14px 0 6px">Extras</h3>
+        <div>${d.addons.filter((a) => a.unit !== "quote" || true).map(extraRow).join("")}</div>
+        <label class="field" id="cf-quote" hidden>What we're charging for the priced-per-job extras ($)<input name="quote" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 250"></label>
+        ${founders.length ? `<label class="field">Founding customer's free extra <span class="hint">Free extras earn nothing</span><select name="founder"><option value="">None</option>${founders.map((a) => `<option value="${a.index}">${esc(a.name)}</option>`).join("")}</select></label>` : ""}
+        <h3 style="margin:14px 0 6px">Who made the sale</h3>
+        <label class="check"><input type="radio" name="who" value="solo" checked> One person did it all</label>
+        <label class="check"><input type="radio" name="who" value="split"> One person opened it, someone else closed it</label>
+        <label class="field">The owner in this sale<select name="owner"><option value="none">Not part of it</option><option value="seller">Made the whole sale</option><option value="opener">Opened it</option><option value="closer">Closed it</option></select></label>
+      </form></section>
+      <div id="cq"></div>
+      <section class="card"><h2>Every plan, no extras</h2>
+        <p class="small muted">Up front = when the first payment clears. Each payment after = every later monthly payment, or each yearly renewal. ${R.residualCapMonths ? `Until it stops = everything over the first ${R.residualCapMonths} months.` : "Payments keep earning for as long as the client pays."}</p>
+        <div style="overflow-x:auto"><table class="stats"><thead><tr><th>Plan</th><th>Way to pay</th><th>Client pays first</th><th>Up front</th><th>Each payment after</th><th>First year</th><th>Until it stops</th></tr></thead><tbody>
+        ${d.table.plans.map((r) => `<tr><th scope="row">${esc(r.plan)}</th><td style="text-align:left">${esc(r.billingLabel)}</td><td>${c(r.clientFirst)}</td><td><strong>${c(r.bonus)}</strong></td><td>${c(r.residualEach)}${r.interval === "year" ? "/yr" : "/mo"}</td><td>${c(r.yearOne)}</td><td>${c(r.overCap)}</td></tr>`).join("")}
+        </tbody></table></div></section>
+      <section class="card"><h2>Every extra</h2>
+        <p class="small muted">Extras add to the plan's commission. Pick any mix above to see the exact total.</p>
+        <div style="overflow-x:auto"><table class="stats"><thead><tr><th>Extra</th><th>Price</th><th>Up front</th><th>Each month after</th><th>How</th></tr></thead><tbody>
+        ${d.table.extras.map((e) => `<tr><th scope="row">${esc(e.name)}</th><td>${esc(e.price)}</td><td><strong>${e.unit === "quote" ? `${R.quotePct}%` : c(e.bonus)}</strong></td><td>${e.unit === "month" ? c(e.residualEach) : "—"}</td><td style="text-align:left" class="small">${esc(e.how)}</td></tr>`).join("")}
+        </tbody></table></div></section>
+      <section class="card"><h2>The rules</h2><ul class="list small">
+        <li><strong>Plans and monthly extras:</strong> ${R.bonusMonths === 1 ? "one month" : `${R.bonusMonths} months`} of the price up front, then ${R.residualPct}% of every later payment${R.residualCapMonths ? ` for ${R.residualCapMonths} months from the first payment` : ""}.</li>
+        <li><strong>Paid yearly:</strong> one month's price plus ${R.residualPct}% of the yearly payment up front, then ${R.residualPct}% of each renewal.</li>
+        <li><strong>Month-to-month setup fee:</strong> ${R.setupPct}% of it, up front.</li>
+        <li><strong>One-time and per-item extras:</strong> ${R.oneTimePct}% of what they cost, up front. <strong>Priced per job:</strong> ${R.quotePct}% of what we charge, when it's paid. <strong>Free founder extras:</strong> nothing.</li>
+        <li><strong>Split sales:</strong> the opener gets ${R.openerPct}% of the up-front money, the closer the rest and every later payment. A lead stays the opener's for ${R.openerDays} days after their last logged contact.</li>
+        <li><strong>Clawback:</strong> if the client cancels or is refunded within ${R.clawbackDays} days, the up-front money comes back out of the next payout.</li>
+        <li><strong>The owner:</strong> ${R.ownerEarns ? "earns commission on their own sales like anyone else." : "takes no commission; the owner's share of a sale stays in the company."}</li>
+      </ul></section>`;
+    const f = document.getElementById("cf");
+    const fillBilling = () => {
+      const p = planOf();
+      if (!p.options.some((o) => o.id === st.billing)) st.billing = (p.options.find((o) => o.id === "standard") || p.options[0]).id;
+      f.billing.innerHTML = p.options.map((o) => `<option value="${esc(o.id)}"${o.id === st.billing ? " selected" : ""}>${esc(o.label)}</option>`).join("");
+      document.getElementById("cf-church").hidden = !(st.billing === "annual" && d.churchYearly);
+    };
+    fillBilling();
+    let seq = 0;
+    let timer = null;
+    const run = async () => {
+      const mine = ++seq;
+      const picks = Object.entries(st.picks).map(([index, qty]) => ({ index: Number(index), qty }));
+      const hasQuote = picks.some((p) => (d.addons[p.index] || {}).unit === "quote");
+      document.getElementById("cf-quote").hidden = !hasQuote;
+      try {
+        const q = await api("/commission/quote", { method: "POST", json: { plan: st.plan, billing: st.billing, picks, founder: st.founder === "" ? null : Number(st.founder), church: st.church, quoteDollars: hasQuote && st.quote ? Number(st.quote) : undefined, who: st.who, owner: st.owner } });
+        if (mine !== seq || !document.getElementById("cq")) return;
+        document.getElementById("cq").innerHTML = quoteHtml(q);
+      } catch (err) { if (mine === seq && document.getElementById("cq")) document.getElementById("cq").innerHTML = `<section class="card"><p class="bad">${esc(err.message)}</p></section>`; }
+    };
+    const later = () => { clearTimeout(timer); timer = setTimeout(run, 150); };
+    const quoteHtml = (q) => {
+      const per = q.interval === "year" ? "each yearly renewal" : "each month after";
+      const who = (p) => `${p.role === "Seller" ? "The seller" : `The ${p.role.toLowerCase()}`}${p.owner ? " (the owner)" : ""}`;
+      return `<section class="card card--client"><h2>What this sale pays</h2>
+        <p class="small muted">${esc(q.plan)} · ${esc(q.billingLabel)}. The client pays ${c(q.clientFirst)} first${q.clientEach ? `, then ${c(q.clientEach)} ${q.interval === "year" ? "a year" : "a month"}` : ""}.</p>
+        ${q.payouts.map((p) => `<div style="margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:10px">
+          <p style="margin:0 0 4px"><strong>${esc(who(p))}</strong>${p.keptByCompany ? ` <span class="chip">stays in the company</span>` : ""}</p>
+          <p class="bignum" style="font-size:1.6rem">${c(p.first)} <span class="small muted">up front</span></p>
+          <p style="margin:4px 0 0">${p.each ? `+ ${c(p.each)} ${per}` : "Nothing after the first payment"} · <strong>${c(p.yearOne)}</strong> in the first year${p.overCap >= 0 && p.overCap !== p.yearOne ? ` · ${c(p.overCap)} until it stops` : ""}</p></div>`).join("")}
+        <div style="overflow-x:auto"><table class="stats"><thead><tr><th>What</th><th>Client pays</th><th>Up front</th><th>${q.interval === "year" ? "Each renewal" : "Each month after"}</th></tr></thead><tbody>
+          ${q.items.map((i) => `<tr><th scope="row">${esc(i.what)}<br><span class="small muted" style="font-weight:400">${esc(i.how)}</span></th><td>${esc(i.price)}</td><td>${c(i.bonus)}</td><td>${i.residual ? c(i.residual) : "—"}</td></tr>`).join("")}
+          <tr><th scope="row">Total</th><td></td><td><strong>${c(q.bonus)}</strong></td><td><strong>${q.residualEach ? c(q.residualEach) : "—"}</strong></td></tr>
+        </tbody></table></div>
+        <ul class="list small">${q.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>
+        ${isOwner() ? `<details class="more"><summary>The company's side, first year</summary><ul class="list small"><li>Client pays ${c(q.clientYearOne)}</li><li>Stripe fees about ${c(q.company.stripeYearOne)}</li><li>Commission paid out ${c(q.company.paidOutYearOne)}</li><li>Team pool ${c(q.company.teamPoolYearOne)}</li><li><strong>Left for the company ${c(q.company.leftYearOne)}</strong>, before running costs</li></ul></details>` : ""}
+      </section>`;
+    };
+    f.addEventListener("input", (e) => {
+      const t = e.target;
+      if (t.name === "plan") { st.plan = t.value; fillBilling(); }
+      else if (t.name === "billing") { st.billing = t.value; fillBilling(); }
+      else if (t.name === "church") st.church = t.checked;
+      else if (t.name === "quote") st.quote = t.value;
+      else if (t.name === "founder") st.founder = t.value;
+      else if (t.name === "who") st.who = t.value;
+      else if (t.name === "owner") st.owner = t.value;
+      else if (t.dataset.pick) { const i = t.dataset.pick; if (t.checked) { const q = f.querySelector(`[data-qty="${i}"]`); st.picks[i] = q ? Math.max(1, Math.min(20, Number(q.value) || 1)) : 1; } else delete st.picks[i]; }
+      else if (t.dataset.qty) { const i = t.dataset.qty; if (st.picks[i] !== undefined) st.picks[i] = Math.max(1, Math.min(20, Number(t.value) || 1)); }
+      later();
+    });
+    run();
+  }
+
   async function viewTraining() {
     setNav("home");
     const my = renderSeq;
@@ -3466,9 +3574,10 @@
       <div class="grid grid--2">
         <section class="card"><h2>Monthly revenue</h2><p class="bignum">${money(d.monthlyRevenue)}<span class="small muted"> / month paid</span></p>
           <p class="small muted">${money(d.signedRevenue)}/month signed in total · ${d.clients.length} client${d.clients.length === 1 ? "" : "s"}. Mark a sign-up as paid on the lead once their payment is set up.</p></section>
-        <section class="card"><h2>Commission this month</h2>${d.commission
-          ? d.commissionOwed.length ? `<ul class="list">${d.commissionOwed.map((c) => `<li><strong>${esc(c.person)}</strong>: ${c.sales} sale${c.sales === 1 ? "" : "s"} × ${money(d.commission)} = <strong>${money(c.amount)}</strong></li>`).join("")}</ul>` : `<p class="muted small">No caller sales yet this month.</p>`
-          : `<p class="muted small">Set a commission per sale in <a href="#/settings">Settings</a>.</p>`}</section>
+        <section class="card"><h2>Commission this month</h2>${d.commissionOwed.length
+          ? `<ul class="list">${d.commissionOwed.map((c) => `<li><strong>${esc(c.person)}</strong>: <strong>${money(c.amount)}</strong> <span class="small muted">(${c.sales} sale${c.sales === 1 ? "" : "s"}${c.bonus != null ? `: ${money(c.bonus)} up front + ${money(c.residual)} from earlier clients` : ""})</span></li>`).join("")}</ul>`
+          : `<p class="muted small">No commission earned yet this month.</p>`}
+          <p class="small muted">An estimate from paid sign-ups and the rules in Settings → Commission; Stripe is the record of what cleared. <a href="#/commission">💰 Commission calculator</a></p></section>
         <section class="card"><h2>This week</h2>${table(d.week)}</section>
         <section class="card"><h2>This month</h2>${table(d.month)}</section>
         ${pipe ? `<section class="card"><h2>In the pipeline</h2><p class="bignum">${money(pipe.monthlyIfPlus ?? pipe.shown * plusPlan.monthly)}<span class="small muted"> / month if they all buy ${esc(plusPlan.name)}</span></p>
@@ -3537,7 +3646,7 @@
         <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
       <section class="card"><h2>📖 Guides</h2>
         <p class="small muted">How to set up and sell what we offer, with the exact buttons to tap. Prices in the guides come from Settings.</p>
-        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/training">🎓 Training course</a>${reportBtn()}</div></section>
+        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/training">🎓 Training course</a><a class="btn" href="#/commission">💰 Commission calculator</a>${reportBtn()}</div></section>
       <section class="card"><h2>💵 Costs & usage</h2>
         <p class="small muted">Every outside service the app depends on: what it costs, what we've used this month, when it renews and what stops if it lapses. For whoever minds the bills.</p>
         <div class="btns btns--full"><a class="btn btn--primary" href="#/costs">💵 Open Costs & usage</a><a class="btn" href="#/guide/costs">📖 The guide</a></div></section>
@@ -3827,7 +3936,7 @@
     meta = await api("/meta");
     if (stale(my)) return;
     if (!isOwner()) {
-      $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}<section class="card"><h2>Help</h2><div class="btns btns--full"><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a>${reportBtn()}</div><p class="small muted">Something didn't work? Report it and the owner sees the screen, the step and the error.</p></section></div>`;
+      $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}<section class="card"><h2>Help</h2><div class="btns btns--full"><a class="btn" href="#/commission">💰 What I'd earn</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a>${reportBtn()}</div><p class="small muted">Something didn't work? Report it and the owner sees the screen, the step and the error.</p></section></div>`;
       return bindDevice();
     }
     const [{ last30Days: u }, { callers }] = await Promise.all([api("/usage"), api("/callers")]);
@@ -3921,7 +4030,14 @@
           ${a.name ? `<details class="more"><summary>Contract terms for this extra</summary><label class="field"><span class="sr-only">Contract terms</span><textarea name="addon_${i}_terms" rows="4" maxlength="1500">${esc(a.terms || (meta.extraTerms || [])[i] || "")}</textarea></label><p class="small muted">Shown in the agreement customers sign when they pick this extra.</p></details>` : `<input type="hidden" name="addon_${i}_terms" value="">`}</div>`).join("")}
         <h2 style="margin-top:18px">Team goals &amp; commission</h2>
         <label class="field">Daily call goal per person <span class="hint">Shows as a progress bar on the Up next card. 0 = off</span><input name="dailyCalls" type="number" min="0" max="500" inputmode="numeric" value="${s.dailyCalls ?? ""}"></label>
-        <label class="field">Commission per sale ($)<input name="commission" type="number" min="0" inputmode="decimal" value="${s.commission ?? ""}"></label>
+        ${(() => { const R = Object.assign({ bonusMonths: 1, setupPct: 20, oneTimePct: 20, quotePct: 20, residualPct: 10, residualCapMonths: 24, openerPct: 40, openerDays: 30, clawbackDays: 60, ownerEarns: false, teamPoolPct: 15 }, s.commissionPlan || {}); const num = (k, label, hint, step = "1") => `<label class="field">${label} <span class="hint">${hint}</span><input name="cp_${k}" type="number" min="0" step="${step}" inputmode="decimal" value="${R[k]}"></label>`;
+          return `<h3 style="margin:14px 0 4px">Commission</h3><p class="small muted">What everyone earns on a sale. The <a href="#/commission">💰 Commission calculator</a> shows any combination with these numbers.</p>
+          <div class="row">${num("bonusMonths", "Up-front bonus (months of the price)", "On the plan and monthly extras", "0.5")}${num("residualPct", "Each later payment (%)", "Plan + monthly extras")}</div>
+          <div class="row">${num("residualCapMonths", "Later payments stop after (months)", "0 = never stop")}${num("setupPct", "Month-to-month setup fee (%)", "Paid up front")}</div>
+          <div class="row">${num("oneTimePct", "One-time & per-item extras (%)", "Paid up front")}${num("quotePct", "Priced-per-job extras (%)", "Of what we charge")}</div>
+          <div class="row">${num("openerPct", "Opener's share of the up-front money (%)", "The closer gets the rest + later payments")}${num("openerDays", "A lead stays the opener's for (days)", "After their last logged contact")}</div>
+          <div class="row">${num("clawbackDays", "Clawback window (days)", "Cancel or refund inside it = bonus comes back")}${num("teamPoolPct", "Team pool (% of what clients pay)", "Pays the office staff")}</div>
+          <label class="check"><input type="checkbox" name="cp_ownerEarns"${R.ownerEarns ? " checked" : ""}> The owner earns commission on their own sales (off = the owner's share stays in the company)</label>`; })()}
         <label class="field">Client agreement <span class="hint">Plain-language starting point, not legal advice. Have a lawyer look it over once.</span><textarea name="terms" rows="10">${esc(s.terms || meta.defaultTerms)}</textarea></label>
         <button class="btn btn--small" type="button" id="resetterms">Reset agreement to the standard text</button>
         <h2 style="margin-top:18px">Runs</h2>
@@ -4024,7 +4140,7 @@
             churchAnnualMonthsFree: n(v("churchAnnualMonthsFree")),
             dailyCalls: n(v("dailyCalls")),
             addons,
-            commission: n(v("commission")),
+            commissionPlan: Object.fromEntries([...["bonusMonths", "residualPct", "residualCapMonths", "setupPct", "oneTimePct", "quotePct", "openerPct", "openerDays", "clawbackDays", "teamPoolPct"].map((k) => [k, Number(v("cp_" + k) || 0)]), ["ownerEarns", f.elements.cp_ownerEarns.checked]]),
             terms: terms && terms !== meta.defaultTerms ? terms : null,
           },
         });
@@ -4351,6 +4467,7 @@
       if ((m = /^#\/full\/([a-z0-9]+)(?:\/(es))?$/.exec(h))) return viewFull(m[1], m[2]);
       if ((m = /^#\/pitch\/([a-z0-9]+)$/.exec(h))) return await viewPitch(m[1]);
       if (h === "#/playbook") return await viewPlaybook();
+      if (h === "#/commission") return await viewCommission();
       if (h === "#/training") return await viewTraining();
       if (h === "#/costs") return await viewCosts();
       if ((m = /^#\/guide\/([a-z0-9-]+)$/.exec(h))) return await viewGuide(m[1]);

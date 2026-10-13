@@ -631,6 +631,8 @@ export interface AppSettings {
   addons: AddOn[];
   terms?: string;
   commission?: number;
+  /** Commission & pay rules (src/worker/commission.ts); missing numbers use DEFAULT_COMMISSION. */
+  commissionPlan?: Partial<import("./commission.ts").CommissionRules>;
   /** Old single-price fields, read only to build a plan for settings saved before plans existed. */
   setupPrice?: number;
   monthlyPrice?: number;

@@ -1,3 +1,4 @@
+import { commissionForMonth, commissionRules } from "./commission.ts";
 import { getSettings, type Plan } from "./db.ts";
 import { localDate, type Env } from "./env.ts";
 import { funnel, type FunnelLead } from "./queue.ts";
@@ -193,15 +194,9 @@ export async function salesDashboard(env: Env) {
   const plusPlan =
     settings.plans.find((p) => p.id === "plus") ??
     settings.plans[Math.floor((settings.plans.length - 1) / 2)];
-  const commission = settings.commission ?? 0;
-  // Full-access team members aren't paid commission; callers are.
-  const admins = new Set(
-    (
-      await env.DB.prepare("SELECT name FROM users WHERE admin = 1").all<{
-        name: string;
-      }>()
-    ).results.map((u) => u.name),
-  );
+  // Commission owed this month under Settings → Commission (src/worker/commission.ts): bonuses on this month's paid
+  // sign-ups, split with the opener when the rules say so, plus residuals on earlier paying clients. An estimate.
+  const owed = await commissionForMonth(env, settings, periods.month);
   const month = table(periods.month);
   // The funnel: every lead that ever reached each stage (expired ones included, they were still shown or not).
   const funnelRows = await env.DB.prepare(
@@ -215,14 +210,16 @@ export async function salesDashboard(env: Env) {
     funnel: funnel(funnelRows.results),
     week: table(periods.week),
     month,
-    commission,
-    commissionOwed: month
-      .filter((r) => r.person !== "Owner" && !admins.has(r.person))
-      .map((r) => ({
-        person: r.person,
-        sales: r.sold,
-        amount: r.sold * commission,
-      })),
+    // `commission` stays a number for app builds before 2.60 (they print "sales × $commission"); 0 shows their hint.
+    commission: 0,
+    commissionRules: commissionRules(settings),
+    commissionOwed: owed.map((r) => ({
+      person: r.person,
+      sales: r.sales,
+      amount: r.total / 100,
+      bonus: r.bonus / 100,
+      residual: r.residual / 100,
+    })),
     clients,
     monthlyRevenue: clients
       .filter((c) => c.paid)

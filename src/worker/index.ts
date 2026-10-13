@@ -188,6 +188,7 @@ import {
 } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
 import { mergeSettings } from "./db.ts";
+import { commissionRules, commissionTable, quoteCommission } from "./commission.ts";
 import { blockedSummary, pruneSpamCounters, turnstileState } from "./spam.ts";
 import {
   allowedEndpoint,
@@ -1258,6 +1259,37 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       }),
     });
   }
+  // Commission calculator (everyone): the rules, every plan × way to pay, every extra, and an exact quote for any order.
+  if (path === "/commission" && m === "GET") {
+    const settings = await getSettings(env);
+    const rules = commissionRules(settings);
+    return json({
+      rules,
+      table: commissionTable(settings, rules),
+      plans: settings.plans
+        .filter((p) => p.monthly > 0)
+        .map((p) => ({ id: p.id, name: p.name, monthly: p.monthly, options: billingOptions(p, settings).map((o) => ({ id: o.id, label: o.label })) })),
+      addons: settings.addons.map((a, index) => ({ index, name: a.name, unit: a.unit, price: a.price, priceText: addonPrice(a), founderPick: !!a.founderPick })),
+      churchYearly: !!(settings.churchAnnualMonthsFree ?? 4),
+    });
+  }
+  if (path === "/commission/quote" && m === "POST") {
+    const q = await body(
+      req,
+      z.object({
+        plan: z.string().max(20),
+        billing: z.string().max(20),
+        picks: z.array(z.object({ index: z.number().int().min(0).max(99), qty: z.number().int().min(1).max(20) })).max(40).default([]),
+        founder: z.number().int().min(0).max(99).nullish(),
+        church: z.boolean().optional(),
+        quoteDollars: z.number().min(0).max(100_000).optional(),
+        who: z.enum(["solo", "split"]).optional(),
+        owner: z.enum(["none", "seller", "opener", "closer"]).optional(),
+      }),
+    );
+    const settings = await getSettings(env);
+    return json(quoteCommission(settings, { ...q, founder: q.founder ?? null }));
+  }
   // Alert preferences: everything / my leads / important only, per person.
   if (path === "/notifications/prefs" && m === "GET")
     return json({ mode: await getAlertMode(env, session.userId), modes: ALERT_MODES });
@@ -1577,6 +1609,22 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           .nullish(),
         terms: z.string().trim().max(6000).nullish(),
         commission: z.number().min(0).max(10_000).nullish(),
+        commissionPlan: z
+          .object({
+            bonusMonths: z.number().min(0).max(12),
+            setupPct: z.number().min(0).max(100),
+            oneTimePct: z.number().min(0).max(100),
+            quotePct: z.number().min(0).max(100),
+            residualPct: z.number().min(0).max(100),
+            residualCapMonths: z.number().int().min(0).max(240),
+            openerPct: z.number().min(0).max(100),
+            openerDays: z.number().int().min(1).max(365),
+            clawbackDays: z.number().int().min(0).max(365),
+            ownerEarns: z.boolean(),
+            teamPoolPct: z.number().min(0).max(100),
+          })
+          .partial()
+          .nullish(),
         /** Calls per day the team aims for (home screen progress). */
         dailyCalls: z.number().int().min(0).max(200).nullish(),
         /** Months free for churches and nonprofits paying yearly. */

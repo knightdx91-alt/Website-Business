@@ -1460,9 +1460,24 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   ranked changes) is public read-only at https://ua-app-review.knightdx91.workers.dev (Worker `ua-app-review`, source and build in
   `research/app-review-page/`) and editable for the team as the Claude Doc "App Review, October 2026" (Your call dropdowns +
   a questions table).
-- The commission & pay plan draft (Oct 2026; sole owner Post, team pool for Brenda and Diana, Model A / B for owner commission,
-  40/60 opener/closer split, 60-day clawback) is public read-only at https://ua-commission-plan.knightdx91.workers.dev (Worker
-  `ua-commission-plan`, source in `research/commission-page/`, deployed from inside that folder). Not built in the app yet.
+- 💰 Commission (Oct 2026, Android 2.60; `src/worker/commission.ts`, `test/worker/commission.test.ts`): Settings → Commission
+  (`commissionPlan`, merged over `DEFAULT_COMMISSION`; web form `cp_*` fields + Android `COMMISSION_FIELDS`) holds the rules:
+  `bonusMonths` 1 (one month of the plan and of each monthly extra up front, on the first payment), `residualPct` 10 (every
+  later payment; yearly = one month + 10% of the yearly payment up front, 10% of each renewal; monthly extras on a yearly
+  plan are ×12 like checkout), `residualCapMonths` 24, `setupPct` 20 (month-to-month setup fee), `oneTimePct` 20 (one-time
+  and per-item extras × qty), `quotePct` 20 (priced per job, of what's charged), founder free extras 0, `openerPct` 40 /
+  `openerDays` 30 (split sales: opener = first author of a real-contact note, `CONTACT_OUTCOMES`; closer = signups.sent_by;
+  residuals all to the closer), `clawbackDays` 60, `ownerEarns` false (Model B: the "Owner" session's share stays in the
+  company), `teamPoolPct` 15 (company side only). `quoteCommission(s, input)` prices the order with `priceSignup` (the same
+  code that charges the client) and returns items, bonus, residualEach, first-year and 24-month totals, payouts per role and
+  the company side; `commissionTable()` = every plan × way to pay + every extra. Routes (everyone): `GET /api/commission`,
+  `POST /api/commission/quote`. Calculator: web `#/commission` (`viewCommission`; Home "💰 What I'd earn", Settings Help /
+  Guides), Android `ui/CommissionScreen.kt` (route `commission`; Home + Settings → More). Sales "Commission this month" =
+  `commissionForMonth()` (bonuses on this month's paid sign-ups with the split, residuals on earlier paying clients inside
+  the cap; `quoteFromSignup` re-prices with the plan as signed), an estimate; `commission` in /api/sales is 0 for old builds;
+  the old flat `settings.commission` is no longer used. Team write-up (tables generated from the same functions with the live
+  settings, scratchpad `comm-md.mts`): https://ua-commission-plan.knightdx91.workers.dev (Worker `ua-commission-plan`, source
+  `research/commission-page/`, deployed from inside that folder).
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
