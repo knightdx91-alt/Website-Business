@@ -737,7 +737,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                                     if (info.active) Text("● Working", color = Good, style = MaterialTheme.typography.labelLarge) else Text(info.status ?: "waiting", color = Warn, style = MaterialTheme.typography.labelLarge)
                                 }
                                 if (!info.active) {
-                                    Text("At the company where the domain was bought (GoDaddy, Namecheap…), add this DNS record:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                                    Text("Where the domain lives (our Cloudflare if we bought it, else their GoDaddy, Namecheap…), add this DNS record:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                                     Text("CNAME · name ${info.recordName} · value ${info.target ?: ""}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 2.dp))
                                     TextButton(onClick = { context.copyText("DNS value", info.target ?: ""); context.toast("Copied") }, contentPadding = PaddingValues(0.dp)) { Text("Copy the value") }
                                     Text((if (info.bare) "A bare domain (no www) works best if the domain uses Cloudflare's nameservers. Using www.yourdomain.com is easiest. " else "") + "It can take a few hours. HTTPS is set up automatically." + (info.error?.let { " Last check: $it" } ?: ""), style = MaterialTheme.typography.bodySmall, color = muted)
@@ -753,7 +753,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                                     Spacer(Modifier.width(8.dp))
                                     Button(onClick = { act("domain") { dom = state.api.addDomain(id, domDraft.trim().lowercase()); domDraft = ""; context.toast("Domain added") } }, enabled = busy == null && domDraft.isNotBlank()) { Text("Add") }
                                 }
-                                Text("They buy the domain (about $10–15 a year, at Cloudflare, GoDaddy or Namecheap), then add it here.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
+                                Text("Three ways: the free .pages.dev address (nothing to add), a domain they buy in their name (about \$10–15 a year at Cloudflare, GoDaddy or Namecheap), or we buy it in their name on our Cloudflare (the Domain name extra on their order; included with Pro). Either way it's theirs. Then add it here.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
                             }
                         }
                     }

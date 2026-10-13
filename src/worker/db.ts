@@ -196,6 +196,19 @@ export function addonPrice(a: Pick<AddOn, "price" | "unit">): string {
       : `${p} one-time`;
 }
 
+/**
+ * The three ways a client gets a web address, asked at every sign-up (training, playbook, the lead's domain card, the
+ * agreement): the free <project>.pages.dev address, a domain they buy themselves that we connect, or one we buy for
+ * them in their name and add to their bill (the "Domain name" extra; included with a plan whose list names a domain).
+ * Whichever they pick, the domain belongs to them.
+ */
+export const DOMAIN_EXTRA = /\bdomain\b/i;
+export const isDomainAddon = (a: Pick<AddOn, "name">): boolean =>
+  DOMAIN_EXTRA.test(a.name);
+/** A plan whose includes promise "Your own domain name" (Pro): the Domain name extra is free on it. */
+export const planIncludesDomain = (p: Pick<Plan, "includes"> | undefined): boolean =>
+  !!p && /own domain/i.test(p.includes ?? "");
+
 export const DEFAULT_ADDONS: AddOn[] = [
   {
     name: "Online ordering or booking hookup",
@@ -316,6 +329,13 @@ export const DEFAULT_ADDONS: AddOn[] = [
     group: "inventory",
     about:
       "Count packaged stock in and out by scanning it, on your board with your phone camera or on the tablet. A new code asks for a name once; many products fill it in by themselves.",
+  },
+  {
+    name: "Domain name, bought for you",
+    price: 2,
+    unit: "month",
+    about:
+      "We buy your web address (like yourbusiness.com) in your name and renew it every year, added to your monthly bill. It belongs to you; if you ever leave, we transfer it to you. Included with Pro.",
   },
 ];
 
@@ -682,7 +702,7 @@ export function defaultTerms(
     `7. Payment disputes. Contact us before disputing a charge with your bank; we refund billing mistakes in full. A dispute of a charge that was due under this agreement counts as a missed payment: we may take the site offline right away, and you owe the amount${returnedFeeOf(s) ? `, a ${money2(returnedFeeOf(s))} dispute fee` : ""}${reinstatementFeeOf(s) ? " and the reinstatement fee" : ""} once it's resolved.`,
     '8. Your content stays yours. Your business name, logo, photos, the text about your business and your domain belong to you. You confirm you have the right to use any photos, logo or text you send us, and that what you tell us about your business, prices and licenses is true. The templates, designs and code we build with are ours, and we use them for other businesses too. While your plan is active you may use the site as we host it. We may show your site in our portfolio and keep a small "Website by" line in the footer unless you ask us not to.',
     "9. Website text. We draft your site's text with software from your public listing and what you tell us, then you review it. Check prices, hours, licenses and promises before you approve; once approved, the text is yours and you're responsible for it.",
-    "10. Your domain and email. If you already own your domain it stays yours; we only need DNS changes. If we register one for you, we put it in your name where the registrar allows, pay renewals while your plan is active, and transfer it to you within 10 business days after your final balance is paid (registrars lock a domain against moving for 60 days after an ownership change). Email forwarding to your own inbox is free with plans that include it. A Google mailbox is billed to you by Google under Google's terms; we set it up but don't control Google's prices or service.",
+    "10. Your domain and email. You choose how you get your web address, and whichever you choose, the domain belongs to you: (a) your site uses the free address we give it (such as yourbusiness.pages.dev) at no cost; (b) you buy your own domain, or already own one, in your name and keep paying its registrar, and we only need DNS changes to connect it; or (c) we buy it for you, registered in your name where the registrar allows, and renew it every year while your plan is active, for the domain price on your order (included with plans that list a domain). With (c), we transfer the domain to you within 10 business days after you ask, once your final balance is paid (registrars lock a domain against moving for 60 days after it is bought or changes owner); from then on you renew it yourself. Email forwarding to your own inbox is free with plans that include it. A Google mailbox is billed to you by Google under Google's terms; we set it up but don't control Google's prices or service.",
     "11. If you leave. The site comes down at the end of your last paid period. Ask within 30 days and we'll send you a copy of your site's pages and images to use anywhere for your business (not our build tools or licensed fonts). Any messages sent through your site's forms are yours and are delivered to you as they arrive.",
     "12. What we need from you. Accurate business details; a yes or no on changes within 7 days; valid licenses for anything you ask us to say you're licensed for; and keeping your own accounts (Google, Facebook, booking or ordering services, your domain) in good standing. Tell us when your hours, prices or services change.",
     "13. Other companies' services. Your site runs on Cloudflare, payments go through Stripe, and features like ordering, booking, maps, reviews and email use Google, Square, Toast, Calendly, Booksy or others you choose. Their outages, prices, verification steps and rules are theirs, not ours. If one of them changes in a way that breaks a feature, we'll tell you and quote any work to fix it.",

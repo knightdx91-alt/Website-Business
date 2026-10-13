@@ -1,5 +1,7 @@
 import {
+  isDomainAddon,
   isListPlan,
+  planIncludesDomain,
   addonGroup,
   addonPrice,
   annualMonthsFreeFor,
@@ -83,6 +85,8 @@ function extraLines(
   addons: AddOn[],
   picks: Pick[],
   interval: "month" | "year",
+  /** The plan includes a domain (Pro): the Domain name extra is listed at no charge. */
+  freeDomain = false,
 ) {
   const lines: Line[] = [];
   const extras: PricedOrder["extras"] = [];
@@ -90,6 +94,10 @@ function extraLines(
   for (const p of picks) {
     const a = addons[p.index];
     if (!a) continue;
+    if (freeDomain && isDomainAddon(a)) {
+      extras.push({ name: a.name, qty: 1, price: "included with your plan" });
+      continue;
+    }
     if (a.unit === "quote") {
       quotes.push(a.name);
       continue;
@@ -171,7 +179,7 @@ export function priceSignup(
       amount: Math.round(setup * 100),
       qty: 1,
     });
-  const x = extraLines(s.addons, picks, interval);
+  const x = extraLines(s.addons, picks, interval, planIncludesDomain(plan));
   lines.push(...x.lines);
   // Founding-customer bonus: one free extra, shown on the order at $0 (never sent to Stripe as a line).
   const fp =
@@ -365,12 +373,22 @@ export function pickerHtml(s: AppSettings, o: PickerOptions): string {
     plans: Object.fromEntries(
       plans.map((p) => [
         p.id,
-        { name: p.name, monthly: p.monthly, setup: p.setup ?? 0 },
+        {
+          name: p.name,
+          monthly: p.monthly,
+          setup: p.setup ?? 0,
+          domain: planIncludesDomain(p),
+        },
       ]),
     ),
     flexSetup: s.flexSetup ?? 0,
     free,
-    addons: s.addons.map((a) => ({ price: a.price, unit: a.unit })),
+    addons: s.addons.map((a) => ({
+      price: a.price,
+      unit: a.unit,
+      domain: isDomainAddon(a),
+      text: addonPrice(a),
+    })),
   };
   const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
   const billingLabel = (b: BillingOption) =>
@@ -463,7 +481,7 @@ function v(n){var x=f.querySelector('[name="'+n+'"]:checked:enabled')||f.querySe
 function m(c){return "$"+(c%100?(c/100).toFixed(2):c/100)}
 function u(){var p=d.plans[v("plan")];if(!p)return;var b=v("billing"),inv=b==="${INVOICE_BILLING}",y=b==="annual",iv=y?"year":"month";var today=Math.round(p.monthly*(y?12-d.free:1)*100),again=today;
 var setup=(p.setup||0)+(b==="flex"?d.flexSetup:0);today+=Math.round(setup*100);
-d.addons.forEach(function(a,i){var c=f.querySelector('[name="x_'+i+'"]');if(!c||!c.checked||a.unit==="quote")return;var q=a.unit==="each"?Math.max(1,parseInt((f.querySelector('[name="q_'+i+'"]')||{}).value)||1):1;var amt=Math.round(a.price*100)*q;
+d.addons.forEach(function(a,i){var c=f.querySelector('[name="x_'+i+'"]'),fr=a.domain&&p.domain;if(c&&a.domain){var pp=c.closest(".opt").querySelector(".pk-price");if(pp)pp.textContent=fr?"included with "+p.name:a.text;}if(!c||!c.checked||a.unit==="quote"||fr)return;var q=a.unit==="each"?Math.max(1,parseInt((f.querySelector('[name="q_'+i+'"]')||{}).value)||1):1;var amt=Math.round(a.price*100)*q;
 if(a.unit==="month"){amt=y?amt*12:amt;again+=amt;}today+=amt;});
 var r=f.querySelector('[name="billing"]:checked');if(r&&r.closest("details"))r.closest("details").open=true;
 document.getElementById("pk-today").innerHTML=(inv?"On your first invoice: ":"Due today: ")+"<strong>"+m(today)+"</strong>";document.getElementById("pk-then").textContent="Then "+m(again)+" per "+iv+(inv?", invoiced.":", charged automatically.");

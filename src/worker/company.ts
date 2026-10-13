@@ -3,6 +3,8 @@ import { notify } from "./notify.ts";
 import {
   isListPlan,
   addonPrice,
+  isDomainAddon,
+  planIncludesDomain,
   billingOptions,
   defaultTerms,
   getSettings,
@@ -53,6 +55,13 @@ import { EXAMPLES } from "../examples/examples.ts";
 import { LAYOUTS } from "../generator/layouts.ts";
 import { LOOKS, parseDesign } from "../generator/themes.ts";
 import type { CategoryId } from "../generator/types.ts";
+
+/** The three ways a client gets a web address, with the Domain name extra's price and the plan that includes it. */
+function domainFaq(s: AppSettings): string {
+  const extra = s.addons.find(isDomainAddon);
+  const pro = s.plans.find((p) => p.monthly && planIncludesDomain(p));
+  return `Your choice, and the domain is always in your name and yours to keep. Use the free address every site comes with (yourbusiness.pages.dev); buy your own at Cloudflare, GoDaddy or Namecheap (about $10 to $15 a year) and we connect it; or we buy it for you${extra ? ` for ${addonPrice(extra)} on your bill` : " and add it to your bill"}${pro ? ` (included with ${pro.name})` : ""}. If you ever leave, a domain we bought transfers to you.`;
+}
 
 /** Underground Associates' own website, served on the company domain from live Settings (prices, phone, email). */
 export const COMPANY_HOSTS = [
@@ -2266,6 +2275,10 @@ ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</
       [
         "Who owns the website?",
         "You own your business name, logo, photos, text and domain. We own the templates and code the site runs on. If you leave, you get a copy of your pages within 30 days and your domain transfers to you.",
+      ],
+      [
+        "Do I need to buy a domain name?",
+        domainFaq(s),
       ],
       [
         "Do you charge for changes?",

@@ -39,7 +39,7 @@ test("plan copy (taglines, pitch, questions, every-plan list) matches app.js", (
 test("playbook objections match app.js, with the prices and terms from Settings filled in", () => {
   const s = { companyName: "Underground Associates", minMonths: 12, shortMonths: 6, flexSetup: 299, annualMonthsFree: 2 };
   const list = playbookObjections(s, SUGGESTED_PLANS);
-  assert.equal(list.length, 20);
+  assert.equal(list.length, 21);
   for (const [q, a] of list) {
     inAppJs("objection", q);
     // Static answers are in app.js verbatim; the dynamic ones are checked by their fixed sentences below.
@@ -89,7 +89,7 @@ test("follow-up texts, share texts and offer hints match app.js", () => {
   }
   inAppJs("SHARE_TEXT", SHARE_TEXT);
   inAppJs("SIGNUP_TEXT", SIGNUP_TEXT);
-  assert.equal(OFFER_HINT.length, 18);
+  assert.equal(OFFER_HINT.length, 19);
   for (const h of OFFER_HINT) {
     inAppJs("OFFER_HINT.text", h.text);
     assert.ok(appJs.includes(`[/${h.match}/i,`), `OFFER_HINT pattern not in app.js: ${h.match}`);
@@ -140,7 +140,7 @@ const settings = (over: Partial<AppSettings> = {}): AppSettings => ({
 test("GET /api/content carries every block the app needs, filled from Settings", () => {
   const c = appContent(settings());
   assert.equal(c.planTagline.plus, PLAN_TAGLINE.plus);
-  assert.equal(c.playbookObjections.length, 20);
+  assert.equal(c.playbookObjections.length, 21);
   assert.match(c.playbookObjections[2]![1], /Basic is \$49 a month/);
   assert.deepEqual(c.churchYearly, { free: 4, payFor: 8, plans: [{ name: "Basic", year: "$392" }, { name: "Plus", year: "$712" }, { name: "Pro", year: "$1192" }] });
   assert.equal(appContent(settings({ churchAnnualMonthsFree: 0 })).churchYearly, null);

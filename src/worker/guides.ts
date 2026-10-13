@@ -461,7 +461,7 @@ export function costsGuide(s: AppSettings): Guide {
         steps: [
           "Each service card has an Open button to its billing or dashboard page and an \"Account\" line for which login it's under. Fill the account lines in once; the next person shouldn't have to guess.",
           "Passwords and API keys never go in the app. They live in the password manager the owner uses and, for the keys the app needs, in Cloudflare's secrets (set by the developer).",
-          "Client domains and client Google Workspace mailboxes are bought by the clients in their own names: not our bill, not in this list.",
+          "Client domains: a client who buys their own pays for it themselves. When we buy one for them (the Domain name extra, or a Pro client), it is registered in their name on our Cloudflare account, about $10 to $15 a year each at cost, auto-renew on, and their monthly bill covers it; it shows on the Cloudflare bill above. Client Google Workspace mailboxes are billed to the clients by Google: not our bill.",
         ],
       },
       {

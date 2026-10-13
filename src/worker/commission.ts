@@ -1,7 +1,9 @@
 import {
   billingOptions,
   addonPrice,
+  isDomainAddon,
   isListPlan,
+  planIncludesDomain,
   type AddOn,
   type AppSettings,
   type Plan,
@@ -184,7 +186,16 @@ export function quoteCommission(s: AppSettings, input: QuoteInput, rules = commi
   for (const p of picks) {
     const a: AddOn = s.addons[p.index]!;
     const cents = Math.round(a.price * 100);
-    if (a.unit === "month") {
+    if (isDomainAddon(a) && planIncludesDomain(plan)) {
+      items.push({
+        what: `${a.name} (included with ${plan.name})`,
+        kind: "free",
+        price: "included",
+        bonus: 0,
+        residual: 0,
+        how: "Nothing is charged for it, so it earns nothing",
+      });
+    } else if (a.unit === "month") {
       const pay = yearly ? cents * 12 : cents;
       items.push({
         what: a.name,

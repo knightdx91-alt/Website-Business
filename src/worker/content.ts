@@ -87,8 +87,12 @@ export const PLAN_QUESTIONS: Array<[string, string]> = [
   ["Wants proof it's working?", "Plus (monthly report)"],
   ["Wants everything done for them, or has lots of competition?", "Pro"],
   [
-    "Already owns a domain name, or wants a business email?",
+    "Wants a business email (info@theirbusiness.com)?",
     "Pro (free email forwarding, or a Google mailbox Google bills them for)",
+  ],
+  [
+    "Wants their own .com?",
+    "Any plan: they buy it, or we buy it in their name and add it to the bill (free on Pro)",
   ],
 ];
 
@@ -101,6 +105,10 @@ export const PLAYBOOK_ALWAYS = [
 
 /** Playbook → Extras: when a caller should bring each extra up (matched on the extra's name, case-insensitive). */
 export const OFFER_HINT: Array<{ match: string; text: string }> = [
+  {
+    match: "\\bdomain\\b",
+    text: "Anyone who wants their own .com but doesn't want to buy it themselves. Free on Pro; they can also bring their own or use the free address.",
+  },
   {
     match: "order|book",
     text: "Restaurants, salons and groomers that already use Square, Toast, DoorDash, Booksy or Calendly.",
@@ -461,6 +469,10 @@ export function playbookObjections(
       "No. Pro comes with a business email like info@yourbusiness.com that forwards free to the email you already use. If you want a full mailbox you can send from too, we set up Google's for you and Google bills you directly, about $7 to $8 a month. We don't mark it up.",
     ],
     [
+      "“Do I need to buy a domain name?” / “What's a domain?”",
+      "A domain is your web address, like smithplumbing.com. You've got three choices. Use the free address that comes with every plan (like smithplumbing.pages.dev). Buy your own at Cloudflare, GoDaddy or Namecheap, about $10 to $15 a year, and we hook it up. Or we buy it for you and add a small charge to your monthly bill; it's included with Pro. Whichever you pick, it's in your name and it belongs to you.",
+    ],
+    [
       "“I need to think about it.”",
       "Of course. Can I ask what you want to think over: the price, or whether it'll bring in business? (Answer that.) I'll text you the preview so you can look at it tonight. Is Thursday good for a quick call back? (Log the callback.)",
     ],
@@ -547,7 +559,7 @@ export const SUGGESTED_PLANS: Plan[] = [
     setup: 0,
     monthly: 149,
     includes:
-      "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes",
+      "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name, bought and renewed for you, in your name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes",
   },
   {
     id: "list",

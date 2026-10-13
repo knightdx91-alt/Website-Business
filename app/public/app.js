@@ -858,12 +858,12 @@
     const renderDomain = (d) => {
       const steps = d && d.domain
         ? `<p><strong>${esc(d.domain)}</strong> ${d.status === "active" ? '<span class="chip chip--good">● Working</span>' : `<span class="chip chip--warn">${esc(d.status || "waiting")}</span>`}</p>
-          ${d.status === "active" ? "" : `<p class="small">At the company where the domain was bought (GoDaddy, Namecheap…), add this DNS record:</p>
+          ${d.status === "active" ? "" : `<p class="small">Where the domain lives (our Cloudflare if we bought it, else their GoDaddy, Namecheap…), add this DNS record:</p>
           <p class="small"><code>CNAME</code> · name <code>${esc(d.domain.split(".").length > 2 ? d.domain.split(".")[0] : "@")}</code> · value <code>${esc(d.target)}</code></p>
           <p class="small muted">${d.domain.split(".").length > 2 ? "" : "A bare domain (no www) works best if the domain uses Cloudflare's nameservers. Using www.yourdomain.com is easiest. "}It can take a few hours. HTTPS is set up automatically.${d.error ? " Last check: " + esc(d.error) : ""}</p>`}
           <div class="btns"><button class="btn btn--small" data-dom="check">Check again</button><button class="btn btn--small btn--danger" data-dom="remove">Remove</button></div>`
         : `<form id="domf" class="row"><label class="field" style="margin:0"><span class="sr-only">Domain</span><input name="domain" placeholder="www.theirbusiness.com" autocapitalize="off" autocomplete="off" inputmode="url"></label><button class="btn" style="flex:none">Add</button></form>
-          <p class="small muted">They buy the domain (about $10–15 a year, at Cloudflare, GoDaddy or Namecheap), then add it here.</p>`;
+          <p class="small muted">Three ways: the free .pages.dev address (nothing to add), a domain they buy in their name (about $10–15 a year at Cloudflare, GoDaddy or Namecheap), or we buy it in their name on our Cloudflare (the Domain name extra on their order; included with Pro). Either way it's theirs. Then add it here.</p>`;
       domEl.innerHTML = steps;
       const f = domEl.querySelector("#domf");
       if (f) f.addEventListener("submit", async (e) => {
@@ -1942,7 +1942,8 @@
     ["Most of their customers find them on Google or Maps?", "Plus"],
     ["Wants proof it's working?", "Plus (monthly report)"],
     ["Wants everything done for them, or has lots of competition?", "Pro"],
-    ["Already owns a domain name, or wants a business email?", "Pro (free email forwarding, or a Google mailbox Google bills them for)"],
+    ["Wants a business email (info@theirbusiness.com)?", "Pro (free email forwarding, or a Google mailbox Google bills them for)"],
+    ["Wants their own .com?", "Any plan: they buy it, or we buy it in their name and add it to the bill (free on Pro)"],
   ];
 
   // Common things owners say on the call, and an honest answer to each.
@@ -1964,6 +1965,8 @@
         `${t.short ? `No problem. There's a ${t.short}-month plan, same price and still no setup fee. ` : "No problem. "}${flex ? `Or go month to month: same monthly price, a one-time ${money(flex)} setup fee, and cancel any time with 30 days' notice.` : "You can cancel any time with 30 days' notice."}`],
       ["“Do I have to pay extra for email?”",
         "No. Pro comes with a business email like info@yourbusiness.com that forwards free to the email you already use. If you want a full mailbox you can send from too, we set up Google's for you and Google bills you directly, about $7 to $8 a month. We don't mark it up."],
+      ["“Do I need to buy a domain name?” / “What's a domain?”",
+        "A domain is your web address, like smithplumbing.com. You've got three choices. Use the free address that comes with every plan (like smithplumbing.pages.dev). Buy your own at Cloudflare, GoDaddy or Namecheap, about $10 to $15 a year, and we hook it up. Or we buy it for you and add a small charge to your monthly bill; it's included with Pro. Whichever you pick, it's in your name and it belongs to you."],
       ["“I need to think about it.”",
         "Of course. Can I ask what you want to think over: the price, or whether it'll bring in business? (Answer that.) I'll text you the preview so you can look at it tonight. Is Thursday good for a quick call back? (Log the callback.)"],
       ["“I need to talk to my wife / husband / partner.”",
@@ -3761,7 +3764,7 @@
   const SUGGESTED_PLANS = [
     { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page\nLive price list with QR tags and a tablet display, if your stock changes" },
     { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
-    { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
+    { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name, bought and renewed for you, in your name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
     { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out and add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
   ];
   const UNIT_LABEL = { month: "/month", each: " each", "one-time": " one-time", quote: " (priced per job)" };
@@ -3772,6 +3775,7 @@
 
   // Playbook: when a caller should bring each extra up (matched on the extra's name).
   const OFFER_HINT = [
+    [/\bdomain\b/i, "Anyone who wants their own .com but doesn't want to buy it themselves. Free on Pro; they can also bring their own or use the free address."],
     [/order|book/i, "Restaurants, salons and groomers that already use Square, Toast, DoorDash, Booksy or Calendly."],
     [/listed/i, "Anyone. Ask: “Do you show up on Apple Maps?” Most small shops don't."],
     [/google business/i, "Anyone whose Google listing has old hours, few photos or no description."],

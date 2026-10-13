@@ -153,6 +153,11 @@ private val SignupLight = lightColorScheme(
     outline = Color(0xFFD5D9E1),
 )
 
+/** The Domain name extra (db.ts isDomainAddon) and a plan that includes a domain (planIncludesDomain): free on Pro. */
+private val DOMAIN_EXTRA = Regex("\\bdomain\\b", RegexOption.IGNORE_CASE)
+private fun AddonInfo.isDomain() = DOMAIN_EXTRA.containsMatchIn(name)
+private fun PlanOffer.includesDomain() = includes.any { it.contains("own domain", ignoreCase = true) }
+
 private data class Totals(val today: Long, val again: Long, val interval: String, val invoice: Boolean)
 
 /** The same math as pickerHtml's live total: the plan's way to pay (priced on the server) plus the ticked extras. */
@@ -165,7 +170,7 @@ private fun totals(o: PlanOptions, p: PlanOffer, billing: String, picks: Map<Int
     var again = opt.renewsCents ?: if (yearly) opt.dueTodayCents else (p.monthly * 100).roundToLong()
     for ((i, q) in picks) {
         val a = o.addons.getOrNull(i) ?: continue
-        if (a.unit == "quote") continue
+        if (a.unit == "quote" || (a.isDomain() && p.includesDomain())) continue
         val cents = (a.amount * 100).roundToLong()
         when (a.unit) {
             "month" -> { val amt = if (yearly) cents * 12 else cents; again += amt; today += amt }
@@ -470,17 +475,17 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
                     SectionCard("Inventory add-ons") {
                         Text("(optional)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(6.dp))
-                        invExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
+                        invExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], included = if (o.addons[i].isDomain() && p.includesDomain()) p.name else null, onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
                     }
                 }
                 if (topExtras.isNotEmpty() || restExtras.isNotEmpty()) item {
                     SectionCard("Add extras") {
                         Text("(optional)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(6.dp))
-                        topExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
+                        topExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], included = if (o.addons[i].isDomain() && p.includesDomain()) p.name else null, onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
                         if (restExtras.isNotEmpty()) {
                             TextButton(onClick = { moreExtras = !moreExtras }, contentPadding = PaddingValues(0.dp)) { Text(if (moreExtras) "▾ More extras" else "▸ More extras") }
-                            if (moreExtras) restExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
+                            if (moreExtras) restExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], included = if (o.addons[i].isDomain() && p.includesDomain()) p.name else null, onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
                         }
                     }
                 }
@@ -488,7 +493,7 @@ fun SignupScreen(state: AppState, nav: NavHostController, leadId: String, planId
                     SectionCard("Inventory add-ons") {
                         Text("(optional, for the live price list)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(6.dp))
-                        invExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
+                        invExtras.forEach { i -> ExtraRow(o.addons[i], picks[i], included = if (o.addons[i].isDomain() && p.includesDomain()) p.name else null, onChange = { q -> if (q == null) picks.remove(i) else picks[i] = q }) }
                     }
                 }
                 o.founder?.takeIf { it.slotsLeft > 0 && it.choices.isNotEmpty() }?.let { f -> item {
@@ -602,7 +607,7 @@ private fun FounderRow(c: FounderChoice, on: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ExtraRow(a: AddonInfo, qty: Int?, onChange: (Int?) -> Unit) {
+private fun ExtraRow(a: AddonInfo, qty: Int?, included: String? = null, onChange: (Int?) -> Unit) {
     val on = qty != null
     Card(
         Modifier.fillMaxWidth().padding(bottom = 8.dp).selectable(selected = on, role = Role.Checkbox, onClick = { onChange(if (on) null else 1) }),
@@ -612,7 +617,7 @@ private fun ExtraRow(a: AddonInfo, qty: Int?, onChange: (Int?) -> Unit) {
         Row(Modifier.padding(start = 4.dp, end = 12.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.Top) {
             Checkbox(checked = on, onCheckedChange = null, modifier = Modifier.padding(top = 4.dp))
             Column(Modifier.weight(1f).padding(top = 10.dp, bottom = 6.dp)) {
-                Row { Text(a.name, fontWeight = FontWeight.Bold); Text(" · ${a.price}") }
+                Row { Text(a.name, fontWeight = FontWeight.Bold); Text(" · ${if (included != null) "included with $included" else a.price}") }
                 if (a.about.isNotBlank()) Text(a.about, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (a.unit == "quote") Text("We'll call you with a price.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (on && a.unit == "each") {

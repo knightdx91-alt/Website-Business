@@ -1478,6 +1478,18 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   the old flat `settings.commission` is no longer used. Team write-up (tables generated from the same functions with the live
   settings, scratchpad `comm-md.mts`): https://ua-commission-plan.knightdx91.workers.dev (Worker `ua-commission-plan`, source
   `research/commission-page/`, deployed from inside that folder).
+- 🌐 Domains (Oct 2026, owner's rule; Android 2.61): every client is asked at sign-up which of three they want, and whichever they
+  pick, **the domain is theirs**: (1) the free `<project>.pages.dev` address, (2) a domain they buy (or own) in their name that we
+  connect, (3) we buy it for them in their name on our Cloudflare account and add it to their bill = the extra **"Domain name,
+  bought for you"** $2/month (last in DEFAULT_ADDONS + live Settings, so older picks keep their indexes), free on a plan whose
+  includes say "own domain" (Pro: "Your own domain name, bought and renewed for you, in your name"). `isDomainAddon` /
+  `planIncludesDomain` in db.ts: `priceSignup` lists it as "included with your plan" at $0 on Pro, the web picker (`pickerHtml`
+  data `domain`) and the native sign-up (`isDomain()` / `includesDomain()` in SignupScreen.kt) show "included with Pro" and leave
+  it out of the total, `quoteCommission` pays nothing on it. Agreement §10 spells out (a)/(b)/(c), transfer within 10 business days
+  on request once paid, renewals ours only while the plan is active; STANDARD_EXTRA_TERMS has the extra's terms (first entry);
+  OFFER_HINT, PLAN_QUESTIONS ("Wants their own .com?") and the objection "Do I need to buy a domain name?" (app.js + content.ts);
+  training: the question is a step in "Signing them up", "Their own domain and email" covers buying it on our Cloudflare with
+  the client as registrant; the lead's domain card (web + Android) lists the three; /pricing FAQ (`domainFaq`); the costs guide.
 - Tap the tank to pay (Oct 2026, plan only, NOT built): one NFC sticker + QR per tank opens that tank's page, the customer pays
   on the phone (Stripe Connect to the shop's own account, tax, minimum order), the receipt lists every fish with its tank, the
   cashier scans it on the tablet and ticks lines per tank. Write-up: https://ua-tank-pay.knightdx91.workers.dev (Worker
