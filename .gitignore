@@ -13,3 +13,6 @@ android/local.properties
 .dev.vars
 .claude/worktrees/
 android/.kotlin/
+
+# generated review page
+research/app-review-page/out/

@@ -1417,6 +1417,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   on published pages only; `editform` field `gsc`), `rel="nofollow"` on the footer "Website by" credit, and two SEO
   rows at the top of the Get-listed checklist (GBP website field, Search Console verified + sitemap submitted; Bing
   Places row says import from GBP). Not built: Search Console / Business Profile Performance API in the monthly report.
+- ⚠️ Never run `wrangler pages …` (or any `wrangler deploy` for another project) from the repo root (Oct 2026): wrangler 4.149
+  "delegates Pages to Workers" and deployed the app's own wrangler.jsonc under the new name (`ua-app-review`), bindings, crons
+  and custom domains included; deleting that Worker left app.undergroundassociates.com and the company site on 522 for two
+  minutes until `npm run deploy` re-attached the domains. Any side project gets its own folder with its own wrangler.jsonc
+  (`research/app-review-page/` is the pattern: static assets only, deployed from inside that folder).
+- The October 2026 app review (`research/app-review-2026.md`; first-week numbers from the live D1, two research passes, 22
+  ranked changes) is public read-only at https://ua-app-review.knightdx91.workers.dev (Worker `ua-app-review`, source and build in
+  `research/app-review-page/`) and editable for the team as the Claude Doc "App Review, October 2026" (Your call dropdowns +
+  a questions table).
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
