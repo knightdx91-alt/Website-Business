@@ -32,6 +32,10 @@ class Api(context: Context) {
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
+        const val SECURE_FAIL = "Couldn't make a secure connection to the app's server. Check that the phone's date and time are set automatically, then try again. On public or work Wi-Fi, try mobile data instead. If it keeps happening, report it from Settings."
+        /** The raw TLS error behind the last SECURE_FAIL, for problem reports. */
+        @Volatile var lastSecureError: String? = null
+
         /**
          * One client for the whole app. Connections are pooled and HTTP/2 carries parallel requests over one TLS handshake,
          * and IPv4-first DNS keeps a dead IPv6 route from being tried first, so a dead route costs nothing.
@@ -43,6 +47,13 @@ class Api(context: Context) {
                 // IPv4 first: a dead IPv6 route used to cost a full connect timeout per address (OkHttp 5's fastFallback did
                 // this, but Stripe Terminal 6.0.0 needs OkHttp 4.12 and crashes on 5.x: NoClassDefFoundError okhttp3.internal.Util).
                 .dns(Ipv4First)
+                // A failed secure connection says what to try instead of "java.security.cert.CertPathValidatorException…".
+                .addInterceptor { chain ->
+                    try { chain.proceed(chain.request()) } catch (e: javax.net.ssl.SSLException) {
+                        lastSecureError = "${e.javaClass.simpleName}: ${e.message}"
+                        throw IOException(SECURE_FAIL, e)
+                    }
+                }
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)

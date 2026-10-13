@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Who the app trusts for HTTPS: the phone's own certificate store, plus the roots (and current Google intermediates)
+  Cloudflare issues our certificates from, bundled in res/raw. A phone whose store is missing or out of date for the
+  current chain (Oct 2026: a caller's phone said "Trust anchor for certification path not found" the morning Cloudflare
+  reissued every certificate from Google Trust Services) still connects. Only public CA certificates are added;
+  nothing is pinned and user-installed certificates stay untrusted, as before.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/ca_globalsign_ecc_root_ca_r4" />
+            <certificates src="@raw/ca_globalsign_root_ca_r3" />
+            <certificates src="@raw/ca_globalsign_root_e46" />
+            <certificates src="@raw/ca_globalsign_root_r46" />
+            <certificates src="@raw/ca_gts_root_r1" />
+            <certificates src="@raw/ca_gts_root_r3" />
+            <certificates src="@raw/ca_gts_root_r4" />
+            <certificates src="@raw/ca_gts_we1" />
+            <certificates src="@raw/ca_gts_wr1" />
+            <certificates src="@raw/ca_isrg_root_x1" />
+            <certificates src="@raw/ca_isrg_root_x2" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1490,6 +1490,16 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   OFFER_HINT, PLAN_QUESTIONS ("Wants their own .com?") and the objection "Do I need to buy a domain name?" (app.js + content.ts);
   training: the question is a step in "Signing them up", "Their own domain and email" covers buying it on our Cloudflare with
   the client as registrant; the lead's domain card (web + Android) lists the three; /pricing FAQ (`domainFaq`); the costs guide.
+- 🔐 Bundled trust anchors (Oct 2026, Android 2.62): the morning Cloudflare reissued every certificate from Google Trust Services
+  (13 Oct, 02:07 UTC; WE1 → GTS Root R4), Chris's phone showed "java.security.cert.CertPathValidatorException: Trust anchor for
+  certification path not found" while the owner's worked. `res/xml/network_security_config.xml` (manifest
+  `networkSecurityConfig`) trusts the system store PLUS public CA certs in `res/raw/ca_*.pem`: GTS Root R1/R3/R4 + the WE1 / WR1
+  intermediates (from pki.goog, verified against the roots), ISRG X1/X2, GlobalSign R3 / ECC R4 / R46 / E46 (roots copied from the
+  build machine's /etc/ssl/certs). No pinning, user CAs still untrusted. When Cloudflare moves to a new intermediate, the roots
+  still cover it; refresh WE1/WR1 before Feb 2029. An `SSLException` anywhere on `Api.http` becomes `Api.SECURE_FAIL` (date/time,
+  try mobile data, report it) and the raw text goes in `Api.lastSecureError` → the problem report's `detail.tls`. Certificate
+  history: certspotter.com's API (crt.sh was down); the container's proxy re-signs TLS, so `openssl s_client` here never shows the
+  real chain (SSL Labs' API does).
 - Tap the tank to pay (Oct 2026, plan only, NOT built): one NFC sticker + QR per tank opens that tank's page, the customer pays
   on the phone (Stripe Connect to the shop's own account, tax, minimum order), the receipt lists every fish with its tank, the
   cashier scans it on the tablet and ticks lines per tank. Write-up: https://ua-tank-pay.knightdx91.workers.dev (Worker
