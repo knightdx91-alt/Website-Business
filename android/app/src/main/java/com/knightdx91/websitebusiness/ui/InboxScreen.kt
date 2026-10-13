@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.knightdx91.websitebusiness.AppState
 import com.knightdx91.websitebusiness.net.Api
+import com.knightdx91.websitebusiness.net.BlockedPost
 import com.knightdx91.websitebusiness.net.InboxItem
 import com.knightdx91.websitebusiness.net.inbox
 import com.knightdx91.websitebusiness.net.inboxMarkRead
@@ -55,6 +56,9 @@ fun InboxScreen(state: AppState, nav: NavHostController) {
     val scope = rememberCoroutineScope()
     val isOwner = state.meta?.isOwner == true
     var items by remember { mutableStateOf<List<InboxItem>>(emptyList()) }
+    var blockedThisMonth by remember { mutableStateOf(0) }
+    var blocked by remember { mutableStateOf<List<BlockedPost>>(emptyList()) }
+    var showBlocked by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var loaded by remember { mutableStateOf(false) }
 
@@ -62,7 +66,10 @@ fun InboxScreen(state: AppState, nav: NavHostController) {
         if (!isOwner) { loading = false; return }
         loading = true
         try {
-            items = state.api.inbox()
+            val inbox = state.api.inbox()
+            items = inbox.items
+            blockedThisMonth = inbox.blockedThisMonth
+            blocked = inbox.blocked
             loaded = true
         } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't load the inbox") } finally { loading = false }
     }
@@ -91,6 +98,25 @@ fun InboxScreen(state: AppState, nav: NavHostController) {
             }
             item { Text("Requests customers send through your clients' live websites.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp)) }
             if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            if (blockedThisMonth > 0) item {
+                // Posts the spam checks dropped (nobody was alerted): a count, and the last few on request.
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🛡️ $blockedThisMonth spam message${if (blockedThisMonth == 1) "" else "s"} blocked this month", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            OutlinedButton(onClick = { showBlocked = !showBlocked }) { Text(if (showBlocked) "Hide" else "Show") }
+                        }
+                        Text("Dropped by the spam checks on the website forms. If a real customer says they wrote and nothing arrived, look for them here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (showBlocked) blocked.forEach { b ->
+                            Column(Modifier.padding(top = 10.dp)) {
+                                Text("${b.who.ifBlank { "No name" }} · ${b.scope} · ${ago(b.at)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                Text(b.reasons.joinToString(", "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (b.snippet.isNotBlank()) Text(b.snippet, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
             if (loaded && items.isEmpty()) {
                 item { Card(Modifier.fillMaxWidth()) { Text("No requests yet. They show up here once a client site is live.", Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             }

@@ -40,6 +40,13 @@ import { esignHtml, readSignature } from "./esign.ts";
 import { extrasToken } from "./auth.ts";
 import { mailReady, maskEmail, sendEmail } from "./mail.ts";
 import { HttpError, newId, now, type Env } from "./env.ts";
+import {
+  formShieldHtml,
+  formStamp,
+  HUMAN_NOTE,
+  screenForm,
+  TURNSTILE_HOST,
+} from "./spam.ts";
 import { escHtml as e } from "./page.ts";
 import { SEARCH_GROUPS } from "../places/queries.ts";
 import { EXAMPLES } from "../examples/examples.ts";
@@ -305,6 +312,7 @@ async function changeRequest(
     : null;
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
+  const stamp = await formStamp(env.APP_SECRET);
   let note = "";
   if (req.method === "POST" && lead) {
     const form = await req.formData().catch(() => null);
@@ -324,10 +332,17 @@ async function changeRequest(
       message: field("message", 2000),
       service: "Change request for their website",
     };
-    if (field("website") || (recent?.n ?? 0) >= 5)
+    const shield = await screenForm(env, s, form, {
+      scope: `Change request for ${lead.name ?? "a client"}`,
+      ip,
+      fields: { name: data.name, phone: data.phone, message: data.message },
+    });
+    if (shield.block || (recent?.n ?? 0) >= 5)
       note = `<p class="note" role="status">Thanks! We got it and will take care of it.</p>`;
     else if (!data.name || !data.message)
       note = `<p class="note note--warn" role="alert">Please add your name and what you'd like changed.</p>`;
+    else if (shield.human === "fail")
+      note = `<p class="note note--warn" role="alert">${HUMAN_NOTE}</p>`;
     else {
       await env.DB.prepare(
         "INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)",
@@ -348,6 +363,7 @@ async function changeRequest(
 <form method="post" class="form"><label>Your name<input name="name" autocomplete="name" required maxlength="200"></label>
 <label>Best phone number <span class="opt">(optional)</span><input name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
 <label>What should we change?<textarea name="message" rows="5" required maxlength="2000"></textarea></label>
+${formShieldHtml({ stamp, siteKey: s.turnstileSiteKey, theme: "dark" })}
 <div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
 <button class="btn" type="submit">Send request</button></form>
 ${s.companyPhone ? `<p class="direct">Or text or call <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>. Photos are easiest to text.</p>` : ""}`
@@ -363,7 +379,10 @@ ${footer(s.legalName || name, s)}</body></html>`;
     headers: {
       ...HEADERS,
       "cache-control": "no-store",
-      "content-security-policy": csp(n, { ga: !!s.gaMeasurementId }),
+      "content-security-policy": csp(n, {
+        ga: !!s.gaMeasurementId,
+        turnstile: !!s.turnstileSiteKey,
+      }),
     },
   });
 }
@@ -374,6 +393,7 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
   const name = s.companyName || "Underground Associates";
   const legal = s.legalName || name;
   const planId = url.searchParams.get("plan") ?? "plus";
+  const stamp = await formStamp(env.APP_SECRET);
   let note =
     url.searchParams.get("canceled") === "1"
       ? `<p class="note note--warn" role="status">Your payment wasn't finished, so nothing was charged. You can try again below.</p>`
@@ -395,8 +415,19 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
       web: field("web", 300),
       notes: field("notes", 1500),
     };
-    if (field("website"))
-      return Response.redirect(`${ORIGIN}/start/thanks`, 303);
+    const shield = await screenForm(env, s, form, {
+      scope: "Website order",
+      ip: req.headers.get("cf-connecting-ip") ?? "",
+      fields: {
+        name: d.name,
+        business: d.business,
+        phone: d.phone,
+        email: d.email,
+        web: d.web,
+        notes: d.notes,
+      },
+    });
+    if (shield.block) return Response.redirect(`${ORIGIN}/start/thanks`, 303);
     const signed = readSignature(form);
     if (
       !d.business ||
@@ -406,6 +437,8 @@ async function startOrder(env: Env, req: Request, url: URL): Promise<Response> {
       !signed
     ) {
       note = `<p class="note note--warn" role="alert">Please fill in your business name, your name, phone and email, then open the agreement and sign it.</p>`;
+    } else if (shield.human === "fail") {
+      note = `<p class="note note--warn" role="alert">${HUMAN_NOTE}</p>`;
     } else {
       const picks = picksFromForm(form, s.addons);
       let order: PricedOrder;
@@ -497,6 +530,7 @@ ${pickerHtml(s, { planId, esc: e, showPlans: false, picks: picksFromUrl(url, s) 
 <label>Phone<input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
 <label>Email for receipts<input name="email" type="email" required maxlength="120" autocomplete="email"></label>
 <label>Anything we should know? <span class="opt">(optional)</span><textarea name="notes" rows="3" maxlength="1500"></textarea></label>
+${formShieldHtml({ stamp, siteKey: s.turnstileSiteKey })}
 <div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
 ${esignHtml({ sectionsHtml: contractSectionsHtml(s, { business: "your business", kind: "signup", esc: e }), esc: e, businessField: "business", title: "Your agreement" })}
 <p class="small muted">See our <a href="/terms#refunds">cancellation &amp; refund policy</a> and <a href="/privacy">privacy policy</a>.</p>
@@ -612,6 +646,7 @@ async function extrasRequest(
       },
     );
   }
+  const stamp = await formStamp(env.APP_SECRET);
   let note = "";
   if (req.method === "POST") {
     const form = await req.formData().catch(() => null);
@@ -629,9 +664,20 @@ async function extrasRequest(
     const wanted = s.addons
       .filter((_, i) => form?.get(`x_${i}`) === "on")
       .map((a) => a.name);
-    if (field("website"))
-      return Response.redirect(`${ORIGIN}/extras?sent=1`, 303);
     const ip = req.headers.get("cf-connecting-ip") ?? "";
+    const shield = await screenForm(env, s, form, {
+      scope: "Extras request",
+      ip,
+      fields: {
+        name: d.name,
+        business: d.business,
+        phone: d.phone,
+        email: d.email,
+        notes: d.notes,
+      },
+    });
+    if (shield.block)
+      return Response.redirect(`${ORIGIN}/extras?sent=1`, 303);
     const recent = await env.DB.prepare(
       "SELECT COUNT(*) AS n FROM submissions WHERE ip = ? AND created_at > ?",
     )
@@ -646,6 +692,8 @@ async function extrasRequest(
       (!wanted.length && !d.notes)
     ) {
       note = `<p class="note note--warn" role="alert">Please add your business name, your name and a 10-digit phone number, and pick at least one extra (or tell us what you need).</p>`;
+    } else if (shield.human === "fail") {
+      note = `<p class="note note--warn" role="alert">${HUMAN_NOTE}</p>`;
     } else {
       const client = await findClient(env, d.phone, d.business);
       const picks = s.addons
@@ -762,6 +810,7 @@ ${inventoryAddons(s.addons).length ? `<fieldset style="border:0;padding:0;margin
 <label>Phone <span class="opt">(the one on your account, if you can)</span><input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
 <label>Email <span class="opt">(optional)</span><input name="email" type="email" maxlength="120" autocomplete="email"></label>
 <label>Anything else? <span class="opt">(optional)</span><textarea name="notes" rows="3" maxlength="1500"></textarea></label>
+${formShieldHtml({ stamp, siteKey: s.turnstileSiteKey })}
 <div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
 <button class="btn" type="submit">Send my request</button>
 </form>
@@ -810,6 +859,7 @@ ${footer(legal, o.settings ?? ({ plans: [], addons: [] } as unknown as AppSettin
         ga: !!o.ga,
         inlineScript: o.script,
         stripe: true,
+        turnstile: !!o.settings?.turnstileSiteKey,
       }),
     },
   });
@@ -831,7 +881,7 @@ async function ownerPhotoExists(env: Env): Promise<boolean> {
 async function contactPost(env: Env, req: Request): Promise<Response> {
   const back = (q: string) => Response.redirect(`${ORIGIN}/?${q}#contact`, 303);
   const form = await req.formData().catch(() => null);
-  if (!form || String(form.get("website") ?? "").trim()) return back("sent=1");
+  if (!form) return back("sent=1");
   const ip = req.headers.get("cf-connecting-ip") ?? "";
   const recent = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM submissions WHERE lead_id = ? AND ip = ? AND created_at > ?",
@@ -850,8 +900,22 @@ async function contactPost(env: Env, req: Request): Promise<Response> {
     service: field("business"),
     message: field("message", 2000),
   };
+  // Spam (SEO sellers, bots) is dropped with the same thank-you a real message gets, and alerts nobody.
+  const shield = await screenForm(env, await getSettings(env), form, {
+    scope: "Website contact form",
+    ip,
+    fields: {
+      name: data.name,
+      business: data.service,
+      phone: data.phone,
+      email: data.email,
+      message: data.message,
+    },
+  });
+  if (shield.block) return back("sent=1");
   for (const k of Object.keys(data)) if (!data[k]) delete data[k];
   if (!data.name || !(data.phone || data.email)) return back("missing=1");
+  if (shield.human === "fail") return back("human=1");
   if (data.service) data.service = `Business: ${data.service}`;
   await env.DB.prepare(
     "INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)",
@@ -1333,7 +1397,10 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
       "cache-control": o.cache ?? "public, max-age=300",
       "x-content-type-options": "nosniff",
       "referrer-policy": "strict-origin-when-cross-origin",
-      "content-security-policy": csp(n, { ga: !!s.gaMeasurementId }),
+      "content-security-policy": csp(n, {
+        ga: !!s.gaMeasurementId,
+        turnstile: !!s.turnstileSiteKey,
+      }),
     },
   });
 }
@@ -1803,7 +1870,7 @@ function faqHtml(items: Array<[string, string]>): string {
 
 function contactSection(
   s: AppSettings,
-  o: { sent?: boolean; missing?: boolean } = {},
+  o: { stamp: string; sent?: boolean; missing?: boolean; human?: boolean },
 ): string {
   const phone = s.companyPhone;
   const email = s.companyEmail;
@@ -1812,12 +1879,14 @@ function contactSection(
 <p>Tell us about your business. We'll build a preview you can look at on your phone, then call or text you. No cost, no obligation, and we never ask for a card to show it.</p>
 ${o.sent ? `<p class="note" role="status">Thanks! We got your message and will be in touch soon.</p>` : ""}
 ${o.missing ? `<p class="note note--warn" role="alert">Please add your name and a phone number or email so we can reach you.</p>` : ""}
+${o.human ? `<p class="note note--warn" role="alert">${HUMAN_NOTE}</p>` : ""}
 <form method="post" action="/contact" class="form">
 <label>Your name<input name="name" autocomplete="name" required maxlength="200"></label>
 <label>Business name<input name="business" autocomplete="organization" maxlength="200"></label>
 <label>Phone<input name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
 <label>Email<input name="email" type="email" autocomplete="email" maxlength="200"></label>
 <label>Anything we should know? <span class="opt">(optional)</span><textarea name="message" rows="3" maxlength="2000"></textarea></label>
+${formShieldHtml({ stamp: o.stamp, siteKey: s.turnstileSiteKey, theme: "dark" })}
 <div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
 <button class="btn" type="submit">Show me my site</button>
 </form>
@@ -1907,6 +1976,8 @@ async function home(env: Env, url: URL): Promise<Response> {
   const lowest = lowestOf(s);
   const sent = url.searchParams.get("sent") === "1";
   const missing = url.searchParams.get("missing") === "1";
+  const human = url.searchParams.get("human") === "1";
+  const stamp = await formStamp(env.APP_SECRET);
   const [ownerPhoto, live, offer] = await Promise.all([
     ownerPhotoExists(env),
     liveClients(env),
@@ -1968,7 +2039,7 @@ ${faqHtml(faq(s).slice(0, 5))}
 <p class="small muted" style="margin-top:14px">More answers on the <a href="/pricing#faq">pricing page</a> and <a href="/about">about us</a>.</p>
 </div></section>
 
-${contactSection(s, { sent, missing })}`;
+${contactSection(s, { stamp, sent, missing, human })}`;
   return marketingPage(s, {
     path: "/",
     title,
@@ -2137,7 +2208,7 @@ ${inventoryAddons(s.addons)
       ],
     ],
   )}</div></section>
-${contactSection(s)}`;
+${contactSection(s, { stamp: await formStamp(env.APP_SECRET) })}`;
   return marketingPage(s, {
     path: "/price-list",
     title,
@@ -2218,7 +2289,7 @@ ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</
         : []),
     ],
   )}</div></section>
-${contactSection(s)}`;
+${contactSection(s, { stamp: await formStamp(env.APP_SECRET) })}`;
   return marketingPage(s, {
     path: "/pricing",
     title,
@@ -2249,7 +2320,7 @@ ${ownerSection(s, ownerPhoto, { heading: "The owner" })}
 <div class="card"><h3>Plain terms</h3><p>The agreement is in plain English and you read it on your phone before you sign. <a href="/terms">Read it any time</a>.</p></div>
 </div></div></section>
 <section class="sec sec--alt"><div class="wrap narrow"><h2>The company</h2><p>${e(legal)}, ${e(MARKET_TOWN)}, Alabama, since ${FOUNDED}.${s.companyPhone ? ` Phone <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>.` : ""}${s.companyEmail ? ` Email <a href="mailto:${e(s.companyEmail)}">${e(s.companyEmail)}</a>.` : ""} Hosting on Cloudflare's network; payments through Stripe; we never store card numbers. <a href="/privacy">Privacy</a> · <a href="/terms">Terms &amp; refunds</a> · <a href="/cullman-county">Where we work</a> · <a href="/portfolio">Our work</a>.</p></div></section>
-${contactSection(s)}`;
+${contactSection(s, { stamp: await formStamp(env.APP_SECRET) })}`;
   return marketingPage(s, {
     path: "/about",
     title,
@@ -2301,7 +2372,7 @@ ${t.cat === "retail" || t.cat === "auto" || t.cat === "general" || t.cat === "re
         `<a href="/websites-for/${o.slug}">${e(o.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a>`,
     )
     .join(" · ")}.</p></div></section>
-${contactSection(s)}`;
+${contactSection(s, { stamp: await formStamp(env.APP_SECRET) })}`;
   return marketingPage(s, {
     path: `/websites-for/${t.slug}`,
     title,
@@ -2327,7 +2398,7 @@ async function countyPage(env: Env): Promise<Response> {
 <div class="card"><h3>We know the area</h3><p>Cullman time on the hours, county roads in the directions, the churches, trades and shops that make up Main Street. The copy reads like it was written here, because it was checked here.</p></div>
 </div></div></section>
 <section class="sec sec--alt"><div class="wrap"><h2>What we build, by trade</h2><ul class="cols">${TRADES.map((t) => `<li><a href="/websites-for/${t.slug}">${e(t.h1.replace(/^Websites for /, "").replace(/ in Cullman.*$/, ""))}</a></li>`).join("")}</ul></div></section>
-${contactSection(s)}`;
+${contactSection(s, { stamp: await formStamp(env.APP_SECRET) })}`;
   return marketingPage(s, {
     path: "/cullman-county",
     title,
@@ -2433,15 +2504,30 @@ function gaTag(
 /** The company site's CSP: no scripts at all unless a page has its own (inline) or the Google tag is on. */
 function csp(
   n: string,
-  o: { ga?: boolean; inlineScript?: boolean; stripe?: boolean } = {},
+  o: {
+    ga?: boolean;
+    inlineScript?: boolean;
+    stripe?: boolean;
+    /** Pages with a form: Turnstile's script and its challenge frame (src/worker/spam.ts). */
+    turnstile?: boolean;
+  } = {},
 ): string {
   // A nonce makes browsers ignore 'unsafe-inline', so pages with their own inline scripts keep 'unsafe-inline' instead.
-  const script = o.inlineScript
-    ? `'unsafe-inline'${o.ga ? ` ${GA_SCRIPT}` : ""}`
-    : o.ga
-      ? `'nonce-${n}' ${GA_SCRIPT}`
-      : "";
-  return `default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:${o.ga ? ` ${GA_CONNECT}` : ""};${script ? ` script-src ${script};` : ""}${o.ga ? ` connect-src ${GA_CONNECT};` : ""} form-action 'self'${o.stripe ? " https://checkout.stripe.com" : ""}; base-uri 'none'; frame-ancestors 'none'`;
+  // Host sources stay in force beside a nonce, so Turnstile's script is allowed by its host either way.
+  const script = [
+    o.inlineScript ? "'unsafe-inline'" : o.ga ? `'nonce-${n}'` : "",
+    o.ga ? GA_SCRIPT : "",
+    o.turnstile ? TURNSTILE_HOST : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const connect = [
+    o.ga ? GA_CONNECT : o.turnstile ? "'self'" : "",
+    o.turnstile ? TURNSTILE_HOST : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:${o.ga ? ` ${GA_CONNECT}` : ""};${script ? ` script-src ${script};` : ""}${connect ? ` connect-src ${connect};` : ""}${o.turnstile ? ` frame-src ${TURNSTILE_HOST};` : ""} form-action 'self'${o.stripe ? " https://checkout.stripe.com" : ""}; base-uri 'none'; frame-ancestors 'none'`;
 }
 
 const HEADERS = {
@@ -2693,7 +2779,7 @@ h1{font-size:clamp(2.2rem,7vw,3.8rem)}h2{font-size:clamp(1.6rem,4.5vw,2.4rem)}h3
 details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer;font-weight:700;padding:12px 0;font-size:1.05rem}details p{margin:0 0 14px;color:var(--muted)}
 .form{display:grid;gap:14px;margin-top:20px}.form label{display:grid;gap:6px;font-weight:700}
 .form input,.form textarea{width:100%;min-height:50px;padding:12px;border-radius:10px;border:2px solid #3b4a6b;background:#fff;color:var(--ink);font:400 1rem "DM Sans",system-ui,sans-serif}
-.opt{font-weight:400;color:#c9d1e0}.hp{position:absolute;left:-9999px}
+.opt{font-weight:400;color:#c9d1e0}.hp{position:absolute;left:-9999px}.cf-turnstile{margin:4px 0 14px}
 .note{background:#e8f5ec;color:#0f5132;border-radius:10px;padding:12px 14px;font-weight:700}.note--warn{background:#fff4e0;color:var(--goldtext)}
 .direct{margin-top:18px}
 .btn--small{min-height:44px;padding:8px 18px;font-size:.98rem}

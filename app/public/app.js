@@ -3506,10 +3506,16 @@
   async function viewInbox() {
     setNav("inbox");
     const my = renderSeq;
-    const { items } = await api("/inbox");
+    const { items, blocked } = await api("/inbox");
     if (stale(my)) return;
     document.getElementById("inbox-dot").hidden = !items.some((i) => !i.read);
+    const blockedHtml = blocked && blocked.month
+      ? `<details class="card small"><summary>🛡️ ${blocked.month} spam message${blocked.month === 1 ? "" : "s"} blocked this month</summary>
+          <p class="muted" style="margin:8px 0">Dropped by the spam checks on the website forms; nobody was alerted. If a real customer says they wrote and nothing arrived, look for them here.</p>
+          <ul class="list">${(blocked.recent || []).map((b) => `<li><strong>${esc(b.who || "No name")}</strong> · ${esc(b.scope)} · ${ago(b.at)}<br><span class="muted">${esc(b.reasons.join(", "))}</span>${b.snippet ? `<br><em>${esc(b.snippet)}</em>` : ""}</li>`).join("")}</ul></details>`
+      : "";
     $app.innerHTML = `<h1>Inbox</h1><p class="muted">Requests customers send through your clients' live websites.</p>
+      ${blockedHtml}
       <ul class="list">${items.length ? items.map((i) => `<li class="card"><div class="lead__top"><strong>${esc(i.data.name)}</strong>${i.read ? "" : '<span class="chip chip--warn">New</span>'}</div>
         <p class="small muted">For ${esc(i.business || "a client")} · ${ago(i.createdAt)}</p>
         ${requestLine(i.data) ? `<p>${esc(requestLine(i.data))}</p>` : ""}
@@ -3854,6 +3860,7 @@
         <label class="field">About you <span class="hint">The paragraph next to your photo ("Hi, I'm Post."). Add app/public/owner.jpg for the photo.</span><textarea name="siteBio" rows="3" maxlength="1200">${esc(s.siteBio || "")}</textarea></label>
         <label class="field">Client quotes <span class="hint">One per line: <code>Quote | Name, Business</code>. Only real clients who said it; the first shows under the top of the home page, the rest on the pricing page.</span><textarea name="siteTestimonials" rows="3" maxlength="3000" placeholder="They had the site done before I'd even decided. | Jane Doe, Doe's Diner">${esc(s.siteTestimonials || "")}</textarea></label>
         <label class="field">Towns served <span class="hint">Comma-separated. The "where we work" page, the footer and what Google is told you serve.</span><input name="siteTowns" value="${esc(s.siteTowns || "")}" maxlength="400" placeholder="Cullman, Hanceville, Good Hope, Vinemont, Holly Pond, Hartselle, Arab"></label>
+        <label class="field">Turnstile site key <span class="hint">Stops bots on the website's forms (free, from Cloudflare). Dashboard → Turnstile → Add widget, hostname undergroundassociates.com → paste the <strong>Site key</strong> here, and add the <strong>Secret key</strong> to the Worker as the secret TURNSTILE_SECRET_KEY (Workers &amp; Pages → website-business → Settings → Variables and Secrets). Blank = off; the hidden-field, timing and content checks still run. Blocked messages are counted in the Inbox.</span><input name="turnstileSiteKey" value="${esc(s.turnstileSiteKey || "")}" maxlength="80" placeholder="0x4AAAAAAA…" autocomplete="off"></label>
         <h2 style="margin-top:18px">Team sign-in (Google)</h2>
         <p class="small muted">Everyone signs in with their company Google account. One-time setup in Google Cloud (see the Android app card below for the steps), then paste the web client ID here.</p>
         <label class="field">Google client ID <span class="hint">The OAuth “Web application” client, ends in .apps.googleusercontent.com</span><input name="googleClientId" value="${esc(s.googleClientId || "")}" placeholder="1234567890-abc.apps.googleusercontent.com" autocomplete="off"></label>
@@ -3990,6 +3997,7 @@
             siteBio: v("siteBio") || undefined,
             siteTestimonials: v("siteTestimonials") || undefined,
             siteTowns: v("siteTowns") || undefined,
+            turnstileSiteKey: v("turnstileSiteKey") || undefined,
             companyReviewUrl: v("companyReviewUrl") || undefined,
             companyFacebookUrl: v("companyFacebookUrl") || undefined,
             gaMeasurementId: v("gaMeasurementId").toUpperCase() || undefined,

@@ -21,6 +21,8 @@ export interface Env {
   /** Email provider for messages clients ask for (e.g. their Buy extras link): MailerSend or Resend. Optional. */
   MAILERSEND_API_KEY?: string;
   RESEND_API_KEY?: string;
+  /** Cloudflare Turnstile secret key (src/worker/spam.ts); the site key lives in Settings → Website. Optional. */
+  TURNSTILE_SECRET_KEY?: string;
 }
 
 export type Job =

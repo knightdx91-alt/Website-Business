@@ -617,6 +617,9 @@ export interface AppSettings {
   siteTestimonials?: string;
   /** Towns served, comma-separated: the county page, the proof row and schema areaServed. */
   siteTowns?: string;
+  /** Cloudflare Turnstile site key (public) for the company website's forms; the secret is the Worker secret
+   * TURNSTILE_SECRET_KEY. Both set = the widget shows and every post is verified (src/worker/spam.ts). */
+  turnstileSiteKey?: string;
   fcmAppId?: string;
   fcmApiKey?: string;
   fcmProjectId?: string;

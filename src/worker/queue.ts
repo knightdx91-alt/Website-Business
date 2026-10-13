@@ -404,6 +404,8 @@ export interface HealthInput {
   reviewLink: boolean;
   companyAddress: boolean;
   plansPriced: number;
+  /** Spam protection on the public forms: Turnstile's state (src/worker/spam.ts) and this month's blocked count. */
+  spam: { turnstile: "on" | "key" | "secret" | "off"; blocked: number };
 }
 
 /** The health strip at the top of Settings: is every outside piece connected, and which ones are optional. */
@@ -511,6 +513,21 @@ export function healthItems(h: HealthInput): HealthItem[] {
           ? `${h.plansPriced} plan${h.plansPriced === 1 ? "" : "s"} with a price.`
           : "No plan has a price yet; nothing can be sold.",
       section: "Plans & prices",
+    },
+    {
+      id: "spam",
+      label: "Spam protection on the website forms",
+      state: h.spam.turnstile === "on" ? "ok" : "warn",
+      detail: `${
+        h.spam.turnstile === "on"
+          ? "Turnstile checks every post, on top of the hidden-field, timing and content rules."
+          : h.spam.turnstile === "key"
+            ? "The site key is saved, but the Worker has no TURNSTILE_SECRET_KEY secret yet, so the widget shows and nothing is checked. Add the secret in Cloudflare → Workers & Pages → website-business → Settings → Variables and Secrets."
+            : h.spam.turnstile === "secret"
+              ? "The secret is set, but Settings → Website has no site key, so no widget shows and nothing is checked."
+              : "The hidden-field, timing and content rules are on. Add Cloudflare Turnstile (free) to stop bots before they post: Turnstile → Add widget, the site key here, the secret key as the Worker secret TURNSTILE_SECRET_KEY."
+      }${h.spam.blocked ? ` ${h.spam.blocked} blocked this month (see the Inbox).` : ""}`,
+      section: "Website",
     },
   ];
 }

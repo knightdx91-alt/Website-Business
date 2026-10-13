@@ -44,8 +44,30 @@ data class InboxItem(
     }
 }
 
+/** One post the spam checks dropped (src/worker/spam.ts): who, where, why and a snippet. Nobody was alerted for it. */
+data class BlockedPost(val at: Long, val scope: String, val reasons: List<String>, val who: String, val snippet: String)
+
+/** The inbox plus this month's blocked-as-spam count and the last few, so "did you get my message?" can be checked. */
+data class Inbox(val items: List<InboxItem>, val blockedThisMonth: Int, val blocked: List<BlockedPost>)
+
 /** GET /api/inbox (owner only): newest first. */
-suspend fun Api.inbox(): List<InboxItem> = getJson("/inbox").optJSONArray("items").objects().map { InboxItem.from(it) }
+suspend fun Api.inbox(): Inbox {
+    val j = getJson("/inbox")
+    val b = j.optJSONObject("blocked")
+    return Inbox(
+        items = j.optJSONArray("items").objects().map { InboxItem.from(it) },
+        blockedThisMonth = b?.optInt("month") ?: 0,
+        blocked = b?.optJSONArray("recent").objects().map { r ->
+            BlockedPost(
+                at = r.optLong("at"),
+                scope = r.optString("scope"),
+                reasons = r.optJSONArray("reasons")?.let { a -> (0 until a.length()).map { a.optString(it) } } ?: emptyList(),
+                who = r.optString("who"),
+                snippet = r.optString("snippet"),
+            )
+        },
+    )
+}
 
 /** POST /api/inbox/:id/read */
 suspend fun Api.inboxMarkRead(id: String) {

@@ -157,6 +157,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       (`research/design-quality-2026.md`, backlog in its §6)
 - [x] Ease-of-use overhaul (Oct 2026): next step per lead, Home queue, three-tap sign-up, agreement "In short", glossary,
       publish checklist, Settings health strip, alert modes, Start here, Report this, funnel; web + Android 2.49
+- [x] Spam protection on every public form (Oct 2026): hidden field + signed render time + content rules + address cap are live;
+      Turnstile switches on once the owner adds the site key (Settings → Website) and the TURNSTILE_SECRET_KEY secret (🛡️ below)
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
 ## Code map
@@ -243,6 +245,26 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   --local`, then a Playwright script like the session's `smoke.mjs` (chromium with `--no-proxy-server`). It caught two older web
   crashes: `ready` and `copyBtn` weren't defined in the sign-up / referral cards, so the web lead page had been failing on ready
   and sold leads (everyone was on Android).
+- 🛡️ Spam protection on every public form (Oct 2026, `src/worker/spam.ts`; Android 2.58): three of the first four messages through
+  the company site's contact form were SEO sellers, each one alerting the owner's phone. `screenForm()` runs five checks: the hidden
+  `website` field; a signed render time `_t` (`formStamp` / `checkStamp`, HMAC over APP_SECRET: missing or forged = never loaded the
+  form, under 3 s = not a person, over a day = one point); the words (`spamScore`: link selling 4, indexing / ranking / traffic
+  pitches 2, "we noticed your website" 2, domain-renewal scams 3, promo codes, mass-mail footers, vendor-like names and emails, links
+  1 each up to 3, our own domain named 1, non-Latin script 3, an Alabama phone number −2; `BLOCK_SCORE` 4; the real posts and real
+  inquiries are fixtures in `test/worker/spam.test.ts`, keep them when tuning); five blocks from one address in an hour (`spam_ip:<ip>`
+  settings keys, pruned by the daily cron); and Cloudflare Turnstile once Settings → Website has the site key (`turnstileSiteKey`,
+  web + Android) AND the Worker secret `TURNSTILE_SECRET_KEY` is set (`turnstileState`: one half alone enforces nothing, so a wrong
+  setup never locks people out; Cloudflare unreachable or our secret rejected = skip). A blocked post gets the normal thank-you and
+  alerts nobody; a missing or rejected Turnstile token shows `HUMAN_NOTE` (the home form comes back with `?human=1`). `formShieldHtml()`
+  (stamp field + widget + script) sits in the contact section, /change, /extras and /start; `csp()` adds challenges.cloudflare.com to
+  script-src / frame-src / connect-src when the key is set. Client sites' forms (`handleFormPost`) get the honeypot, the words and the
+  address cap (static pages carry no stamp). Blocks are counted in settings key `spam_log` (per month + the last 25 with who / scope /
+  reasons / snippet): `/api/inbox` → `blocked` (web Inbox fold "🛡️ N spam messages blocked this month", Android a card with Show),
+  health item `spam` (section Website). Owner setup: Cloudflare dashboard → Turnstile → Add widget (hostname undergroundassociates.com,
+  Managed) → the Site key into Settings → Website, the Secret key as the Worker secret (Workers & Pages → website-business → Settings →
+  Variables and Secrets, or `wrangler secret put TURNSTILE_SECRET_KEY`). The API token here has no Turnstile permission (creating the
+  widget by API answered "Authentication error"), so the owner makes it in the dashboard. `test/worker/company-forms.test.ts` drives
+  `serveCompany` with a fake D1 (page markup, CSP, a stampless post, a spam post, the try-again note).
 - Roles: the owner (password in `settings.owner_password`) and team members (`users` table, managed in
   Settings → Team). A team member is a caller, or has `users.admin = 1` ("Full access"): their session gets
   role "owner" (everything the owner can do) but keeps their own id and name for notes, texts and sales credit. Login is password-only, so passwords are unique across everyone. The session

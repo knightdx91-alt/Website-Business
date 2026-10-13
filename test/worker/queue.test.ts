@@ -147,6 +147,7 @@ test("health strip states", () => {
     reviewLink: false,
     companyAddress: false,
     plansPriced: 3,
+    spam: { turnstile: "key", blocked: 7 },
   });
   const by = Object.fromEntries(items.map((i) => [i.id, i]));
   assert.equal(by.stripe!.state, "warn");
@@ -156,7 +157,11 @@ test("health strip states", () => {
   assert.equal(by.push!.state, "ok");
   assert.equal(by.search!.state, "warn");
   assert.equal(by.plans!.detail, "3 plans with a price.");
-  assert.equal(items.length, 10);
+  assert.equal(by.spam!.state, "warn");
+  assert.match(by.spam!.detail, /TURNSTILE_SECRET_KEY secret yet/);
+  assert.match(by.spam!.detail, /7 blocked this month/);
+  assert.equal(by.spam!.section, "Website");
+  assert.equal(items.length, 11);
 });
 
 const settings = (): AppSettings =>

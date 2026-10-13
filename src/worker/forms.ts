@@ -1,6 +1,7 @@
 import { notify } from "./notify.ts";
 import { getLead } from "./db.ts";
 import { newId, now, type Env } from "./env.ts";
+import { screenForm } from "./spam.ts";
 
 // Every FormField name the generator can render (src/generator/components.ts), plus the hidden topic a special form sets.
 const FIELDS = [
@@ -164,9 +165,6 @@ export async function handleFormPost(
   } catch {
     return back("/");
   }
-  // Honeypot: real people never fill this hidden field.
-  if (String(form.get("website") ?? "").trim()) return back("/thanks/");
-
   const ip = req.headers.get("cf-connecting-ip") ?? "";
   const recent = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM submissions WHERE lead_id = ? AND ip = ? AND created_at > ?",
@@ -182,6 +180,16 @@ export async function handleFormPost(
       .slice(0, f === "message" ? 2000 : 200);
     if (v) data[f] = v;
   }
+  // The hidden "website" field, the words and the repeat-sender cap (src/worker/spam.ts). A static site carries no
+  // render stamp and no Turnstile widget, so those two checks are skipped here. Spam gets the same thank-you page.
+  const shield = await screenForm(env, {}, form, {
+    scope: `Website of ${lead.name}`,
+    ip,
+    fields: data,
+    stamp: false,
+    turnstile: false,
+  });
+  if (shield.block) return back("/thanks/");
   if (!data.name || !data.phone) return back("/#contact");
   await env.DB.prepare(
     "INSERT INTO submissions (id, lead_id, created_at, data_json, ip, unverified) VALUES (?, ?, ?, ?, ?, 1)",

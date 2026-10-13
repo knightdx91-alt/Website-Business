@@ -187,6 +187,7 @@ import {
   type Job,
 } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
+import { blockedSummary, pruneSpamCounters, turnstileState } from "./spam.ts";
 import {
   allowedEndpoint,
   getAlertMode,
@@ -1249,6 +1250,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         reviewLink: !!settings.companyReviewUrl,
         companyAddress: !!(settings.companyStreet && settings.companyCity),
         plansPriced: settings.plans.filter((p) => p.monthly).length,
+        spam: {
+          turnstile: turnstileState(env, settings),
+          blocked: (await blockedSummary(env)).month,
+        },
       }),
     });
   }
@@ -1463,6 +1468,14 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         siteBio: z.string().trim().max(1200).optional(),
         siteTestimonials: z.string().trim().max(3000).optional(),
         siteTowns: z.string().trim().max(400).optional(),
+        turnstileSiteKey: z
+          .string()
+          .trim()
+          .regex(
+            /^[0-9A-Za-z_-]{10,80}$/,
+            "A Turnstile site key looks like 0x4AAAAAAA… (from Cloudflare → Turnstile)",
+          )
+          .optional(),
         fcmAppId: z
           .string()
           .trim()
@@ -3646,6 +3659,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         read: !!r.read,
         data: JSON.parse(r.data_json),
       })),
+      // Posts dropped as spam this month, with the last few (who, why, a snippet), so a "did you get my message?" can be checked.
+      blocked: await blockedSummary(env),
     });
   }
   const inboxMatch = /^\/inbox\/([a-z0-9]+)\/read$/.exec(path);
@@ -3784,6 +3799,7 @@ async function pruneOldRows(env: Env): Promise<void> {
     .bind(now() - 90 * 86_400_000)
     .run();
   await pruneLoginFailures(env);
+  await pruneSpamCounters(env);
 }
 
 /* ---------- Backups ---------- */
