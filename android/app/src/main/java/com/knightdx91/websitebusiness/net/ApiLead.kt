@@ -13,6 +13,9 @@ data class DnaValue(val id: String, val name: String)
 /** A design knob from `dnaOrder`: its id, the letter used in the design id, and the values in order. */
 data class DnaKnob(val id: String, val letter: String, val label: String, val values: List<DnaValue>)
 
+/** Why the site looks the way it does, from the art director ("A chalkboard menu board": "Your reviews are all about…"). */
+data class DesignNotes(val concept: String, val why: String)
+
 /** A named page structure ("Photo first", "Menu board"…) that `POST /restyle {recipe}` keeps the colors for. */
 data class DnaRecipe(val id: String, val name: String, val about: String)
 
@@ -43,6 +46,8 @@ data class LeadFull(
     val layouts: List<NamedOption>,
     val dnaOrder: List<DnaKnob>,
     val dnaRecipes: List<DnaRecipe>,
+    /** The art director's concept and reason for the current design; null for hand-rolled or older designs. */
+    val designNotes: DesignNotes?,
     /** knob id → value id for the current design (empty before the site is built). */
     val dna: Map<String, String>,
     val layout: String?,
@@ -109,6 +114,7 @@ data class LeadFull(
                     DnaKnob(k.optString("id"), k.optString("letter"), k.optString("label"), k.optJSONArray("values").objects().map { DnaValue(it.optString("id"), it.optString("name")) })
                 },
                 dnaRecipes = j.optJSONArray("dnaRecipes").objects().map { DnaRecipe(it.optString("id"), it.optString("name"), it.optString("about")) },
+                designNotes = j.optJSONObject("designNotes")?.let { DesignNotes(it.optString("concept"), it.optString("why")) },
                 dna = dna,
                 layout = j.str("layout"),
                 lookBase = j.str("lookBase"),

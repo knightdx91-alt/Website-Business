@@ -12,7 +12,7 @@ import type { BusinessRecord, Copy, ExistingSite } from "../generator/types.ts";
 
 export const DEFAULT_COPY_MODEL = "claude-opus-5-5";
 /** Bump when the prompt changes so cached copy is regenerated. */
-export const COPY_PROMPT_VERSION = 4;
+export const COPY_PROMPT_VERSION = 5;
 
 const CopySchema = z.object({
   cuisineLabel: z.string().describe("Restaurants only; empty string otherwise"),
@@ -43,6 +43,7 @@ Rules that matter more than style:
 - Don't restate hours, phone numbers, prices or the street address in prose. The page shows those from live data, and prose copies go stale.
 - Don't recite a list of amenities or options; mention one or two only if they help the story.
 - Write fresh wording for this specific business. Don't reuse generic template sentences.
+- <design_direction>, when given, is the art director's note on the page this copy goes on: the tone to hit and what the headline should lead with. Follow it where it doesn't conflict with the facts or the brief; a headline length it asks for is a hard limit.
 - Fill fields the brief doesn't ask for with an empty string or empty array.`;
 
 export interface WriteCopyInput {
@@ -53,6 +54,8 @@ export interface WriteCopyInput {
   primaryTypeLabel?: string;
   /** Their current website's facts, when they have one (site-import.ts). */
   existingSite?: ExistingSite;
+  /** The art director's note for the copywriter (tone, what the headline leads with); see art-director.ts. */
+  direction?: string;
   model?: string;
 }
 
@@ -301,6 +304,10 @@ ${input.editorialSummary ? `Google's own summary: ${input.editorialSummary}` : "
 <existing_site>
 ${input.existingSite ? existingSiteText(input.existingSite) : "none"}
 </existing_site>
+
+<design_direction>
+${input.direction ? input.direction.slice(0, 400) : "none"}
+</design_direction>
 
 ${brief(input.pack, input.record)}`;
 

@@ -150,6 +150,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       + review link; verify undergroundassociates.com as a Domain property in Search Console and submit /sitemap.xml;
       Chamber of Commerce, Bing Places, Apple Business Connect listings; add `app/public/owner.jpg`
 - [x] Tax & finance pack and churches & nonprofits pack (Oct 2026), 25 looks each. Hand-added businesses can have a typed-in phone
+- [x] Design quality round 3 (Oct 2026, Android 2.56): generator polish (type, motion, scrim, icons), DNA align / bento /
+      marquee / offset, and the AI art director that picks each site's design from the business and explains why
+      (`research/design-quality-2026.md`, backlog in its §6)
 - [x] Ease-of-use overhaul (Oct 2026): next step per lead, Home queue, three-tap sign-up, agreement "In short", glossary,
       publish checklist, Settings health strip, alert modes, Start here, Report this, funnel; web + Android 2.49
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
@@ -556,6 +559,34 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   first open if still New (`restyleOldPreview` in preview.ts). Checking designs by eye:
   `npx tsx scripts/design-sheet.ts <scratchDir> "<look>~<layout>,..." [--no-photo]` (phone + desktop sheets, flags
   overflow) and `npx tsx scripts/check-looks.ts <category>`.
+- 🎨 Design quality round 3 (Oct 2026, Android 2.56; research in `research/design-quality-2026.md`, which also holds the backlog):
+  four research passes (2026 trends, local-site conversion, a rulebook from the design books, an audit of the best local
+  sites and the AI builders) + an audit of our own output drove three changes. (1) **Generator polish** (`css.ts`,
+  `client-script.ts`, `components.ts`, `icons.ts`): `text-wrap` balance/pretty, tighter h1 tracking, tabular numerals on
+  hours/prices, button hover lift + press, header shadow once scrolled, floor-fade photo scrim (left-to-right on
+  desktop), once-only scroll reveals (`html.motion` + `.reveal`/`.is-in` from the client script, stagger `--i`, off under
+  reduced motion or without IntersectionObserver, 5 s safety reveal), hero lines rising in, big quote mark + lettered
+  avatar on reviews, and `serviceIcon(title, fallback)` (18 stroke icons keyed on the service name, so no grid repeats one
+  wrench). Billboard / statement / poster headlines never break mid-word: `hero()` sets `--h1-ch` (the longest word) and
+  css.ts `--h1-adv` (advance width per face class). Screenshot scripts emulate reduced motion (full-page captures were
+  blank below the fold). (2) **DNA third round**: knob `align` (letter `g`, Left / Centered; older ids parse as Left),
+  `services: bento` (first tile featured on the brand color, last tile widened `sp2m`/`sp2d`/`sp3d`, < 4 services → cards),
+  `strip: marquee` (scrolling address line; the client script clones the track `aria-hidden`; pauses on hover/focus; wraps
+  statically under reduced motion or without JS; never with a utility bar or proof band), `photo: offset`; recipes general
+  `bento`, restaurant `marquee`, contractor `bento-board`, salon `centered`, auto `parts-wall`, retail `window-display`.
+  Rules in `settleDna`; `test/dna.test.ts` "third round". (3) **The art director** (`src/copy/art-director.ts`): a Claude
+  call (Opus 5.5, effort low, catalog block cached) picks look + layout + recipe + knobs from a text catalog
+  (`catalogFor(category)`: looks described by palette words via `colorName`, font kind, buttons, labels, photo direction;
+  layouts; recipes; every knob) and the business (facts, photos and whether they can go live, rating, hours, their site's
+  words, reviews as background, neighbors' designs to avoid, paying clients' designs never) → `settlePick` validates
+  every id (alternates → pack default; hints win: no owner photo → type-led opening, owner proof → band; asked-for knobs
+  beat seeded ones) → `DesignNotes` {concept, why, copyNotes, model, at, fixes} on `record.designNotes`. `designFor()` in
+  pipeline.ts runs it for every new build BEFORE the copy (`writeCopy` gets `direction` = copyNotes → `<design_direction>`,
+  COPY_PROMPT_VERSION 5) and for "Try another design" (`POST /restyle` without a recipe; the current design counts as
+  taken); recipe / structure-only restyles clear the notes. Falls back to `chooseLook` without a key or on any error;
+  usage metered like copy. `detail().designNotes` → the Design card on web + Android shows "✨ <concept>. <why>"; the call
+  guide's `previewFeatures` leads with it. `test/art-director.test.ts`. Design sheets: scratchpad `ids.mts` composes ids
+  from recipe names, `crop-sheet.mts` tiles the first phone screens.
 - Design DNA (Oct 2026, `src/generator/dna.ts` + `dna-css.ts`): a third part of the design id, `<look>~<layout>~<dna>`
   (e.g. `h1n2b3s2v1c1f1a1p1`), that changes the page *structure*: opening (`hero`: stack / cover / split with an at-a-glance
   panel / banner + lede / statement with a photo band), top bar (`nav`), buttons, address bar (`strip`), services

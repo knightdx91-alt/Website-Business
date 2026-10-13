@@ -60,7 +60,7 @@ for (const design of designs) {
   const slug = design.replace(/[^a-z0-9]+/gi, "-");
   const base = `/${slug}`;
   const out = await buildSite({
-    record, copy: ex.copy, site: { slug, look: design, origin: `https://example.com${base}` }, mode: "publish", formEndpoint: "/form", basePath: base,
+    record, copy: ex.copy, site: { slug, look: design, origin: `https://example.com${base}` }, mode: "publish", formEndpoint: "/form", basePath: base, allowSamples: true,
     loadFont: (pkg, file) => readFile(`node_modules/@fontsource/${pkg}/files/${file}`),
   });
   if (out.lint.errors.length) console.log(`LINT ${design}: ${JSON.stringify(out.lint.errors)}`);
@@ -76,6 +76,7 @@ for (const design of designs) {
   const phone = join(outDir, `${slug}--phone.png`);
   const desktop = join(outDir, `${slug}--desktop.png`);
   const p = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+  await p.emulateMedia({ reducedMotion: "reduce" }); // scroll reveals would leave the lower page blank in a full-page capture
   await p.clock.setFixedTime(new Date("2026-10-06T15:30:00Z"));
   await p.goto(`${origin}${base}/`, { waitUntil: "networkidle" });
   await p.evaluate(() => document.fonts.ready);

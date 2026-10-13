@@ -562,6 +562,8 @@ export interface BusinessRecord {
   siteImport?: { url: string; triedAt: string; error: string };
   /** When "Import from their Google page" last refreshed this record from the listing (ISO). */
   googleImportedAt?: string;
+  /** The art director's concept for this site's design (src/copy/art-director.ts): shown on the lead page and said in the call guide. */
+  designNotes?: DesignNotes;
   businessStatus: string;
   phone: { e164: string; display: string };
   smsEnabled: boolean;
@@ -621,6 +623,22 @@ export interface BusinessRecord {
   /** Plans & pricing cards (memberships, recurring tiers, ways to work with us). Owner-entered; 1–3. */
   plans?: Plan[];
   guarantee?: Guarantee;
+}
+
+/** Why a site looks the way it does, from the art director; cleared when the design is rolled by hand. */
+export interface DesignNotes {
+  /** The idea in a few words: "A chalkboard menu board". */
+  concept: string;
+  /** One or two plain sentences the salesperson can say to the owner. */
+  why: string;
+  /** Direction handed to the copywriter (tone, what the headline leads with). */
+  copyNotes?: string;
+  /** "<model>/v<prompt version>" that made the pick. */
+  model: string;
+  /** "YYYY-MM-DD HH:MM" (UTC). */
+  at: string;
+  /** Anything the validator changed about the model's answer ("look x → y"), for the log. */
+  fixes?: string[];
 }
 
 export interface OwnerProof {

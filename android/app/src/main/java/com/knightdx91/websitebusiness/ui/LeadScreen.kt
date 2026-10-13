@@ -598,6 +598,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                     Column(Modifier.padding(14.dp)) {
                         Text("🎨 Design", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text("Now: ${detail.designName}", style = MaterialTheme.typography.bodySmall, color = muted)
+                        detail.designNotes?.let { n -> Text("✨ ${n.concept}. ${n.why}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
                             Button(onClick = { act("design") { state.api.restyle(id); context.toast("New design ready"); load() } }, enabled = busy == null) { Text("Try another design") }
                             OutlinedButton(onClick = { act("design") { state.api.restyle(id, structureOnly = true); context.toast("New structure ready"); load() } }, enabled = busy == null) { Text("Same colors, new structure") }

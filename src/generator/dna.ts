@@ -17,12 +17,12 @@ export const DNA_KNOBS = {
   hero: ["stack", "cover", "split", "banner", "statement", "card", "billboard"],
   nav: ["bar", "centered", "slim", "utility", "overlay"],
   buttons: ["solid-ghost", "solid-link", "solid-solid", "outline", "block", "pill", "shadow"],
-  strip: ["bar", "tiles", "inline", "none", "ticker", "factcard"],
-  services: ["cards", "list", "tiles", "accordion", "columns", "table", "scroller"],
+  strip: ["bar", "tiles", "inline", "none", "ticker", "factcard", "marquee"],
+  services: ["cards", "list", "tiles", "accordion", "columns", "table", "scroller", "bento"],
   cta: ["band", "split", "boxed", "inline"],
   footer: ["columns", "stack", "bigcta", "bigname"],
   bar: ["bar", "fab"],
-  photo: ["plain", "duotone", "frame", "arch", "tilt"],
+  photo: ["plain", "duotone", "frame", "arch", "tilt", "offset"],
   // Added Oct 2026 (ids without these letters mean the legacy value).
   // "question" and "benefit" (Oct 2026, appended) use copy.heroQuestion / copy.heroBenefit and fall back to "service" without them.
   headline: ["service", "name", "promise", "question", "benefit"],
@@ -32,6 +32,8 @@ export const DNA_KNOBS = {
   tone: ["default", "light"],
   motif: ["none", "rules", "stripes", "dots", "grain"],
   proof: ["inline", "band"],
+  // Oct 2026 (appended): where the opening's text sits. "center" fills a wide screen with the headline instead of leaving the right half empty.
+  align: ["start", "center"],
 } as const;
 
 export type DnaKnob = keyof typeof DNA_KNOBS;
@@ -62,12 +64,12 @@ export const DNA_LABELS: { [K in DnaKnob]: { label: string; values: Record<Dna[K
     label: "Buttons",
     values: { "solid-ghost": "Solid + outline", "solid-link": "Solid + text link", "solid-solid": "Two solid colors", outline: "Outlined", block: "Big full-width", pill: "Pill shaped", shadow: "Hard shadow" },
   },
-  strip: { label: "Address bar", values: { bar: "Thin line", tiles: "Three tiles", inline: "One centered line", none: "In the opening", ticker: "Colored one-liner", factcard: "Card over the opening" } },
-  services: { label: "Services", values: { cards: "Cards", list: "Ruled list", tiles: "Compact tiles", accordion: "Tap to expand", columns: "Text columns", table: "Price list", scroller: "Swipe row" } },
+  strip: { label: "Address bar", values: { bar: "Thin line", tiles: "Three tiles", inline: "One centered line", none: "In the opening", ticker: "Colored one-liner", factcard: "Card over the opening", marquee: "Scrolling line" } },
+  services: { label: "Services", values: { cards: "Cards", list: "Ruled list", tiles: "Compact tiles", accordion: "Tap to expand", columns: "Text columns", table: "Price list", scroller: "Swipe row", bento: "Bento grid (one big, the rest small)" } },
   cta: { label: "Closing call", values: { band: "Centered band", split: "Side by side", boxed: "Boxed", inline: "One line" } },
   footer: { label: "Footer", values: { columns: "Three columns", stack: "Centered stack", bigcta: "Big call button", bigname: "Giant name" } },
   bar: { label: "Phone bar", values: { bar: "Bottom bar", fab: "Round call button" } },
-  photo: { label: "Photo style", values: { plain: "As is", duotone: "Tinted", frame: "Framed", arch: "Arched", tilt: "Snapshot" } },
+  photo: { label: "Photo style", values: { plain: "As is", duotone: "Tinted", frame: "Framed", arch: "Arched", tilt: "Snapshot", offset: "Color block behind" } },
   headline: { label: "Headline", values: { service: "What + where", name: "Business name", promise: "The promise line", question: "A question (\"AC blowing warm air?\")", benefit: "A benefit (\"Take your weekend back\")" } },
   rhythm: { label: "Page rhythm", values: { bands: "Alternating bands", continuous: "One background, ruled", chapters: "Numbered chapters", boxed: "Boxed sections" } },
   scale: { label: "Type size", values: { standard: "Standard", dramatic: "Dramatic", poster: "Poster", tight: "Tight" } },
@@ -75,6 +77,7 @@ export const DNA_LABELS: { [K in DnaKnob]: { label: string; values: Record<Dna[K
   tone: { label: "Opening tone", values: { default: "Brand color", light: "Light" } },
   motif: { label: "Texture", values: { none: "None", rules: "Fine lines", stripes: "Diagonal stripes", dots: "Dots", grain: "Grain" } },
   proof: { label: "Proof", values: { inline: "In the opening", band: "Band under the opening" } },
+  align: { label: "Opening text", values: { start: "Left", center: "Centered" } },
 };
 
 const LETTER: Record<DnaKnob, string> = {
@@ -94,6 +97,7 @@ const LETTER: Record<DnaKnob, string> = {
   tone: "o",
   motif: "m",
   proof: "q",
+  align: "g",
 };
 
 /** For the app's pickers: knob order, letter and values, so it can encode a design id the same way. */
@@ -146,9 +150,9 @@ type Prefs = { [K in DnaKnob]?: Array<Dna[K]> };
 const PREFS: Record<CategoryId, Prefs> = {
   general: {
     hero: ["split", "stack", "banner", "card", "statement", "cover"],
-    services: ["cards", "list", "tiles", "columns"],
-    strip: ["bar", "tiles", "inline", "none"],
-    photo: ["plain", "frame"],
+    services: ["cards", "list", "tiles", "columns", "bento"],
+    strip: ["bar", "tiles", "inline", "none", "marquee"],
+    photo: ["plain", "frame", "offset"],
     buttons: ["solid-ghost", "solid-solid", "pill", "block"],
     headline: ["name", "service", "promise"],
     scale: ["standard", "dramatic"],
@@ -156,9 +160,9 @@ const PREFS: Record<CategoryId, Prefs> = {
   },
   restaurant: {
     hero: ["cover", "stack", "card", "banner", "billboard", "split"],
-    services: ["cards", "tiles", "scroller", "columns", "table"],
-    strip: ["tiles", "bar", "ticker", "inline", "factcard"],
-    photo: ["plain", "frame", "arch"],
+    services: ["cards", "tiles", "scroller", "columns", "table", "bento"],
+    strip: ["tiles", "bar", "ticker", "inline", "factcard", "marquee"],
+    photo: ["plain", "frame", "arch", "offset"],
     buttons: ["solid-ghost", "solid-solid", "block", "pill"],
     headline: ["service", "name", "promise"],
     scale: ["standard", "dramatic", "poster"],
@@ -166,7 +170,7 @@ const PREFS: Record<CategoryId, Prefs> = {
   },
   contractor: {
     hero: ["split", "stack", "statement", "card", "banner"],
-    services: ["list", "cards", "accordion", "tiles", "scroller"],
+    services: ["list", "cards", "accordion", "tiles", "scroller", "bento"],
     cta: ["split", "band", "boxed", "inline"],
     buttons: ["block", "solid-solid", "solid-ghost", "shadow"],
     photo: ["plain", "duotone", "frame"],
@@ -176,11 +180,12 @@ const PREFS: Record<CategoryId, Prefs> = {
     motif: ["none", "stripes", "rules"],
     proof: ["band", "inline"],
     tone: ["default"],
+    align: ["start"],
   },
   salon: {
     hero: ["cover", "banner", "billboard", "stack", "card", "split"],
-    services: ["list", "table", "columns", "cards"],
-    photo: ["arch", "plain", "frame", "tilt"],
+    services: ["list", "table", "columns", "cards", "bento"],
+    photo: ["arch", "plain", "frame", "tilt", "offset"],
     buttons: ["solid-ghost", "outline", "solid-link", "pill"],
     strip: ["inline", "bar", "tiles", "ticker"],
     headline: ["name", "service", "promise"],
@@ -190,20 +195,21 @@ const PREFS: Record<CategoryId, Prefs> = {
   },
   auto: {
     hero: ["split", "stack", "cover", "statement", "card"],
-    services: ["list", "tiles", "cards", "accordion", "scroller"],
+    services: ["list", "tiles", "cards", "accordion", "scroller", "bento"],
     buttons: ["block", "solid-solid", "solid-ghost", "shadow"],
     photo: ["plain", "duotone"],
-    strip: ["bar", "ticker", "tiles", "factcard"],
+    strip: ["bar", "ticker", "tiles", "factcard", "marquee"],
     headline: ["service", "promise"],
     scale: ["standard", "dramatic"],
     motif: ["none", "stripes", "rules"],
     proof: ["band", "inline"],
     tone: ["default"],
+    align: ["start"],
   },
   landscaping: {
     hero: ["cover", "stack", "banner", "card"],
-    services: ["tiles", "cards", "list", "scroller"],
-    photo: ["plain", "frame"],
+    services: ["tiles", "cards", "list", "scroller", "bento"],
+    photo: ["plain", "frame", "offset"],
     buttons: ["solid-ghost", "block", "solid-solid", "pill"],
     headline: ["service", "benefit", "promise", "question"],
     motif: ["none", "dots"],
@@ -211,8 +217,8 @@ const PREFS: Record<CategoryId, Prefs> = {
   },
   cleaning: {
     hero: ["statement", "split", "stack", "banner", "card"],
-    services: ["columns", "list", "cards", "tiles"],
-    photo: ["frame", "plain"],
+    services: ["columns", "list", "cards", "tiles", "bento"],
+    photo: ["frame", "plain", "offset"],
     buttons: ["solid-ghost", "solid-link", "block", "pill"],
     strip: ["inline", "bar", "none", "factcard"],
     headline: ["service", "benefit", "promise", "question"],
@@ -222,8 +228,9 @@ const PREFS: Record<CategoryId, Prefs> = {
   },
   print: {
     hero: ["banner", "stack", "statement", "billboard", "card", "cover"],
-    services: ["tiles", "cards", "list", "scroller"],
-    photo: ["frame", "plain", "duotone", "tilt"],
+    services: ["tiles", "cards", "list", "scroller", "bento"],
+    photo: ["frame", "plain", "duotone", "tilt", "offset"],
+    strip: ["bar", "tiles", "inline", "ticker", "marquee"],
     buttons: ["solid-solid", "solid-ghost", "block", "shadow"],
     headline: ["name", "service"],
     scale: ["standard", "poster", "dramatic"],
@@ -232,9 +239,9 @@ const PREFS: Record<CategoryId, Prefs> = {
   },
   retail: {
     hero: ["cover", "banner", "stack", "billboard", "card", "split"],
-    services: ["tiles", "cards", "columns", "scroller"],
-    photo: ["plain", "arch", "frame", "tilt"],
-    strip: ["tiles", "inline", "bar", "ticker"],
+    services: ["tiles", "cards", "columns", "scroller", "bento"],
+    photo: ["plain", "arch", "frame", "tilt", "offset"],
+    strip: ["tiles", "inline", "bar", "ticker", "marquee"],
     headline: ["name", "service", "promise"],
     scale: ["standard", "dramatic", "poster"],
     motif: ["none", "dots", "rules"],
@@ -288,6 +295,7 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
     R("at-a-glance", "At a glance", "Info panel beside the photo, list of services.", { hero: "split", strip: "none", services: "list" }),
     R("plain-sign", "Plain sign", "Big name, facts row, light tone, tiles.", { hero: "billboard", tone: "light", services: "tiles" }),
     R("storefront", "Storefront", "Banner with a lede, bar under it, columns.", { hero: "banner", strip: "bar", services: "columns" }),
+    R("bento", "Bento", "Centered headline, services as a bento grid, color block behind the photo.", { hero: "banner", align: "center", services: "bento", photo: "offset" }),
   ],
   restaurant: [
     R("photo-first", "Photo first", "Full-screen food photo, menu tiles, swipeable specials.", { hero: "cover", services: "tiles", strip: "inline", scale: "dramatic" }),
@@ -296,6 +304,7 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
     R("postcard", "Postcard", "Photo, then a floating card with the hours and call button.", { hero: "card", strip: "none", services: "scroller", footer: "bigname" }),
     R("classic-diner", "Classic", "Headline over photo, three tiles, cards.", { hero: "stack", strip: "tiles", services: "cards", rhythm: "bands" }),
     R("poster", "Poster", "Huge type, one background, numbered chapters.", { hero: "statement", scale: "poster", rhythm: "chapters", buttons: "shadow" }),
+    R("marquee", "Marquee", "Full-screen photo, a scrolling line of specials and hours, bento menu highlights.", { hero: "cover", align: "center", strip: "marquee", services: "bento", scale: "dramatic" }),
   ],
   contractor: [
     R("dispatch", "Dispatch", "Info panel beside the headline, proof band, ruled list.", { hero: "split", strip: "none", proof: "band", services: "list", buttons: "block" }),
@@ -304,6 +313,7 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
     R("ledger", "Ledger", "One background, numbered chapters, price-list services.", { hero: "banner", rhythm: "chapters", services: "table", footer: "stack" }),
     R("classic-crew", "Classic crew", "Headline over the crew photo, three tiles, cards.", { hero: "stack", strip: "tiles", services: "cards", proof: "inline" }),
     R("fact-card", "Fact card", "A details card pulled up over the opening.", { hero: "stack", strip: "factcard", services: "list", cta: "split" }),
+    R("bento-board", "Bento board", "Big words, proof band, services as a bento grid with the main job featured.", { hero: "statement", proof: "band", services: "bento", buttons: "block" }),
   ],
   salon: [
     R("lookbook", "Lookbook", "Full-screen photo, name headline, arched photos.", { hero: "cover", headline: "name", photo: "arch", services: "list", scale: "dramatic" }),
@@ -311,6 +321,7 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
     R("editorial", "Editorial", "Short band, generous spacing, text columns.", { hero: "banner", density: "generous", services: "columns", photo: "frame", buttons: "outline" }),
     R("snapshot", "Snapshot", "Photo, floating card, tilted snapshots, pill buttons.", { hero: "card", photo: "tilt", buttons: "pill", services: "list", footer: "bigname" }),
     R("poster-shop", "Poster", "Huge type, grain texture, numbered chapters.", { hero: "statement", scale: "poster", motif: "grain", rhythm: "chapters" }),
+    R("centered", "Centered", "Centered headline, price list, color block behind the photo.", { hero: "statement", align: "center", services: "table", photo: "offset", strip: "inline" }),
   ],
   auto: [
     R("service-desk", "Service desk", "Info panel, proof band, ruled list, big buttons.", { hero: "split", strip: "none", proof: "band", services: "list", buttons: "block" }),
@@ -318,6 +329,7 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
     R("workshop", "Workshop", "Big words, stripes, swipe row of services.", { hero: "statement", motif: "stripes", services: "scroller", buttons: "shadow" }),
     R("classic-shop", "Classic shop", "Headline over photo, three tiles, cards.", { hero: "stack", strip: "tiles", services: "cards" }),
     R("front-counter", "Front counter", "Photo, floating card, fact strip, accordion.", { hero: "card", strip: "factcard", services: "accordion", cta: "inline" }),
+    R("parts-wall", "Parts wall", "Full-screen photo, scrolling line, bento services.", { hero: "cover", strip: "marquee", services: "bento", proof: "band" }),
   ],
   landscaping: [
     R("yard-photo", "Yard photo", "Full-screen photo, proof band, tiles.", { hero: "cover", proof: "band", services: "tiles", strip: "inline" }),
@@ -343,6 +355,7 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
     R("boutique", "Boutique", "Short band, arched photos, generous spacing.", { hero: "banner", photo: "arch", density: "generous", services: "columns", rhythm: "continuous" }),
     R("snapshots", "Snapshots", "Photo, floating card, tilted snapshots.", { hero: "card", photo: "tilt", buttons: "pill", services: "cards" }),
     R("classic-shop", "Classic", "Headline over photo, three tiles, cards.", { hero: "stack", strip: "tiles", services: "cards" }),
+    R("window-display", "Window display", "Name huge and centered, scrolling line, bento of what we carry.", { hero: "billboard", align: "center", strip: "marquee", services: "bento", photo: "offset" }),
   ],
   finance: [
     R("quiet-office", "Quiet office", "Big words on a light opening, one background, generous spacing.", { hero: "statement", tone: "light", rhythm: "continuous", density: "generous", services: "columns" }),
@@ -370,7 +383,7 @@ export function settleDna(d: Dna): Dna {
   // The fact card overlaps the opening; it needs a flat bottom edge to sit on.
   if (d.strip === "factcard" && (d.hero === "banner" || d.hero === "card")) d.strip = "bar";
   // Photo treatments only make sense where the photo is a picture, not a backdrop.
-  if ((d.hero === "stack" || d.hero === "cover") && (d.photo === "frame" || d.photo === "arch" || d.photo === "tilt")) d.photo = "plain";
+  if ((d.hero === "stack" || d.hero === "cover") && (d.photo === "frame" || d.photo === "arch" || d.photo === "tilt" || d.photo === "offset")) d.photo = "plain";
   if (d.hero === "statement" && d.photo === "duotone") d.photo = "plain";
   // The billboard is the name; the headline knob has nothing to say there.
   if (d.hero === "billboard") d.headline = "service";
@@ -386,6 +399,10 @@ export function settleDna(d: Dna): Dna {
   if (d.headline === "promise" && d.scale === "poster") d.scale = "dramatic";
   // A proof band plus a thin address line stacks two bands; make the second one quieter.
   if (d.proof === "band" && d.strip === "bar") d.strip = "inline";
+  // Centered text only suits openings that are one column of text; the panel, card and photo-band kinds keep their grid.
+  if (d.align === "center" && !["stack", "cover", "statement", "banner", "billboard"].includes(d.hero)) d.align = "start";
+  // A scrolling line under a utility bar or a proof band is one moving thing too many.
+  if (d.strip === "marquee" && (d.nav === "utility" || d.proof === "band")) d.strip = "inline";
   return d;
 }
 
@@ -449,7 +466,7 @@ export function pickDna(seed: string, category: CategoryId, o: { avoid?: Dna[]; 
 export function dnaAttrs(d: Dna): string {
   return (
     ` data-hero="${d.hero}" data-nav="${d.nav}" data-btn="${d.buttons}" data-strip="${d.strip}" data-svc="${d.services}" data-cta="${d.cta}" data-ftr="${d.footer}" data-bar="${d.bar}" data-photo="${d.photo}"` +
-    ` data-headline="${d.headline}" data-rhythm="${d.rhythm}" data-scale="${d.scale}" data-density="${d.density}" data-tone="${d.tone}" data-motif="${d.motif}" data-proof="${d.proof}"`
+    ` data-headline="${d.headline}" data-rhythm="${d.rhythm}" data-scale="${d.scale}" data-density="${d.density}" data-tone="${d.tone}" data-motif="${d.motif}" data-proof="${d.proof}" data-align="${d.align}"`
   );
 }
 

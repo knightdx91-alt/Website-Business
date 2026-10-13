@@ -2,7 +2,7 @@ import type { Action } from "./actions.ts";
 import { action, reviewUrl } from "./actions.ts";
 import { hasAnyHours, hoursSummary, weeklyRows } from "./hours.ts";
 import { html, join, raw, type Html, type Raw } from "./html.ts";
-import { icon, type IconName } from "./icons.ts";
+import { icon, serviceIcon, type IconName } from "./icons.ts";
 import type { Dna } from "./dna.ts";
 import type { Theme } from "./themes.ts";
 import type { BuildMode, BusinessRecord, Copy, EventItem, Faq, Guarantee, Image, License, Offer, Plan, Site } from "./types.ts";
@@ -158,6 +158,9 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   }
   const backdrop = showImg && (kind === "stack" || kind === "cover");
   const cls = `hero hero--${ctx.theme.knobs.hero}${backdrop ? " hero--photo" : ""} hero--${kind}`;
+  // The billboard / poster / statement H1 is sized to the screen; its longest word sets the ceiling so no word ever breaks.
+  const longest = Math.max(1, ...h1Text.split(/\s+/).map((w) => w.length));
+  const fit = kind === "billboard" || kind === "statement" || dna.scale === "poster" ? raw(` style="--h1-ch:${longest}"`) : "";
   const imgAttrs = raw(`src="${img?.src ?? ""}" alt="" width="${img?.width ?? 1200}" height="${img?.height ?? 800}" decoding="async"`);
   const media = backdrop ? html`<div class="hero__media"><img ${imgAttrs} fetchpriority="high"></div>` : "";
   const photo = showImg && !backdrop ? html`<div class="ph"><img ${imgAttrs} fetchpriority="high"></div>` : "";
@@ -198,21 +201,21 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   switch (kind) {
     case "card":
       // The photo first, full width; then a card with everything else floating up over its bottom edge.
-      return html`<section class="${cls}" aria-labelledby="hero-title">
+      return html`<section class="${cls}" aria-labelledby="hero-title"${fit}>
 <div class="hero__photo">${photo}</div>
 <div class="hero__in"><div class="hero__card">${badge}${eyebrow}${h1}${sub}${status}${trust}${btns}</div></div>
 ${credit}
 </section>`;
     case "billboard":
       // The name as the sign: huge, then what they do and the facts in a row under it; the photo as a band below.
-      return html`<section class="${cls}" aria-labelledby="hero-title"><div class="hero__in">${badge}${eyebrow}${h1}<div class="hero__bb">${sub}${status}${trust}${btns}</div></div></section>
+      return html`<section class="${cls}" aria-labelledby="hero-title"${fit}><div class="hero__in">${badge}${eyebrow}${h1}<div class="hero__bb">${sub}${status}${trust}${btns}</div></div></section>
 ${photo ? html`<div class="hero__band">${photo}${credit}</div>` : ""}`;
     case "split": {
       // Headline on the left; an "at a glance" panel (photo, open/closed, hours, address, phone, buttons) on the right.
       const dir = action(r, "directions")!;
       const call = action(r, "call")!;
       const addr = r.showStreetAddress && r.address.street ? `${r.address.street}, ${r.address.city}` : `${r.address.city}, ${r.address.state}`;
-      return html`<section class="${cls}" aria-labelledby="hero-title">
+      return html`<section class="${cls}" aria-labelledby="hero-title"${fit}>
 <div class="hero__in hero__grid"><div class="hero__text">${badge}${eyebrow}${h1}${sub}${trust}</div>
 <aside class="hero__panel" aria-label="At a glance">${photo}${status}${hasAnyHours(r.hours) ? html`<p class="hero__row">${icon("clock")}<span>${hoursSummary(r.hours)}</span></p>` : ""}
 <p class="hero__row">${icon("pin")}<a href="${dir.href}" target="_blank" rel="noopener">${addr}<span class="sr"> (opens directions in new tab)</span></a></p>
@@ -221,14 +224,14 @@ ${photo ? html`<div class="hero__band">${photo}${credit}</div>` : ""}`;
     }
     case "banner":
       // A short color band with the name and headline, then the details (and the photo) on the page background.
-      return html`<section class="${cls}" aria-labelledby="hero-title"><div class="hero__in">${badge}${eyebrow}${h1}</div></section>
+      return html`<section class="${cls}" aria-labelledby="hero-title"${fit}><div class="hero__in">${badge}${eyebrow}${h1}</div></section>
 <div class="lede"><div class="lede__in"><div>${sub}${status}${trust}${btns}</div>${photo ? html`<div>${photo}${credit}</div>` : ""}</div></div>`;
     case "statement":
       // Big words on the hero color, no photo behind them; the photo (if any) runs as a wide band underneath.
-      return html`<section class="${cls}" aria-labelledby="hero-title"><div class="hero__in">${badge}${eyebrow}${h1}${sub}${status}${btns}${trust}</div></section>
+      return html`<section class="${cls}" aria-labelledby="hero-title"${fit}><div class="hero__in">${badge}${eyebrow}${h1}${sub}${status}${btns}${trust}</div></section>
 ${photo ? html`<div class="hero__band">${photo}${credit}</div>` : ""}`;
     default:
-      return html`<section class="${cls}" aria-labelledby="hero-title">
+      return html`<section class="${cls}" aria-labelledby="hero-title"${fit}>
 ${media}
 <div class="hero__in">
 ${badge}${eyebrow}${h1}${sub}${status}${trust}${btns}
@@ -246,12 +249,15 @@ export function infoStrip(ctx: Ctx, chips: string[]): Raw {
   const call = action(r, "call")!;
   const dir = action(r, "directions")!;
   const addr = r.showStreetAddress && r.address.street ? `${r.address.street}, ${r.address.city}` : `${r.address.city}, ${r.address.state}`;
-  return html`<div class="strip strip--${kind}"><div class="strip__in">
-<a class="strip__item" href="${dir.href}" target="_blank" rel="noopener">${icon("pin")}<span>${addr}<span class="sr"> (opens directions in new tab)</span></span></a>
+  const items = html`<a class="strip__item" href="${dir.href}" target="_blank" rel="noopener">${icon("pin")}<span>${addr}<span class="sr"> (opens directions in new tab)</span></span></a>
 <a class="strip__item" href="${call.href}">${icon("phone")}<span>${r.phone.display}</span></a>
 ${hasAnyHours(r.hours) ? html`<a class="strip__item" href="#visit">${icon("clock")}<span>${ctx.statusShown ? html`<span data-today-hours>Hours</span>` : html`<span data-open-status hidden></span>`}<span class="strip__more"> See all hours</span></span></a>` : ""}
 ${chips.length ? html`<ul class="chips" aria-label="Services">${chips.map((c) => html`<li class="chip">${icon("check", 16)}${c}</li>`)}</ul>` : ""}
-${closureNote(r)}
+${closureNote(r)}`;
+  // The scrolling line: one track the site script clones (aria-hidden) so the loop is seamless; without the script it is a plain row.
+  if (kind === "marquee") return html`<div class="strip strip--marquee"><div class="strip__in"><div class="marquee__track">${items}</div></div></div>`;
+  return html`<div class="strip strip--${kind}"><div class="strip__in">
+${items}
 </div></div>`;
 }
 
@@ -283,7 +289,7 @@ export interface CardItem {
 
 export function cardGrid(items: CardItem[], cols: 2 | 3 = 3): Raw {
   return html`<ul class="cards${cols === 3 ? " cards--3" : ""}">${items.map(
-    (c) => html`<li class="card"><h3>${c.icon ? icon(c.icon) : ""}${c.title}</h3>${c.price ? html`<p class="price">${c.price}</p>` : ""}${
+    (c) => html`<li class="card"><h3>${c.icon ? icon(serviceIcon(c.title, c.icon)) : ""}${c.title}</h3>${c.price ? html`<p class="price">${c.price}</p>` : ""}${
       c.body ? html`<p>${c.body}</p>` : ""
     }</li>`,
   )}</ul>`;
@@ -296,14 +302,28 @@ export function cardGrid(items: CardItem[], cols: 2 | 3 = 3): Raw {
 export function serviceList(ctx: Ctx, items: CardItem[], cols: 2 | 3 = 3): Raw {
   const price = (p?: string) => (p ? html`<span class="price">${p}</span>` : "");
   const body = (b?: string) => (b ? html`<p>${b}</p>` : "");
+  // The icon says what the line is about (a drop for drains, a snowflake for A/C) instead of one wrench six times.
+  const ic = (it: CardItem, size: number) => (it.icon ? icon(serviceIcon(it.title, it.icon), size) : "");
   switch (ctx.theme.dna.services) {
     case "list":
-      return html`<ul class="svc svc--list">${items.map((it) => html`<li><span class="svc__i">${it.icon ? icon(it.icon, 28) : ""}</span><div><h3>${it.title}${price(it.price)}</h3>${body(it.body)}</div></li>`)}</ul>`;
+      return html`<ul class="svc svc--list">${items.map((it) => html`<li><span class="svc__i">${ic(it, 28)}</span><div><h3>${it.title}${price(it.price)}</h3>${body(it.body)}</div></li>`)}</ul>`;
     case "tiles":
-      return html`<ul class="svc svc--tiles">${items.map((it) => html`<li>${it.icon ? html`<span class="svc__i">${icon(it.icon, 34)}</span>` : ""}<h3>${it.title}</h3>${price(it.price)}${body(it.body)}</li>`)}</ul>`;
+      return html`<ul class="svc svc--tiles">${items.map((it) => html`<li>${it.icon ? html`<span class="svc__i">${ic(it, 34)}</span>` : ""}<h3>${it.title}</h3>${price(it.price)}${body(it.body)}</li>`)}</ul>`;
+    case "bento": {
+      // One featured service (the first) on the brand color, the rest as small tiles; the last tile widens so no row is left ragged.
+      if (items.length < 4) return cardGrid(items, cols);
+      const n = items.length - 1;
+      const phoneWide = n % 2 === 1;
+      const deskRest = (2 + n) % 3;
+      return html`<ul class="svc svc--bento">${items.map((it, i) => {
+        const last = i === items.length - 1;
+        const cls = [last && phoneWide ? "sp2m" : "", last && deskRest === 1 ? "sp3d" : last && deskRest === 2 ? "sp2d" : ""].filter(Boolean).join(" ");
+        return html`<li${cls ? raw(` class="${cls}"`) : ""}>${it.icon ? html`<span class="svc__i">${ic(it, 30)}</span>` : ""}<h3>${it.title}</h3>${price(it.price)}${body(it.body)}</li>`;
+      })}</ul>`;
+    }
     case "accordion":
       return html`<div class="svc svc--acc">${items.map(
-        (it, i) => html`<details${i === 0 ? raw(" open") : ""}><summary><h3>${it.icon ? html`<span class="svc__i">${icon(it.icon, 22)}</span>` : ""}${it.title}${price(it.price)}</h3></summary>${body(it.body)}</details>`,
+        (it, i) => html`<details${i === 0 ? raw(" open") : ""}><summary><h3>${it.icon ? html`<span class="svc__i">${ic(it, 22)}</span>` : ""}${it.title}${price(it.price)}</h3></summary>${body(it.body)}</details>`,
       )}</div>`;
     case "columns":
       return html`<div class="svc svc--cols">${items.map((it) => html`<div><h3>${it.title}${price(it.price)}</h3>${body(it.body)}</div>`)}</div>`;
@@ -314,7 +334,7 @@ export function serviceList(ctx: Ctx, items: CardItem[], cols: 2 | 3 = 3): Raw {
       )}</ul>`;
     case "scroller":
       return html`<div class="svc svc--scroll" tabindex="0" role="region" aria-label="Services, swipe to see more"><ul>${items.map(
-        (it) => html`<li>${it.icon ? html`<span class="svc__i">${icon(it.icon, 30)}</span>` : ""}<h3>${it.title}${price(it.price)}</h3>${body(it.body)}</li>`,
+        (it) => html`<li>${it.icon ? html`<span class="svc__i">${ic(it, 30)}</span>` : ""}<h3>${it.title}${price(it.price)}</h3>${body(it.body)}</li>`,
       )}</ul></div>`;
     default:
       return cardGrid(items, cols);
@@ -453,7 +473,7 @@ ${sectionHead("Reviews", "What customers say", intro, "reviews-title")}
 ${
   t.length
     ? html`<ul class="quotes">${t.map(
-        (q) => html`<li><blockquote class="quote"><p>“${q.quote}”</p><footer>${q.displayName}${q.town ? `, ${q.town}` : ""}</footer></blockquote></li>`,
+        (q) => html`<li><blockquote class="quote"><p>“${q.quote}”</p><footer><span class="quote__ava" aria-hidden="true">${(q.displayName.trim()[0] ?? "★").toUpperCase()}</span><span>${q.displayName}${q.town ? `, ${q.town}` : ""}</span></footer></blockquote></li>`,
       )}</ul>`
     : todo(ctx, "Add 3 customer quotes", "Send us a few kind words from customers (with their OK) and we'll feature them here. We never copy Google reviews onto your site.")
 }

@@ -61,6 +61,7 @@ const ANGLES: Record<string, string[]> = {
 /** Exactly what the generated preview contains, so the guide never over-describes it. */
 function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
   const f = [
+    ...(r.designNotes ? [`a design picked for this business, "${r.designNotes.concept}": ${r.designNotes.why}`] : []),
     "a mobile-friendly site with tap-to-call buttons on every screen and a call bar at the bottom on phones",
     "a one-tap directions button",
     "an About section",

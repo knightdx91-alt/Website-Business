@@ -49,11 +49,13 @@ for (const slug of slugs) {
   const { url, close } = await serve(join(sitesDir, slug));
   for (const v of VIEWS) {
     const page = await browser.newPage({ viewport: { width: v.width, height: v.height }, deviceScaleFactor: 1 });
+    await page.emulateMedia({ reducedMotion: "reduce" }); // scroll reveals would leave the lower page blank in a full-page capture
     await page.goto(`${url}/`, { waitUntil: "networkidle" });
     await page.screenshot({ path: join(shotsDir, `${slug}--${v.name}.png`), fullPage: v.full });
     await page.close();
   }
   const menuPage = await browser.newPage({ viewport: { width: 360, height: 780 } });
+  await menuPage.emulateMedia({ reducedMotion: "reduce" });
   const res = await menuPage.goto(`${url}/menu/`, { waitUntil: "networkidle" });
   if (res?.ok()) await menuPage.screenshot({ path: join(shotsDir, `${slug}--menu.png`), fullPage: true });
   await menuPage.close();

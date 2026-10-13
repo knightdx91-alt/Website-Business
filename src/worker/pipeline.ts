@@ -2,13 +2,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { autoVariant, setAutoVariant } from "../generator/packs/auto.ts";
 import { restaurantVariant } from "../generator/packs/restaurant.ts";
 import { writeCopy } from "../copy/write.ts";
+import { directDesign } from "../copy/art-director.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { churchVariant } from "../generator/packs/church.ts";
 import { financeVariant } from "../generator/packs/finance.ts";
 import { pickDesign } from "../generator/design.ts";
 import type { DnaHints } from "../generator/dna.ts";
 import { buildSite } from "../generator/render.ts";
-import type { BusinessRecord, CategoryId, Copy } from "../generator/types.ts";
+import type { BusinessRecord, CategoryId, Copy, DesignNotes } from "../generator/types.ts";
 import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { groupById, MARKET } from "../places/queries.ts";
 import { qualify, scorePlace } from "../places/qualify.ts";
@@ -208,6 +209,54 @@ export async function chooseLook(
     ],
     hints: dnaHints(record),
   });
+}
+
+/**
+ * The design for a new site (or a replacement the owner asked for): the art director picks a look, layout and structure
+ * that fit the business and explains why; its answer is validated against the catalog. Without a Claude key, or when the
+ * call fails, the deterministic spread (`chooseLook`) decides and the site still builds. Usage is metered like copy.
+ */
+export async function designFor(
+  env: Env,
+  record: BusinessRecord,
+  leadId: string,
+  o: { place?: Place; current?: string; client?: Anthropic } = {},
+): Promise<{ look: string; notes?: DesignNotes }> {
+  if (!env.ANTHROPIC_API_KEY) return { look: await chooseLook(env, record, leadId, o.current) };
+  const pack = packFor(record.category);
+  const rows = await env.DB.prepare(
+    "SELECT look, sales_status FROM leads WHERE category = ? AND look IS NOT NULL AND status != 'expired' AND id != ?",
+  )
+    .bind(record.category, leadId.split(":")[0])
+    .all<{ look: string; sales_status: string }>();
+  try {
+    const client = o.client ?? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const r = await directDesign(client, {
+      record,
+      looks: pack.looks,
+      preferred: pack.defaultLook(record),
+      used: rows.results.map((x) => x.look),
+      taken: [
+        ...rows.results.filter((x) => x.sales_status === "sold" || x.sales_status === "live").map((x) => x.look),
+        ...(o.current ? [o.current] : []),
+      ],
+      current: o.current,
+      reviews: o.place ? reviewTexts(o.place) : [],
+      editorialSummary: o.place?.editorialSummary?.text,
+      hints: dnaHints(record),
+      seed: leadId,
+    });
+    const price = MODEL_PRICES[r.model] ?? MODEL_PRICES["claude-opus-5-5"]!;
+    await addUsage(env, {
+      aiIn: r.usage.input,
+      aiOut: r.usage.output,
+      costMicro: Math.round(r.usage.input * price.input + r.usage.output * price.output),
+    });
+    return { look: r.design, notes: r.notes };
+  } catch (err) {
+    console.warn(`art director failed for ${leadId}: ${(err as Error).message}`);
+    return { look: await chooseLook(env, record, leadId, o.current) };
+  }
 }
 
 /** What the structure picker should know about this business: owner proof to show off, and whether a photo can go live. */
@@ -531,6 +580,13 @@ export async function runBuild(
       }
     }
 
+    // A new site gets its design first, so the copywriter knows the page it is writing for.
+    let look = lead.look;
+    if (!look) {
+      const d = await designFor(env, record, lead.id, { place });
+      look = d.look;
+      if (d.notes) record.designNotes = d.notes;
+    }
     let copy: Copy | undefined =
       lead.copy_json && !lead.rewrite ? JSON.parse(lead.copy_json) : undefined;
     if (!copy) {
@@ -543,6 +599,7 @@ export async function runBuild(
         editorialSummary: place.editorialSummary?.text,
         primaryTypeLabel: place.primaryTypeDisplayName?.text,
         existingSite: record.existingSite,
+        direction: record.designNotes?.copyNotes,
         model: settings.copyModel,
       });
       const price =
@@ -561,7 +618,6 @@ export async function runBuild(
         : undefined;
       if (old?.es) copy.es = old.es;
     }
-    const look = lead.look ?? (await chooseLook(env, record, lead.id));
     await renderPreview(env, lead, record, copy, look);
     if (lead.rewrite) await updateLead(env, lead.id, { rewrite: 0 });
   } catch (err) {

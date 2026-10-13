@@ -16,9 +16,10 @@ test("dna encodes and parses round-trip; bad codes are rejected", () => {
   assert.equal(parseDna("h9n0b0s0v0c0f0a0p0"), undefined, "index out of range");
   assert.equal(parseDna("h0n0"), undefined, "too short");
   assert.equal(parseDna("h0n0b0s0v0c0f0a0p0x"), undefined, "trailing junk");
-  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q0") }, "an id from before the newer knobs still parses, with legacy values for them");
+  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q0g0") }, "an id from before the newer knobs still parses, with legacy values for them");
   assert.equal(parseDna("h0n0b0s0v0c0f0a0p0t5"), undefined, "a newer knob out of range is still rejected");
-  assert.equal(encodeDna(LEGACY_DNA), "h0n0b0s0v0c0f0a0p0t0r0k0d0o0m0q0");
+  assert.equal(encodeDna(LEGACY_DNA), "h0n0b0s0v0c0f0a0p0t0r0k0d0o0m0q0g0");
+  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g0") }, "an id from before the align knob still parses");
   const d = parseDesign("auto.motor_oil~classic~h1n2b3s2v1c1f1a1p1");
   assert.equal(d.layout, "classic");
   assert.equal(d.dna?.hero, "cover");
@@ -99,4 +100,72 @@ test("every structure builds lint-clean on every layout, with and without a phot
   }
   const r = await buildSite({ record: restaurantRecord(), copy: sampleCopy(), site: site(`restaurant.pit_plank~classic~${encodeDna({ ...LEGACY_DNA, hero: "split", strip: "none", services: "tiles" })}`), mode: "preview" });
   assert.deepEqual(r.lint.errors, []);
+});
+
+test("third round: centered openings, bento services, marquee strip, offset photo, headline fit and service icons", async () => {
+  const { settleDna } = await import("../src/generator/dna.ts");
+  const { serviceIcon } = await import("../src/generator/icons.ts");
+  const { CLIENT_SCRIPT } = await import("../src/generator/client-script.ts");
+  const services = [
+    { id: "one", name: "Brake repair" },
+    { id: "two", name: "Oil changes" },
+    { id: "three", name: "AC repair" },
+    { id: "four", name: "Check engine diagnostics" },
+    { id: "five", name: "Tire rotation" },
+    { id: "six", name: "Alignments" },
+  ];
+  // A storefront pack (auto) renders the address strip; service-area packs never had one.
+  const record = categoryRecord("auto", { smsEnabled: true, services });
+  const d = settleDna({ ...LEGACY_DNA, hero: "banner", align: "center", services: "bento", strip: "marquee", photo: "offset", scale: "poster" });
+  assert.equal(d.align, "center");
+  assert.equal(d.strip, "marquee");
+  const design = `auto.motor_oil~classic~${encodeDna(d)}`;
+  const out = await buildSite({ record, copy: sampleCopy(), site: site(design), mode: "preview" });
+  assert.deepEqual(out.lint.errors, []);
+  const html = String(out.files.get("index.html"));
+  assert.match(html, /data-align="center"/);
+  assert.match(html, /hero--banner[^>]*style="--h1-ch:\d+"/, "poster scale carries the longest word so the headline never breaks mid-word");
+  assert.match(html, /<ul class="svc svc--bento"><li>/, "the first service is the featured tile (styled by position)");
+  // Six services: one featured + five tiles. Phones (2 columns) need the last tile full-width; desktops (3 columns, the feature taking two) need it across the row.
+  assert.match(html, /<li class="sp2m sp3d">(?:(?!<li).)*<\/ul>/, "the last tile widens so no row is ragged");
+  assert.match(html, /<div class="strip strip--marquee"><div class="strip__in"><div class="marquee__track">/);
+  const css = String(out.files.get("assets/site.css"));
+  assert.match(css, /\.svc--bento/);
+  assert.match(css, /html\[data-strip="marquee"\]/);
+  assert.match(css, /html\[data-align="center"\]/);
+  assert.match(css, /content:"\\2726"/, "the marquee separator is a real CSS escape");
+  assert.match(css, /content:"\\201C"/, "the quote mark is a real CSS escape");
+  assert.match(css, /@keyframes rise/);
+  assert.match(css, /prefers-reduced-motion/);
+  // The shipped client script is plain JS: its regexes carry single backslashes and it only turns motion on when the browser can observe.
+  assert.match(CLIENT_SCRIPT, /\(\^\|\\s\)\(cards\|svc/);
+  assert.doesNotMatch(CLIENT_SCRIPT, /\\\\s/);
+  assert.match(CLIENT_SCRIPT, /IntersectionObserver/);
+  assert.match(CLIENT_SCRIPT, /prefers-reduced-motion/);
+  assert.match(CLIENT_SCRIPT, /marquee__track/);
+  // Consistency: centered text only on openings that can carry it; a marquee never fights the utility bar or the proof band; a split opening keeps the photo plain.
+  assert.equal(settleDna({ ...LEGACY_DNA, hero: "split", align: "center" }).align, "start");
+  assert.equal(settleDna({ ...LEGACY_DNA, nav: "utility", strip: "marquee" }).strip, "inline");
+  assert.equal(settleDna({ ...LEGACY_DNA, proof: "band", strip: "marquee" }).strip, "inline");
+  assert.equal(settleDna({ ...LEGACY_DNA, hero: "cover", photo: "offset" }).photo, "plain");
+  // Bento needs four services; fewer fall back to the card grid.
+  const fewOut = await buildSite({ record: categoryRecord("auto", { smsEnabled: true }), copy: sampleCopy(), site: site(design), mode: "preview" });
+  assert.doesNotMatch(String(fewOut.files.get("index.html")), /svc--bento/);
+  assert.match(String(fewOut.files.get("index.html")), /class="cards/);
+  // Billboard and statement openings carry the fit variable; a stack opening does not.
+  for (const hero of ["billboard", "statement"] as const) {
+    const h = await buildSite({ record, copy: sampleCopy(), site: site(`auto.motor_oil~classic~${encodeDna(settleDna({ ...LEGACY_DNA, hero }))}`), mode: "preview" });
+    assert.match(String(h.files.get("index.html")), /--h1-ch:\d+/, hero);
+  }
+  const stack = await buildSite({ record, copy: sampleCopy(), site: site("auto.motor_oil~classic"), mode: "preview" });
+  assert.doesNotMatch(String(stack.files.get("index.html")), /--h1-ch/);
+  // Service icons follow the words in the title, with the pack's icon as the fallback.
+  assert.equal(serviceIcon("Drain cleaning", "wrench"), "droplet");
+  assert.equal(serviceIcon("AC repair", "wrench"), "snowflake");
+  assert.equal(serviceIcon("Furnace tune-ups", "wrench"), "flame");
+  assert.equal(serviceIcon("Panel upgrades", "wrench"), "bolt");
+  assert.equal(serviceIcon("Men's haircuts", "wrench"), "scissors");
+  assert.equal(serviceIcon("Something unusual", "wrench"), "wrench");
+  const icons = html.match(/<svg class="i" [^>]*stroke="currentColor"/g) ?? [];
+  assert.ok(icons.length >= 4, `service tiles carry stroke icons (${icons.length})`);
 });

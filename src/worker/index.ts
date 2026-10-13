@@ -233,6 +233,7 @@ import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
 import {
   chooseLook,
+  designFor,
   dnaHints,
   renderPreview,
   runBuild,
@@ -589,6 +590,8 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
     })),
     dnaOrder: DNA_ORDER,
     dnaRecipes: RECIPES[l.category as CategoryId] ?? [],
+    /** The art director's concept and reason for this design, when it picked it (null for hand-rolled or older designs). */
+    designNotes: record?.designNotes ? { concept: record.designNotes.concept, why: record.designNotes.why, at: record.designNotes.at } : null,
     dna: l.look ? (parseDesign(l.look).dna ?? LEGACY_DNA) : null,
     layout: l.look ? layoutOf(l.look) : null,
     lookBase: l.look ? parseDesign(l.look).look : null,
@@ -3067,13 +3070,17 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           layoutOf(lead.look),
           recipe ? settleDna({ ...base, ...recipe.dna }) : base,
         );
-      } else
-        look = await chooseLook(
-          env,
-          record,
-          `${id}:${Date.now()}`,
-          lead.look ?? undefined,
-        );
+      } else {
+        // "Try another design": the art director proposes a different design that fits the business, with a new reason.
+        const d = await designFor(env, record, `${id}:${Date.now()}`, {
+          place: lead.place_json ? (JSON.parse(lead.place_json) as Place) : undefined,
+          current: lead.look ?? undefined,
+        });
+        look = d.look;
+        if (d.notes) record.designNotes = d.notes;
+        else delete record.designNotes;
+      }
+      if (recipe || want.structureOnly) delete record.designNotes; // the concept no longer matches a hand-rolled structure
       await renderPreview(env, lead, record, JSON.parse(lead.copy_json), look);
       await siteUpdated(env, session, lead, ["new design"]);
       return json({ ok: true, look });

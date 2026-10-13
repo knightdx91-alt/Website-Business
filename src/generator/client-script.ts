@@ -203,6 +203,38 @@ if (lp && typeof fetch === "function") {
     }).catch(function () {});
   } catch (err) {}
 }
+/* Motion: the opening settles in on load, and sections and cards rise into view as they scroll in (the CSS keys off
+   html.motion + .reveal / .is-in). Never on under reduced motion, never without IntersectionObserver, and whatever the
+   observer misses is shown after a few seconds, so nothing can stay hidden. */
+if ("IntersectionObserver" in window && !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)) {
+  root.classList.add("motion");
+  var sel = "main .section>.wrap>*,main .proof__in>*,.cards>li,.svc>li,.svc--acc>details,.svc--cols>div,.svc--scroll li,.quotes>li,.steps>li,.tiles>li,.gallery>li,.pairs>li,.plans>li,.faq details,.team>li,.events>li,.seasons>li,.offers>li,.facts>div,.cta .wrap>*,.ftr__grid>div";
+  var skip = /(^|\\s)(cards|svc|quotes|steps|tiles|gallery|pairs|plans|faq|team|events|seasons|offers|facts|menu-nav|todo)(\\s|$)/;
+  var items = d.querySelectorAll(sel), vh = window.innerHeight, io;
+  io = new IntersectionObserver(function (es) {
+    for (var i = 0; i < es.length; i++) if (es[i].isIntersecting) { es[i].target.classList.add("is-in"); io.unobserve(es[i].target); }
+  }, { rootMargin: "0px 0px -6% 0px", threshold: 0.06 });
+  for (var m = 0; m < items.length; m++) {
+    var el = items[m];
+    // Lists animate per item, so their container stays as is (and the sticky menu nav never moves).
+    if (skip.test(el.className) || el.closest("#prices-live")) continue;
+    var p = el.parentNode, idx = 0;
+    if (p && p.children) { for (var s = 0; s < p.children.length; s++) { if (p.children[s] === el) { idx = Math.min(s, 5); break; } } }
+    el.style.setProperty("--i", String(idx));
+    el.classList.add("reveal");
+    if (el.getBoundingClientRect().top < vh * 0.95) el.classList.add("is-in"); else io.observe(el);
+  }
+  setTimeout(function () { var left = d.querySelectorAll(".reveal:not(.is-in)"); for (var k = 0; k < left.length; k++) left[k].classList.add("is-in"); }, 5000);
+  // Marquee address line: a second copy of the items makes the loop seamless; the copy is hidden from assistive tech.
+  var mq = d.querySelector(".marquee__track");
+  if (mq) {
+    var copy = mq.cloneNode(true), links = copy.querySelectorAll("a");
+    copy.setAttribute("aria-hidden", "true");
+    for (var li = 0; li < links.length; li++) links[li].setAttribute("tabindex", "-1");
+    mq.parentNode.appendChild(copy);
+    mq.parentNode.classList.add("is-dup");
+  }
+}
 var fy = d.querySelectorAll("[data-year]");
 for (var y = 0; y < fy.length; y++) fy[y].textContent = String(new Date().getFullYear());
 })();

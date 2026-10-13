@@ -992,6 +992,7 @@
       </section>`;
     C.design = `${ready && work && l.salesStatus !== "live" ? `<section class="card"><h2>🎨 Design</h2>
         <p class="small muted">Now: ${esc(lookName)}</p>
+        ${l.designNotes ? `<p class="small" style="margin:0 0 10px">✨ <strong>${esc(l.designNotes.concept)}.</strong> ${esc(l.designNotes.why)}</p>` : ""}
         <div class="btns btns--full"><button class="btn btn--primary" type="button" data-act="restyle">Try another design</button><button class="btn" type="button" data-act="restructure">Same colors, new structure</button></div>
         ${(l.dnaRecipes || []).length ? `<p class="small" style="margin:12px 0 6px"><strong>Or pick a style</strong> (keeps the colors)</p><div class="row" style="flex-wrap:wrap;gap:6px">${l.dnaRecipes.map((x) => `<button class="btn btn--small" type="button" data-recipe="${esc(x.id)}" title="${esc(x.about)}">${esc(x.name)}</button>`).join("")}</div>` : ""}
         <label class="field small" style="margin-top:12px">Colors &amp; fonts<select data-look>${l.looks.map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>

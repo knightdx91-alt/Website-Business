@@ -59,6 +59,7 @@ const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium" }).catch(() => chromium.launch());
 for (const ex of ogOnly ? [] : EXAMPLES) {
   const page = await browser.newPage({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 });
+  await page.emulateMedia({ reducedMotion: "reduce" }); // reveals and the opening animation finish instantly
   // A Tuesday at 10:30 AM in Cullman, so every example shows "Open now".
   await page.clock.setFixedTime(new Date("2026-10-06T15:30:00Z"));
   await page.goto(`${origin}/examples/${ex.slug}/`, { waitUntil: "networkidle" });
@@ -70,6 +71,7 @@ for (const ex of ogOnly ? [] : EXAMPLES) {
 
 // Link preview for undergroundassociates.com (texts, Facebook): 1200x630.
 const og = await browser.newPage({ viewport: { width: 1200, height: 630 } });
+await og.emulateMedia({ reducedMotion: "reduce" });
 await og.goto(`${origin}/examples/${EXAMPLES[0]!.slug}/`);
 const shots = EXAMPLES.slice(0, 3).map((e) => `/examples/${e.slug}.jpg`);
 await og.setContent(`<html><head><style>
