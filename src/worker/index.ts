@@ -187,6 +187,7 @@ import {
   type Job,
 } from "./env.ts";
 import { handleFormPost } from "./forms.ts";
+import { mergeSettings } from "./db.ts";
 import { blockedSummary, pruneSpamCounters, turnstileState } from "./spam.ts";
 import {
   allowedEndpoint,
@@ -1425,17 +1426,17 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
 
   if (path === "/settings" && m === "PUT") {
     ownerOnly();
-    const s = await body(
+    const patch = await body(
       req,
       z.object({
         defaultCap: z.number().int().min(1).max(500),
         copyModel: z.enum(Object.keys(MODEL_PRICES) as [string, ...string[]]),
-        companyName: z.string().trim().max(80).optional(),
-        legalName: z.string().trim().max(120).optional(),
-        companyPhone: z.string().trim().max(30).optional(),
-        companyEmail: z.string().trim().email().max(120).optional(),
-        billingEmail: z.string().trim().email().max(120).optional().or(z.literal("")),
-        supportEmail: z.string().trim().email().max(120).optional().or(z.literal("")),
+        companyName: z.string().trim().max(80).nullish(),
+        legalName: z.string().trim().max(120).nullish(),
+        companyPhone: z.string().trim().max(30).nullish(),
+        companyEmail: z.string().trim().email().max(120).nullish(),
+        billingEmail: z.string().trim().email().max(120).nullish().or(z.literal("")),
+        supportEmail: z.string().trim().email().max(120).nullish().or(z.literal("")),
         googleClientId: z
           .string()
           .trim()
@@ -1443,7 +1444,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             /^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/,
             "A Google client ID ends in .apps.googleusercontent.com",
           )
-          .optional(),
+          .nullish(),
         googleDomain: z
           .string()
           .trim()
@@ -1452,9 +1453,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             /^[a-z0-9.-]+\.[a-z]{2,}$/,
             "A domain like undergroundassociates.com",
           )
-          .optional(),
-        ownerEmail: z.string().trim().toLowerCase().email().max(120).optional(),
-        requireGoogle: z.boolean().optional(),
+          .nullish(),
+        ownerEmail: z.string().trim().toLowerCase().email().max(120).nullish(),
+        requireGoogle: z.boolean().nullish(),
         stripePublishableKey: z
           .string()
           .trim()
@@ -1462,12 +1463,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             /^pk_(live|test)_[A-Za-z0-9]+$/,
             "A Stripe publishable key starts with pk_live_ or pk_test_",
           )
-          .optional(),
-        siteHeadline: z.string().trim().max(120).optional(),
-        siteLead: z.string().trim().max(400).optional(),
-        siteBio: z.string().trim().max(1200).optional(),
-        siteTestimonials: z.string().trim().max(3000).optional(),
-        siteTowns: z.string().trim().max(400).optional(),
+          .nullish(),
+        siteHeadline: z.string().trim().max(120).nullish(),
+        siteLead: z.string().trim().max(400).nullish(),
+        siteBio: z.string().trim().max(1200).nullish(),
+        siteTestimonials: z.string().trim().max(3000).nullish(),
+        siteTowns: z.string().trim().max(400).nullish(),
         turnstileSiteKey: z
           .string()
           .trim()
@@ -1475,7 +1476,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             /^[0-9A-Za-z_-]{10,80}$/,
             "A Turnstile site key looks like 0x4AAAAAAA… (from Cloudflare → Turnstile)",
           )
-          .optional(),
+          .nullish(),
         fcmAppId: z
           .string()
           .trim()
@@ -1483,7 +1484,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             /^1:\d+:android:[a-f0-9]+$/,
             "A Firebase App ID looks like 1:123456:android:abc123",
           )
-          .optional(),
+          .nullish(),
         fcmApiKey: z
           .string()
           .trim()
@@ -1491,7 +1492,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             /^AIza[A-Za-z0-9_-]{20,}$/,
             "A Firebase API key starts with AIza",
           )
-          .optional(),
+          .nullish(),
         fcmProjectId: z
           .string()
           .trim()
@@ -1499,29 +1500,29 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             /^[a-z0-9-]{4,40}$/,
             "The Firebase project ID is lower-case letters, digits and dashes",
           )
-          .optional(),
+          .nullish(),
         fcmSenderId: z
           .string()
           .trim()
           .regex(/^\d{6,}$/, "The sender ID is a number")
-          .optional(),
-        companyStreet: z.string().trim().max(120).optional(),
-        companyCity: z.string().trim().max(60).optional(),
+          .nullish(),
+        companyStreet: z.string().trim().max(120).nullish(),
+        companyCity: z.string().trim().max(60).nullish(),
         companyState: z
           .string()
           .trim()
           .toUpperCase()
           .regex(/^[A-Z]{2}$/, "Two-letter state")
-          .optional(),
+          .nullish(),
         companyZip: z
           .string()
           .trim()
           .regex(/^\d{5}(-\d{4})?$/, "ZIP code")
-          .optional(),
-        directEmail: z.string().trim().email().max(120).optional(),
-        companyReviewUrl: WEB_URL(500).optional(),
-        companyFacebookUrl: WEB_URL(500).optional(),
-        calendarEmail: z.string().trim().email().max(120).optional(),
+          .nullish(),
+        directEmail: z.string().trim().email().max(120).nullish(),
+        companyReviewUrl: WEB_URL(500).nullish(),
+        companyFacebookUrl: WEB_URL(500).nullish(),
+        calendarEmail: z.string().trim().email().max(120).nullish(),
         gaMeasurementId: z
           .string()
           .trim()
@@ -1530,9 +1531,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             /^G-[A-Z0-9]{4,16}$/,
             "A Google tag ID looks like G-XXXXXXXXXX",
           )
-          .optional(),
-        gbpEmail: z.string().trim().email().max(120).optional(),
-        callerName: z.string().trim().max(60).optional(),
+          .nullish(),
+        gbpEmail: z.string().trim().email().max(120).nullish(),
+        callerName: z.string().trim().max(60).nullish(),
         plans: z
           .array(
             z.object({
@@ -1543,52 +1544,55 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
               // The Price list plan's includes text runs past 500 characters, and there are four plans since Oct 2026:
               // the old limits made every Settings save fail ("plans: Too big"), found through Report a problem.
               includes: z.string().trim().max(2000),
-              payLink: PAY_LINK.optional(),
-              payLinkFlex: PAY_LINK.optional(),
-              payLinkAnnual: PAY_LINK.optional(),
-              payLinkShort: PAY_LINK.optional(),
+              payLink: PAY_LINK.nullish(),
+              payLinkFlex: PAY_LINK.nullish(),
+              payLinkAnnual: PAY_LINK.nullish(),
+              payLinkShort: PAY_LINK.nullish(),
             }),
           )
           .max(4),
-        minMonths: z.number().int().min(0).max(36).optional(),
-        shortMonths: z.number().int().min(0).max(36).optional(),
-        flexSetup: z.number().min(0).max(10_000).optional(),
-        lateFee: z.number().min(0).max(500).optional(),
-        payoffDiscount: z.number().int().min(0).max(100).optional(),
-        interestRate: z.number().min(0).max(8).optional(),
-        reinstatementFee: z.number().min(0).max(500).optional(),
-        returnedPaymentFee: z.number().min(0).max(100).optional(),
-        invoiceForAll: z.boolean().optional(),
-        annualMonthsFree: z.number().int().min(0).max(6).optional(),
+        minMonths: z.number().int().min(0).max(36).nullish(),
+        shortMonths: z.number().int().min(0).max(36).nullish(),
+        flexSetup: z.number().min(0).max(10_000).nullish(),
+        lateFee: z.number().min(0).max(500).nullish(),
+        payoffDiscount: z.number().int().min(0).max(100).nullish(),
+        interestRate: z.number().min(0).max(8).nullish(),
+        reinstatementFee: z.number().min(0).max(500).nullish(),
+        returnedPaymentFee: z.number().min(0).max(100).nullish(),
+        invoiceForAll: z.boolean().nullish(),
+        annualMonthsFree: z.number().int().min(0).max(6).nullish(),
         addons: z
           .array(
             z.object({
               name: z.string().trim().min(1).max(60),
               price: z.number().min(0).max(10_000),
               unit: z.enum(["month", "each", "one-time", "quote"]),
-              about: z.string().trim().max(200).optional(),
-              terms: z.string().trim().max(1500).optional(),
-              group: z.enum(["general", "inventory"]).optional(),
-              founderPick: z.boolean().optional(),
+              about: z.string().trim().max(200).nullish(),
+              terms: z.string().trim().max(1500).nullish(),
+              group: z.enum(["general", "inventory"]).nullish(),
+              founderPick: z.boolean().nullish(),
             }),
           )
           .max(24)
-          .optional(),
-        terms: z.string().trim().max(6000).optional(),
-        commission: z.number().min(0).max(10_000).optional(),
+          .nullish(),
+        terms: z.string().trim().max(6000).nullish(),
+        commission: z.number().min(0).max(10_000).nullish(),
         /** Calls per day the team aims for (home screen progress). */
-        dailyCalls: z.number().int().min(0).max(200).optional(),
+        dailyCalls: z.number().int().min(0).max(200).nullish(),
         /** Months free for churches and nonprofits paying yearly. */
-        churchAnnualMonthsFree: z.number().int().min(0).max(11).optional(),
+        churchAnnualMonthsFree: z.number().int().min(0).max(11).nullish(),
         /** Discount programs: founding-customer spots and the referral rules (0 turns a program off). */
-        founderSlots: z.number().int().min(0).max(1000).optional(),
-        referralMonths: z.number().int().min(0).max(12).optional(),
-        referralMaxPerYear: z.number().int().min(0).max(24).optional(),
-        referralMinMonths: z.number().int().min(1).max(24).optional(),
+        founderSlots: z.number().int().min(0).max(1000).nullish(),
+        referralMonths: z.number().int().min(0).max(12).nullish(),
+        referralMaxPerYear: z.number().int().min(0).max(24).nullish(),
+        referralMinMonths: z.number().int().min(1).max(24).nullish(),
       }),
     );
+    // A key the app leaves out keeps its value (an older app, or one without the field, can't wipe it); null clears it.
     const before = await getSettings(env);
-    await setSetting(env, "app_settings", JSON.stringify(s));
+    const stored = JSON.parse((await getSetting(env, "app_settings")) ?? "{}") as Record<string, unknown>;
+    const s = mergeSettings(before, patch);
+    await setSetting(env, "app_settings", JSON.stringify(mergeSettings(stored, patch)));
     // Call guides quote these, so saved guides are rewritten on next open.
     const sales = (x: Partial<typeof s>) =>
       JSON.stringify([
@@ -3805,6 +3809,7 @@ async function pruneOldRows(env: Env): Promise<void> {
 /* ---------- Backups ---------- */
 
 const BACKUP_TABLES = [
+  "settings",
   "users",
   "leads",
   "lead_notes",

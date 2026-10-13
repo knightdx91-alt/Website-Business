@@ -717,6 +717,33 @@ export const MODEL_PRICES: Record<
   },
 };
 
+/**
+ * How PUT /api/settings applies what an app sends (Oct 2026, after the Android Settings screen, which had no Stripe
+ * publishable key field, wiped that key by saving the whole record): a key the app leaves out keeps its value, null
+ * clears it, anything else replaces it. So an app that doesn't know a field, or is older than the server, can never
+ * erase it. Nulls inside plans / extras are dropped.
+ */
+export function mergeSettings<T extends object>(base: T, patch: Record<string, unknown>): T {
+  const out = { ...base } as Record<string, unknown>;
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    if (v === null) delete out[k];
+    else out[k] = stripNulls(v);
+  }
+  return out as T;
+}
+
+function stripNulls(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(stripNulls);
+  if (v && typeof v === "object")
+    return Object.fromEntries(
+      Object.entries(v as Record<string, unknown>)
+        .filter(([, x]) => x !== null && x !== undefined)
+        .map(([k, x]) => [k, stripNulls(x)]),
+    );
+  return v;
+}
+
 export async function getSettings(env: Env): Promise<AppSettings> {
   const raw = await getSetting(env, "app_settings");
   const s = raw ? (JSON.parse(raw) as Partial<AppSettings>) : {};

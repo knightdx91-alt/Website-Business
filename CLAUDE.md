@@ -138,7 +138,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       every board sat on "Loading your tanks" with dead buttons; `test/worker/tankboard.test.ts` now parses the page's inline
       scripts with `new Function`. Reproduce a board locally: `wrangler dev --local --port 8789 --host …`, copy the lead row into
       the local D1, log in, `POST /api/leads/<id>/clientlink`, open the link with a trailing slash (the scratchpad `board.mjs`).
-- [ ] Owner to do: Stripe payment links; Google account for client profiles (Settings); apply for
+- [ ] Owner to do: paste the Stripe publishable key again (Settings → Your business; wiped Oct 2026, see ⚠️ Settings saves merge);
+      Stripe payment links; Google account for client profiles (Settings); apply for
       Google Business Profile API once a client's profile is managed (then build step 2). LLC is Underground Associates LLC
 - [x] Plans & answers screen for callers; 7 page layouts; print/sign and retail packs; more search groups
 - [x] Preview-opened alerts, policies, example sites, Stripe webhook, follow-up texts, change requests, review asks, and
@@ -245,6 +246,17 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   --local`, then a Playwright script like the session's `smoke.mjs` (chromium with `--no-proxy-server`). It caught two older web
   crashes: `ready` and `copyBtn` weren't defined in the sign-up / referral cards, so the web lead page had been failing on ready
   and sold leads (everyone was on Android).
+- ⚠️ Settings saves merge (Oct 2026, Android 2.59): the Android Settings screen had no "Stripe publishable key" field (CLAUDE.md said it
+  did), and `PUT /api/settings` stored exactly what the app sent, so the owner's first save from the phone (the Turnstile site key)
+  wiped `stripePublishableKey`: the Connections row "Card entry on the phone" went orange and the card sheet disappeared from the
+  lead page. The key is not in any backup (the weekly dump had no `settings` table; it does now) and must be pasted again from
+  Stripe → Developers → API keys. Rules since: (1) the server merges with `mergeSettings()` in db.ts: a key the app leaves out
+  keeps its value, `null` clears it, nested nulls are dropped; every optional field in the PUT schema is `.nullish()`;
+  `test/worker/settings-merge.test.ts`. (2) Web sends `null` for a blank field (`v(x) || null`, `n()` → null) and Android
+  `JSONObject.NULL` (`putStr` / `putNum`), so blanking a field still clears it. (3) When a Settings field is added, add it to the
+  web form, the web save block, the Android `SettingsForm` (var + put) and its card, and keep the key-diff honest: `grep -o
+  'put[A-Za-z]*("[a-zA-Z]*"' …SettingsScreen.kt` vs the web save block. The card row's "Open" button points at Your business,
+  where the field lives on both apps.
 - 🛡️ Spam protection on every public form (Oct 2026, `src/worker/spam.ts`; Android 2.58): three of the first four messages through
   the company site's contact form were SEO sellers, each one alerting the owner's phone. `screenForm()` runs five checks: the hidden
   `website` field; a signed render time `_t` (`formStamp` / `checkStamp`, HMAC over APP_SECRET: missing or forged = never loaded the

@@ -437,8 +437,8 @@ export function healthItems(h: HealthInput): HealthItem[] {
       state: h.stripePublishableKey ? "ok" : "warn",
       detail: h.stripePublishableKey
         ? "The card sheet works in the Android app."
-        : "Paste the Stripe publishable key to type a card in on the phone.",
-      section: "Sales",
+        : "Paste the Stripe publishable key (Stripe → Developers → API keys, pk_live_…) into Settings → Your business to type a card in on the phone.",
+      section: "Your business",
     },
     {
       id: "email",

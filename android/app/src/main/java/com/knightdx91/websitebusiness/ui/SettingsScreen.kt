@@ -170,6 +170,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
     var billingEmail by mutableStateOf(s.txt("billingEmail"))
     var supportEmail by mutableStateOf(s.txt("supportEmail"))
     var companyStreet by mutableStateOf(s.txt("companyStreet"))
+    var stripePublishableKey by mutableStateOf(s.txt("stripePublishableKey"))
     var companyCity by mutableStateOf(s.txt("companyCity"))
     var companyState by mutableStateOf(s.str("companyState") ?: "AL")
     var companyZip by mutableStateOf(s.txt("companyZip"))
@@ -241,9 +242,10 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         b.put("defaultCap", capN)
         if (model.isBlank()) throw FormError("Pick an AI writer")
         b.put("copyModel", model)
+        // Blank = null = "clear it": the server keeps any key the form leaves out, so a blank has to say so.
         fun putStr(key: String, v: String, transform: (String) -> String = { it }) {
             val t = transform(v.trim())
-            if (t.isNotEmpty()) b.put(key, t)
+            b.put(key, if (t.isNotEmpty()) t else JSONObject.NULL)
         }
         putStr("companyName", companyName)
         putStr("legalName", legalName)
@@ -260,6 +262,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         putStr("companyCity", companyCity)
         putStr("companyState", companyState) { it.uppercase(Locale.US) }
         putStr("companyZip", companyZip)
+        putStr("stripePublishableKey", stripePublishableKey)
         putStr("directEmail", directEmail)
         putStr("companyReviewUrl", companyReviewUrl)
         putStr("siteHeadline", siteHeadline)
@@ -289,7 +292,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
             plansArr.put(o)
         }
         b.put("plans", plansArr)
-        fun putNum(key: String, v: String, label: String) { numOrNull(v, label)?.let { b.put(key, it) } }
+        fun putNum(key: String, v: String, label: String) { b.put(key, numOrNull(v, label) ?: JSONObject.NULL) }
         putNum("minMonths", minMonths, "Standard plan (months)")
         putNum("shortMonths", shortMonths, "Short plan (months)")
         putNum("flexSetup", flexSetup, "Month-to-month setup")
@@ -759,6 +762,7 @@ private fun BusinessCard(f: SettingsForm, showsCallerName: Boolean) {
             Field(f.companyState, { f.companyState = it.take(2) }, "State", caps = KeyboardCapitalization.Characters, modifier = Modifier.weight(1f))
             Field(f.companyZip, { f.companyZip = it }, "ZIP", placeholder = "35055", keyboard = KeyboardType.Number, modifier = Modifier.weight(1.4f))
         }
+        Field(f.stripePublishableKey, { f.stripePublishableKey = it.trim() }, "Stripe publishable key", hint = "From Stripe → Developers → API keys (starts with pk_live_). Lets this app take a card typed on the phone. Not a secret.", placeholder = "pk_live_…")
         Field(f.companyReviewUrl, { f.companyReviewUrl = it }, "Our Google review link", hint = "From your Google profile: “Ask for reviews” → copy link. Texted to happy clients.", placeholder = "https://g.page/r/…/review", keyboard = KeyboardType.Uri)
         Field(f.companyFacebookUrl, { f.companyFacebookUrl = it }, "Our Facebook page", hint = "Linked in the website footer", placeholder = "https://www.facebook.com/…", keyboard = KeyboardType.Uri)
         Field(f.calendarEmail, { f.calendarEmail = it }, "Calendar email", hint = "Tasks for you with a date are sent here as calendar invites (your Google Calendar address). Blank uses your direct email.", placeholder = "post@undergroundassociates.com", keyboard = KeyboardType.Email)
