@@ -1478,6 +1478,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   the old flat `settings.commission` is no longer used. Team write-up (tables generated from the same functions with the live
   settings, scratchpad `comm-md.mts`): https://ua-commission-plan.knightdx91.workers.dev (Worker `ua-commission-plan`, source
   `research/commission-page/`, deployed from inside that folder).
+- Tap the tank to pay (Oct 2026, plan only, NOT built): one NFC sticker + QR per tank opens that tank's page, the customer pays
+  on the phone (Stripe Connect to the shop's own account, tax, minimum order), the receipt lists every fish with its tank, the
+  cashier scans it on the tablet and ticks lines per tank. Write-up: https://ua-tank-pay.knightdx91.workers.dev (Worker
+  `ua-tank-pay`, source `research/tank-pay-page/`, deployed from inside that folder), with questions for King Fish first.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
