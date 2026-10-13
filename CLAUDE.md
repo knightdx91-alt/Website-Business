@@ -1460,6 +1460,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   ranked changes) is public read-only at https://ua-app-review.knightdx91.workers.dev (Worker `ua-app-review`, source and build in
   `research/app-review-page/`) and editable for the team as the Claude Doc "App Review, October 2026" (Your call dropdowns +
   a questions table).
+- The commission & pay plan draft (Oct 2026; sole owner Post, team pool for Brenda and Diana, Model A / B for owner commission,
+  40/60 opener/closer split, 60-day clawback) is public read-only at https://ua-commission-plan.knightdx91.workers.dev (Worker
+  `ua-commission-plan`, source in `research/commission-page/`, deployed from inside that folder). Not built in the app yet.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
