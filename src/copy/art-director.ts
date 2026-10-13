@@ -23,7 +23,7 @@ import type { BusinessRecord, CategoryId, DesignNotes } from "../generator/types
 
 export const DEFAULT_DESIGN_MODEL = "claude-opus-5-5";
 /** Bump when the rules or the catalog wording change in a way worth noting in `DesignNotes.model`. */
-export const DESIGN_PROMPT_VERSION = 2;
+export const DESIGN_PROMPT_VERSION = 3;
 
 const Schema = z.object({
   look: z.string().max(60).describe("The look id from LOOKS, spelled exactly (e.g. restaurant.pit_plank)."),
@@ -47,7 +47,7 @@ const SYSTEM = `You are the art director for a small studio that builds websites
 
 What a good pick does:
 - Looks like the business, not like a template. The owner should think "that's us": a barbecue joint is dark, warm, slab type; a CPA is quiet, light, serif, never a full-screen photo; a kids' party rental is bright and rounded; a barber at night is dark with a condensed face.
-- Reads at a glance as "a <trade> in <town>". Prefer type-led openings (statement, billboard, banner) when there is no owner photo: Google photos never go live, so a photo-led opening (stack, cover, split, card) would look worse the day it is published. With real owner photos, lead with them.
+- Reads at a glance as "a <trade> in <town>". Pages should feel alive, not like a color block: when the hints say a photo is available (the owner's, or a trade scene from our public-domain library that replaces a Google photo on the live site), a photo-led opening (stack, cover, split, card) is welcome. Only with no photo at all prefer type-led openings (statement, billboard, banner). Use the life knobs: shaped section edges (edge), decoration in the trade's own icons or soft shapes (decor) and a mid-page photo band or a photo behind the closing call (pics); leave them plain only for the quietest offices.
 - Trades, auto, cleaning, lawn care: strong condensed or grotesque type, left-aligned text, a utility bar or thin address line, services framed as the customer's problem (cards, bento or a list), the bottom call bar. Restaurants and cafes: photo first where photos exist, menu-board or marquee structures, warm palettes. Salons and barbers: book-first, elegant display or serif type, centered openings are fine, price-list services. Retail: window-display or billboard openings, bento "what we carry". Finance and churches: quiet, light, generous spacing, bottom bar, no marquee, no poster type, no full-screen photo. Churches: service times live next to the headline, so keep the opening calm.
 - Proof: when the business has 10+ Google reviews at 4.3 or better, pick a structure that shows the rating under the opening (proof "band"), unless the category hides ratings.
 - Read the business's own words. Reviews that say "fancy", "date night", "cozy" → refined serif, darker, generous. "Cheap", "quick", "honest", "fair" → plain bold sans, light page, compact. "Family", "kids", "friendly" → rounded, warm. A long-standing business (a founding year) can carry a classic or slab face; a new one can be modern.
@@ -171,7 +171,7 @@ function businessText(i: DirectorInput): string {
   const takenNames = [...new Set(i.taken.map((d) => `${LOOKS[parseDesign(d).look]?.name ?? parseDesign(d).look} (${layoutOf(d)} layout, ${parseDesign(d).dna?.hero ?? "stack"} opening)`))];
   const openings = [...new Set(i.used.map((d) => parseDesign(d).dna?.hero).filter(Boolean))];
   const cur = i.current ? parseDesign(i.current) : undefined;
-  const photos = r.media.hero ? (r.media.hero.source === "google" ? "only a Google photo (cannot go live)" : "their own photo") : "none";
+  const photos = r.media.hero ? (r.media.hero.source === "google" ? "a Google photo in the preview (a trade scene replaces it on the live site)" : "their own photo") : "none (a trade scene photo is used when the library has one)";
   const gallery = (r.media.gallery ?? []).filter((g) => g.source !== "google").length;
   const hours = r.hours && hasAnyHours(r.hours) ? JSON.stringify(r.hours).slice(0, 400) : "not given";
   const site = r.existingSite ? [r.existingSite.title, r.existingSite.description, ...(r.existingSite.headings ?? []).slice(0, 6)].filter(Boolean).join(" | ").slice(0, 500) : "";
@@ -193,7 +193,7 @@ function businessText(i: DirectorInput): string {
     site ? `their current website says: ${site}` : "",
     i.editorialSummary ? `google's summary: ${i.editorialSummary}` : "",
     i.reviews.length ? `what reviews praise (background only):\n${i.reviews.slice(0, 5).map((t, n) => `  [${n + 1}] ${t.slice(0, 300)}`).join("\n")}` : "",
-    `hints: ${i.hints.noPhoto ? "no owner photo, so open without one (statement, billboard or banner)" : "owner photo available"}${i.hints.proof ? "; owner proof given, show the proof band" : ""}`,
+    `hints: ${i.hints.noPhoto ? "no photo at all, so open without one (statement, billboard or banner)" : "a photo is available (owner, Google preview or trade scene)"}${i.hints.proof ? "; owner proof given, show the proof band" : ""}`,
     i.brief ? `OWNER'S STYLE REQUEST (wins over the category's usual style): "${i.brief}"` : "",
     cur ? `replacing: ${LOOKS[cur.look]?.name ?? cur.look} with a ${cur.dna?.hero ?? "stack"} opening (the owner wants something clearly different)` : "",
     takenNames.length ? `taken (never): ${takenNames.join(", ")}` : "",

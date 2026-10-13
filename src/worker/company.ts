@@ -266,6 +266,7 @@ export async function serveCompany(
     path.startsWith("/fonts/") ||
     path.startsWith("/icons/") ||
     path.startsWith("/brand/") ||
+    path.startsWith("/scenes/") ||
     path === "/og.png"
   )
     return null;

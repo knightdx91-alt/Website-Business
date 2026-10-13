@@ -39,6 +39,11 @@ export const DNA_KNOBS = {
   phone: ["stacked", "natural", "link", "bar"],
   trust: ["checks", "chips", "dots", "stack"],
   heads: ["label", "rule", "tag", "big"],
+  // Oct 2026 (appended): the owner's "it's only colors" note. Shapes between the color bands, the trade's own artwork
+  // behind sections, and photos past the opening (a scenic band mid-page, or behind the closing call).
+  edge: ["straight", "wave", "curve", "slant", "zigzag"],
+  decor: ["none", "icons", "blobs", "confetti", "lines"],
+  pics: ["none", "band", "cta"],
 } as const;
 
 export type DnaKnob = keyof typeof DNA_KNOBS;
@@ -86,6 +91,9 @@ export const DNA_LABELS: { [K in DnaKnob]: { label: string; values: Record<Dna[K
   phone: { label: "Phone buttons", values: { stacked: "Stacked, full width", natural: "Side by side", link: "One button + a text link", bar: "Only in the bottom bar" } },
   trust: { label: "Trust row", values: { checks: "Check marks", chips: "Chips", dots: "One line with dots", stack: "One per line" } },
   heads: { label: "Section headings", values: { label: "Small label + title", rule: "Title with an accent rule", tag: "Colored tag + title", big: "Big title only" } },
+  edge: { label: "Section edges", values: { straight: "Straight", wave: "Wavy", curve: "Curved", slant: "Slanted", zigzag: "Zigzag" } },
+  decor: { label: "Decoration", values: { none: "None", icons: "Big trade icons", blobs: "Soft color shapes", confetti: "Confetti dots", lines: "Fine line shapes" } },
+  pics: { label: "More photos", values: { none: "Opening only", band: "Photo band mid-page", cta: "Photo behind the closing call" } },
 };
 
 const LETTER: Record<DnaKnob, string> = {
@@ -109,6 +117,9 @@ const LETTER: Record<DnaKnob, string> = {
   phone: "e",
   trust: "u",
   heads: "w",
+  edge: "x",
+  decor: "y",
+  pics: "z",
 };
 
 /** For the app's pickers: knob order, letter and values, so it can encode a design id the same way. */
@@ -405,6 +416,24 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
 
 const ALL = <K extends DnaKnob>(k: K): Array<Dna[K]> => [...(DNA_KNOBS[k] as unknown as readonly Dna[K][])];
 
+/** Picks for knobs a category doesn't list: the lively values first, so a new site never comes out as flat color bands. */
+const DEFAULT_PREFS: Prefs = {
+  edge: ["wave", "curve", "slant", "zigzag", "straight"],
+  decor: ["icons", "blobs", "lines", "confetti"],
+  pics: ["band", "cta"],
+};
+/** Quiet categories (finance, churches) keep calm shapes; playful ones get the lot. */
+const CATEGORY_LIFE: Partial<Record<CategoryId, Prefs>> = {
+  finance: { edge: ["curve", "slant", "straight"], decor: ["lines", "blobs", "icons"], pics: ["band", "cta"] },
+  church: { edge: ["curve", "wave", "straight"], decor: ["lines", "blobs", "icons"], pics: ["band", "cta"] },
+  contractor: { edge: ["slant", "zigzag", "curve", "wave"], decor: ["icons", "lines", "blobs"], pics: ["band", "cta"] },
+  auto: { edge: ["slant", "zigzag", "curve"], decor: ["icons", "lines", "blobs"], pics: ["cta", "band"] },
+  restaurant: { edge: ["wave", "curve", "zigzag", "slant"], decor: ["icons", "blobs", "confetti", "lines"], pics: ["band", "cta"] },
+  salon: { edge: ["curve", "wave", "slant"], decor: ["blobs", "lines", "icons", "confetti"], pics: ["band", "cta"] },
+  retail: { edge: ["wave", "curve", "zigzag", "slant"], decor: ["blobs", "icons", "confetti", "lines"], pics: ["band", "cta"] },
+  general: { edge: ["wave", "curve", "slant", "zigzag"], decor: ["icons", "blobs", "confetti", "lines"], pics: ["band", "cta"] },
+};
+
 /** Knobs that depend on each other, settled after the free picks. */
 export function settleDna(d: Dna): Dna {
   // The split opening carries the address, phone and hours in its panel, so no strip under it.
@@ -441,6 +470,8 @@ export function settleDna(d: Dna): Dna {
   if (d.rhythm === "chapters" && (d.heads === "rule" || d.heads === "big")) d.heads = "label";
   // A one-per-line trust list under centered text reads as a ragged column; chips center cleanly.
   if (d.trust === "stack" && d.align === "center") d.trust = "chips";
+  // Edges are the outline of a color band; one background (continuous) or boxed sections have no band edge to shape.
+  if ((d.rhythm === "continuous" || d.rhythm === "boxed") && d.edge !== "straight") d.edge = "straight";
   return d;
 }
 
@@ -467,7 +498,7 @@ export function pickDna(seed: string, category: CategoryId, o: { avoid?: Dna[]; 
   const prefs = PREFS[category] ?? {};
   const roll = (salt: string) => (hash(`${seed}|${salt}`) % 10_000) / 10_000;
   const pick = <K extends DnaKnob>(k: K, salt = ""): Dna[K] => {
-    const pool = (prefs[k] as Array<Dna[K]> | undefined) ?? ALL(k);
+    const pool = (prefs[k] as Array<Dna[K]> | undefined) ?? (CATEGORY_LIFE[category]?.[k] as Array<Dna[K]> | undefined) ?? (DEFAULT_PREFS[k] as Array<Dna[K]> | undefined) ?? ALL(k);
     // Earlier entries get a slightly bigger slice: weights 3,2.5,2,... down to 1.
     const weights = pool.map((_, i) => Math.max(1, 3 - i * 0.5));
     const total = weights.reduce((a, b) => a + b, 0);
@@ -510,7 +541,7 @@ export function dnaAttrs(d: Dna): string {
   return (
     ` data-hero="${d.hero}" data-nav="${d.nav}" data-btn="${d.buttons}" data-strip="${d.strip}" data-svc="${d.services}" data-cta="${d.cta}" data-ftr="${d.footer}" data-bar="${d.bar}" data-photo="${d.photo}"` +
     ` data-headline="${d.headline}" data-rhythm="${d.rhythm}" data-scale="${d.scale}" data-density="${d.density}" data-tone="${d.tone}" data-motif="${d.motif}" data-proof="${d.proof}" data-align="${d.align}"` +
-    ` data-phone="${d.phone}" data-trust="${d.trust}" data-heads="${d.heads}"`
+    ` data-phone="${d.phone}" data-trust="${d.trust}" data-heads="${d.heads}" data-edge="${d.edge}" data-decor="${d.decor}" data-pics="${d.pics}"`
   );
 }
 

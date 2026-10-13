@@ -240,7 +240,7 @@ import {
   dnaHints,
   renderPreview,
   runBuild,
-  runRestyle,
+  runRestyle, runRelive, queueRelive,
   runSearch,
   importSitePhotos,
   forgetSiteImport,
@@ -4177,6 +4177,7 @@ async function handleQueue(batch: MessageBatch<Job>, env: Env): Promise<void> {
       if (msg.body.type === "search") await runSearch(env, msg.body);
       else if (msg.body.type === "build") await runBuild(env, msg.body);
       else if (msg.body.type === "restyle") await runRestyle(env, msg.body);
+      else if (msg.body.type === "relive") await runRelive(env, msg.body);
       msg.ack();
     } catch (err) {
       console.error("job failed", msg.body, err);
@@ -4197,6 +4198,7 @@ async function handleScheduled(
     await announceUpdate(env);
     await republishDirty(env);
     await requeueStuck(env);
+    await queueRelive(env);
     return;
   }
   if (event.cron === CRON_WEEKLY_BACKUP) {

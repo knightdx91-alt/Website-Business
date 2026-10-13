@@ -1502,6 +1502,34 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   try mobile data, report it) and the raw text goes in `Api.lastSecureError` → the problem report's `detail.tls`. Certificate
   history: certspotter.com's API (crt.sh was down); the container's proxy re-signs TLS, so `openssl s_client` here never shows the
   real chain (SSL Labs' API does).
+- 🌿 Life round (Oct 2026, owner's ask: "the websites only get colors, no background photos, nothing that brings them to
+  life"; Android 2.65). (1) **To-dos hidden from the customer**: the dashed owner to-do boxes (`.todo`) are `display:none`
+  unless `html.notes`; the client script turns that on from `?notes=1` (kept per tab in sessionStorage `ua-notes`, `?notes=0`
+  turns it off) and hides sections that are empty without them. Team switch: web Preview "📝 Show notes" (`#notesbtn`), Android
+  `PreviewScreen` chip. (2) **Trade scene library** (`src/generator/scenes.ts`, files in `app/public/scenes/`, 198 photos, ~21 MB):
+  CC0 / public-domain photos from Openverse (StockSnap, rawpixel, WordPress photo directory), picked by eye per trade, no faces,
+  no children, no claims to be the business; `fits` words (plumb, roof, barber, nail, bbq, coffee, pizza, florist, farm, tax,
+  church…) put the best match first, a stable order per Place ID. `buildSite`: no hero that may show (none, or Google's when
+  publishing) → the first scene is the hero; `ctx.photos` (owner gallery, Google gallery in previews, scenes) feed the photo
+  knobs. Previews serve `assets/scene/*` from ASSETS `/scenes/`; publishing copies the files a page uses (`BuildInput.loadScene`,
+  `scenesUsed`); the company host passes `/scenes/` (example sites point there). So the lint "Google photos must be replaced"
+  blocker no longer fires for a hero (a scene replaces it), and `dnaHints.noPhoto` is true only when the business has neither a
+  photo nor scenes (`hasScenes`): Google-photo leads now get photo-led openings. Most scenes are 960 px wide (what Openverse
+  serves); swap in larger copies when found. Churches only get church scenes when the name / type says church (never posts or
+  charities). (3) **Life knobs** in the DNA (letters x y z, older ids parse as legacy): `edge` (straight / wave / curve / slant /
+  zigzag: an `<i class="edg">` in the band's own color sticking out over the neighbour on `.section--band` top + bottom, `.cta`
+  and `.ftr` top; off with continuous / boxed rhythm), `decor` (none / icons = the business's own trade icons from its services
+  via `serviceIcon`, `tradeIcons()` / blobs / confetti / lines, an aria-hidden `<i class="dec">` behind the text of the opening
+  (never over a photo), the bands and the closing call; plus a "Since 1987 · City" seal on wide screens when `foundedYear` is set),
+  `pics` (none / band = one or two wide photos before reviews or about / cta = a photo behind the closing call under a scrim of
+  the section's own background, `background:inherit`, so contrast holds whatever the layout made it). Markup in
+  `src/generator/life.ts` (`addLife` on every page body in `doc()`, `footerEdge`), CSS at the end of `dna-css.ts`. New picks lean
+  lively (`DEFAULT_PREFS`, `CATEGORY_LIFE`: finance and churches get curves / lines). The art director's prompt (v3) asks for photo-led
+  openings when a photo or scene exists and for the life knobs. (4) **Open leads re-done once**: the minute cron's `queueRelive`
+  (settings key `relive_v1`) queues a `relive` job per ready New / Shown lead; `runRelive` keeps look + layout + structure, adds
+  life knobs from `pickDna(lead.id)`, swaps a type-led opening for a photo-led one on New leads that now have a photo, and
+  re-renders (no AI cost; the call guide is redone on next open). Sold / live sites are untouched until republished.
+  `test/scenes.test.ts`, `test/dna.test.ts` "fifth round". Contact sheets / picks: scratchpad `scenes_fetch.py`, `scenes_picks.py`.
 - ✨ Describe the style they want (Oct 2026, owner's ask; Android 2.64): the lead page's Design card has a text box "Or describe the
   style they want" + idea chips (`STYLE_IDEAS` in app.js and LeadScreen.kt: Hippie, Bright and happy kids' play world, Clean and
   businesslike, Rustic country…) + "Also rewrite the words to match" (on by default) + "✨ Design it" = `POST /restyle {brief, rewrite}`

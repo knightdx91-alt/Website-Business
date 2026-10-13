@@ -94,6 +94,12 @@ export async function servePreview(
     });
   }
 
+  // Trade scenes (public-domain photos) live with the app's own files.
+  if (/^assets\/scene\/[\w.-]+\.jpg$/.test(path)) {
+    const asset = await env.ASSETS.fetch(new Request(new URL(`/scenes/${path.slice("assets/scene/".length)}`, req.url)));
+    return new Response(asset.body, { status: asset.status, headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=604800" } });
+  }
+
   // The Google hero and, after "Import from their Google page", the listing's other photos: proxied live for the preview only.
   const gphoto = path === "assets/img/hero.jpg" ? 0 : Number(path.match(/^assets\/img\/google-(\d{1,2})\.jpg$/)?.[1] ?? -1);
   if (gphoto >= 0) {

@@ -72,6 +72,11 @@ async function buildForPublish(
         ? reviewTexts(JSON.parse(lead.place_json) as Place)
         : [],
       loadFont: await loadFontFrom(env, appOrigin),
+      loadScene: async (file) => {
+        const res = await env.ASSETS.fetch(new Request(new URL(`/scenes/${file}`, appOrigin)));
+        if (!res.ok) throw new Error(`Missing scene ${file}`);
+        return new Uint8Array(await res.arrayBuffer());
+      },
       credit: {
         company:
           (await getSettings(env)).companyName || "Underground Associates",

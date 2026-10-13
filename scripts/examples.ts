@@ -33,7 +33,7 @@ for (const ex of ogOnly ? [] : EXAMPLES) {
   for (const [path, content] of out.files) {
     if (SKIP.has(path) || typeof content !== "string") continue;
     // Fonts come from the app's /fonts/, and the form posts to the shared /examples/form page (the basePath rewrite prefixed both).
-    let text = content.split(`${base}/assets/fonts/`).join("/fonts/").split(`action="${base}/examples/form"`).join('action="/examples/form"');
+    let text = content.split(`${base}/assets/fonts/`).join("/fonts/").split(`${base}/assets/scene/`).join("/scenes/").split(`action="${base}/examples/form"`).join('action="/examples/form"');
     if (path.endsWith(".html")) text = text.replace("<head>", '<head><meta name="robots" content="noindex">').replace(/<body([^>]*)>/, `<body$1>${banner}`);
     const file = join(OUT, ex.slug, path);
     await mkdir(dirname(file), { recursive: true });

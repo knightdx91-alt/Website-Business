@@ -42,7 +42,9 @@ export type Job =
       /** Also take businesses whose website is outdated or broken. */
       badSites?: boolean;
     }
-  | { type: "build"; leadId: string };
+  | { type: "build"; leadId: string }
+  /** One-time (Oct 2026): give an open lead's preview the life knobs (edges, decoration, photos) and re-render it. */
+  | { type: "relive"; leadId: string };
 
 export function json(
   data: unknown,

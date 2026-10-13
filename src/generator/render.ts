@@ -5,12 +5,14 @@ import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
 import { html, jsonForScript, raw, type Raw } from "./html.ts";
 import { dnaAttrs } from "./dna.ts";
+import { addLife, footerEdge } from "./life.ts";
 import { lintSite, type LintResult } from "./lint.ts";
 import { packFor } from "./packs/index.ts";
 import type { CategoryPack, PageSpec } from "./packs/types.ts";
 import { businessNode, faqNode, graph, originFor, webPageNode, websiteNode } from "./schema.ts";
 import { spanishNav, spanishPage } from "./spanish.ts";
 import { resolveTheme } from "./themes.ts";
+import { scenesFor, scenesUsed } from "./scenes.ts";
 import type { BuildMode, BusinessRecord, Copy, Site } from "./types.ts";
 
 export interface BuildInput {
@@ -31,6 +33,8 @@ export interface BuildInput {
   basePath?: string;
   /** Example sites only: sample stock may stay on a published build. */
   allowSamples?: boolean;
+  /** Returns a scene library file (app/public/scenes/<file>). Publishing passes it so the pages' scenes ship with the site. */
+  loadScene?: (file: string) => Promise<Uint8Array>;
 }
 
 export interface BuildOutput {
@@ -89,8 +93,8 @@ ${ogImage ? html`<meta property="og:image" content="${ogImage}">${heroImg!.width
 ${hasAnyHours(ctx.r.hours) ? html`<script type="application/json" id="hours-data">${jsonForScript({ tz: ctx.r.timezone, hours: ctx.r.hours })}</script>` : ""}
 </head><body>
 ${header(ctx, nav, { utilityLine: pack.utilityLine?.(ctx) })}
-${o.body}
-${footer(ctx, nav, { note: pack.footerNote?.(ctx), reviews: pack.reviewsAllowed?.(ctx.r) ?? true })}
+${raw(addLife(ctx, o.body.value))}
+${raw(footer(ctx, nav, { note: pack.footerNote?.(ctx), reviews: pack.reviewsAllowed?.(ctx.r) ?? true }).value.replace(/^<footer[^>]*>/, (m) => m + footerEdge(ctx.theme.dna)))}
 ${actionBar(pack.actionBar(ctx), ctx.theme.dna)}
 </body></html>`}`;
 }
@@ -143,8 +147,18 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   const pack: CategoryPack = { ...basePack, nav: (c) => [...priceListNav(c), ...basePack.nav(c)], pages: (c) => [...basePack.pages(c), ...[pricesPage(c)].filter((p): p is PageSpec => !!p)] };
   const look = input.site.look || pack.defaultLook(input.record);
   const theme = resolveTheme(look);
+  // No photo that may show here (none at all, or Google's on a live site): a trade scene opens the page instead.
+  const scenes = scenesFor(input.record, input.record.placeId || input.record.name);
+  const own = input.record.media.hero;
+  const heroOk = !!own && (input.mode === "preview" || own.source !== "google");
+  const record: BusinessRecord = !heroOk && scenes[0] ? { ...input.record, media: { ...input.record.media, hero: scenes[0] } } : input.record;
+  const heroSrc = record.media.hero?.src;
+  const photos = [
+    ...record.media.gallery.filter((g) => g.source !== "google" || input.mode === "preview"),
+    ...scenes,
+  ].filter((p) => p.src !== heroSrc);
   const ctx: Ctx = {
-    r: input.record,
+    r: record,
     copy: input.copy,
     theme,
     mode: input.mode,
@@ -158,6 +172,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     hasForm: pack.hasForm(input.record),
     credit: input.mode === "publish" ? input.credit : undefined,
     reviewsAllowed: pack.reviewsAllowed?.(input.record) ?? true,
+    photos,
   };
   const files = new Map<string, string | Uint8Array>();
   const pages: Array<{ path: string; html: string; noindex?: boolean }> = [];
@@ -232,6 +247,9 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   for (const p of pages) files.set(p.path === "/" ? "index.html" : `${p.path.replace(/^\//, "")}index.html`, p.html);
   files.set("404.html", notFound);
 
+  if (input.loadScene) {
+    for (const f of scenesUsed([...files.values()].filter((v): v is string => typeof v === "string"))) files.set(`assets/scene/${f}`, await input.loadScene(f));
+  }
   const css = buildCss(theme);
   files.set("assets/site.css", css);
   files.set("assets/site.js", CLIENT_SCRIPT);

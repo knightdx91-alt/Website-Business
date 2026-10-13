@@ -18,7 +18,7 @@ test("dna encodes and parses round-trip; bad codes are rejected", () => {
   assert.equal(parseDna("h0n0b0s0v0c0f0a0p0x"), undefined, "trailing junk");
   assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q0g0e0u0w0") }, "an id from before the newer knobs still parses, with legacy values for them");
   assert.equal(parseDna("h0n0b0s0v0c0f0a0p0t5"), undefined, "a newer knob out of range is still rejected");
-  assert.equal(encodeDna(LEGACY_DNA), "h0n0b0s0v0c0f0a0p0t0r0k0d0o0m0q0g0e0u0w0");
+  assert.equal(encodeDna(LEGACY_DNA), "h0n0b0s0v0c0f0a0p0t0r0k0d0o0m0q0g0e0u0w0x0y0z0");
   assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g0e0u0w0") }, "an id from before the align knob still parses");
   assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g1e0u0w0") }, "an id from before the phone knobs still parses");
   const d = parseDesign("auto.motor_oil~classic~h1n2b3s2v1c1f1a1p1");
@@ -215,4 +215,25 @@ test("fourth round: the phone view has its own knobs (buttons, trust row, sectio
   // A restyle lists the current design as taken, so "Try another design" always changes the colors.
   const again = pickDesign({ leadId: "lead-y", looks, used: [], taken: [`auto.pit_lane~classic`] });
   assert.notEqual(parseDesign(again).look, "auto.pit_lane");
+});
+
+test("fifth round: section edges, decoration and more photos", async () => {
+  const { addLife, tradeIcons } = await import("../src/generator/life.ts");
+  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g1e0u0w0"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g1e0u0w0x0y0z0") }, "an id from before the life knobs still parses");
+  // New picks lean lively: most get a shaped edge and decoration.
+  let lively = 0;
+  for (let i = 0; i < 40; i++) {
+    const d = pickDna(`life-${i}`, "restaurant");
+    if (d.edge !== "straight" || d.decor !== "none") lively++;
+    if (d.rhythm === "continuous" || d.rhythm === "boxed") assert.equal(d.edge, "straight");
+  }
+  assert.ok(lively >= 30, `lively picks: ${lively}`);
+  assert.deepEqual(tradeIcons({ category: "contractor", services: [{ id: "a", name: "Water heater repair" }, { id: "b", name: "AC tune-up" }] } as never).slice(0, 2), ["flame", "snowflake"]);
+  const body = '<main><section class="hero hero--x" aria-labelledby="hero-title"><div class="hero__in"></div></section><section class="section section--band" id="s"><div class="wrap"></div></section><section class="cta cta--band"><div class="wrap"></div></section></main>';
+  const ctx = (edge: string, decor: string) => ({ r: { category: "salon", services: [] }, theme: { dna: { ...LEGACY_DNA, edge, decor } } }) as never;
+  assert.equal(addLife(ctx("straight", "none"), body), body, "legacy values add nothing");
+  const out = addLife(ctx("wave", "icons"), body);
+  assert.equal((out.match(/class="edg/g) ?? []).length, 3, "band top + bottom, cta top");
+  assert.equal((out.match(/class="dec"/g) ?? []).length, 3, "hero, band, cta");
+  assert.match(out, /aria-hidden="true"/);
 });

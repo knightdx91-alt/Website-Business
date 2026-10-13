@@ -97,8 +97,9 @@ test("favicon, link-preview image and cache headers", async () => {
   const home = String(plain.files.get("index.html"));
   assert.match(home, /<link rel="icon" href="data:image\/svg\+xml,/);
   assert.match(home, /%3Ctext[^>]*%3EM%3C%2Ftext%3E/, "the initial M");
-  assert.match(home, /name="twitter:card" content="summary"/);
-  assert.doesNotMatch(home, /og:image/);
+  // No photo of their own: a trade scene opens the page and is the link-preview image too.
+  assert.match(home, /property="og:image" content="https:\/\/example.test\/assets\/scene\/restaurant-[\w-]+\.jpg"/);
+  assert.match(home, /name="twitter:card" content="summary_large_image"/);
   const record = structuredClone(ex.record);
   record.media.hero = { src: "/assets/owner/hero.jpg", alt: "Front door", source: "owner", width: 1600, height: 1000 };
   const withHero = await buildSite({ record, copy: ex.copy, site: site(), mode: "publish", allowSamples: true });

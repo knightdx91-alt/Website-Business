@@ -40,6 +40,18 @@ const PATHS = {
   paw: 'S<circle cx="7" cy="8" r="2"/><circle cx="12" cy="5.5" r="2"/><circle cx="17" cy="8" r="2"/><path d="M12 10c-3 0-6 3.5-6 6.5 0 1.5 1 2.5 2.5 2.5 1.2 0 2-.6 3.5-.6s2.3.6 3.5.6c1.5 0 2.5-1 2.5-2.5 0-3-3-6.5-6-6.5z"/>',
   book: 'S<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>',
   camera: 'S<path d="M4 8h3l2-3h6l2 3h3v12H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  // Decoration icons (Oct 2026): the trade's own shapes, drawn big and faint behind sections ("decor: icons").
+  cup: 'S<path d="M4 9h13v5a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 2.5c-.8 1 .8 2-.1 3.2M12 2.5c-.8 1 .8 2-.1 3.2"/>',
+  utensils: 'S<path d="M6 2v8a2 2 0 0 0 2 2v10M10 2v8a2 2 0 0 1-2 2M8 2v6"/><path d="M17 22V2c-2.5 1.5-4 4.5-4 8v3h4"/>',
+  hammer: 'S<path d="m14 5 5 5-3 3-5-5zM11 8 3.5 15.5a1.8 1.8 0 0 0 2.5 2.5L13.5 10.5"/><path d="M14 5c1-2 3-3 6-2"/>',
+  comb: 'S<path d="M3 8h18v4H3z"/><path d="M5 12v6M8 12v6M11 12v6M14 12v6M17 12v6M20 12v6"/>',
+  gear: 'S<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  flower: 'S<circle cx="12" cy="9" r="2.5"/><path d="M12 6.5C12 3 15 3 15 5.5S12 9 12 9M12 6.5C12 3 9 3 9 5.5S12 9 12 9M14.5 9c3.5 0 3.5 3 1 3S12 9 12 9M9.5 9C6 9 6 12 8.5 12S12 9 12 9M12 11.5V22M12 17c2-2 4-2 5-1M12 19c-2-2-4-2-5-1"/>',
+  sun: 'S<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  brush: 'S<path d="M18 3 9.5 11.5M14 3h7v7"/><path d="M9.5 11.5 12.5 14.5 7 20c-1.5 1.5-4 1-4 1s-.5-2.5 1-4z"/>',
+  bell: 'S<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21a2 2 0 0 0 4 0M12 3v2"/>',
+  chart: 'S<path d="M3 21h18M6 17v-5M11 17V8M16 17v-8M20 17V5"/>',
+  music: 'S<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;
@@ -80,4 +92,9 @@ const SERVICE_ICONS: Array<[RegExp, IconName]> = [
 export function serviceIcon(title: string, fallback: IconName): IconName {
   for (const [re, name] of SERVICE_ICONS) if (re.test(title)) return name;
   return fallback;
+}
+
+/** The raw path data of an icon ("S…" = stroke icon), for decoration drawn at other sizes and stroke widths. */
+export function svgPaths(name: IconName): string {
+  return PATHS[name] as string;
 }

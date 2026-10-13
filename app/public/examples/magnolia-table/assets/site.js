@@ -1,6 +1,23 @@
 (function () {
 "use strict";
 var d = document, root = d.documentElement;
+/* Previews: the team's to-do notes ("Add your hours", "Send photos") stay hidden, so the owner sees a finished-looking site.
+   ?notes=1 (the app's "Show notes" switch) turns them on for this tab; ?notes=0 turns them off again. A section left with
+   nothing but its heading once its notes are hidden is hidden too. Published sites carry no notes at all. */
+if (d.querySelector(".todo")) {
+  var nt = /[?&]notes=([01])/.exec(location.search), notesOn = false;
+  try { if (nt) sessionStorage.setItem("ua-notes", nt[1]); notesOn = sessionStorage.getItem("ua-notes") === "1"; } catch (err) { notesOn = !!nt && nt[1] === "1"; }
+  if (notesOn) root.classList.add("notes");
+  else {
+    var secs = d.querySelectorAll("main section");
+    for (var si = 0; si < secs.length; si++) {
+      if (!secs[si].querySelector(".todo")) continue;
+      var cl = secs[si].cloneNode(true), junk = cl.querySelectorAll(".todo,.section__label,.section__title,.lead,.deco,svg");
+      for (var ji = 0; ji < junk.length; ji++) junk[ji].parentNode.removeChild(junk[ji]);
+      if (!cl.textContent.replace(/s+/g, "") && !cl.querySelector("img,a,button,form,iframe,table,input")) secs[si].hidden = true;
+    }
+  }
+}
 root.className = root.className.replace("no-js", "js");
 
 function fmtTime(hhmm) {

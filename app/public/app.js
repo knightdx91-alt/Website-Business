@@ -1217,10 +1217,19 @@ async function viewLead(id, intent) {
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p>
       <div class="row" style="margin-bottom:10px"><div class="tabs" style="margin:0">
         <button type="button" data-mode="phone">Phone view</button><button type="button" data-mode="desktop">Desktop view</button></div>
-        <a class="btn btn--small" href="#/full/${id}" style="flex:none">Full screen</a><span id="previewsample" style="flex:none"></span></div>
+        <a class="btn btn--small" href="#/full/${id}" style="flex:none">Full screen</a><button class="btn btn--small btn--line" type="button" id="notesbtn" style="flex:none" title="Our to-do notes (missing hours, photos…). The business owner never sees them.">📝 Show notes</button><span id="previewsample" style="flex:none"></span></div>
       <div class="frame-wrap" id="fw"><iframe id="pf" title="Site preview" src="/p/${id}/"></iframe></div>
       <div id="previewshare" style="margin-top:12px"></div>`;
     const my = renderSeq;
+    // The to-do notes are hidden on every preview so the owner sees a finished site; this shows them for us.
+    let notesOn = false;
+    document.getElementById("notesbtn").addEventListener("click", (e) => {
+      notesOn = !notesOn;
+      e.currentTarget.textContent = notesOn ? "📝 Hide notes" : "📝 Show notes";
+      e.currentTarget.classList.toggle("btn--line", !notesOn);
+      const f = document.getElementById("pf");
+      f.src = `/p/${id}/?notes=${notesOn ? 1 : 0}`;
+    });
     api("/leads/" + id).then((l) => {
       const box = document.getElementById("previewshare");
       if (stale(my)) return;

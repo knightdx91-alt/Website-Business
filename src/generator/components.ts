@@ -34,6 +34,8 @@ export interface Ctx {
   statusShown?: boolean;
   /** Set once announcements() rendered, so render.ts doesn't add the section twice. */
   eventsShown?: boolean;
+  /** Photos for the photo band / closing-call backdrop (DNA "pics"): the owner's, then (previews) Google's, then trade scenes. */
+  photos?: Image[];
 }
 
 export interface NavItem {

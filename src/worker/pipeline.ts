@@ -1,9 +1,11 @@
+import { hasScenes } from "../generator/scenes.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { autoVariant, setAutoVariant } from "../generator/packs/auto.ts";
 import { restaurantVariant } from "../generator/packs/restaurant.ts";
 import { writeCopy } from "../copy/write.ts";
 import { directDesign } from "../copy/art-director.ts";
-import { LOOKS, parseDesign } from "../generator/themes.ts";
+import { designId, LOOKS, parseDesign } from "../generator/themes.ts";
+import { LEGACY_DNA, pickDna, settleDna } from "../generator/dna.ts";
 import { notify } from "./notify.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { churchVariant } from "../generator/packs/church.ts";
@@ -278,7 +280,9 @@ export function dnaHints(record: BusinessRecord): DnaHints {
     );
   return {
     proof,
-    noPhoto: !record.media.hero || record.media.hero.source === "google",
+    // A Google photo shows in the preview and a trade scene replaces it on the live site, so either way the page has a
+    // photo; only a business with neither (and no scenes for its trade) gets a type-led opening.
+    noPhoto: !record.media.hero && !hasScenes(record),
   };
 }
 
@@ -676,4 +680,34 @@ export function contentType(path: string): string {
   if (path.endsWith(".png")) return "image/png";
   if (path.endsWith(".webp")) return "image/webp";
   return "application/octet-stream";
+}
+
+/**
+ * The life round (Oct 2026): previews built before section edges, decoration and trade photos existed were flat color
+ * blocks. Every open lead gets the new knobs once; a New lead whose opening was type-led only because it had no owner
+ * photo also gets a photo-led opening now that a scene (or the Google photo) can carry it. Same words, no AI cost.
+ */
+export async function runRelive(env: Env, job: Extract<Job, { type: "relive" }>): Promise<void> {
+  const lead = await getLead(env, job.leadId);
+  if (!lead || lead.status !== "ready" || !lead.record_json || !lead.copy_json || !lead.look) return;
+  if (lead.sales_status !== "new" && lead.sales_status !== "shown") return;
+  const d = parseDesign(lead.look);
+  const old = d.dna ?? LEGACY_DNA;
+  if (old.edge !== "straight" || old.decor !== "none" || old.pics !== "none") return; // already lively
+  const record = JSON.parse(lead.record_json) as BusinessRecord;
+  const hints = dnaHints(record);
+  const fresh = pickDna(lead.id, record.category, { hints });
+  const typeLed = ["statement", "billboard", "banner"].includes(old.hero);
+  const swapHero = lead.sales_status === "new" && typeLed && !hints.noPhoto;
+  const dna = settleDna({ ...old, edge: fresh.edge, decor: fresh.decor, pics: fresh.pics, ...(swapHero ? { hero: fresh.hero } : {}) });
+  await renderPreview(env, lead, record, JSON.parse(lead.copy_json) as Copy, designId(d.look, d.layout ?? "classic", dna));
+}
+
+/** Queues the life round for every open lead, once (settings key `relive_v1`). Called from the minute cron. */
+export async function queueRelive(env: Env): Promise<void> {
+  if (await env.DB.prepare("SELECT 1 FROM settings WHERE key = 'relive_v1'").first()) return;
+  await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('relive_v1', ?)").bind(now()).run();
+  const rows = await env.DB.prepare("SELECT id FROM leads WHERE status = 'ready' AND sales_status IN ('new', 'shown')").all<{ id: string }>();
+  const ids = rows.results.map((r) => r.id);
+  for (let i = 0; i < ids.length; i += 100) await env.JOBS.sendBatch(ids.slice(i, i + 100).map((leadId) => ({ body: { type: "relive", leadId } as Job })));
 }

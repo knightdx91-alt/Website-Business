@@ -67,6 +67,8 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
     // Sample stock on the price list (owner): null until the lead is read, or when the site is live.
     var sample by remember { mutableStateOf<Boolean?>(null) }
     var sampleBusy by remember { mutableStateOf(false) }
+    // Our to-do notes ("Add your hours", "Send photos") are hidden on every preview so the owner sees a finished site.
+    var notes by remember { mutableStateOf(false) }
     LaunchedEffect(id) {
         if (state.meta != null) runCatching { state.api.leadFull(id) }.getOrNull()?.let { d -> if (d.lead.salesStatus != "live") sample = d.sampleStock }
     }
@@ -100,6 +102,7 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected = !desktop, onClick = { desktop = false; webView?.let { w -> w.settings.userAgentString = mobileUa; w.settings.useWideViewPort = false; w.settings.loadWithOverviewMode = false; w.reload() } }, label = { Text("📱 Phone") })
                 FilterChip(selected = desktop, onClick = { desktop = true; webView?.let { w -> w.settings.userAgentString = DESKTOP_UA; w.settings.useWideViewPort = true; w.settings.loadWithOverviewMode = true; w.reload() } }, label = { Text("🖥️ Desktop") })
+                if (state.meta != null) FilterChip(selected = notes, onClick = { notes = !notes; webView?.loadUrl("$url?notes=${if (notes) 1 else 0}") }, label = { Text(if (notes) "📝 Hide notes" else "📝 Show notes") })
                 OutlinedButton(onClick = { share(false) }) { Text("💬 Text link") }
                 OutlinedButton(onClick = { share(true) }) { Text("🔗 Copy") }
                 if (state.meta != null) OutlinedButton(onClick = { nav.navigate("edit/$id") }) { Text("✏️ Edit") }

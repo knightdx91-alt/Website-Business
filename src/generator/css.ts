@@ -282,8 +282,9 @@ ${divider}
 @keyframes settle{from{scale:1.06}to{scale:1}}
 @keyframes marquee{to{translate:-50% 0}}
 /* owner to-do (preview only) */
-.todo{border:2px dashed ${withAlpha(c.text, 0.45)};border-radius:var(--radius);padding:18px 20px;background:${withAlpha(c.surface, 0.7)};color:var(--text);margin:20px 0}
-.todo strong{display:block;margin-bottom:.25em}
+.todo{display:none}html.notes .todo{display:block}
+html.notes .todo{border:2px dashed ${withAlpha(c.text, 0.45)};border-radius:var(--radius);padding:18px 20px;background:${withAlpha(c.surface, 0.7)};color:var(--text);margin:20px 0}
+html.notes .todo strong{display:block;margin-bottom:.25em}
 /* owner-stated extras: closures, pay/parking lines, fact lists, photo tiles, team, rates, tags */
 .hero__addr{display:inline-flex;align-items:center;gap:.4em;font-weight:600;margin:-.4rem 0 1.1rem}.hero__addr a{color:inherit}
 .strip__note{display:flex;align-items:center;gap:.5em;margin:4px 0 0;font-weight:700;color:var(--text)}.strip__note .i{color:var(--primary)}

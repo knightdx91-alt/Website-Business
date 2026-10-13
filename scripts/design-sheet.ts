@@ -62,6 +62,7 @@ for (const design of designs) {
   const out = await buildSite({
     record, copy: ex.copy, site: { slug, look: design, origin: `https://example.com${base}` }, mode: "publish", formEndpoint: "/form", basePath: base, allowSamples: true,
     loadFont: (pkg, file) => readFile(`node_modules/@fontsource/${pkg}/files/${file}`),
+    loadScene: (file) => readFile(`app/public/scenes/${file}`),
   });
   if (out.lint.errors.length) console.log(`LINT ${design}: ${JSON.stringify(out.lint.errors)}`);
   for (const [path, content] of out.files) {
