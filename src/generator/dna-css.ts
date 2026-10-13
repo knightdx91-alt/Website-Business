@@ -355,6 +355,32 @@ html[data-align="center"] .lede__in{text-align:center;justify-items:center}
 html[data-align="center"] .lede .btns{justify-content:center}
 html[data-align="center"] .lede .status{margin-left:auto;margin-right:auto}
 @media (min-width:900px){html[data-align="center"] .hero__bb{grid-template-columns:1fr;row-gap:18px}html[data-align="center"] .hero__bb .btns{grid-row:auto;grid-column:auto}html[data-align="center"] .lede__in{grid-template-columns:1fr;max-width:760px}}
+/* phone buttons: how the opening's actions show on small screens (the owner sees the phone view first) */
+@media (max-width:599px){
+html[data-phone="natural"] .hero .btns .btn,html[data-phone="natural"] .lede .btns .btn{flex:0 1 auto}
+html[data-phone="link"] .hero .btns .btn--ghost,html[data-phone="link"] .lede .btns .btn--ghost{flex:1 1 100%;background:none;border:0;min-height:44px;padding:4px 0;justify-content:flex-start;color:inherit;text-decoration:underline;text-underline-offset:.22em;text-decoration-thickness:2px}
+html[data-phone="link"] .hero .btns .btn--ghost::after,html[data-phone="link"] .lede .btns .btn--ghost::after{content:"\\2192";margin-left:.15em}
+html[data-phone="link"][data-align="center"] .hero .btns .btn--ghost,html[data-phone="link"][data-align="center"] .lede .btns .btn--ghost{justify-content:center}
+html[data-phone="bar"] .hero .btns,html[data-phone="bar"] .lede .btns,html[data-phone="bar"] .hero .hero__alt,html[data-phone="bar"] .lede .hero__alt{display:none}
+html[data-phone="bar"] .hero__in{padding-bottom:30px}
+}
+/* trust row */
+html[data-trust="chips"] .hero__trust{gap:8px}
+html[data-trust="chips"] .hero__trust li{background:color-mix(in srgb,currentColor 12%,transparent);border:1px solid color-mix(in srgb,currentColor 24%,transparent);border-radius:999px;padding:5px 12px 5px 9px;font-size:.9rem;font-weight:600}
+html[data-trust="chips"] .hero__trust li>.i{width:16px;height:16px}
+html[data-trust="dots"] .hero__trust{display:block;font-weight:600;line-height:1.75}
+html[data-trust="dots"] .hero__trust li{display:inline}
+html[data-trust="dots"] .hero__trust li>.i{display:none}
+html[data-trust="dots"] .hero__trust li+li::before{content:"\\00B7";margin:0 .55em;opacity:.6}
+html[data-trust="stack"] .hero__trust{flex-direction:column;gap:8px;align-items:flex-start}
+html[data-trust="stack"] .hero__trust li>.i{color:var(--accent)}
+/* section headings */
+html[data-heads="rule"] .section__label,html[data-heads="big"] .section__label{display:none}
+html[data-heads="rule"] .section__title::before,html[data-heads="tag"] .section__title::before,html[data-heads="big"] .section__title::before{display:none}
+html[data-heads="rule"] .section__title{position:relative;padding-bottom:.7rem;margin-bottom:1.1rem}
+html[data-heads="rule"] .section__title::after{content:"";position:absolute;left:0;bottom:0;width:52px;height:4px;background:var(--accent);border-radius:2px}
+html[data-heads="tag"] .section__label{display:inline-block;background:var(--primary);color:var(--on-primary);padding:4px 10px;border-radius:var(--btn-radius);font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;font-variant-caps:normal;margin-bottom:.8rem}
+html[data-heads="big"] .section__title{font-size:clamp(1.9rem,5.6vw,3.1rem);line-height:1.05;letter-spacing:-.02em;margin-bottom:1rem}
 /* texture on the opening (not over photos) */
 html[data-motif]:not([data-motif="none"]) .hero:not(.hero--photo)::before{content:"";position:absolute;inset:0;pointer-events:none}
 html[data-motif="rules"] .hero:not(.hero--photo)::before{background:repeating-linear-gradient(0deg,transparent 0 31px,${withAlpha(c.onHero, 0.12)} 31px 32px)}

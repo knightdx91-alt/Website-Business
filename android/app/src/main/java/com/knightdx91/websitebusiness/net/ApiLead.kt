@@ -19,7 +19,8 @@ data class DesignNotes(val concept: String, val why: String)
 /** A named page structure ("Photo first", "Menu board"…) that `POST /restyle {recipe}` keeps the colors for. */
 data class DnaRecipe(val id: String, val name: String, val about: String)
 
-data class NamedOption(val id: String, val name: String)
+/** `soldTo` (looks only): the client whose design this is now; the picker shows it and won't apply it to anyone else. */
+data class NamedOption(val id: String, val name: String, val soldTo: String? = null)
 
 /** Extras a client bought later through a Buy extras link. */
 data class Purchase(val id: String, val items: List<String>, val dueCents: Long, val paid: Boolean, val createdAt: Long)
@@ -108,7 +109,7 @@ data class LeadFull(
                 customDomain = j.str("customDomain"),
                 blockers = lint?.optJSONArray("errors").strings() + lint?.optJSONArray("publishBlockers").strings(),
                 suggestions = lint?.optJSONArray("suggestions").strings(),
-                looks = j.optJSONArray("looks").objects().map { NamedOption(it.optString("id"), it.optString("name")) },
+                looks = j.optJSONArray("looks").objects().map { NamedOption(it.optString("id"), it.optString("name"), it.optString("soldTo").ifBlank { null }) },
                 layouts = j.optJSONArray("layouts").objects().map { NamedOption(it.optString("id"), it.optString("name")) },
                 dnaOrder = j.optJSONArray("dnaOrder").objects().map { k ->
                     DnaKnob(k.optString("id"), k.optString("letter"), k.optString("label"), k.optJSONArray("values").objects().map { DnaValue(it.optString("id"), it.optString("name")) })

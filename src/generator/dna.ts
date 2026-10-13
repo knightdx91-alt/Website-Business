@@ -34,6 +34,11 @@ export const DNA_KNOBS = {
   proof: ["inline", "band"],
   // Oct 2026 (appended): where the opening's text sits. "center" fills a wide screen with the headline instead of leaving the right half empty.
   align: ["start", "center"],
+  // Oct 2026 (appended): the phone's own variety. The owner sees the phone view first, and before these every opening ended the
+  // same way: two stacked full-width buttons, a row of check marks, the same small label over every section.
+  phone: ["stacked", "natural", "link", "bar"],
+  trust: ["checks", "chips", "dots", "stack"],
+  heads: ["label", "rule", "tag", "big"],
 } as const;
 
 export type DnaKnob = keyof typeof DNA_KNOBS;
@@ -78,6 +83,9 @@ export const DNA_LABELS: { [K in DnaKnob]: { label: string; values: Record<Dna[K
   motif: { label: "Texture", values: { none: "None", rules: "Fine lines", stripes: "Diagonal stripes", dots: "Dots", grain: "Grain" } },
   proof: { label: "Proof", values: { inline: "In the opening", band: "Band under the opening" } },
   align: { label: "Opening text", values: { start: "Left", center: "Centered" } },
+  phone: { label: "Phone buttons", values: { stacked: "Stacked, full width", natural: "Side by side", link: "One button + a text link", bar: "Only in the bottom bar" } },
+  trust: { label: "Trust row", values: { checks: "Check marks", chips: "Chips", dots: "One line with dots", stack: "One per line" } },
+  heads: { label: "Section headings", values: { label: "Small label + title", rule: "Title with an accent rule", tag: "Colored tag + title", big: "Big title only" } },
 };
 
 const LETTER: Record<DnaKnob, string> = {
@@ -98,6 +106,9 @@ const LETTER: Record<DnaKnob, string> = {
   motif: "m",
   proof: "q",
   align: "g",
+  phone: "e",
+  trust: "u",
+  heads: "w",
 };
 
 /** For the app's pickers: knob order, letter and values, so it can encode a design id the same way. */
@@ -149,6 +160,9 @@ function hash(s: string): number {
 type Prefs = { [K in DnaKnob]?: Array<Dna[K]> };
 const PREFS: Record<CategoryId, Prefs> = {
   general: {
+    phone: ["stacked", "natural", "link", "bar"],
+    trust: ["checks", "chips", "dots", "stack"],
+    heads: ["label", "rule", "big", "tag"],
     hero: ["split", "stack", "banner", "card", "statement", "cover"],
     services: ["cards", "list", "tiles", "columns", "bento"],
     strip: ["bar", "tiles", "inline", "none", "marquee"],
@@ -159,6 +173,9 @@ const PREFS: Record<CategoryId, Prefs> = {
     motif: ["none", "dots", "rules"],
   },
   restaurant: {
+    phone: ["natural", "stacked", "link", "bar"],
+    trust: ["dots", "chips", "checks"],
+    heads: ["label", "big", "rule", "tag"],
     hero: ["cover", "stack", "card", "banner", "billboard", "split"],
     services: ["cards", "tiles", "scroller", "columns", "table", "bento"],
     strip: ["tiles", "bar", "ticker", "inline", "factcard", "marquee"],
@@ -169,6 +186,9 @@ const PREFS: Record<CategoryId, Prefs> = {
     motif: ["none", "dots", "rules", "grain"],
   },
   contractor: {
+    phone: ["stacked", "bar", "natural", "link"],
+    trust: ["checks", "stack", "dots", "chips"],
+    heads: ["label", "rule", "tag", "big"],
     hero: ["split", "stack", "statement", "card", "banner"],
     services: ["list", "cards", "accordion", "tiles", "scroller", "bento"],
     cta: ["split", "band", "boxed", "inline"],
@@ -183,6 +203,9 @@ const PREFS: Record<CategoryId, Prefs> = {
     align: ["start"],
   },
   salon: {
+    phone: ["natural", "link", "stacked", "bar"],
+    trust: ["chips", "dots", "checks"],
+    heads: ["rule", "big", "label", "tag"],
     hero: ["cover", "banner", "billboard", "stack", "card", "split"],
     services: ["list", "table", "columns", "cards", "bento"],
     photo: ["arch", "plain", "frame", "tilt", "offset"],
@@ -194,6 +217,9 @@ const PREFS: Record<CategoryId, Prefs> = {
     rhythm: ["bands", "continuous", "chapters"],
   },
   auto: {
+    phone: ["stacked", "bar", "natural", "link"],
+    trust: ["checks", "stack", "chips", "dots"],
+    heads: ["label", "rule", "tag", "big"],
     hero: ["split", "stack", "cover", "statement", "card"],
     services: ["list", "tiles", "cards", "accordion", "scroller", "bento"],
     buttons: ["block", "solid-solid", "solid-ghost", "shadow"],
@@ -247,6 +273,9 @@ const PREFS: Record<CategoryId, Prefs> = {
     motif: ["none", "dots", "rules"],
   },
   finance: {
+    phone: ["stacked", "link", "natural"],
+    trust: ["checks", "dots", "stack"],
+    heads: ["label", "rule", "big"],
     hero: ["statement", "split", "banner", "stack", "card"],
     services: ["columns", "list", "cards", "table"],
     buttons: ["outline", "solid-link", "solid-ghost", "pill"],
@@ -262,6 +291,9 @@ const PREFS: Record<CategoryId, Prefs> = {
     rhythm: ["bands", "continuous"],
   },
   church: {
+    phone: ["stacked", "link", "natural"],
+    trust: ["dots", "checks", "chips"],
+    heads: ["label", "rule", "big"],
     hero: ["banner", "split", "statement", "stack", "card"],
     services: ["columns", "list", "cards"],
     buttons: ["solid-link", "solid-ghost", "outline", "pill"],
@@ -295,7 +327,7 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
     R("at-a-glance", "At a glance", "Info panel beside the photo, list of services.", { hero: "split", strip: "none", services: "list" }),
     R("plain-sign", "Plain sign", "Big name, facts row, light tone, tiles.", { hero: "billboard", tone: "light", services: "tiles" }),
     R("storefront", "Storefront", "Banner with a lede, bar under it, columns.", { hero: "banner", strip: "bar", services: "columns" }),
-    R("bento", "Bento", "Centered headline, services as a bento grid, color block behind the photo.", { hero: "banner", align: "center", services: "bento", photo: "offset" }),
+    R("bento", "Bento", "Centered headline, services as a bento grid, color block behind the photo.", { hero: "banner", align: "center", services: "bento", photo: "offset", heads: "tag" }),
   ],
   restaurant: [
     R("photo-first", "Photo first", "Full-screen food photo, menu tiles, swipeable specials.", { hero: "cover", services: "tiles", strip: "inline", scale: "dramatic" }),
@@ -304,7 +336,7 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
     R("postcard", "Postcard", "Photo, then a floating card with the hours and call button.", { hero: "card", strip: "none", services: "scroller", footer: "bigname" }),
     R("classic-diner", "Classic", "Headline over photo, three tiles, cards.", { hero: "stack", strip: "tiles", services: "cards", rhythm: "bands" }),
     R("poster", "Poster", "Huge type, one background, numbered chapters.", { hero: "statement", scale: "poster", rhythm: "chapters", buttons: "shadow" }),
-    R("marquee", "Marquee", "Full-screen photo, a scrolling line of specials and hours, bento menu highlights.", { hero: "cover", align: "center", strip: "marquee", services: "bento", scale: "dramatic" }),
+    R("marquee", "Marquee", "Full-screen photo, a scrolling line of specials and hours, bento menu highlights.", { hero: "cover", align: "center", strip: "marquee", services: "bento", scale: "dramatic", trust: "dots", phone: "natural" }),
   ],
   contractor: [
     R("dispatch", "Dispatch", "Info panel beside the headline, proof band, ruled list.", { hero: "split", strip: "none", proof: "band", services: "list", buttons: "block" }),
@@ -321,7 +353,7 @@ export const RECIPES: Record<CategoryId, Recipe[]> = {
     R("editorial", "Editorial", "Short band, generous spacing, text columns.", { hero: "banner", density: "generous", services: "columns", photo: "frame", buttons: "outline" }),
     R("snapshot", "Snapshot", "Photo, floating card, tilted snapshots, pill buttons.", { hero: "card", photo: "tilt", buttons: "pill", services: "list", footer: "bigname" }),
     R("poster-shop", "Poster", "Huge type, grain texture, numbered chapters.", { hero: "statement", scale: "poster", motif: "grain", rhythm: "chapters" }),
-    R("centered", "Centered", "Centered headline, price list, color block behind the photo.", { hero: "statement", align: "center", services: "table", photo: "offset", strip: "inline" }),
+    R("centered", "Centered", "Centered headline, price list, color block behind the photo.", { hero: "statement", align: "center", services: "table", photo: "offset", strip: "inline", trust: "chips", heads: "big" }),
   ],
   auto: [
     R("service-desk", "Service desk", "Info panel, proof band, ruled list, big buttons.", { hero: "split", strip: "none", proof: "band", services: "list", buttons: "block" }),
@@ -403,7 +435,18 @@ export function settleDna(d: Dna): Dna {
   if (d.align === "center" && !["stack", "cover", "statement", "banner", "billboard"].includes(d.hero)) d.align = "start";
   // A scrolling line under a utility bar or a proof band is one moving thing too many.
   if (d.strip === "marquee" && (d.nav === "utility" || d.proof === "band")) d.strip = "inline";
+  // Phone buttons only in the bottom bar needs a bottom bar (not the round call button).
+  if (d.phone === "bar" && d.bar !== "bar") d.phone = "stacked";
+  // Numbered chapters put the number in the section label; headings without a label would lose it.
+  if (d.rhythm === "chapters" && (d.heads === "rule" || d.heads === "big")) d.heads = "label";
+  // A one-per-line trust list under centered text reads as a ragged column; chips center cleanly.
+  if (d.trust === "stack" && d.align === "center") d.trust = "chips";
   return d;
+}
+
+/** The parts of a structure people notice first: two sites with the same signature look alike whatever the other knobs say. */
+export function dnaSignature(d: Dna): string {
+  return `${d.hero}|${d.services}|${d.strip}|${d.headline}`;
 }
 
 /**
@@ -451,7 +494,7 @@ export function pickDna(seed: string, category: CategoryId, o: { avoid?: Dna[]; 
     return settleDna(d);
   };
   // "Used" means the parts people notice first match (opening, services, address bar, headline), not every knob.
-  const sig = (d: Dna) => `${d.hero}|${d.services}|${d.strip}|${d.headline}`;
+  const sig = dnaSignature;
   const used = new Set((o.avoid ?? []).map(sig));
   let first: Dna | undefined;
   for (let i = 0; i < 12; i++) {
@@ -466,7 +509,8 @@ export function pickDna(seed: string, category: CategoryId, o: { avoid?: Dna[]; 
 export function dnaAttrs(d: Dna): string {
   return (
     ` data-hero="${d.hero}" data-nav="${d.nav}" data-btn="${d.buttons}" data-strip="${d.strip}" data-svc="${d.services}" data-cta="${d.cta}" data-ftr="${d.footer}" data-bar="${d.bar}" data-photo="${d.photo}"` +
-    ` data-headline="${d.headline}" data-rhythm="${d.rhythm}" data-scale="${d.scale}" data-density="${d.density}" data-tone="${d.tone}" data-motif="${d.motif}" data-proof="${d.proof}" data-align="${d.align}"`
+    ` data-headline="${d.headline}" data-rhythm="${d.rhythm}" data-scale="${d.scale}" data-density="${d.density}" data-tone="${d.tone}" data-motif="${d.motif}" data-proof="${d.proof}" data-align="${d.align}"` +
+    ` data-phone="${d.phone}" data-trust="${d.trust}" data-heads="${d.heads}"`
   );
 }
 
@@ -480,6 +524,8 @@ const PARTS: Array<{ knob: DnaKnob; attr: string; test: RegExp }> = [
   { knob: "cta", attr: "data-cta", test: /\.cta\b/ },
   { knob: "footer", attr: "data-ftr", test: /\.ftr/ },
   { knob: "bar", attr: "data-bar", test: /\.bar\b/ },
+  { knob: "trust", attr: "data-trust", test: /\.hero__trust/ },
+  { knob: "heads", attr: "data-heads", test: /\.section__label|\.section__title/ },
 ];
 
 /**

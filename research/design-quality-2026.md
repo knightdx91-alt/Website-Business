@@ -194,6 +194,21 @@ say to the owner, and a note for the copywriter (tone, what the headline leads w
 - Model: the studio default, Opus 5.5 at low effort; the catalog block is cached, so a call is a few hundred fresh
   input tokens and ~400 out (about a cent). Six live picks took 4–12 s each.
 
+### 4.4 Round 4: the phone view, and designs that stay sold (same week)
+
+The owner's review of round 3 found two gaps. First, phones: the DNA varied openings and sections, but every phone
+opening ended the same way, with two stacked full-width buttons, a row of check marks and the same small label over
+every section, so sites still read as one family on the device that sells them. Three knobs now vary that chrome on
+purpose: `phone` (buttons stacked, side by side, one button plus a text link, or only in the bottom bar), `trust` (check
+marks, chips, one line with dots, one per line) and `heads` (small label + title, title with an accent rule, colored tag,
+big title). Layout rules for the trust row and section headings are scoped to the legacy values, so a knob's style wins.
+Second, exclusivity: a paying client's look (colors + fonts) is never handed to another business, and neither are its
+layout or structure signature while alternatives remain; the pickers show a client's look as sold, the editor refuses it,
+and the moment a lead is sold or goes live every open preview in the category that shares its look is given a new design
+by the art director and the team is told why. The research behind both: Williams's repetition principle cuts both ways
+(repeat within a site, not across clients), the 50 ms verdict is made on the phone screen, and "looks like a template"
+is the owner's most common reason for not buying.
+
 ## 5. Rules the generator now holds (keep them when adding things)
 
 1. Every text/surface pair is contrast-checked at build; a failing look does not ship (`resolveTheme`).
@@ -210,6 +225,9 @@ say to the owner, and a note for the copywriter (tone, what the headline leads w
 9. Reviews are never quoted from Google; the rating and count link out; owner-supplied quotes carry a name.
 10. Prices are said per month, never per day, anywhere the company's own plans appear.
 11. Web and Android show the same facts: anything added to `detail()` for one app is added to the other.
+12. A sold or live client's look never goes to another site; its layout and structure signature stay theirs while other
+    options exist; the pickers mark it sold; sold or live leads are never restyled by the app.
+13. The phone opening's chrome (buttons, trust row, section headings) varies between neighbors like everything else.
 
 ## 6. Backlog (researched, not built)
 

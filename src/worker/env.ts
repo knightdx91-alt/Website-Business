@@ -25,6 +25,12 @@ export interface Env {
 
 export type Job =
   | {
+      /** A sold or live client (`because`) owns this lead's look now: give the lead a new design and tell the team. */
+      type: "restyle";
+      leadId: string;
+      because: string;
+    }
+  | {
       type: "search";
       runId: string;
       category: string;

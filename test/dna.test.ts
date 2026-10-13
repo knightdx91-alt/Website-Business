@@ -16,10 +16,11 @@ test("dna encodes and parses round-trip; bad codes are rejected", () => {
   assert.equal(parseDna("h9n0b0s0v0c0f0a0p0"), undefined, "index out of range");
   assert.equal(parseDna("h0n0"), undefined, "too short");
   assert.equal(parseDna("h0n0b0s0v0c0f0a0p0x"), undefined, "trailing junk");
-  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q0g0") }, "an id from before the newer knobs still parses, with legacy values for them");
+  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q0g0e0u0w0") }, "an id from before the newer knobs still parses, with legacy values for them");
   assert.equal(parseDna("h0n0b0s0v0c0f0a0p0t5"), undefined, "a newer knob out of range is still rejected");
-  assert.equal(encodeDna(LEGACY_DNA), "h0n0b0s0v0c0f0a0p0t0r0k0d0o0m0q0g0");
-  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g0") }, "an id from before the align knob still parses");
+  assert.equal(encodeDna(LEGACY_DNA), "h0n0b0s0v0c0f0a0p0t0r0k0d0o0m0q0g0e0u0w0");
+  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g0e0u0w0") }, "an id from before the align knob still parses");
+  assert.deepEqual(parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g1"), { ...parseDna("h1n2b3s2v1c1f1a1p1t0r0k0d0o0m0q1g1e0u0w0") }, "an id from before the phone knobs still parses");
   const d = parseDesign("auto.motor_oil~classic~h1n2b3s2v1c1f1a1p1");
   assert.equal(d.layout, "classic");
   assert.equal(d.dna?.hero, "cover");
@@ -168,4 +169,50 @@ test("third round: centered openings, bento services, marquee strip, offset phot
   assert.equal(serviceIcon("Something unusual", "wrench"), "wrench");
   const icons = html.match(/<svg class="i" [^>]*stroke="currentColor"/g) ?? [];
   assert.ok(icons.length >= 4, `service tiles carry stroke icons (${icons.length})`);
+});
+
+test("fourth round: the phone view has its own knobs (buttons, trust row, section headings) and a client's structure is never copied", async () => {
+  const { settleDna, dnaSignature } = await import("../src/generator/dna.ts");
+  const { pickDesign } = await import("../src/generator/design.ts");
+  const record = categoryRecord("auto", { smsEnabled: true });
+  const build = (d: Partial<Dna>) => buildSite({ record, copy: sampleCopy(), site: site(`auto.motor_oil~editorial~${encodeDna(settleDna({ ...LEGACY_DNA, ...d }))}`), mode: "preview" });
+  const out = await build({ phone: "link", trust: "chips", heads: "rule" });
+  assert.deepEqual(out.lint.errors, []);
+  const html = String(out.files.get("index.html"));
+  assert.match(html, /data-phone="link" data-trust="chips" data-heads="rule"/);
+  const css = String(out.files.get("assets/site.css"));
+  for (const sel of ['html[data-phone="natural"]', 'html[data-phone="link"]', 'html[data-phone="bar"]', 'html[data-trust="chips"]', 'html[data-trust="dots"]', 'html[data-trust="stack"]', 'html[data-heads="rule"]', 'html[data-heads="tag"]', 'html[data-heads="big"]']) assert.ok(css.includes(sel), sel);
+  assert.match(css, /content:"\\2192"/, "the text-link arrow is a real CSS escape");
+  assert.match(css, /content:"\\00B7"/, "the dot separator is a real CSS escape");
+  // Phone rules live only under the phone media query; the trust and heading rules apply at every width.
+  const phoneBlock = css.slice(css.indexOf('html[data-phone="natural"]') - 40, css.indexOf('html[data-phone="natural"]'));
+  assert.match(phoneBlock, /@media \(max-width:599px\)\{/);
+  // Layouts' own section-heading and trust-row rules step aside when the knob isn't legacy (scoped to the legacy value).
+  assert.match(css, /html\[data-heads="label"\] [^{]*\.section__title/);
+  // Consistency rules.
+  assert.equal(settleDna({ ...LEGACY_DNA, phone: "bar", bar: "fab" }).phone, "stacked");
+  assert.equal(settleDna({ ...LEGACY_DNA, phone: "bar", bar: "bar" }).phone, "bar");
+  assert.equal(settleDna({ ...LEGACY_DNA, rhythm: "chapters", heads: "big" }).heads, "label");
+  assert.equal(settleDna({ ...LEGACY_DNA, rhythm: "chapters", heads: "tag" }).heads, "tag");
+  assert.equal(settleDna({ ...LEGACY_DNA, hero: "statement", align: "center", trust: "stack" }).trust, "chips");
+  // The spread picks all four phone values over a run (no value is dead).
+  const seen = new Set(Array.from({ length: 80 }, (_, i) => pickDna(`p${i}`, "contractor").phone));
+  assert.equal(seen.size, 4, [...seen].join(","));
+  // A sold client's design is exclusive: never its look, nor its layout or structure signature while others are free.
+  const looks = ["auto.motor_oil", "auto.pit_lane", "auto.midnight_shine"];
+  const sold = `auto.motor_oil~classic~${encodeDna(settleDna({ ...LEGACY_DNA, hero: "split", services: "list" }))}`;
+  for (let i = 0; i < 30; i++) {
+    const d = pickDesign({ leadId: `lead-${i}`, looks, used: [sold], taken: [sold] });
+    assert.notEqual(parseDesign(d).look, "auto.motor_oil", d);
+    assert.notEqual(parseDesign(d).layout, "classic", d);
+    assert.notEqual(dnaSignature(parseDesign(d).dna!), dnaSignature(parseDesign(sold).dna!), d);
+  }
+  // Only when every look is a client's does the spread share one (and still not the exact combination).
+  const all = looks.map((l, i) => `${l}~${LAYOUT_IDS[i]}`);
+  const forced = pickDesign({ leadId: "lead-x", looks, used: all, taken: all });
+  assert.ok(looks.includes(parseDesign(forced).look));
+  assert.ok(!all.includes(`${parseDesign(forced).look}~${parseDesign(forced).layout}`), "never the exact sold combination");
+  // A restyle lists the current design as taken, so "Try another design" always changes the colors.
+  const again = pickDesign({ leadId: "lead-y", looks, used: [], taken: [`auto.pit_lane~classic`] });
+  assert.notEqual(parseDesign(again).look, "auto.pit_lane");
 });

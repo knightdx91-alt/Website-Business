@@ -85,7 +85,7 @@ export interface EditDetail {
   record: AnyRecord;
   copy: AnyRecord;
   menuText?: string;
-  looks: Array<{ id: string; name: string }>;
+  looks: Array<{ id: string; name: string; soldTo?: string }>;
   layouts?: Array<{ id: string; name: string; about: string }>;
   dnaOrder?: Array<{
     id: string;
@@ -588,7 +588,7 @@ export function editForm(l: EditDetail): EditForm {
       "lookBase",
       "Colors & fonts",
       l.lookBase ?? "",
-      l.looks.map((x): [string, string] => [x.id, x.name]),
+      l.looks.map((x): [string, string] => [x.id, x.soldTo ? `${x.name} (sold: ${x.soldTo})` : x.name]),
     ),
     sel(
       "layout",

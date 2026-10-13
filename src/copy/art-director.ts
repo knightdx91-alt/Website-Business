@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { layoutOf } from "../generator/design.ts";
-import { DNA_KNOB_IDS, DNA_KNOBS, DNA_LABELS, pickDna, RECIPES, settleDna, type Dna, type DnaHints, type DnaKnob } from "../generator/dna.ts";
+import { DNA_KNOB_IDS, DNA_KNOBS, DNA_LABELS, dnaSignature, pickDna, RECIPES, settleDna, type Dna, type DnaHints, type DnaKnob } from "../generator/dna.ts";
 import { FONTS } from "../generator/fonts.ts";
 import { hasAnyHours } from "../generator/hours.ts";
 import { LAYOUT_IDS, LAYOUTS, type LayoutId } from "../generator/layouts.ts";
@@ -54,6 +54,8 @@ What a good pick does:
 - Dark pages suit night and shop businesses (auto, barbers, barbecue, gyms, bars); light pages suit daytime shops, churches, finance, cleaning, kids, food trucks.
 - Variety: neighbors in the same category must not match. Prefer looks and openings not listed under "in use nearby"; never pick anything listed under "taken".
 - Keep it buildable: centered text only on one-column openings (stack, cover, statement, banner, billboard); a marquee address line never with a utility top bar or a proof band; poster type only with short headlines.
+- The phone view is what the owner sees first. Vary it on purpose with the phone, trust and heads knobs (how the opening's buttons sit, how the trust line reads, how section headings look), so two neighbors never share the same phone chrome; "bar" (buttons only in the bottom bar) suits trades and shops with a strong name, "link" suits calm pages, "natural" suits short labels.
+- A paying client's design is theirs: never their look, and not their layout or opening either while others fit.
 Return only ids that exist in the catalog, spelled exactly. The "why" is for a salesperson talking to the owner: plain words, specific to this business, no design jargon.`;
 
 /* ---------- describing the catalog ---------- */
@@ -162,7 +164,7 @@ function businessText(i: DirectorInput): string {
   const r = i.record;
   const names = (ids: string[]) => ids.map((d) => LOOKS[parseDesign(d).look]?.name ?? parseDesign(d).look);
   const usedNames = [...new Set(names(i.used.filter((d) => !i.taken.includes(d))))];
-  const takenNames = [...new Set(names(i.taken))];
+  const takenNames = [...new Set(i.taken.map((d) => `${LOOKS[parseDesign(d).look]?.name ?? parseDesign(d).look} (${layoutOf(d)} layout, ${parseDesign(d).dna?.hero ?? "stack"} opening)`))];
   const openings = [...new Set(i.used.map((d) => parseDesign(d).dna?.hero).filter(Boolean))];
   const cur = i.current ? parseDesign(i.current) : undefined;
   const photos = r.media.hero ? (r.media.hero.source === "google" ? "only a Google photo (cannot go live)" : "their own photo") : "none";
@@ -217,8 +219,19 @@ export function settlePick(pick: Pick, i: DirectorInput): { design: string; fixe
     look = (i.preferred && free.includes(i.preferred) ? i.preferred : free[hash(i.seed) % Math.max(1, free.length)]) ?? i.looks[0]!;
     fixes.push(`look ${pick.look} → ${look}`);
   } else if (look !== pick.look) fixes.push(`look ${pick.look} → ${look}`);
-  const layout: LayoutId = (LAYOUT_IDS as string[]).includes(pick.layout) ? (pick.layout as LayoutId) : (LOOKS[look]?.layout ?? "classic");
+  let layout: LayoutId = (LAYOUT_IDS as string[]).includes(pick.layout) ? (pick.layout as LayoutId) : (LOOKS[look]?.layout ?? "classic");
   if (layout !== pick.layout) fixes.push(`layout ${pick.layout} → ${layout}`);
+  // A client's layout stays theirs while other layouts are free.
+  const takenLayouts = new Set(i.taken.map(layoutOf));
+  if (takenLayouts.has(layout)) {
+    const free = LAYOUT_IDS.filter((l) => !takenLayouts.has(l));
+    if (free.length) {
+      const own = LOOKS[look]?.layout;
+      const next = own && free.includes(own) ? own : free[hash(`${i.seed}|layout`) % free.length]!;
+      fixes.push(`layout ${layout} → ${next} (a client's)`);
+      layout = next;
+    }
+  }
   const recipe = pick.recipe ? (RECIPES[category] ?? []).find((r) => r.id === pick.recipe) : undefined;
   if (pick.recipe && !recipe) fixes.push(`recipe ${pick.recipe} dropped`);
   const avoid = i.used.map((d) => parseDesign(d).dna).filter((d): d is Dna => !!d);
@@ -247,7 +260,15 @@ export function settlePick(pick: Pick, i: DirectorInput): { design: string; fixe
     fixes.push(`hero → ${d.hero} (no owner photo)`);
   }
   if (i.hints.proof) d.proof = "band";
-  return { design: designId(look, layout, settleDna(d)), fixes };
+  // Nor does another site get a client's structure signature (opening, services, strip, headline): move the services knob.
+  const takenSigs = new Set(i.taken.map((t) => parseDesign(t).dna).filter((t): t is Dna => !!t).map(dnaSignature));
+  let settled = settleDna(d);
+  const services = DNA_KNOBS.services as readonly Dna["services"][];
+  for (let n = 1; n < services.length && takenSigs.has(dnaSignature(settled)); n++) {
+    settled = settleDna({ ...d, services: services[(services.indexOf(d.services) + n) % services.length]! });
+    if (!takenSigs.has(dnaSignature(settled))) fixes.push(`services → ${settled.services} (a client has that structure)`);
+  }
+  return { design: designId(look, layout, settled), fixes };
 }
 
 /* ---------- the call ---------- */

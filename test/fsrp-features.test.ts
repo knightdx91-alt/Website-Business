@@ -65,7 +65,7 @@ test("pickDna hints: owner proof prefers the band, no owner photo prefers a phot
   const lights = Array.from({ length: 40 }, (_, i) => pickDna(`x${i}`, "contractor", { hints: { noPhoto: true } })).filter((d) => d.tone === "light").length;
   assert.ok(lights > 0 && lights < 40, "a light opening is allowed, not forced");
   const picked = pickDesign({ leadId: "lead-9", looks: ["restaurant.pit_plank"], used: [], taken: [], hints: { proof: true, noPhoto: true } });
-  assert.match(picked, /q1g[01]$/, "the design id carries the band");
+  assert.match(picked, /q1g[01]e\du\dw\d$/, "the design id carries the band");
 });
 
 /* ---------- shared: closures, payment methods, parking ---------- */

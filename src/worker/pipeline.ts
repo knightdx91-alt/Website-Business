@@ -3,6 +3,8 @@ import { autoVariant, setAutoVariant } from "../generator/packs/auto.ts";
 import { restaurantVariant } from "../generator/packs/restaurant.ts";
 import { writeCopy } from "../copy/write.ts";
 import { directDesign } from "../copy/art-director.ts";
+import { LOOKS, parseDesign } from "../generator/themes.ts";
+import { notify } from "./notify.ts";
 import { packFor } from "../generator/packs/index.ts";
 import { churchVariant } from "../generator/packs/church.ts";
 import { financeVariant } from "../generator/packs/finance.ts";
@@ -627,6 +629,36 @@ export async function runBuild(
       rewrite: 0,
     });
   }
+}
+
+/**
+ * A client bought the look this lead's preview uses (`lockDesign` in exclusive.ts): pick the lead a new design, with the
+ * client's design counted as taken, re-render the preview and tell the team. A lead that is sold, live, gone or not built
+ * yet is left alone (an unbuilt lead loses its pre-picked look so the build picks fresh).
+ */
+export async function runRestyle(env: Env, job: Extract<Job, { type: "restyle" }>): Promise<void> {
+  const lead = await getLead(env, job.leadId);
+  if (!lead || lead.status === "expired" || lead.sales_status === "sold" || lead.sales_status === "live") return;
+  const buyer = await getLead(env, job.because);
+  const buyerLook = buyer?.look ? parseDesign(buyer.look).look : undefined;
+  if (!lead.look || !buyerLook || parseDesign(lead.look).look !== buyerLook) return; // already different
+  const lookName = LOOKS[buyerLook]?.name ?? buyerLook;
+  if (!lead.record_json || !lead.copy_json) {
+    await updateLead(env, lead.id, { look: null });
+    return;
+  }
+  const record = JSON.parse(lead.record_json) as BusinessRecord;
+  const place = lead.place_json ? (JSON.parse(lead.place_json) as Place) : undefined;
+  const d = await designFor(env, record, `${lead.id}:${Date.now()}`, { place, current: lead.look });
+  if (d.notes) record.designNotes = d.notes;
+  else delete record.designNotes;
+  await renderPreview(env, lead, record, JSON.parse(lead.copy_json) as Copy, d.look);
+  await notify(env, {
+    kind: "status",
+    actorName: "The app",
+    leadId: lead.id,
+    text: `🎨 ${lead.name}'s preview got a new design: ${buyer?.name ?? "a client"} bought the "${lookName}" look, so it's theirs alone now`,
+  });
 }
 
 export function contentType(path: string): string {

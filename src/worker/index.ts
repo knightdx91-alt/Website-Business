@@ -237,10 +237,12 @@ import {
   dnaHints,
   renderPreview,
   runBuild,
+  runRestyle,
   runSearch,
   importSitePhotos,
   forgetSiteImport,
   requeueStuck, recategorizeLead } from "./pipeline.ts";
+import { lockDesign, lookOwner, soldDesigns, type SoldDesign } from "./exclusive.ts";
 import { servePreview } from "./preview.ts";
 import {
   costAlerts,
@@ -532,7 +534,8 @@ async function chargeAi(
 
 const CATEGORY_IDS = ["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail", "finance", "church", "general"] as const;
 
-function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
+/** `o.sold`: the category's sold / live clients, so the look picker can mark their looks (GET lead and the editor data pass it). */
+function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?: SoldDesign[] } = {}) {
   const record = l.record_json
     ? (JSON.parse(l.record_json) as BusinessRecord)
     : null;
@@ -582,7 +585,10 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }) {
           paragraphs: record.existingSite.paragraphs.length,
         }
       : null,
-    looks: pack.looks.map((id) => ({ id, name: LOOKS[id]?.name ?? id })),
+    looks: pack.looks.map((id) => {
+      const owner = o.sold ? lookOwner(o.sold, id) : undefined;
+      return { id, name: LOOKS[id]?.name ?? id, ...(owner ? { soldTo: owner.name } : {}) };
+    }),
     layouts: LAYOUT_IDS.map((id) => ({
       id,
       name: LAYOUTS[id].name,
@@ -2199,10 +2205,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (action === "" && m === "GET") {
       const signups = await signupsFor(env, id);
       return json({
-        ...detail({
-          ...lead,
-          latest_signup_paid: signups[0] ? (signups[0].paid ? 1 : 0) : null,
-        }),
+        ...detail(
+          {
+            ...lead,
+            latest_signup_paid: signups[0] ? (signups[0].paid ? 1 : 0) : null,
+          },
+          { sold: await soldDesigns(env, lead.category, id) },
+        ),
         notes: await notesFor(env, id),
         // Callers take payments too, so they see what is owed; only the signer's email stays with the owner.
         signups: isOwner
@@ -2947,6 +2956,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
               ...(salesStatus === "new" ? { shown_at: null } : {}),
             },
       );
+      // Sold: the design is theirs now; open leads in the category that share its look get a new one.
+      if (salesStatus === "sold" && lead.sales_status !== "sold") await lockDesign(env, lead);
       if (salesStatus !== lead.sales_status) {
         const label = {
           new: "New",
@@ -3089,7 +3100,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (action === "/editform" && m === "GET") {
       if (!lead.record_json || !lead.copy_json)
         throw new HttpError(409, "This site hasn't finished building yet");
-      return json(editForm(detail(lead) as Parameters<typeof editForm>[0]));
+      return json(editForm(detail(lead, { sold: await soldDesigns(env, lead.category, id) }) as Parameters<typeof editForm>[0]));
     }
     if (action === "/editform" && m === "PUT") {
       if (!lead.record_json || !lead.copy_json)
@@ -3110,6 +3121,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         JSON.parse(lead.copy_json),
         edits,
       );
+      if (next.look) {
+        // A paying client's look is theirs alone.
+        const owner = lookOwner(await soldDesigns(env, lead.category, id), next.look);
+        if (owner)
+          throw new HttpError(
+            409,
+            `The "${LOOKS[parseDesign(next.look).look]?.name ?? "chosen"}" look is ${owner.name}'s now (they bought it). Pick another.`,
+          );
+      }
       await renderPreview(
         env,
         lead,
@@ -3148,6 +3168,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         JSON.parse(lead.copy_json),
         edits,
       );
+      if (next.look) {
+        // A paying client's look is theirs alone.
+        const owner = lookOwner(await soldDesigns(env, lead.category, id), next.look);
+        if (owner)
+          throw new HttpError(
+            409,
+            `The "${LOOKS[parseDesign(next.look).look]?.name ?? "chosen"}" look is ${owner.name}'s now (they bought it). Pick another.`,
+          );
+      }
       await renderPreview(
         env,
         lead,
@@ -4062,6 +4091,7 @@ async function handleQueue(batch: MessageBatch<Job>, env: Env): Promise<void> {
     try {
       if (msg.body.type === "search") await runSearch(env, msg.body);
       else if (msg.body.type === "build") await runBuild(env, msg.body);
+      else if (msg.body.type === "restyle") await runRestyle(env, msg.body);
       msg.ack();
     } catch (err) {
       console.error("job failed", msg.body, err);

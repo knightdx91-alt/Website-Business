@@ -1,4 +1,5 @@
 import { allowedFounderPick, founderOffer } from "./referrals.ts";
+import { lockDesign } from "./exclusive.ts";
 import { notify } from "./notify.ts";
 import { shareToken, signupToken } from "./auth.ts";
 import {
@@ -475,6 +476,7 @@ export async function serveSignup(
       follow_up: localDate(1),
       last_contact: now(),
     });
+    await lockDesign(env, lead); // their design is theirs now: open leads sharing it get a new one
     // Signed on the owner's Android phone with Tap to Pay set up (?tap=1 from the app): take the card right here instead
     // of sending them to Stripe's card form. The buttons call the owner's API with the owner's own login cookie.
     if (
@@ -1270,6 +1272,7 @@ export async function appSignup(
     follow_up: localDate(1),
     last_contact: now(),
   });
+  await lockDesign(env, lead); // their design is theirs now: open leads sharing it get a new one
   return {
     signupId: saved.signupId,
     dueCents: order.dueToday,

@@ -150,6 +150,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       + review link; verify undergroundassociates.com as a Domain property in Search Console and submit /sitemap.xml;
       Chamber of Commerce, Bing Places, Apple Business Connect listings; add `app/public/owner.jpg`
 - [x] Tax & finance pack and churches & nonprofits pack (Oct 2026), 25 looks each. Hand-added businesses can have a typed-in phone
+- [x] Design round 4 (Oct 2026, Android 2.57): phone-view knobs (buttons, trust row, section headings) so phones differ too, and sold
+      designs are exclusive (never reused, marked sold in the pickers, open previews sharing a newly sold look are redesigned)
 - [x] Design quality round 3 (Oct 2026, Android 2.56): generator polish (type, motion, scrim, icons), DNA align / bento /
       marquee / offset, and the AI art director that picks each site's design from the business and explains why
       (`research/design-quality-2026.md`, backlog in its §6)
@@ -559,6 +561,26 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   first open if still New (`restyleOldPreview` in preview.ts). Checking designs by eye:
   `npx tsx scripts/design-sheet.ts <scratchDir> "<look>~<layout>,..." [--no-photo]` (phone + desktop sheets, flags
   overflow) and `npx tsx scripts/check-looks.ts <category>`.
+- 📱🔒 Design round 4 (Oct 2026, Android 2.57; owner's two rules: the phone view must differ between sites too, and a sold
+  site's design is never reused). (1) **Phone-view knobs** (`dna.ts`, letters `e u w`, older ids parse as legacy): `phone`
+  (how the opening's buttons sit on phones: stacked full width / natural width side by side / primary + the second action
+  as an underlined text link with an arrow / only in the bottom bar, which needs `bar: bar`), `trust` (the trust row:
+  check marks / chips via `color-mix` on currentColor / one line with dots / one per line), `heads` (section headings:
+  small label + title / title with an accent rule / colored tag + title / big title only; chapters rhythm keeps the label
+  because its number lives there). CSS in `dna-css.ts`; `PARTS` scopes layouts' `.hero__trust` and `.section__label/title`
+  rules to the legacy values, so a knob's style wins over the layout's. Per-category `PREFS` + recipe flavor
+  (marquee → dots + natural, centered → chips + big, bento → tag). The director's prompt tells it the phone view is what
+  the owner sees first. `test/dna.test.ts` "fourth round". (2) **Sold designs are exclusive** (`src/worker/exclusive.ts`):
+  `pickDesign` and the director's `settlePick` never hand out a sold / live client's look (hard), nor its layout or
+  structure signature (`dnaSignature`: hero|services|strip|headline) while alternatives exist (the current design counts
+  as taken on a restyle, so "Try another design" always changes the colors); `detail().looks[].soldTo` marks a client's
+  look in the pickers (web options disabled "+ (sold: X)", editform label, Android dropdown disabled) and `/edits` + the
+  editor-data PUT refuse one with 409; `lockDesign(env, lead)` runs on every sold / live transition (`/status` sold, both
+  sign-up paths in signup.ts, publish.ts) and queues a `restyle` job (new Job type, `runRestyle` in pipeline.ts) for every
+  open (new / shown) lead in the category sharing the look: the art director picks it a new design with the client's
+  counted as taken, the preview is re-rendered and the team is told ("🎨 X's preview got a new design: Y bought the
+  "Pit & Plank" look"); a lead not built yet just loses its pre-picked look. The lead page says "🔒 Sold: this design is
+  X's alone now" (web + Android). `test/worker/exclusive.test.ts`. Design sheets for the phone knobs: scratchpad `ids4.mts`.
 - 🎨 Design quality round 3 (Oct 2026, Android 2.56; research in `research/design-quality-2026.md`, which also holds the backlog):
   four research passes (2026 trends, local-site conversion, a rulebook from the design books, an audit of the best local
   sites and the AI builders) + an audit of our own output drove three changes. (1) **Generator polish** (`css.ts`,

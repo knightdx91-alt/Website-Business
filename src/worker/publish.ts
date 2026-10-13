@@ -1,4 +1,5 @@
 import { zipSync } from "fflate";
+import { lockDesign } from "./exclusive.ts";
 import { slugify } from "../generator/html.ts";
 import { buildSite } from "../generator/render.ts";
 import type { BusinessRecord, Copy } from "../generator/types.ts";
@@ -155,6 +156,7 @@ export async function publishLead(
     published_at: now(),
     sales_status: "live",
   });
+  await lockDesign(env, lead); // a live site's design is its own: open leads sharing it get a new one
   return { url: origin, pagesUrl: pagesOrigin };
 }
 

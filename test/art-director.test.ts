@@ -66,11 +66,18 @@ test("a good pick becomes exactly that design: look, layout, recipe knobs and th
   assert.notEqual(settlePick(pick(), input({ seed: "lead-2" })).design, design, "another seed opens other knobs");
 });
 
-test("bad ids never leave the catalog: taken looks fall to the alternates, junk falls to the defaults, and the hints win", () => {
+test("bad ids never leave the catalog: taken looks fall to the alternates, junk falls to the defaults, and the hints win", async () => {
   // A paying client already has Pit & Plank: the second choice is used.
   let r = settlePick(pick(), input({ taken: ["restaurant.pit_plank~poster"] }));
   assert.equal(parseDesign(r.design).look, "restaurant.blue_plate");
-  assert.deepEqual(r.fixes, ["look restaurant.pit_plank → restaurant.blue_plate"]);
+  assert.equal(parseDesign(r.design).layout, "soft", "the client's layout moves too: Blue Plate's own layout is free");
+  assert.deepEqual(r.fixes, ["look restaurant.pit_plank → restaurant.blue_plate", "layout poster → soft (a client's)"]);
+  // A client's structure signature is never copied either: the services knob moves.
+  const soldDna = settlePick(pick({ look: "restaurant.blue_plate", layout: "soft" }), input()).design;
+  r = settlePick(pick({ look: "restaurant.pit_plank", layout: "poster" }), input({ taken: [soldDna] }));
+  assert.notEqual(parseDesign(r.design).look, "restaurant.blue_plate");
+  const { dnaSignature } = await import("../src/generator/dna.ts");
+  assert.notEqual(dnaSignature(parseDesign(r.design).dna!), dnaSignature(parseDesign(soldDna).dna!));
   // Nothing usable: the pack's best fit, else a seeded free look.
   r = settlePick(pick({ look: "restaurant.nope", alsoGood: ["salon.night_shift", "auto.motor_oil"] }), input());
   assert.equal(parseDesign(r.design).look, "restaurant.blue_plate");
@@ -129,9 +136,10 @@ test("directDesign sends the cached catalog and the business facts, and returns 
   assert.match(user, /replacing: Pit & Plank with a stack opening/);
   assert.match(user, /what reviews praise/);
   assert.equal((req.output_config as { effort: string }).effort, "low");
-  // Pit & Plank is taken (it is the current design), so the alternate was used and the fix is on record.
+  // Pit & Plank is taken (it is the current design), so the alternate was used, its layout moved off the client's, and both fixes are on record.
   assert.equal(parseDesign(res.design).look, "restaurant.blue_plate");
-  assert.deepEqual(res.notes.fixes, ["look restaurant.pit_plank → restaurant.blue_plate"]);
+  assert.deepEqual(res.notes.fixes, ["look restaurant.pit_plank → restaurant.blue_plate", "layout poster → soft (a client's)"]);
+  assert.match(user, /taken \(never\): Pit & Plank \(poster layout, stack opening\)/);
   assert.equal(res.notes.concept, "A chalkboard menu board");
   assert.match(res.notes.why, /plate lunches/);
   assert.match(res.notes.copyNotes!, /Friday supper/);

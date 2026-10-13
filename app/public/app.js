@@ -993,9 +993,11 @@
     C.design = `${ready && work && l.salesStatus !== "live" ? `<section class="card"><h2>🎨 Design</h2>
         <p class="small muted">Now: ${esc(lookName)}</p>
         ${l.designNotes ? `<p class="small" style="margin:0 0 10px">✨ <strong>${esc(l.designNotes.concept)}.</strong> ${esc(l.designNotes.why)}</p>` : ""}
+        ${l.salesStatus === "sold" ? `<p class="small" style="margin:0 0 10px">🔒 Sold: this design is ${esc(l.name)}'s alone now. No other business gets these colors, and any open preview that shared them was given a new design.</p>` : ""}
         <div class="btns btns--full"><button class="btn btn--primary" type="button" data-act="restyle">Try another design</button><button class="btn" type="button" data-act="restructure">Same colors, new structure</button></div>
         ${(l.dnaRecipes || []).length ? `<p class="small" style="margin:12px 0 6px"><strong>Or pick a style</strong> (keeps the colors)</p><div class="row" style="flex-wrap:wrap;gap:6px">${l.dnaRecipes.map((x) => `<button class="btn btn--small" type="button" data-recipe="${esc(x.id)}" title="${esc(x.about)}">${esc(x.name)}</button>`).join("")}</div>` : ""}
-        <label class="field small" style="margin-top:12px">Colors &amp; fonts<select data-look>${l.looks.map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>
+        <label class="field small" style="margin-top:12px">Colors &amp; fonts<select data-look>${l.looks.map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}${x.soldTo && x.id !== l.lookBase ? " disabled" : ""}>${esc(x.name)}${x.soldTo ? ` (sold: ${esc(x.soldTo)})` : ""}</option>`).join("")}</select></label>
+        ${(l.looks || []).some((x) => x.soldTo) ? `<p class="small muted" style="margin:6px 0 0">Looks marked "sold" belong to a client now and can't be used for anyone else.</p>` : ""}
         <p class="small muted" style="margin:8px 0 0">Every part (layout, opening, buttons, services…) can be set by hand in <a href="#/edit/${l.id}">Edit → Design</a>.</p>
       </section>` : ""}`;
     C.notes = `<section class="card"><h2>Calls &amp; notes</h2>
@@ -1392,7 +1394,7 @@
         <p class="small muted">Change this when the site was built as the wrong kind (a truck dealer built as a food truck). Rebuilding redoes the sections and text for the new kind; the name, phone, hours, links, the photos you added, awards and the price list stay.</p>
         <button class="btn btn--small" type="button" data-eact="rekind">🔁 Rebuild as this kind</button></section>
       <section class="card"><h2>Design</h2><label class="field">Colors &amp; fonts<select name="lookBase">${l.looks
-        .map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}>${esc(x.name)}</option>`)
+        .map((x) => `<option value="${esc(x.id)}"${x.id === l.lookBase ? " selected" : ""}${x.soldTo && x.id !== l.lookBase ? " disabled" : ""}>${esc(x.name)}${x.soldTo ? ` (sold: ${esc(x.soldTo)})` : ""}</option>`)
         .join("")}</select></label>
         <label class="field">Layout<select name="layout">${(l.layouts || [])
         .map((x) => `<option value="${esc(x.id)}"${x.id === l.layout ? " selected" : ""}>${esc(x.name)}: ${esc(x.about)}</option>`)
