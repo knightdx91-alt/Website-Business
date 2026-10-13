@@ -19,8 +19,12 @@ running a four-person sales operation). Numbers below are from the live database
 - Two things will bite as soon as a restaurant or salon signs: every restaurant preview needs the menu typed in before it
   can go live, and salons need services and prices. Reading those from a photo is the single biggest post-sale time saver
   available and the app has no photo reading yet.
+- One rule to check with a lawyer: Alabama's Telemarketing Act licenses phone selling. Booking the visit by phone and
+  closing in person fits an exemption; closing on the phone with a texted checkout link does not. The license is $500 a
+  year plus $50 a caller.
 - A feature freeze on new surfaces until ten paying clients, plus a short cut list, would free the only developer time
-  the business has for the above.
+  the business has for the above. The outside evidence is blunt about in-house tools: most features go unused, dashboards
+  without a meeting go unread, and every feature here ships twice (web and Android).
 
 ## 1. What the app is today
 
@@ -187,58 +191,151 @@ and the opened-preview beacon are the lever most reps lack: the prospect sees th
 
 ### 4.6 What a four-person sales operation should run on
 
-(From the second research pass; added below when it reports.)
+Nearly all "speed-to-lead" research is about inbound leads, so it applies to this app's inbound moments: a preview
+opened, a text back, a form post, a Buy-now. Those deserve minutes, not hours.
+
+| Finding | Number | Source |
+|---|---|---|
+| Firms that never answered a web lead; answered within an hour | 23%; 37% (mean 42 h) | HBR audit of 2,241 US firms, 2011 |
+| Odds of qualifying a lead answered within an hour vs an hour later; vs a day later | about 7×; over 60× | HBR 2011 |
+| Same audit re-run in 2026 | over 99% not within 5 min; average phone reply 14.5 h, 3.5 h with a routing tool | Workato (vendor) |
+| Call attempts that pay | optimal 6; only 8% of unresponsive leads ever got 5–7; two short voicemails on six calls +34% | Velocify (vendor) |
+| Voicemail | later connects fall 28% after a voicemail; keep to two, 15–30 s, to prime the next text | Gong, 300M calls (vendor) |
+| Texting | after a live contact +113% conversion; before any live contact −39% chance of ever reaching them; 3+ texts after contact best | Velocify (vendor, 2012) |
+| Left to themselves, reps' cadences | most common: one email; median whole cadence under 5 days | InsideSales, 8,000 companies (vendor) |
+| Connects by time | peak 11 AM–4 PM; about 13 dials per conversation | Allo 2026, 72k calls (observational) |
+| Interrupted work | gets done, faster, with more stress and errors | Mark et al., CHI 2008 |
+| E-sign completion | 43% within 15 min, 78% within a day; after that it joins the 22% that take longer | DocuSign (vendor) |
+| Contracts read | 1–2 shoppers per 1,000 open the terms | Bakos 2009 |
+| Annual prepay | about 30% better retention than monthly; whole-number offers ("two months free") beat percentages; best asked 2–9 months in | ProfitWell/SaaStr (vendor) |
+| SMB retention by products sold | 1 product: 30% kept at 2 years; 4 products: 80%; not upsold by month 3: 62% churned; weekly engagement +26% | Vendasta, 100k+ accounts (vendor) |
+| Reviews | 63% expect a reply within a week; an email ask prompts 40%, in person 27% | BrightLocal 2025 |
+| Why owners have no site | "not relevant to my industry" 34%, cost 16% | Clutch 2025 (via Review42) |
+| End-of-day reflection | 15 minutes of written reflection raised performance 22.8% in 11 days | Di Stefano et al., Wipro field experiment |
+| Stand-ups | help when they share problems, hurt when they are status reports | Stray et al., 12 teams |
+| Contests vs leaderboards | more than one winner; rank-ordered prizes add nothing; leaders coast, trailers quit; top ranks breed complacency | Lim/Ahearne/Ham; Casas-Arce; Na & Han 2023 |
+| Training that sticks | practice testing and spaced practice high utility, rereading low | Dunlosky 2013 |
+| Feature use | 80% of features rarely or never used; 12% carry 80% of use | Pendo, 615 products |
+| Dashboards | about 25% of employees use BI, flat for seven years; a dashboard without a meeting is decoration | BARC |
+| Alert fatigue | 80–99% of hospital alarms are false and staff respond slower to all of them | JMIR 2019 |
+
+What the second pass judged over-built against this evidence: 625 designs per category plus structure knobs (buyers
+object on relevance, not variety), the inventory stack built around one prospect, costs and usage screens for four
+people, many guides and alert kinds, and a native app that duplicates every web feature. Under-built: a response-time
+rule for inbound signals, an attempt counter with a give-up rule, assignment to stop cherry-picking the shared queue, a
+weekly scorecard with a scheduled review, a dated 30/90-day client checklist with a month-3 add-on ask, an end-of-day
+reflection prompt, spaced re-quizzes, and usage telemetry of the app itself.
 
 ## 5. Recommendations, in order
 
-Each item: what, why (with the evidence), and effort (S = an afternoon, M = a few days, L = a week or more). The first
-five are about getting the existing pipeline worked; nothing new is sold until they happen.
+Each item: what, why (with the evidence from §3 and §4), and effort (S = an afternoon, M = a few days, L = a week or
+more). The first six are about working the pipeline that already exists; nothing in §5 after them matters until they
+happen.
 
-1. **A morning plan in every pocket (S).** At 7:45 AM Central each person gets one push: "Today: 3 callbacks, 2 visits,
-   5 fresh calls. Tap to start." The queue already computes it; the daily cron exists; Web Push and Firebase are wired.
-   Add an end-of-day push to the owner: "Logged today: Owner 8, Fox 2, Brenda 3. Overdue: 6." Overdue callbacks are the
-   most expensive leak in any outbound process and the cheapest to fix with a nudge.
-2. **Assign the week's leads (M).** A "This week" list per person: the owner (or the app, round-robin by score and
-   category) hands each caller 15–20 leads on Monday; the queue shows yours first; the Sales page shows each person's
-   touches, reached, shown, and overdue. No lead sits in two people's lists. Raise the daily goal from 5 to a real number
-   for the hours worked (15 dials for a part-time caller is ordinary) and show it as a progress bar, not a setting.
-3. **Build to capacity, not to the cap (S).** Default runs to 20 leads and run them when a list is empty, not before.
-   Previews expire in 30 days and go stale (hours, photos) sooner; a lead built the week it is worked gets the freshest
-   Google data and the best chance. Move churches out of the default run groups into a "slow lane" run the owner starts on
-   purpose.
-4. **Walk in first for the top of the list (S).** For restaurants with 100+ reviews the first touch should be a visit at
-   2–4 PM with the preview on the phone, not a text to the counter line. The walk-in guide already knows the best time
-   to visit by trade (`WALKIN_TIMING`); the route and the queue do not use it. Order the route by "likely in now", and
-   make the log card ask "Who did you talk to? When are they usually in?" after a visit so `contact` and `best_time` fill
-   themselves (today they are a separate button nobody taps). Then the second visit asks for Kevin by name.
-5. **Fix the texted link (S).** Send it to the owner's own number (ask for it at the counter), make the text one line
-   with the business name and "built for you, 20 seconds", and send it standing there so the open happens in front of
-   you. Log which follow-up text was used so the open rate per text is visible. One open in eight is a message problem,
-   not a product problem.
-6. **Read menus and price boards from a photo (M).** The owner photographs the menu or the price list at the demo; Claude
-   (vision) turns it into menu sections with prices or a services-and-prices list; the team reviews and saves. This turns
-   the biggest required to-do into a two-minute step, lets "live within 3 business days" become "live today", and removes
-   the one chore that would otherwise land on the office manager after every restaurant and salon sale. Same for a photo
-   of the hours sign.
-7. **Spam protection on the company form (S).** Cloudflare Turnstile (free, same account) plus a honeypot field, and
-   drop submissions whose message links to an SEO domain. The inbox should only ever ring for a real prospect.
-8. **Cut the first-call course to one card (S).** Fourteen lessons and zero completions means the course is the wrong
-   shape for part-time callers. Keep the course for the office, but give callers a single "Your first call" card on Home:
-   the five lines to say, the one button to tap after, and "Mark done". Measure whether it gets done.
-9. **Make the sales page about the week (S).** Four numbers per person per week: touches, reached, shown, signed; plus
-   time-to-first-touch and overdue count. The funnel across all time is fine, but nobody acts on it in week one.
-10. **A feature freeze until ten paying clients, with a cut list (policy).** Nothing new on the lead page, no new packs,
-    no new extras until the tenth client pays. Candidates to retire or hide if still unused at that point: Tasks (0
-    created), the costs page for callers, the 17-extra menu at sign-up (show 3, keep the rest in "Buy extras"), the
-    glossary button on Home. The time goes to items 1–7 and to the first clients' onboarding.
-11. **The first 30 days for a client, as next steps (S).** The Live stage already says "ask for a review". Make it a
-    four-week script: week 1 Google Business Profile website field + review link card; week 2 first stats text ("12
-    people called from your site"); week 3 ask for the photo of the thing they are proudest of; week 4 the review ask.
-    Retention for subscriptions is decided in the first month, and the app already has every piece.
-12. **Decide the second front end on purpose (policy).** Keep Android for what only it can do (Tap to Pay, camera imports,
-    the owner's phone speed) and stop mirroring admin screens into it; callers get the lead page, log card, sign-up and
-    payment natively and everything else in the web app. Write that line into CLAUDE.md so each new feature is not built
-    twice by default.
+### Work the leads you have
+
+1. **A morning plan in every pocket, and an evening count for the owner (S).** At 7:45 AM Central each person gets one
+   push: "Today: 3 callbacks, 2 visits, 5 fresh calls. Tap to start." At 6 PM the owner gets "Logged today: Owner 8,
+   Fox 2, Brenda 3. Overdue: 6." The queue already computes it; the daily cron, Web Push and Firebase exist. Why: 8 of 13
+   callbacks were overdue this morning; reps left to themselves under-touch (InsideSales) and a nudge is the cheapest
+   fix in the literature.
+2. **Assign the week's leads (S–M).** Monday hands each caller 15–20 leads (round robin by score and category, or by the
+   owner); "Up next" shows yours first; a claim lapses at midnight so nothing is hoarded; the owner sees what nobody took.
+   Why: a shared queue showing everyone the same five best leads invites cherry-picking and leaves the rest cold
+   (ActiveProspect); 109 of 114 New leads are untouched.
+3. **Treat inbound signals as emergencies (S).** A preview opened, a text reply, a form post or a Buy-now puts the lead
+   at the top of Up next with a five-minute countdown and a push to whoever owns it; log time-to-first-touch. Why: HBR
+   found 7× the qualification odds within the hour and 60× against a day later, and nothing has changed since (Workato
+   2026). The beacon exists; the urgency does not.
+4. **Front-load the cadence and count attempts (S).** After a demo: a text within the hour, a call the next day, a second
+   voicemail on day 3, then the existing day 5 / 10 / 21 steps; show "attempt 3 of 6, voicemails 1 of 2" on the lead and
+   park the lead after six to eight touches in three weeks. Why: Velocify's optimum is six attempts and two short
+   voicemails; most reps stop after one; the current cadence is thin where the data says to be thick.
+5. **Build to capacity, not to the cap (S).** Default runs to 20 leads, run them when a list is empty, and move churches to
+   a "slow lane" run the owner starts on purpose. Why: previews expire in 30 days and go stale sooner; 25 church leads with
+   four required to-dos each and committee decisions sat untouched while restaurants, the best category by score and
+   reviews, were the ones shown.
+6. **Walk in first for the top of the list, and capture who you met (S).** Restaurants with 100+ reviews get a visit at
+   2:30–4:30 PM with the preview on the phone, not a text to the counter line; the route orders stops by "likely in now"
+   (the walk-in guide's `WALKIN_TIMING` already knows the windows); after a visit the log card asks "Who did you talk to?
+   When are they usually in?" and fills `contact` and `best_time`. Why: the only real interest in week one came from
+   visits; the notes name Kevin and Paige but the field is filled on 1 lead in 127; restaurant owners are at the counter
+   between lunch and dinner (practitioner evidence).
+
+### Stay on the right side of the rules
+
+7. **Book by phone, close in person or by a link the owner asked for; file the Alabama license anyway (S, plus a lawyer
+   read).** Alabama's Telemarketing Act exempts calls whose purpose is to book a face-to-face meeting with the sale made
+   there; a phone close with a texted checkout link sits outside that exemption and the license is $500 a year plus $50
+   per caller. Keep texts human-sent from the caller's own phone after the owner gave the number (what the app does), put
+   the business name and "Reply STOP" in every template, keep one shared do-not-contact list for calls and texts, and
+   never text a number that has not been reached live. Why: §4.4; also Velocify's −39% for texts before first contact,
+   so the rule and the data agree. Hide "Text preview link" on never-reached leads; keep the flyer and QR.
+
+### Make the first sales easier and the first clients stay
+
+8. **Read menus, price boards and hours signs from a photo (M).** The owner photographs the menu or the price list at the
+   demo; Claude turns it into menu sections with prices or a services-and-prices list; the team reviews and saves. Why:
+   "Send us your menu" is a required to-do on all 34 restaurant previews and "services and prices" on 15 salons; the
+   first signing turns into an evening of typing for the office manager, and "live within 3 business days" could be
+   "live today". The app has no photo reading yet.
+9. **Attach a second product at sign-up and ask again at month 3 (S).** Default the Google Business Profile setup or the
+   review cards into the sign-up picker; put "add one thing" on the Live lead's next step at 90 days. Why: a second paid
+   product halves churn (Thryv), one product kept 30% of SMBs at two years vs 80% with four, and clients not upsold by
+   month 3 churned 62% (Vendasta). Show three extras at the counter, not seventeen.
+10. **The first 30 and 90 days as dated next steps (M).** Week 1: Google profile linked and complete, review link card in
+    hand; week 2: the first stats text ("12 people called from your site"); week 3: ask for the photo they are proudest
+    of; week 4: the review ask; day 90: a results call with the report and the add-on ask. Turn on Stripe's card updater
+    and retries. Why: the first month decides retention, "dissatisfaction with delivery" is the top exit reason, and
+    about a third of churn is failed cards. Every piece exists; the dates do not.
+11. **Say the agreement's five lines out loud and initial the cancellation line (S).** Why: one or two shoppers in a
+    thousand read terms; the incumbents' one-star reviews are all about surprise terms; the "In short" block is the right
+    design, so make it the ritual.
+12. **Ask for the yearly upgrade at month 3, not at signing (S).** Why: annual prepay retains about 30% better, whole-number
+    offers ("two months free", which is what twelve-for-ten is) beat percentages, and the best moment is 2–9 months in.
+
+### Grow the list without a bigger phone bill
+
+13. **Join the chamber ($250) and co-host a "Get Online Day" with the Wallace State SBDC or the library (M).** Build
+    previews live in the room, sign on the spot. Why: SBDC "website workday" events already run elsewhere; the app's
+    one-day build is a stage act nobody else can do.
+14. **Trade leads with POS reps (M).** Register as a Toast local partner ($500 per referred restaurant) and meet the local
+    Clover and Square reps; pitch "we build the site that links to your ordering". Why: program terms are published; the
+    results are not, so start small.
+15. **Turn the incumbents' complaints into written promises (S).** One page on the company site and in the walk-in guide:
+    no auto-renew surprise, cancel by text after the term, you own the domain and the content, changes within two
+    business days, and a price comparison against Thryv ($99–399), Townsquare (~$300–400) and Hibu (custom, 6–12-month
+    terms). Why: §4.1; the complaint columns are the competitor's weak flank and the agreement already keeps these
+    promises.
+
+### Run the team on evidence, not on screens
+
+16. **A weekly scorecard with a 15-minute Monday look (S).** Per person: dials and visits, quality conversations, demos,
+    sign-ups, paid, time-to-first-touch on inbound signals, lead age at first contact. Why: dashboards without a meeting
+    go unread (BARC); the funnel across all time is fine but nobody acts on it in week one.
+17. **An end-of-day three-question log instead of a morning status round; two-week contests with two winners instead of a
+    leaderboard; re-ask the quick-checks on days 1, 7 and 30 (S).** Why: written reflection raised performance 23% in
+    eleven days; stand-ups help only when they solve problems; rank-ordered leaderboards make leaders coast and trailers
+    quit; spaced retrieval is what makes training stick, and zero lessons have been completed.
+18. **Cut the first-call training to one card (S).** A "Your first call" card on Home: the five lines to say, the one
+    button to tap after, "Mark done". Keep the course for the office.
+
+### Spend the developer's time where it pays
+
+19. **A feature freeze on new surfaces until ten paying clients, plus a cut list (policy).** Nothing new on the lead page,
+    no new packs, no new extras until the tenth client pays. Candidates to hide if still unused then: Tasks (0 created),
+    the costs page for callers, the glossary button on Home, most alert kinds for callers (default them to "important";
+    fold "site updated" alerts per day). Why: 80% of features go unused (Pendo) and alert fatigue slows response to the
+    alerts that matter; the time goes to items 1–12.
+20. **Spam protection on the company form (S).** Cloudflare Turnstile plus a honeypot; drop messages linking to SEO
+    domains. Why: three of four inbox items were spam and each one rang the owner's phone.
+21. **Decide the second front end on purpose (policy, then L).** Keep native Android for field tasks (queue, lead page,
+    log, sign-up, Tap to Pay, camera imports, preview) and serve settings, sales, costs, guides and the editor to Android
+    as web views. Why: almost every change this month shipped twice; Hotwire Native's "content is web, navigation is
+    native" is the pattern for a four-user app whose screens change weekly. It is the only item that halves future
+    effort, and the owner's reasons for going native (cold start, Tap to Pay) survive it.
+22. **Count opens per screen (M).** Web and Android report which screens are opened; hide anything under about 5% monthly
+    use at the quarterly review; apply Intercom's test (valuable, within our purview, used by everyone) before building.
 
 ## 6. What not to change
 
@@ -248,8 +345,11 @@ five are about getting the existing pipeline worked; nothing new is sold until t
   is in the market's range for done-for-you local sites and simpler than most. Do not add plans.
 - The agreement, Tap to Pay, the publish gate and the sold-design exclusivity are the parts a competitor would envy. Leave
   them alone.
-- The art director and the design system are now good enough that design is not why a prospect says no. Stop polishing
-  the generator until a prospect says it is.
+- The art director and the design system are now good enough that design is not why a prospect says no (owners who
+  skip a website say "not relevant to my industry" far more than anything about looks). Stop polishing the generator
+  until a prospect says it is.
+- The agreement's "In short" block, the e-signature, Tap to Pay and the texted follow-ups are all aligned with the
+  evidence on completion and friction. Keep them.
 
 ## 7. Sources
 
@@ -268,3 +368,17 @@ Circuit text ruling; Alabama Attorney General on the Alabama Telemarketing Act; 
 Twilio's A2P 10DLC and SMS compliance guides; the Cullman Area Chamber membership tiers; chamber discount and mini-site
 programs (Bonita Springs, Rose Hill); an SBA/SBDC "website workday" event; Clover and Square referral terms; Toast Local
 Partner FAQ (snippet); BNI 2025 mid-year report; direct-mail response benchmarks (ANA via directmail.io).
+
+Team operations (read in full unless noted): HBR "The Short Life of Online Sales Leads" (via SmartCompany); two critical
+reviews of the InsideSales/Oldroyd five-minute study; Workato's 2026 lead-response study; Velocify call-attempt and
+texting studies (via CustomerThink and a slide deck); Gong on voicemails; InsideSales 2017 sales cadence study; Allo
+2026 cold-calling statistics; Kixie and the Bridge Group on SDR activity; ActiveProspect on lead distribution; BrightLocal
+2025; Google's Business Profile help on complete profiles; Review42 on Clutch 2025; Upward on restaurant sales visits; a
+Hacker News thread on selling to bars and restaurants; Temple University / USPS on print vs digital; Webdesignerdepot on
+objections; DocuSign's e-signature datasheet; Bakos et al. on reading licenses; Obar & Oeldorf-Hirsch on terms of service;
+Patrick Campbell on SaaStr (annual prepay); a hospital deposit study; Vendasta's client churn study; Databox on client
+reporting; Stray et al. on daily stand-ups; Di Stefano, Gino, Pisano & Staats on reflection; Lim, Ahearne & Ham on
+sales contests; Casas-Arce & Martínez-Jerez on tournaments; Na & Han 2023 on leaderboards; Dunlosky et al. 2013 on
+learning techniques; Pendo's feature adoption report and Mountain Goat on the "64%" figure; BARC on BI adoption; JMIR
+2019 on alarm fatigue; Mark et al. CHI 2008 on interruptions; Airbnb on leaving React Native; Hotwire Native; Intercom
+on saying no; Basecamp's Shape Up on appetites and circuit breakers.
