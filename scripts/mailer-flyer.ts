@@ -54,7 +54,7 @@ html,body{width:8.5in;height:11in}
 body{font:400 13pt/1.4 I,sans-serif;color:${NAVY};background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .page{position:relative;width:8.5in;height:11in;overflow:hidden;display:flex;flex-direction:column}
 .top{flex:none;background:${NAVY};color:#fff;padding:.32in .55in .32in;position:relative;overflow:hidden}
-.top:after{display:none}
+.top:after{content:"";position:absolute;right:-1.2in;top:-1.4in;width:4in;height:4in;border-radius:50%;border:.16in solid ${GOLD};z-index:0}
 .brand{display:flex;align-items:center;gap:.14in;font:800 13pt/1 M,sans-serif;letter-spacing:.04em;text-transform:uppercase}
 .brand svg{width:.85in;height:.85in;flex:none}
 .brand small{display:block;font:600 9.5pt/1.3 I,sans-serif;letter-spacing:0;text-transform:none;opacity:.8;margin-top:3px}
