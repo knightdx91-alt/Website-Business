@@ -76,6 +76,7 @@ import com.knightdx91.websitebusiness.net.saveSettings
 import com.knightdx91.websitebusiness.net.settingsMeta
 import com.knightdx91.websitebusiness.net.str
 import com.knightdx91.websitebusiness.net.updateCaller
+import com.knightdx91.websitebusiness.net.setHourlyPay
 import com.knightdx91.websitebusiness.net.usage
 import com.knightdx91.websitebusiness.update.Updater
 import kotlinx.coroutines.Dispatchers
@@ -355,6 +356,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
 private sealed class Dlg {
     data class Email(val c: Caller) : Dlg()
     data class Password(val c: Caller) : Dlg()
+    data class Pay(val c: Caller) : Dlg()
     data class Admin(val c: Caller) : Dlg()
     data class Off(val c: Caller) : Dlg()
     data class Remove(val c: Caller) : Dlg()
@@ -590,6 +592,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                             domain = m.settings.str("googleDomain") ?: "undergroundassociates.com",
                             onEmail = { dialog = Dlg.Email(it) },
                             onPassword = { dialog = Dlg.Password(it) },
+                            onPay = { dialog = Dlg.Pay(it) },
                             onAdmin = { c -> if (c.admin) callerAction { state.api.updateCaller(c.id, JSONObject().put("admin", false)) } else { dialog = Dlg.Admin(c) } },
                             onToggle = { c -> if (c.disabled) callerAction { state.api.updateCaller(c.id, JSONObject().put("disabled", false)) } else { dialog = Dlg.Off(c) } },
                             onRemove = { dialog = Dlg.Remove(it) },
@@ -707,6 +710,21 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
             if (v.isBlank()) return@PromptDialog
             dialog = null
             callerAction { state.api.updateCaller(d.c.id, JSONObject().put("password", v)); context.toast("Password changed") }
+        }
+        is Dlg.Pay -> PromptDialog(
+            title = "Hourly pay for ${d.c.name}",
+            label = "Dollars an hour, like 15 or 15.50. Leave blank for commission only (no time clock).",
+            initial = d.c.hourlyCents?.let { String.format(java.util.Locale.US, "%.2f", it / 100.0) } ?: "",
+            keyboard = KeyboardType.Decimal,
+            onDismiss = { dialog = null },
+        ) { v ->
+            val n = v.replace("$", "").replace(",", "").trim().ifBlank { "0" }.toDoubleOrNull()
+            if (n == null || n < 0 || n > 1000) { context.toast("Type a dollar amount like 15.50"); return@PromptDialog }
+            dialog = null
+            callerAction {
+                state.api.setHourlyPay(d.c.id, if (n > 0) Math.round(n * 100) else null)
+                context.toast(if (n > 0) "Hourly pay saved. They can clock in from Tasks." else "Set to commission only")
+            }
         }
         is Dlg.Admin -> ConfirmDialog("Give full access?", "Give full access? They'll be able to do everything you can, including settings and publishing.", "Give full access", onDismiss = { dialog = null }) {
             dialog = null
@@ -1026,6 +1044,7 @@ private fun TeamCard(
     domain: String,
     onEmail: (Caller) -> Unit,
     onPassword: (Caller) -> Unit,
+    onPay: (Caller) -> Unit,
     onAdmin: (Caller) -> Unit,
     onToggle: (Caller) -> Unit,
     onRemove: (Caller) -> Unit,
@@ -1046,9 +1065,10 @@ private fun TeamCard(
                 Text(if (c.admin) "Full access" else "Caller", style = MaterialTheme.typography.labelMedium, color = if (c.admin) Good else MaterialTheme.colorScheme.onSurfaceVariant)
                 if (c.disabled) Text("  Turned off", style = MaterialTheme.typography.labelMedium, color = Warn)
             }
-            Hint(if (c.email != null) "✉️ ${c.email}${if (c.googleOnly) " · Google sign-in only" else ""}" else "No Google address yet")
+            Hint((if (c.email != null) "✉️ ${c.email}${if (c.googleOnly) " · Google sign-in only" else ""}" else "No Google address yet") + " · ⏱ " + (c.hourlyCents?.let { "${money(it)}/hr (uses the time clock)" } ?: "commission only"))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
                 OutlinedButton(onClick = { onEmail(c) }) { Text(if (c.email != null) "Change email" else "Add Google email") }
+                OutlinedButton(onClick = { onPay(c) }) { Text(if (c.hourlyCents != null) "Change hourly pay" else "Set hourly pay") }
                 OutlinedButton(onClick = { onPassword(c) }) { Text("New password") }
                 if (c.id != meId) OutlinedButton(onClick = { onAdmin(c) }) { Text(if (c.admin) "Make caller" else "Give full access") }
                 OutlinedButton(onClick = { onToggle(c) }) { Text(if (c.disabled) "Turn on" else "Turn off") }

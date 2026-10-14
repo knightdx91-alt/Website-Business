@@ -96,6 +96,7 @@ interface UserRow {
   admin: number;
   created_at: number;
   email: string | null;
+  hourly_cents?: number | null;
 }
 
 /** Login is password-only, so every password must be unique across the owner and callers. */
@@ -141,6 +142,7 @@ export async function listCallers(
     createdAt: number;
     email: string | null;
     googleOnly: boolean;
+    hourlyCents: number | null;
   }[]
 > {
   const rows = await env.DB.prepare(
@@ -154,6 +156,7 @@ export async function listCallers(
     createdAt: u.created_at,
     email: u.email ?? null,
     googleOnly: u.password.startsWith("google."),
+    hourlyCents: u.hourly_cents ?? null,
   }));
 }
 

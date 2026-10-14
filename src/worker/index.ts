@@ -1,3 +1,4 @@
+import { addEntry, chicagoDay, clockIn, clockOut, clockStatus, deleteEntry, editEntry, EntryInput, remindOpenShifts, setHourly, teamWeek, timesheetCsv } from "./clock.ts";
 import { AI_KEY_RE, aiKeyStatus, clearAiKey, saveAiKey, testAiKey, withAiKey } from "./ai-key.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
 import { kindWords, listKind } from "../generator/pricelist.ts";
@@ -1898,6 +1899,49 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       });
     }
     return json({ runs: out });
+  }
+
+  // Time clock: anyone clocks themselves in and out; the owner / full access see everyone's week, fix punches and set pay.
+  if (path === "/clock" && m === "GET") return json(await clockStatus(env, session.userId));
+  if ((path === "/clock/in" || path === "/clock/out") && m === "POST") {
+    const { note } = await body(req, z.object({ note: z.string().max(300).optional() }));
+    const entry = await (path === "/clock/in" ? clockIn : clockOut)(env, session, note ?? "");
+    return json({ entry, status: await clockStatus(env, session.userId) });
+  }
+  if (path === "/clock/team" && m === "GET") {
+    ownerOnly();
+    const from = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("week") ?? "") ? url.searchParams.get("week")! : chicagoDay(now());
+    return json(await teamWeek(env, from));
+  }
+  if (path === "/clock/team.csv" && m === "GET") {
+    ownerOnly();
+    const from = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("week") ?? "") ? url.searchParams.get("week")! : chicagoDay(now());
+    const w = await teamWeek(env, from);
+    return new Response(timesheetCsv(w), {
+      headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="timesheet-${w.from}.csv"` },
+    });
+  }
+  if (path === "/clock/entries" && m === "POST") {
+    ownerOnly();
+    const i = await body(req, EntryInput.extend({ userId: z.string().max(40) }));
+    return json({ entry: await addEntry(env, i.userId, i, session.name) });
+  }
+  const clockEntry = /^\/clock\/entries\/([a-z0-9]+)$/.exec(path);
+  if (clockEntry && m === "PUT") {
+    ownerOnly();
+    return json({ entry: await editEntry(env, clockEntry[1]!, await body(req, EntryInput), session.name) });
+  }
+  if (clockEntry && m === "DELETE") {
+    ownerOnly();
+    await deleteEntry(env, clockEntry[1]!);
+    return json({ ok: true });
+  }
+  const clockPay = /^\/clock\/pay\/([a-z0-9]+)$/.exec(path);
+  if (clockPay && m === "PUT") {
+    ownerOnly();
+    const { hourlyCents } = await body(req, z.object({ hourlyCents: z.number().int().min(0).max(100_000).nullable() }));
+    await setHourly(env, clockPay[1]!, hourlyCents);
+    return json({ ok: true });
   }
 
   if (path === "/callers" || path.startsWith("/callers/")) ownerOnly();
@@ -3925,8 +3969,8 @@ async function pruneOldRows(env: Env): Promise<void> {
 
 /* ---------- Backups ---------- */
 
+// settings is read separately above (owner password and the saved Claude key left out); listing it here overwrote that.
 const BACKUP_TABLES = [
-  "settings",
   "users",
   "leads",
   "lead_notes",
@@ -3936,6 +3980,7 @@ const BACKUP_TABLES = [
   "site_stats",
   "usage",
   "stripe_events",
+  "time_entries",
 ] as const;
 
 /** Every row of a table, read in pages so one big table (leads carry whole sites) can't blow a single response. */
@@ -4256,6 +4301,7 @@ async function handleScheduled(
     await requeueStuck(env);
     await queueRelive(env);
     await backfillMailCodes(env);
+    await remindOpenShifts(env);
     return;
   }
   if (event.cron === CRON_WEEKLY_BACKUP) {

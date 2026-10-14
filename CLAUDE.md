@@ -1583,6 +1583,22 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   the Worker secret. The fetch / queue / cron handlers run with `env = await withAiKey(env)` (60 s cache per isolate), so every
   `env.ANTHROPIC_API_KEY` reader uses the saved key. Left out of backups. Rotating APP_SECRET makes a saved key unreadable
   (status `unreadable`, falls back to the Worker secret; paste it again). Alert kind `costs` (owner / full access).
+- ⏱ Time clock + task date/time pickers (Oct 2026, owner's ask; Android 2.69; migration 0024 `users.hourly_cents` + `time_entries`,
+  `src/worker/clock.ts`, `test/worker/clock.test.ts`). Hourly pay per person: Settings → Team → "Set hourly pay" (web `data-cpay`,
+  Android `Dlg.Pay`; `PUT /api/clock/pay/:userId {hourlyCents|null}`; blank = commission only). Anyone with a rate gets a ⏱ card at
+  the top of Tasks (web `clockCardHtml` / `loadClock`, Android `ClockCard` in `ui/ClockScreens.kt`): Clock in / Clock out with an
+  optional note, a running timer, today / this week (hours + estimated pay), their own shifts this week and last. `GET /api/clock`,
+  `POST /api/clock/in|out {note}`; one open shift per person (partial unique index); each shift keeps the `rate_cents` it started
+  with. Owner / full access: 🗂️ Timesheets (web `#/timesheet[/<monday>]` `viewTimesheet`, Android route `timesheet`
+  `TimesheetScreen`): weeks Monday–Sunday Cullman time (a shift counts on the day it started), per person hours + pay, Fix a shift
+  (date + clock in/out pickers, "past midnight" box, delete; `PUT/DELETE /api/clock/entries/:id`, `edited_by` shown), Add a missed
+  shift (`POST /api/clock/entries`), overlap and >24 h refused, CSV for payroll (`GET /api/clock/team.csv?week=`). Alerts kind
+  `clock` (owner / full access only): clock in / out, and once per shift after 10 h on the clock (`remindOpenShifts`, minute cron).
+  `time_entries` is in the weekly backup. Tasks on Android: calendar + clock pop-ups (`ui/Pickers.kt` `DateButton` / `TimeButton`,
+  Material3 DatePickerDialog / TimePicker) next to the Today/Tomorrow chips, times shown as "2:30 PM", tap a task to change
+  title / notes / date / time / who or delete it (`TaskEditDialog`, `Api.updateTask`). A time picked without a date means today
+  (web and Android; the web used to drop it). Backup fix: `BACKUP_TABLES` listed `settings`, which overwrote the filtered settings
+  dump (owner password hash and the saved Claude key were going into backups); removed.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

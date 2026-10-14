@@ -34,9 +34,9 @@ data class ModelOption(val id: String, val label: String)
 
 data class CheckoutInfo(val online: Boolean, val webhook: Boolean, val email: Boolean)
 
-data class Caller(val id: String, val name: String, val disabled: Boolean, val admin: Boolean, val email: String?, val googleOnly: Boolean) {
+data class Caller(val id: String, val name: String, val disabled: Boolean, val admin: Boolean, val email: String?, val googleOnly: Boolean, val hourlyCents: Long? = null) {
     companion object {
-        fun from(j: JSONObject) = Caller(j.optString("id"), j.optString("name", ""), j.optBoolean("disabled"), j.optBoolean("admin"), j.str("email"), j.optBoolean("googleOnly"))
+        fun from(j: JSONObject) = Caller(j.optString("id"), j.optString("name", ""), j.optBoolean("disabled"), j.optBoolean("admin"), j.str("email"), j.optBoolean("googleOnly"), if (j.isNull("hourlyCents") || !j.has("hourlyCents")) null else j.optLong("hourlyCents"))
     }
 }
 

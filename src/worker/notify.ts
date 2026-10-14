@@ -32,7 +32,8 @@ export type EventKind =
   | "preview_open"
   | "task"
   | "costs"
-  | "problem";
+  | "problem"
+  | "clock";
 
 /** The notifications callers get: anything added or changed on a lead, plus tasks. Not website messages or search runs. */
 export const CALLER_KINDS: EventKind[] = [
@@ -220,6 +221,7 @@ const PUSH_TITLE: Record<EventKind, string> = {
   task: "📝 Task",
   costs: "💵 Costs & usage",
   problem: "🐞 Problem reported",
+  clock: "⏱ Time clock",
 };
 
 /** What a phone shows when a push arrives: the newest unread item, or a count when there are several. */

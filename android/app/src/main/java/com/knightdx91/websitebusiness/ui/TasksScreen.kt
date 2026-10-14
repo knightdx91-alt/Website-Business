@@ -40,8 +40,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.knightdx91.websitebusiness.AppState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.clickable
 import com.knightdx91.websitebusiness.net.Task
+import com.knightdx91.websitebusiness.net.updateTask
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 /** The team's shared to-do list. `leadId` pre-fills a task for one business. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -55,6 +60,8 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
     var title by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var due by remember { mutableStateOf<String?>(null) }
+    var dueTime by remember { mutableStateOf<String?>(null) }
+    var editing by remember { mutableStateOf<Task?>(null) }
     var assignee by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     val meta = state.meta
@@ -72,8 +79,10 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
         busy = true
         scope.launch {
             try {
-                state.api.addTask(title.trim(), notes.trim(), due, null, assignee, leadId)
-                title = ""; notes = ""; due = null
+                // A time without a date means today.
+                val day = due ?: if (dueTime != null) dayFromNow(0) else null
+                state.api.addTask(title.trim(), notes.trim(), day, if (day != null) dueTime else null, assignee, leadId)
+                title = ""; notes = ""; due = null; dueTime = null
                 load()
                 context.toast("Added")
             } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't add") } finally { busy = false }
@@ -87,6 +96,7 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
         )
     }) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (leadId == null) item { ClockCard(state, nav) }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
@@ -100,6 +110,11 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
                                 FilterChip(selected = due == day, onClick = { due = if (due == day) null else day }, label = { Text(label) })
                             }
                         }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            DateButton(due, { due = it }, placeholder = "📅 Other date")
+                            TimeButton(dueTime, { dueTime = it })
+                        }
+                        if (dueTime != null && due == null) Text("No date picked: it'll be for today.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (meta != null && meta.team.size > 1) {
                             Text("For:", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -112,21 +127,80 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
                 }
             }
             if (open.isEmpty()) item { Text("Nothing open. Nice.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp)) }
-            items(open, key = { it.id }) { t -> TaskRow(t, false, onToggle = { scope.launch { runCatching { state.api.setTaskDone(t.id, true) }; load() } }, onLead = { t.leadId?.let { nav.navigate("lead/$it") } }) }
+            items(open, key = { it.id }) { t -> TaskRow(t, false, onToggle = { scope.launch { runCatching { state.api.setTaskDone(t.id, true) }; load() } }, onLead = { t.leadId?.let { nav.navigate("lead/$it") } }, onEdit = { editing = t }) }
             item { TextButton(onClick = { showDone = !showDone }) { Text(if (showDone) "Hide finished" else "Show finished") } }
-            if (showDone) items(done, key = { "d" + it.id }) { t -> TaskRow(t, true, onToggle = { scope.launch { runCatching { state.api.setTaskDone(t.id, false) }; load() } }, onLead = { t.leadId?.let { nav.navigate("lead/$it") } }) }
+            if (showDone) items(done, key = { "d" + it.id }) { t -> TaskRow(t, true, onToggle = { scope.launch { runCatching { state.api.setTaskDone(t.id, false) }; load() } }, onLead = { t.leadId?.let { nav.navigate("lead/$it") } }, onEdit = { editing = t }) }
         }
+    }
+    editing?.let { t ->
+        TaskEditDialog(
+            t,
+            team = meta?.team?.map { it.id to it.name } ?: emptyList(),
+            canDelete = meta?.isOwner == true || t.createdBy == meta?.meId,
+            onDismiss = { editing = null },
+            onSave = { change ->
+                scope.launch {
+                    try { state.api.updateTask(t.id, change); editing = null; context.toast("Saved"); load() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't save") }
+                }
+            },
+            onDelete = {
+                scope.launch {
+                    try { state.api.deleteTask(t.id); editing = null; load() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't delete") }
+                }
+            },
+        )
     }
 }
 
+/** Tap a task to change its name, notes, date, time or who it's for. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TaskRow(t: Task, isDone: Boolean, onToggle: () -> Unit, onLead: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+private fun TaskEditDialog(t: Task, team: List<Pair<String, String>>, canDelete: Boolean, onDismiss: () -> Unit, onSave: (JSONObject) -> Unit, onDelete: () -> Unit) {
+    var title by remember { mutableStateOf(t.title) }
+    var notes by remember { mutableStateOf(t.notes) }
+    var due by remember { mutableStateOf(t.due) }
+    var time by remember { mutableStateOf(t.dueTime) }
+    var assignee by remember { mutableStateOf(t.assignee) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change task") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(title, { title = it }, label = { Text("What") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(notes, { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth())
+                DateButton(due, { due = it })
+                TimeButton(time, { time = it })
+                if (team.size > 1) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = assignee == null, onClick = { assignee = null }, label = { Text("Anyone") })
+                    team.forEach { (id, name) -> FilterChip(selected = assignee == id, onClick = { assignee = id }, label = { Text(name) }) }
+                }
+                if (canDelete) TextButton(onClick = { if (confirmDelete) onDelete() else confirmDelete = true }) { Text(if (confirmDelete) "Tap again to delete" else "Delete task", color = Warn) }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = title.isNotBlank(), onClick = {
+                val day = due ?: if (time != null) dayFromNow(0) else null
+                onSave(
+                    JSONObject().put("title", title.trim()).put("notes", notes.trim())
+                        .put("due", day ?: JSONObject.NULL)
+                        .put("dueTime", if (day != null && time != null) time else JSONObject.NULL)
+                        .put("assignee", assignee ?: JSONObject.NULL),
+                )
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun TaskRow(t: Task, isDone: Boolean, onToggle: () -> Unit, onLead: () -> Unit, onEdit: () -> Unit) {
+    Card(Modifier.fillMaxWidth().clickable { onEdit() }) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = isDone, onCheckedChange = { onToggle() })
             Column(Modifier.weight(1f)) {
                 Text(t.title, fontWeight = FontWeight.SemiBold)
-                val bits = listOfNotNull(t.due?.let { "📅 ${niceDay(it)}${t.dueTime?.let { tm -> " $tm" } ?: ""}" }, t.assigneeName?.let { "for $it" }, t.createdByName?.let { "by $it" })
+                val bits = listOfNotNull(t.due?.let { "📅 ${prettyDay(it)}${t.dueTime?.let { tm -> " ${prettyTime(tm)}" } ?: ""}" }, t.assigneeName?.let { "for $it" }, t.createdByName?.let { "by $it" })
                 if (bits.isNotEmpty()) Text(bits.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = if ((t.due ?: "9") < dayFromNow(0) && !isDone) Warn else MaterialTheme.colorScheme.onSurfaceVariant)
                 if (t.notes.isNotBlank()) Text(t.notes, style = MaterialTheme.typography.bodySmall)
                 if (t.leadName != null) TextButton(onClick = onLead, contentPadding = PaddingValues(0.dp)) { Text("🏢 ${t.leadName}") }

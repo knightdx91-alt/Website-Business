@@ -304,6 +304,7 @@ data class Task(
     val leadName: String?,
     val createdByName: String?,
     val doneAt: Long?,
+    val createdBy: String? = null,
 ) {
     companion object {
         fun from(j: JSONObject) = Task(
@@ -318,6 +319,7 @@ data class Task(
             leadName = j.str("leadName"),
             createdByName = j.str("createdByName"),
             doneAt = if (j.isNull("doneAt")) null else j.optLong("doneAt"),
+            createdBy = j.str("createdBy"),
         )
     }
 }

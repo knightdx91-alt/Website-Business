@@ -210,6 +210,7 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
             composable("preview/{id}?path={path}", arguments = listOf(navArgument("path") { type = NavType.StringType; nullable = true; defaultValue = null })) { e -> PreviewScreen(state, nav, e.arguments?.getString("id") ?: "", e.arguments?.getString("path")) }
             composable("notifications") { NotificationsScreen(state, nav) }
             composable("tasks") { TasksScreen(state, nav, null) }
+            composable("timesheet") { TimesheetScreen(state, nav) }
             composable("tasks/{lead}") { e -> TasksScreen(state, nav, e.arguments?.getString("lead")) }
             composable("run") { RunScreen(state, nav) }
             composable("settings") { SettingsScreen(state, nav) }

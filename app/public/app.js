@@ -3799,9 +3799,10 @@ async function viewLead(id, intent) {
       <p class="small muted"><strong>Callers</strong> work leads end to end: calls, previews, edits, sign-ups, payments, publishing. <strong>Full access</strong> adds Settings, runs, Sales, Inbox and Costs.</p>
       <p class="small">Everyone signs in at <strong>https://app.undergroundassociates.com</strong> (laptop or any phone browser; add it to the home screen), or installs the Android app from Settings → Android app.</p>
       <ul class="list">${callers.length ? callers.map((c) => `<li><div class="row"><strong>${esc(c.name)}</strong><span class="chip${c.admin ? " chip--good" : ""}" style="flex:none">${c.admin ? "Full access" : "Caller"}</span>${c.disabled ? `<span class="chip" style="flex:none">Turned off</span>` : ""}</div>
-        <p class="small muted" style="margin:2px 0 0">${c.email ? `✉️ ${esc(c.email)}${c.googleOnly ? " · Google sign-in only" : ""}` : "No Google address yet"}</p>
+        <p class="small muted" style="margin:2px 0 0">${c.email ? `✉️ ${esc(c.email)}${c.googleOnly ? " · Google sign-in only" : ""}` : "No Google address yet"} · ⏱ ${c.hourlyCents ? `$${(c.hourlyCents / 100).toFixed(2)}/hr (uses the time clock)` : "commission only"}</p>
         <div class="btns" style="margin-top:6px">
           <button class="btn btn--small" data-cemail="${c.id}" data-email="${esc(c.email || "")}">${c.email ? "Change email" : "Add Google email"}</button>
+          <button class="btn btn--small" data-cpay="${c.id}" data-pay="${c.hourlyCents ? (c.hourlyCents / 100).toFixed(2) : ""}">${c.hourlyCents ? "Change hourly pay" : "Set hourly pay"}</button>
           <button class="btn btn--small" data-cpass="${c.id}">New password</button>
           ${c.id === meta.me.id ? "" : `<button class="btn btn--small" data-cadmin="${c.id}" data-admin="${c.admin ? 1 : 0}">${c.admin ? "Make caller" : "Give full access"}</button>`}
           <button class="btn btn--small" data-ctoggle="${c.id}" data-off="${c.disabled ? 1 : 0}">${c.disabled ? "Turn on" : "Turn off"}</button>
@@ -3840,6 +3841,13 @@ async function viewLead(id, intent) {
       const email = prompt("Their company Google address (blank to remove):", b.dataset.email || "");
       if (email === null) return;
       try { await api(`/callers/${b.dataset.cemail}`, { method: "PUT", json: { email: email.trim() || null } }); viewSettings(); } catch (err) { toast(err.message); }
+    }));
+    $app.querySelectorAll("[data-cpay]").forEach((b) => b.addEventListener("click", async () => {
+      const v = prompt("Hourly pay in dollars (for example 15 or 15.50). Leave blank for commission only; they then don't see the time clock.", b.dataset.pay || "");
+      if (v === null) return;
+      const n = v.trim() ? Number(v.replace(/[$,\s]/g, "")) : 0;
+      if (!Number.isFinite(n) || n < 0 || n > 1000) return toast("Type a dollar amount like 15.50");
+      try { await api(`/clock/pay/${b.dataset.cpay}`, { method: "PUT", json: { hourlyCents: n ? Math.round(n * 100) : null } }); toast(n ? "Hourly pay saved. They can clock in from Tasks." : "Set to commission only"); viewSettings(); } catch (err) { toast(err.message); }
     }));
     $app.querySelectorAll("[data-cpass]").forEach((b) => b.addEventListener("click", async () => {
       const password = prompt("New password for this caller (at least 8 characters). They'll be logged out everywhere.");
@@ -4260,7 +4268,7 @@ async function viewLead(id, intent) {
   }
 
   /* ---------- notifications ---------- */
-  const NOTIF_ICON = { problem: "🐞", costs: "💵", note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎", preview_open: "👀", task: "📝" };
+  const NOTIF_ICON = { problem: "🐞", costs: "💵", note: "📝", call: "📞", status: "🏷️", signup_sent: "📨", signed: "✍️", paid: "💵", published: "🚀", added: "➕", message: "💬", run: "🔎", preview_open: "👀", task: "📝", clock: "⏱" };
 
   async function refreshNotifCount() {
     try {
@@ -4402,8 +4410,9 @@ async function viewLead(id, intent) {
   }
   const taskFormValues = (f) => ({
     title: f.title.value.trim(),
-    due: f.due.value || null,
-    dueTime: f.due.value && f.dueTime.value ? f.dueTime.value : null,
+    // A time picked without a date means today (it used to be dropped silently).
+    due: f.due.value || (f.dueTime.value ? dayFromNow(0) : null),
+    dueTime: f.dueTime.value || null,
     assignee: f.assignee.value || null,
     notes: f.notes.value.trim(),
   });
@@ -4419,6 +4428,7 @@ async function viewLead(id, intent) {
     if (stale(my)) return;
     $app.innerHTML = `<p><a href="${state.leadId ? `#/lead/${state.leadId}` : "#/"}" id="back">← ${state.leadId ? "Lead" : "Home"}</a></p>
       <h1>Tasks${state.leadName ? `: ${esc(state.leadName)}` : ""}</h1>
+      ${state.leadId ? "" : `<div id="clockbox"></div>`}
       <section class="card"><h2>Add a task</h2>${taskFormHtml({ assignee: state.leadId ? "" : "" }, state.leadName)}
         <p class="small muted" style="margin:6px 0 0">${isOwner() ? "Tasks for you with a date go to your calendar as invites." : "The owner sees these on their home screen; dated tasks for the owner go to their calendar."}</p></section>
       <div class="tabs" role="tablist">
@@ -4486,7 +4496,125 @@ async function viewLead(id, intent) {
     }));
     const mineBtn = $app.querySelector("[data-mine]");
     mineBtn.addEventListener("click", () => { state.mine = !state.mine; mineBtn.classList.toggle("is-on", state.mine); load(); });
+    const clockBox = $app.querySelector("#clockbox");
+    if (clockBox) loadClock(clockBox, my);
     await load();
+  }
+
+  /* ---------- time clock ---------- */
+  // Hourly team members clock in and out at the top of Tasks; the owner / full access see everyone's week in Timesheets.
+  const hm = (min) => `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}m`;
+  const clockTime = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const clockDay = (day) => { const d = new Date(day + "T12:00:00"); return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }); };
+  const cents = (c) => "$" + (c / 100).toFixed(2);
+
+  function clockCardHtml(st) {
+    const timesheets = isOwner() ? `<a class="btn btn--small" href="#/timesheet">🗂️ Timesheets</a>` : "";
+    if (!st.canClock) return isOwner() ? `<section class="card"><h2>⏱ Time clock</h2><p class="small muted">Set someone's hourly pay in Settings → Team and they get a Clock in button here. Everyone's hours are in Timesheets.</p><div class="btns">${timesheets}</div></section>` : "";
+    const o = st.open;
+    const week = `This week: <strong>${hm(st.week.minutes)}</strong>${st.week.payCents ? ` · about ${cents(st.week.payCents)}` : ""}`;
+    return `<section class="card${o ? " card--client" : ""}"><h2>⏱ ${o ? "You're on the clock" : "Time clock"}</h2>
+      ${o ? `<p style="font-size:1.6rem;font-weight:800;margin:4px 0" data-clock-since="${o.clockIn}">${hm(o.minutes)}</p>
+        <p class="small muted" style="margin:0 0 8px">Since ${clockTime(o.clockIn)}${o.note ? ` · ${esc(o.note)}` : ""}</p>`
+        : `<p class="small muted" style="margin:0 0 8px">Today: ${hm(st.today.minutes)} · ${week}</p>`}
+      <label class="field"><span class="sr-only">Note</span><input id="clocknote" maxlength="300" placeholder="${o ? "What you got done (optional)" : "What you're working on (optional)"}"></label>
+      <div class="btns"><button class="btn btn--primary" type="button" id="clockbtn" style="flex:1">${o ? "⏹ Clock out" : "▶ Clock in"}</button>${timesheets}</div>
+      ${o ? `<p class="small muted" style="margin:8px 0 0">${week}</p>` : ""}
+      ${st.entries.length ? `<details style="margin-top:8px"><summary class="small">My hours, this week and last</summary><ul class="list">${st.entries.map((e) => `<li class="small"><strong>${clockDay(e.day)}</strong> ${clockTime(e.clockIn)} – ${e.clockOut ? clockTime(e.clockOut) : "now"} · ${hm(e.minutes)}${e.note ? ` · ${esc(e.note)}` : ""}${e.editedBy ? ` <span class="muted">(fixed by ${esc(e.editedBy)})</span>` : ""}</li>`).join("")}</ul></details>` : ""}
+    </section>`;
+  }
+
+  async function loadClock(box, my) {
+    let st;
+    try { st = await api("/clock"); } catch (e) { box.innerHTML = ""; return; }
+    if (stale(my)) return;
+    box.innerHTML = clockCardHtml(st);
+    const btn = box.querySelector("#clockbtn");
+    if (btn) btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        const r = await api(st.open ? "/clock/out" : "/clock/in", { method: "POST", json: { note: box.querySelector("#clocknote").value.trim() || undefined } });
+        toast(st.open ? `Clocked out: ${hm(r.entry.minutes)}` : "Clocked in");
+        loadClock(box, my);
+      } catch (err) { toast(err.message); btn.disabled = false; }
+    });
+    const since = box.querySelector("[data-clock-since]");
+    if (since) {
+      const tick = setInterval(() => {
+        if (stale(my) || !document.body.contains(since)) return clearInterval(tick);
+        since.textContent = hm(Math.max(0, Math.round((Date.now() - Number(since.dataset.clockSince)) / 60000)));
+      }, 20000);
+    }
+  }
+
+  const todayStr = () => dayFromNow(0);
+  function shiftFormHtml(e, people) {
+    const d = (ms) => (ms ? new Date(ms) : null);
+    const ymd = (x) => (x ? `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}` : "");
+    const hhmm = (x) => (x ? `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}` : "");
+    const i = d(e && e.clockIn), o = d(e && e.clockOut);
+    return `<form class="shiftform" data-shift="${e ? e.id : ""}">
+      ${people ? `<label class="field">Who<select name="userId" required>${people.map((p) => `<option value="${esc(p.userId)}">${esc(p.name)}</option>`).join("")}</select></label>` : ""}
+      <div class="row">
+        <label class="field">Date<input name="inDay" type="date" required value="${ymd(i) || todayStr()}"></label>
+        <label class="field">Clock in<input name="inTime" type="time" required value="${hhmm(i)}"></label>
+        <label class="field">Clock out<input name="outTime" type="time" value="${hhmm(o)}" ${people ? "required" : ""}></label>
+      </div>
+      <label class="check small"><input type="checkbox" name="nextDay"${o && ymd(o) !== ymd(i) ? " checked" : ""}> Clocked out the next day (past midnight)</label>
+      <label class="field"><span class="sr-only">Note</span><input name="note" maxlength="300" placeholder="Note (optional)" value="${esc((e && e.note) || "")}"></label>
+      <div class="btns"><button class="btn btn--primary" type="submit">${e ? "Save" : "Add shift"}</button>${e ? `<button class="btn" type="button" data-cancel>Cancel</button><button class="btn btn--danger" type="button" data-delshift>Delete</button>` : ""}</div>
+    </form>`;
+  }
+  const shiftValues = (f) => {
+    const outDay = f.outTime.value && f.nextDay.checked ? (() => { const x = new Date(f.inDay.value + "T12:00:00"); x.setDate(x.getDate() + 1); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; })() : null;
+    return { inDay: f.inDay.value, inTime: f.inTime.value, outDay, outTime: f.outTime.value || null, note: f.note.value.trim() || null, ...(f.userId ? { userId: f.userId.value } : {}) };
+  };
+
+  async function viewTimesheet(week) {
+    setNav("tasks");
+    const my = renderSeq;
+    meta = meta || (await api("/meta"));
+    if (!isOwner()) { $app.innerHTML = `<p><a href="#/tasks">← Tasks</a></p><section class="card"><p>Only the owner and full-access team members see timesheets.</p></section>`; return; }
+    let w;
+    try { w = await api("/clock/team" + (week ? `?week=${week}` : "")); } catch (err) { $app.innerHTML = `<p><a href="#/tasks">← Tasks</a></p><section class="card offline"><p>${esc(err.message)}</p></section>`; return; }
+    if (stale(my)) return;
+    const shift = (day, n) => { const x = new Date(day + "T12:00:00"); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+    const thisWeek = w.from <= todayStr() && todayStr() <= w.to;
+    $app.innerHTML = `<p><a href="#/tasks">← Tasks</a></p>
+      <h1>🗂️ Timesheets</h1>
+      <div class="btns" style="align-items:center"><a class="btn btn--small" href="#/timesheet/${shift(w.from, -7)}">← Week before</a>
+        <strong style="flex:1;text-align:center">${clockDay(w.from)} – ${clockDay(w.to)}${thisWeek ? " (this week)" : ""}</strong>
+        ${thisWeek ? "" : `<a class="btn btn--small" href="#/timesheet/${shift(w.from, 7)}">Week after →</a>`}</div>
+      <section class="card"><h2>Everyone: ${hm(w.totalMinutes)} · ${cents(w.totalPayCents)}</h2>
+        <p class="small muted">Hourly pay only (commission is on Sales). A shift counts on the day it started. Set or change pay in Settings → Team; a change applies to shifts started after it.</p>
+        <div class="btns"><a class="btn" href="/api/clock/team.csv?week=${w.from}" download>⬇ Download this week (CSV)</a></div></section>
+      ${w.people.length ? w.people.map((p) => `<section class="card"><h2>${esc(p.name)}${p.open ? ` <span class="chip chip--good">On the clock</span>` : ""}</h2>
+        <p class="small muted" style="margin:0 0 6px">${hm(p.minutes)}${p.hourlyCents ? ` · ${cents(p.hourlyCents)}/hr · ${cents(p.payCents)}` : " · no hourly pay set"}</p>
+        <ul class="list">${p.entries.length ? p.entries.map((e) => `<li data-entry="${e.id}"><div class="row"><span><strong>${clockDay(e.day)}</strong> ${clockTime(e.clockIn)} – ${e.clockOut ? clockTime(e.clockOut) : "<em>still on</em>"} · ${hm(e.minutes)}${e.payCents ? ` · ${cents(e.payCents)}` : ""}</span><button class="btn btn--small" type="button" data-editshift>Fix</button></div>
+          ${e.note || e.editedBy ? `<p class="small muted" style="margin:2px 0 0">${esc(e.note)}${e.editedBy ? ` (changed by ${esc(e.editedBy)})` : ""}</p>` : ""}</li>`).join("") : `<li class="small muted">No shifts this week.</li>`}</ul></section>`).join("")
+        : `<section class="card"><p class="muted">Nobody has hourly pay yet. Set it in Settings → Team.</p></section>`}
+      ${w.people.length ? `<section class="card"><h2>Add a missed shift</h2>${shiftFormHtml(null, w.people)}</section>` : ""}`;
+    const all = w.people.flatMap((p) => p.entries);
+    $app.querySelectorAll("[data-editshift]").forEach((b) => b.addEventListener("click", () => {
+      const li = b.closest("[data-entry]");
+      const e = all.find((x) => x.id === li.dataset.entry);
+      li.innerHTML = shiftFormHtml(e, null);
+      const f = li.querySelector("form");
+      f.querySelector("[data-cancel]").addEventListener("click", () => viewTimesheet(week));
+      f.querySelector("[data-delshift]").addEventListener("click", async () => {
+        if (!confirm("Delete this shift?")) return;
+        try { await api(`/clock/entries/${e.id}`, { method: "DELETE" }); viewTimesheet(week); } catch (err) { toast(err.message); }
+      });
+      f.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        try { await api(`/clock/entries/${e.id}`, { method: "PUT", json: shiftValues(f) }); toast("Shift saved"); viewTimesheet(week); } catch (err) { toast(err.message); }
+      });
+    }));
+    const add = $app.querySelector(".shiftform[data-shift='']");
+    if (add) add.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      try { await api("/clock/entries", { method: "POST", json: shiftValues(add) }); toast("Shift added"); viewTimesheet(week); } catch (err) { toast(err.message); }
+    });
   }
 
   async function viewNotifications() {
@@ -4591,6 +4719,7 @@ async function viewLead(id, intent) {
       if (h === "#/inbox") return await viewInbox();
       if (h === "#/notifications") return await viewNotifications();
       if ((m = /^#\/tasks(?:\/([a-z0-9]+))?$/.exec(h))) return await viewTasks(m[1]);
+      if ((m = /^#\/timesheet(?:\/(\d{4}-\d{2}-\d{2}))?$/.exec(h))) return await viewTimesheet(m[1]);
       if (h === "#/settings") return await viewSettings();
       $app.innerHTML = "";
       return await viewHome();
