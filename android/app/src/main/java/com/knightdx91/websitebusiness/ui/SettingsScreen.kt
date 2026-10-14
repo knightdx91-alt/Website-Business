@@ -629,6 +629,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                     if (updateMsg.isNotBlank()) Text(updateMsg, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                 }
             }
+            if (isOwner) item { AiKeyCard(state.api) }
             if (isOwner) item {
                 CollapsibleCard("💳 Tap to Pay") {
                     Text("Take a client's card on your phone, in person: they sign on the sign-up page, then tap their card on the back of the phone. The card is saved in Stripe for the monthly or yearly renewals.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

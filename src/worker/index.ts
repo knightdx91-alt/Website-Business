@@ -1,3 +1,4 @@
+import { AI_KEY_RE, aiKeyStatus, clearAiKey, saveAiKey, testAiKey, withAiKey } from "./ai-key.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
 import { kindWords, listKind } from "../generator/pricelist.ts";
 import {
@@ -913,6 +914,28 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   const ownerOnly = () => {
     if (!isOwner) throw new HttpError(403, "Only the owner can do that");
   };
+
+  // Claude API key (owner): which key the app uses, swap in another account's key (checked first), or go back to the
+  // Worker secret. The key itself never comes back; only its last 4 characters.
+  if (path === "/aikey" && m === "GET") {
+    ownerOnly();
+    return json(await aiKeyStatus(env));
+  }
+  if (path === "/aikey" && m === "PUT") {
+    ownerOnly();
+    const { key } = await body(req, z.object({ key: z.string().trim().max(400) }));
+    if (!AI_KEY_RE.test(key)) throw new HttpError(400, "That doesn't look like a Claude API key. It starts with sk-ant-.");
+    const t = await testAiKey(key);
+    if (!t.ok) throw new HttpError(400, t.error);
+    await saveAiKey(env, key, session.name);
+    await notify(env, { kind: "costs", actor: session, text: `🤖 ${session.name} switched the app to a new Claude API key (ending ${key.slice(-4)}).` });
+    return json(await aiKeyStatus(env));
+  }
+  if (path === "/aikey" && m === "DELETE") {
+    ownerOnly();
+    await clearAiKey(env);
+    return json(await aiKeyStatus(env));
+  }
 
   // Mail list for a flyer mail-out: the best open leads with a street address, each with its flyer code (owner).
   if (path === "/mailing.csv" && m === "GET") {
@@ -3941,7 +3964,7 @@ async function backupData(env: Env): Promise<{
   const tables: Record<string, Record<string, unknown>[]> = {};
   tables.settings = await allRows(
     env,
-    "SELECT key, value FROM settings WHERE key != 'owner_password' AND key NOT LIKE 'login_failures%' ORDER BY key",
+    "SELECT key, value FROM settings WHERE key != 'owner_password' AND key != 'anthropic_key' AND key NOT LIKE 'login_failures%' ORDER BY key",
   );
   for (const t of BACKUP_TABLES)
     tables[t] = await allRows(env, `SELECT * FROM ${t} ORDER BY rowid`);
@@ -3977,6 +4000,7 @@ export default {
     ctx: ExecutionContext,
   ): Promise<Response> {
     try {
+      env = await withAiKey(env);
       return await handle(req, env);
     } finally {
       ctx.waitUntil(flushUsage(env));
@@ -3985,6 +4009,7 @@ export default {
 
   async queue(batch: MessageBatch<Job>, env: Env): Promise<void> {
     try {
+      env = await withAiKey(env);
       await handleQueue(batch, env);
     } finally {
       await flushUsage(env);
@@ -3993,6 +4018,7 @@ export default {
 
   async scheduled(event: ScheduledController, env: Env): Promise<void> {
     try {
+      env = await withAiKey(env);
       await handleScheduled(event, env);
     } finally {
       await flushUsage(env);

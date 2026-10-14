@@ -3711,6 +3711,57 @@ async function viewLead(id, intent) {
       ${isOwner() ? tapCard() : ""}`;
   }
 
+  // Claude API key (owner): paste a key from another Anthropic account when one runs out of credit. The server checks it
+  // with a tiny request before saving; only the last 4 characters ever come back.
+  function aiKeyCard() {
+    return `<section class="card" id="aikey"><h2>🤖 Claude API key</h2>
+      <p class="small muted">The key the app uses to write websites, call guides and designs. Out of credit? Paste a key from another Anthropic account (console.anthropic.com → API keys). It's checked before it's saved.</p>
+      <p id="aikeystate" class="small">Checking…</p><p id="aikeyerr" class="small" hidden></p>
+      <form id="aikeyform"><label class="field">New key<input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" required></label>
+        <div class="btns"><button class="btn btn--primary" type="submit">Check and use this key</button><button class="btn" type="button" id="aikeyclear" hidden>Go back to the original key</button></div></form></section>`;
+  }
+  function aiKeyLine(st) {
+    if (st.unreadable) return "⚠️ A saved key can't be read any more (the app's secret changed). Paste it again." + (st.workerKey ? " Until then the original key is used." : "");
+    if (st.using === "app") return `✅ Using the key you saved here, ending <strong>…${esc(st.last4 || "")}</strong>${st.savedBy ? `, saved by ${esc(st.savedBy)}` : ""}${st.savedAt ? ` on ${new Date(st.savedAt).toLocaleDateString()}` : ""}.`;
+    if (st.using === "worker") return "Using the original key (set on the server).";
+    return "⚠️ No key is set: AI writing is off until you add one.";
+  }
+  async function bindAiKey() {
+    const box = $app.querySelector("#aikey");
+    if (!box) return;
+    const state = box.querySelector("#aikeystate");
+    const clear = box.querySelector("#aikeyclear");
+    const show = (st) => {
+      state.innerHTML = aiKeyLine(st);
+      clear.hidden = !(st.using === "app" || st.unreadable) || !st.workerKey;
+    };
+    try { show(await api("/aikey")); } catch (e) { state.textContent = e.message; }
+    box.querySelector("#aikeyform").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = e.target.querySelector("[name=key]");
+      const btn = e.target.querySelector("[type=submit]");
+      btn.disabled = true;
+      btn.textContent = "Checking the key…";
+      const errLine = box.querySelector("#aikeyerr");
+      errLine.hidden = true;
+      try {
+        show(await api("/aikey", { method: "PUT", json: { key: input.value.trim() } }));
+        input.value = "";
+        toast("New Claude key saved. The app uses it from now on.");
+      } catch (err) {
+        errLine.textContent = "⚠️ " + err.message;
+        errLine.hidden = false;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Check and use this key";
+      }
+    });
+    clear.addEventListener("click", async () => {
+      if (!confirm("Stop using the key saved here and go back to the original one?")) return;
+      try { show(await api("/aikey", { method: "DELETE" })); toast("Back on the original key."); } catch (err) { toast(err); }
+    });
+  }
+
   function tapCard() {
     const t = meta.tap || {};
     return `<section class="card" id="tapcard"><h2>💳 Tap to Pay</h2>
@@ -4103,6 +4154,7 @@ async function viewLead(id, intent) {
       <section class="card"><h2>Spending, last 30 days</h2><p class="small muted">The full picture, every service we pay for, this month's usage and renewals: <a href="#/costs">💵 Costs &amp; usage</a>.</p><ul class="list">
         <li>AI writing: <strong>$${u.aiCost.toFixed(2)}</strong> <span class="muted small">(${u.aiTokensIn.toLocaleString()} in / ${u.aiTokensOut.toLocaleString()} out tokens)</span></li>
         <li>Google: about <strong>$${u.googleCostEstimate.toFixed(2)}</strong> <span class="muted small">(${u.googleRequests} searches, ${u.googlePhotos} photos; estimate, before Google's free monthly credit)</span></li></ul></section>
+      ${aiKeyCard()}
       ${callersCard(callers)}
       ${deviceCard()}
     </div>`;
@@ -4112,6 +4164,7 @@ async function viewLead(id, intent) {
     loadProblems();
     bindCallers();
     bindDevice();
+    bindAiKey();
     $app.querySelector("#resetterms").addEventListener("click", () => {
       if (confirm("Replace the agreement with the standard text?")) $app.querySelector("[name=terms]").value = meta.defaultTerms;
     });

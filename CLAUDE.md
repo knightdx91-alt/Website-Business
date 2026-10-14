@@ -1575,6 +1575,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   on the phone (Stripe Connect to the shop's own account, tax, minimum order), the receipt lists every fish with its tank, the
   cashier scans it on the tablet and ticks lines per tank. Write-up: https://ua-tank-pay.knightdx91.workers.dev (Worker
   `ua-tank-pay`, source `research/tank-pay-page/`, deployed from inside that folder), with questions for King Fish first.
+- 🤖 Claude API key from Settings (Oct 2026, owner's ask: the first Anthropic account ran out of credit; Android 2.68;
+  `src/worker/ai-key.ts`, `test/worker/ai-key.test.ts`): Settings → "🤖 Claude API key" (web `aiKeyCard` / `bindAiKey`, Android
+  `ui/AiKeyCard.kt`, owner / full access). `PUT /api/aikey {key}` checks the key with one 1-token claude-haiku-5-5 request
+  (`testAiKey`: 401 = not valid, "credit balance" = no credit, 429 = fine) and only then saves it AES-GCM encrypted (key derived from
+  APP_SECRET) in settings key `anthropic_key`; `GET` returns which key is in use + the last 4 characters only; `DELETE` goes back to
+  the Worker secret. The fetch / queue / cron handlers run with `env = await withAiKey(env)` (60 s cache per isolate), so every
+  `env.ANTHROPIC_API_KEY` reader uses the saved key. Left out of backups. Rotating APP_SECRET makes a saved key unreadable
+  (status `unreadable`, falls back to the Worker secret; paste it again). Alert kind `costs` (owner / full access).
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

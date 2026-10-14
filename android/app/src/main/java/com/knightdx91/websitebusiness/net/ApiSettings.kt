@@ -80,3 +80,24 @@ suspend fun Api.mailTest(): MailTestResult {
 
 /** The whole database as one JSON file (owner). */
 suspend fun Api.backup(): ByteArray = bytes("/api/backup")
+
+/** Which Claude API key the server uses (`GET /api/aikey`, owner). The key itself never comes back, only its last 4. */
+data class AiKeyStatus(val using: String, val last4: String?, val savedAt: Long?, val savedBy: String?, val unreadable: Boolean, val workerKey: Boolean) {
+    companion object {
+        fun from(j: JSONObject) = AiKeyStatus(
+            j.optString("using", "none"),
+            j.str("last4"),
+            if (j.isNull("savedAt") || !j.has("savedAt")) null else j.optLong("savedAt"),
+            j.str("savedBy"),
+            j.optBoolean("unreadable"),
+            j.optBoolean("workerKey"),
+        )
+    }
+}
+
+suspend fun Api.aiKey(): AiKeyStatus = AiKeyStatus.from(getJson("/aikey"))
+
+/** Checks the key with Anthropic, then saves it (400 with the reason when it's wrong or its account has no credit). */
+suspend fun Api.setAiKey(key: String): AiKeyStatus = AiKeyStatus.from(putJson("/aikey", JSONObject().put("key", key)))
+
+suspend fun Api.clearAiKey(): AiKeyStatus = AiKeyStatus.from(deleteJson("/aikey"))
