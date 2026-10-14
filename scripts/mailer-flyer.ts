@@ -29,7 +29,7 @@ function qrSvg(text: string): string {
 
 const font = async (pkg: string, w: number) => (await readFile(`node_modules/@fontsource/${pkg}/files/${pkg}-latin-${w}-normal.woff2`)).toString("base64");
 const logo = (await readFile("app/public/brand/logo.svg", "utf8")).replace(/<\?xml[^>]*>/, "");
-const shot = (await readFile("app/public/examples/magnolia-table.jpg")).toString("base64");
+const shot = (await readFile("app/public/examples/biscuit-hollow.jpg")).toString("base64");
 
 const css = `
 @font-face{font-family:B;font-weight:800;src:url(data:font/woff2;base64,${await font("bricolage-grotesque", 800)})}

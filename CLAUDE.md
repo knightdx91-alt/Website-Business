@@ -747,8 +747,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   with item names (after photos come over from their old site, and on every list save), retyping keeps photos by item name,
   and Edit → "Item photos" (`pi_name_i` / `pi_img_i`, edits `retail.priceItems`) overrides. Gallery cap is 24 (was 12).
 - Example sites carry sample stock (Oct 2026): the pure sample-stock code lives in `src/generator/sample-stock.ts` (the worker's
-  `sample-stock.ts` re-exports it) so `src/examples/examples.ts` can call `withSampleStock(record)` for Magnolia Table Cafe (a
-  bakery case, "Today's case"), Crossroads Auto Care (parts, "In stock") and Willow & Wren Boutique (goods, "In stock"); the
+  `sample-stock.ts` re-exports it) so `src/examples/examples.ts` can call `withSampleStock(record)` for Biscuit Hollow Cafe (a
+  bakery case, "Today's case"), Copperline Auto Care (parts, "In stock") and Juniper & Finch Boutique (goods, "In stock"); the
   `sample` flags are stripped there because example sites build in publish mode. Their /prices/ pages are linked from /price-list
   (hero button + the three example links), the pricing strip ("See an example") and the portfolio cards ("See its live price
   list"). `npm run examples` rebuilds them (screenshots too).
@@ -1183,7 +1183,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   app as "Payment test (not a real business)", status ready / shown): every sign-up on it is $1 (`saveOrder` + both sign-up
   paths), no Stripe Checkout (tap or the card sheet only), `activatePlan` starts no subscription and the note says TEST; its
   Buy extras page (open /api/leads/<id>/extraslink while logged in) offers only a $1 item.
-  Since Oct 2026 the test lead (id f043cb5ec556468e) has a real preview: a clone of the Willow & Wren example record + copy
+  Since Oct 2026 the test lead (id f043cb5ec556468e) has a real preview: a clone of the Juniper & Finch example record + copy
   (name "Payment test (not a real business)", placeId paytest, phone 256-555-0100, sample stock + scanning on, approved copy,
   confirmed fields) built locally with `buildSite` the way `renderPreview` does (basePath `/p/<id>`, liveData) and uploaded to R2
   `previews/<id>/` with `wrangler r2 object put`; record_json / copy_json / look / lint_json set by D1 SQL (scratchpad
@@ -1530,7 +1530,7 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   life knobs from `pickDna(lead.id)`, swaps a type-led opening for a photo-led one on New leads that now have a photo, and
   re-renders (no AI cost; the call guide is redone on next open). Sold / live sites are untouched until republished.
   `test/scenes.test.ts`, `test/dna.test.ts` "fifth round". Contact sheets / picks: scratchpad `scenes_fetch.py`, `scenes_picks.py`.
-- 📬 Flyer codes + mail-out flyer (Oct 2026, owner's ask; Android 2.66; migration 0022 `leads.mail_code / mail_code_at /
+- 📬 Flyer codes + mail-out flyer (Oct 2026, owner's ask; Android 2.66, auto codes 2.67; migration 0022 `leads.mail_code / mail_code_at /
   mail_opened_at / mail_opens`, `src/worker/mailcodes.ts`): every lead can get a random 5-digit code (`assignMailCode`, unique index,
   never sequential) that the team hand-writes in the white box on the printed flyer (mailed or left behind). The business types it at
   **undergroundassociates.com/code** (`codePage` in company.ts; `POST /code {c}` or `GET /code/12345`) → `useCode` counts it, alerts
@@ -1546,7 +1546,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   "We already built your business a website.", steps 1–2 with the code box, QR to /code, what it does, "from $49 a month, no setup
   fee on 6/12-month", call/text footer; the phone mockup is labeled "An example of our work") → `app/public/flyers/mailer.pdf`
   (served at app.undergroundassociates.com/flyers/mailer.pdf); rerun with `--phone` / `--from` when Settings change.
-  `test/worker/mailcodes.test.ts`.
+  `test/worker/mailcodes.test.ts`. Since 2.67 every ready lead gets its code automatically (`backfillMailCodes`, minute cron, 50
+  a tick), so it's always on the lead page; `mail_code_at` is stamped only when a code is handed out (mail list export, a logged
+  "Left a flyer"), and only that keeps the preview past the normal expiry.
+- Example businesses are invented (owner's rule, Oct 2026: we have no permission to use a real business's name). Six example names
+  that matched or nearly matched real businesses (Magnolia Table, Cedar Creek Baptist, Crossroads Auto Care, Main Street Tees,
+  Ivy & Iron, Willow & Wren) were renamed to Biscuit Hollow Cafe, Sweetgum Hill Church, Copperline Auto Care, Ink & Anvil Print
+  Co, Thistle & Comb Barber Co and Juniper & Finch Boutique, each checked with a Places text search first. Check any new example
+  or flyer name the same way before using it.
 - ✨ Describe the style they want (Oct 2026, owner's ask; Android 2.64): the lead page's Design card has a text box "Or describe the
   style they want" + idea chips (`STYLE_IDEAS` in app.js and LeadScreen.kt: Hippie, Bright and happy kids' play world, Clean and
   businesslike, Rustic country…) + "Also rewrite the words to match" (on by default) + "✨ Design it" = `POST /restyle {brief, rewrite}`

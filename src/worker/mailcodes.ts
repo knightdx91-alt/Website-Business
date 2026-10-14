@@ -21,16 +21,23 @@ function randomCode(): string {
   return String(10000 + (n[0]! % 90000));
 }
 
-/** The lead's flyer code, made on first use. */
-export async function assignMailCode(env: Env, leadId: string): Promise<string | null> {
+/**
+ * The lead's flyer code, made on first use. Every ready lead gets one automatically (`backfillMailCodes`, minute cron), so the
+ * code is on the lead page whenever someone needs to write it down. `handedOut` (the mail list export, a logged "Left a
+ * flyer") stamps `mail_code_at`, which keeps the preview from expiring inside the 90-day Google window.
+ */
+export async function assignMailCode(env: Env, leadId: string, o: { handedOut?: boolean } = {}): Promise<string | null> {
   const row = await env.DB.prepare("SELECT mail_code FROM leads WHERE id = ?").bind(leadId).first<{ mail_code: string | null }>();
   if (!row) return null;
-  if (row.mail_code) return row.mail_code;
+  if (row.mail_code) {
+    if (o.handedOut) await markHandedOut(env, leadId);
+    return row.mail_code;
+  }
   for (let i = 0; i < 20; i++) {
     const code = randomCode();
     try {
       const r = await env.DB.prepare("UPDATE leads SET mail_code = ?, mail_code_at = ? WHERE id = ? AND mail_code IS NULL")
-        .bind(code, now(), leadId)
+        .bind(code, o.handedOut ? now() : null, leadId)
         .run();
       if (r.meta.changes) return code;
       const again = await env.DB.prepare("SELECT mail_code FROM leads WHERE id = ?").bind(leadId).first<{ mail_code: string | null }>();
@@ -40,6 +47,20 @@ export async function assignMailCode(env: Env, leadId: string): Promise<string |
     }
   }
   throw new Error("Couldn't find a free flyer code");
+}
+
+/** The code went out on a flyer: keep the preview around for it. */
+export async function markHandedOut(env: Env, leadId: string): Promise<void> {
+  await env.DB.prepare("UPDATE leads SET mail_code_at = ? WHERE id = ? AND mail_code IS NOT NULL").bind(now(), leadId).run();
+}
+
+/** Gives every ready lead without a code one (minute cron, a batch at a time). */
+export async function backfillMailCodes(env: Env, max = 50): Promise<number> {
+  const rows = await env.DB.prepare("SELECT id FROM leads WHERE status = 'ready' AND mail_code IS NULL AND place_id != 'paytest' LIMIT ?")
+    .bind(max)
+    .all<{ id: string }>();
+  for (const r of rows.results) await assignMailCode(env, r.id);
+  return rows.results.length;
 }
 
 function ipKey(ip: string): string {
@@ -133,7 +154,7 @@ export async function mailList(env: Env, o: { limit: number; includeMailed?: boo
     const rec = r.record_json ? (JSON.parse(r.record_json) as { address?: { street?: string; city?: string; state?: string; zip?: string }; showStreetAddress?: boolean }) : null;
     const a = rec?.address;
     if (!a?.street || !a.city) continue; // service-area businesses with no street can't be mailed
-    const code = r.mail_code ?? (await assignMailCode(env, r.id));
+    const code = await assignMailCode(env, r.id, { handedOut: true });
     if (!code) continue;
     out.push({ id: r.id, name: r.name ?? "", street: a.street, city: a.city, state: a.state ?? "AL", zip: a.zip ?? "", code, category: r.category, status: r.sales_status });
   }

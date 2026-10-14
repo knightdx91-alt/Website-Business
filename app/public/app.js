@@ -1723,7 +1723,7 @@ async function viewLead(id, intent) {
     if (!l.mailCode) return `<button class="btn" type="button" data-mailcode="${esc(l.id)}">📬 Get flyer code</button>
       <p class="small muted">For the mail-out / leave-behind flyer: write the code in the white box. They type it at undergroundassociates.com/code to see this preview, and you get an alert.</p>`;
     return `<p style="margin:0">📬 Flyer code: <strong style="font:800 1.6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.15em">${esc(l.mailCode)}</strong></p>
-      <p class="small muted" style="margin:4px 0 0">Write it in the box on their flyer. They enter it at undergroundassociates.com/code.${l.mailOpens ? ` Used ${l.mailOpens === 1 ? "once" : `${l.mailOpens} times`}, last ${ago(l.mailOpenedAt)}.` : " Not used yet."}</p>`;
+      <p class="small muted" style="margin:4px 0 0">Write it in the white box on their flyer; they enter it at undergroundassociates.com/code and you get an alert. Log "Left a flyer" so their preview stays up 90 days.${l.mailOpens ? ` Used ${l.mailOpens === 1 ? "once" : `${l.mailOpens} times`}, last ${ago(l.mailOpenedAt)}.` : " Not used yet."}</p>`;
   }
 
   function shareButtonsHtml() {

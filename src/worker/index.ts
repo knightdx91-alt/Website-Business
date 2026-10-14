@@ -162,7 +162,7 @@ import {
 } from "./queue.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { EXPIRE_SQL } from "./expire.ts";
-import { assignMailCode, mailCsv, mailList, pruneCodeCounters } from "./mailcodes.ts";
+import { assignMailCode, backfillMailCodes, mailCsv, mailList, markHandedOut, pruneCodeCounters } from "./mailcodes.ts";
 import {
   addonPrice,
   addUsage,
@@ -2896,6 +2896,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         throw new HttpError(400, "Write a note first");
       if (input.outcome === "callback" && !input.followUp)
         throw new HttpError(400, "Pick a day to call back");
+      // Left a flyer: its code went out, so the preview is kept for it.
+      if (input.outcome === "flyer") await markHandedOut(env, lead.id);
       if (input.followUp && input.followUp < localDate())
         throw new HttpError(400, "Pick today or a later day");
       const fields: Partial<LeadRow> = {};
@@ -4225,6 +4227,7 @@ async function handleScheduled(
     await republishDirty(env);
     await requeueStuck(env);
     await queueRelive(env);
+    await backfillMailCodes(env);
     return;
   }
   if (event.cron === CRON_WEEKLY_BACKUP) {

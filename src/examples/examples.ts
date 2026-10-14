@@ -67,7 +67,7 @@ const said = (quote: string, displayName: string) => ({ quote, displayName, town
 
 export const EXAMPLES: Example[] = [
   (() => {
-    const record = base({ slug: "magnolia-table", name: "Magnolia Table Cafe", category: "restaurant", variant: "southern", phone: "0101", street: "210 Example St SE", storefront: true });
+    const record = base({ slug: "biscuit-hollow", name: "Biscuit Hollow Cafe", category: "restaurant", variant: "southern", phone: "0101", street: "210 Example St SE", storefront: true });
     record.hours = { weekly: [[], [], day("06:30", "14:00"), day("06:30", "14:00"), day("06:30", "14:00"), day("06:30", "20:00"), day("07:00", "14:00")] };
     record.ext.restaurant = {
       cuisineLabel: "Southern cooking",
@@ -98,7 +98,7 @@ Turnip greens | $3`),
     withSampleStock(record);
     record.testimonials = [said("Best biscuits we've had in years. The staff knows everybody by name.", "Linda P."), said("Meat and three every Friday. Never had a bad meal.", "Jerry W."), said("Fast, friendly and the sweet tea is just right.", "Amanda R.")];
     return {
-      slug: "magnolia-table",
+      slug: "biscuit-hollow",
       kind: "Southern cafe",
       design: "restaurant.garden_table~split~h1n0b0s1v0c0f0a0p0",
       record,
@@ -157,7 +157,7 @@ Turnip greens | $3`),
     };
   })(),
   (() => {
-    const record = base({ slug: "ivy-iron-barber", name: "Ivy & Iron Barber Co", category: "salon", variant: "barber", phone: "0103", street: "88 Example Ave NE", storefront: true });
+    const record = base({ slug: "thistle-comb", name: "Thistle & Comb Barber Co", category: "salon", variant: "barber", phone: "0103", street: "88 Example Ave NE", storefront: true });
     record.hours = { weekly: [[], [], day("09:00", "18:00"), day("09:00", "18:00"), day("09:00", "18:00"), day("09:00", "18:00"), day("08:00", "14:00")] };
     record.services = svc(["Haircut", "Skin fade", "Beard trim", "Hot towel shave", "Kids' cut", "Line up"]);
     record.services.forEach((s, i) => (s.price = { mode: "exact", amount: [25, 30, 15, 30, 18, 12][i] }));
@@ -165,14 +165,14 @@ Turnip greens | $3`),
     record.links.booking = "https://booksy.com/";
     record.testimonials = [said("Best fade in town and the conversation is just as good.", "Tyler B."), said("My son actually looks forward to haircuts now.", "Rachel M."), said("Clean shop, sharp cuts, fair prices.", "Dustin K.")];
     return {
-      slug: "ivy-iron-barber",
+      slug: "thistle-comb",
       kind: "Barbershop",
       design: "salon.night_shift~editorial~h3n1b3s2v4c2f0a1p3",
       record,
       copy: copy({
         heroTagline: "Classic cuts, sharp fades and hot towel shaves in downtown Cullman.",
         heroSub: "Walk in or book ahead. Cuts for men and kids, beard work and straight-razor shaves.",
-        about: ["Ivy & Iron is a neighborhood barbershop with old-school service and modern cuts.", "Grab a seat, catch up on the game, and leave looking your best."],
+        about: ["Thistle & Comb is a neighborhood barbershop with old-school service and modern cuts.", "Grab a seat, catch up on the game, and leave looking your best."],
         serviceBlurbs: blurbs([
           ["Haircut", "A classic cut finished with a neck shave."],
           ["Skin fade", "Clean fades blended to your taste."],
@@ -193,13 +193,13 @@ Turnip greens | $3`),
     };
   })(),
   (() => {
-    const record = base({ slug: "crossroads-auto", name: "Crossroads Auto Care", category: "auto", variant: "general", phone: "0104", street: "1500 Example Rd SW", storefront: true });
+    const record = base({ slug: "copperline-auto", name: "Copperline Auto Care", category: "auto", variant: "general", phone: "0104", street: "1500 Example Rd SW", storefront: true });
     record.services = svc(["Brakes", "Oil changes", "Check engine light", "A/C repair", "Tires & alignment", "Inspections"]);
     record.ext.auto = { ase: true, freeEstimates: true, warranty: { months: 12, miles: 12000 } };
     withSampleStock(record);
     record.testimonials = [said("They told me what could wait and what couldn't. That's rare.", "Steve L."), said("Fair price on brakes and done the same day.", "Megan D."), said("I trust them with all three of our family's cars.", "Ron G.")];
     return {
-      slug: "crossroads-auto",
+      slug: "copperline-auto",
       kind: "Auto repair shop",
       design: "auto.clear_diagnostic~overlap~h4n2b2s0v2c0f2a0p0",
       record,
@@ -313,20 +313,20 @@ Turnip greens | $3`),
     };
   })(),
   (() => {
-    const record = base({ slug: "main-street-tees", name: "Main Street Tees", category: "print", variant: "screen_printing", phone: "0107", street: "305 Example St NW", storefront: true });
+    const record = base({ slug: "ink-anvil", name: "Ink & Anvil Print Co", category: "print", variant: "screen_printing", phone: "0107", street: "305 Example St NW", storefront: true });
     record.email = "hello@example.com";
     record.services = svc(["Custom T-shirts", "Hoodies & sweatshirts", "Team & school spirit wear", "Business & work shirts", "Event & fundraiser shirts", "Small full-color runs"]);
     record.ext.print = { designHelp: true, proofBeforePrint: true };
     record.testimonials = [said("Our reunion shirts came out perfect and right on time.", "Donna F."), said("They helped us fix our logo before printing. Big help.", "Coach Allen"), said("Great quality and easy to work with.", "Heather V.")];
     return {
-      slug: "main-street-tees",
+      slug: "ink-anvil",
       kind: "Screen printing shop",
       design: "print.fresh_ink~classic~h3n2b2s1v2c0f2a1p1",
       record,
       copy: copy({
         heroTagline: "Custom shirts and hoodies for teams, schools, churches and businesses around Cullman.",
         heroSub: "Screen-printed tees, hoodies and work shirts for teams, schools, reunions and local businesses.",
-        about: ["Main Street Tees prints custom shirts for the people and groups that make Cullman home.", "Bring us a logo, a sketch or just an idea, and we'll help you turn it into something you're proud to wear."],
+        about: ["Ink & Anvil Print Co prints custom shirts for the people and groups that make Cullman home.", "Bring us a logo, a sketch or just an idea, and we'll help you turn it into something you're proud to wear."],
         serviceBlurbs: blurbs([
           ["Custom T-shirts", "For teams, reunions and staff shirts."],
           ["Hoodies & sweatshirts", "Warm, printed hoodies for cool weather."],
@@ -347,7 +347,7 @@ Turnip greens | $3`),
     };
   })(),
   (() => {
-    const record = base({ slug: "willow-wren", name: "Willow & Wren Boutique", category: "retail", variant: "boutique", phone: "0108", street: "120 Example Ave SE", storefront: true });
+    const record = base({ slug: "juniper-finch", name: "Juniper & Finch Boutique", category: "retail", variant: "boutique", phone: "0108", street: "120 Example Ave SE", storefront: true });
     record.hours = { weekly: [[], [], day("10:00", "17:30"), day("10:00", "17:30"), day("10:00", "17:30"), day("10:00", "17:30"), day("10:00", "16:00")] };
     record.services = svc(["Tops & blouses", "Dresses", "Jeans & bottoms", "Shoes & boots", "Jewelry & accessories", "Gifts"]);
     record.links.social = { instagram: "https://www.instagram.com/", facebook: "https://www.facebook.com/" };
@@ -355,14 +355,14 @@ Turnip greens | $3`),
     withSampleStock(record);
     record.testimonials = [said("Always something new, and they help you put an outfit together.", "Kayla N."), said("My go-to for gifts. Everything is so cute.", "Melissa O."), said("Friendly owners and great prices.", "Tasha W.")];
     return {
-      slug: "willow-wren",
+      slug: "juniper-finch",
       kind: "Clothing boutique",
       design: "retail.shop_window~split~h2n1b0s3v2c2f0a0p3",
       record,
       copy: copy({
         heroTagline: "Cute clothes, shoes and gifts in downtown Cullman.",
         heroSub: "Come see what's new this week. Fresh styles arrive all the time, so there's always something to find.",
-        about: ["Willow & Wren is a small boutique with clothes, shoes and gifts picked for real life in North Alabama.", "Stop in to browse, try something on, or grab a last-minute gift."],
+        about: ["Juniper & Finch is a small boutique with clothes, shoes and gifts picked for real life in North Alabama.", "Stop in to browse, try something on, or grab a last-minute gift."],
         serviceBlurbs: blurbs([
           ["Tops & blouses", "Easy tops for work, church and weekends."],
           ["Dresses", "Casual and dressy styles for every season."],
@@ -421,7 +421,7 @@ Turnip greens | $3`),
     };
   })(),
   (() => {
-    const record = base({ slug: "cedar-creek", name: "Cedar Creek Baptist Church", category: "church", variant: "church", phone: "0110", street: "2200 Example Rd NW", storefront: true });
+    const record = base({ slug: "sweetgum-hill", name: "Sweetgum Hill Church", category: "church", variant: "church", phone: "0110", street: "2200 Example Rd NW", storefront: true });
     record.hours = { weekly: [[], [], day("09:00", "13:00"), day("09:00", "13:00"), day("09:00", "13:00"), [], []] };
     record.services = svc(["Sunday School & Bible classes", "Kids", "Students", "Women", "Men", "Music & choir"]);
     record.foundedYear = 1923;
@@ -444,12 +444,12 @@ Turnip greens | $3`),
         kids: "Nursery for babies through age 3 during Sunday School and worship.",
         length: "Morning worship usually runs about an hour.",
       },
-      pastor: { name: "Bro. Tom Hale", title: "Pastor", bio: "Bro. Tom and his wife, Carol, have served at Cedar Creek for twelve years. He loves fishing, a good church dinner on the grounds, and visiting folks in their homes." },
+      pastor: { name: "Bro. Tom Hale", title: "Pastor", bio: "Bro. Tom and his wife, Carol, have served at Sweetgum Hill for twelve years. He loves fishing, a good church dinner on the grounds, and visiting folks in their homes." },
       givingUrl: "https://example.com/",
       liveUrl: "https://example.com/",
     };
     return {
-      slug: "cedar-creek",
+      slug: "sweetgum-hill",
       kind: "Country church",
       design: "church.country_chapel~letter~h3n1b1s2v1c0f0a0p2",
       record,
@@ -457,7 +457,7 @@ Turnip greens | $3`),
         heroTagline: "There's a place here for every age, from little ones to senior adults.",
         heroSub: "A church family on the edge of Cullman. We'd love to meet you this Sunday.",
         serviceAreaIntro: "It's normal to wonder what to expect at a new church. Here are a few answers before you come.",
-        about: ["Cedar Creek Baptist Church is a small country church just outside Cullman, where neighbors gather on Sundays and Wednesday nights.", "Whether you've been in church all your life or it's been a while, you're welcome here."],
+        about: ["Sweetgum Hill Church is a small country church just outside Cullman, where neighbors gather on Sundays and Wednesday nights.", "Whether you've been in church all your life or it's been a while, you're welcome here."],
         serviceBlurbs: blurbs([
           ["Sunday School & Bible classes", "Classes for every age before morning worship."],
           ["Kids", "A place for children to learn and make friends."],
@@ -469,7 +469,7 @@ Turnip greens | $3`),
         faq: [{ q: "Who's welcome?", a: "Everyone. Whether you're new to Cullman or just looking for a church home, we'd be glad to have you. Give us a call with any questions." }],
         ctaTitle: "We'd love to see you",
         ctaLine: "Join us this Sunday, or call the church office with any questions.",
-        description: "Cedar Creek Baptist Church in Cullman, AL: service times, what to expect on your first visit, ministries for every age, and directions. Join us Sunday.",
+        description: "Sweetgum Hill Church in Cullman, AL: service times, what to expect on your first visit, ministries for every age, and directions. Join us Sunday.",
       }),
     };
   })(),
