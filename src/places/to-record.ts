@@ -35,7 +35,7 @@ export function hoursFromPlaces(periods: NonNullable<Place["regularOpeningHours"
 }
 
 function component(p: Place, type: string, short = false): string | undefined {
-  const c = p.addressComponents?.find((a) => a.types.includes(type));
+  const c = p.addressComponents?.find((a) => a.types?.includes(type));
   return c ? (short ? c.shortText : c.longText) : undefined;
 }
 
@@ -95,7 +95,8 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
     phone,
     smsEnabled: false,
     address: {
-      street: streetNo && route ? `${streetNo} ${route}` : route,
+      // Some listings send the street line as one component with no types ("8743 US-31 N"): use it when route is missing.
+      street: streetNo && route ? `${streetNo} ${route}` : (route ?? p.addressComponents?.find((a) => !a.types?.length && /^\d+\s+\S/.test(a.longText))?.longText),
       city,
       state: component(p, "administrative_area_level_1", true) ?? "AL",
       zip: component(p, "postal_code"),

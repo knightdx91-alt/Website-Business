@@ -17,7 +17,8 @@ export interface Place {
   id: string;
   displayName?: { text: string };
   formattedAddress?: string;
-  addressComponents?: Array<{ longText: string; shortText: string; types: string[] }>;
+  /** Google sometimes sends a component with no `types` (seen Oct 2026 on a street line). */
+  addressComponents?: Array<{ longText: string; shortText?: string; types?: string[] }>;
   nationalPhoneNumber?: string;
   internationalPhoneNumber?: string;
   location?: { latitude: number; longitude: number };
