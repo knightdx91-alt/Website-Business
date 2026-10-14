@@ -20,7 +20,8 @@ export function autoVariant(primaryType: string | undefined, types: string[], na
   if (/\b(auto ?glass|windshields?|glass)\b/.test(n)) return "glass";
   if (/\b(mufflers?|exhaust)\b/.test(n)) return "exhaust";
   if (/\b(body|collision|paint\s?(&|and)\s?body|dent)\b/.test(n)) return "body";
-  if (/\b(towing|wrecker|tow)\b/.test(n)) return "towing";
+  // A tow company is its own kind (Hays Towing was built as a repair shop); one whose name also says repair does both.
+  if (/\b(towing|wrecker|tow|roadside|recovery)\b/.test(n)) return /\b(repair|automotive|garage|mechanic|auto service|service center)\b/.test(n) ? "tow_repair" : "towing";
   if (/\btransmission/.test(n)) return "transmission";
   if (/\bdiesel\b/.test(n)) return "diesel";
   if (all.includes("tire_shop") || /\btires?\b/.test(n)) return "tire";
@@ -34,7 +35,8 @@ const LABEL: Record<string, string> = {
   transmission: "Transmission Repair",
   diesel: "Diesel & Auto Repair",
   european: "Import Auto Repair",
-  towing: "Towing & Auto Repair",
+  towing: "Towing & Roadside",
+  tow_repair: "Towing & Auto Repair",
   body: "Auto Body & Collision Repair",
   detailing: "Auto Detailing",
   small_engine: "Small Engine Repair",
@@ -53,9 +55,11 @@ export const AUTO_VARIANTS = Object.keys(LABEL);
  * its parts extension and no service area. Returns false when nothing changed. The copy must be rewritten afterwards.
  */
 export function setAutoVariant(r: BusinessRecord, variant: string): boolean {
-  if (!(variant in LABEL) || r.variant === variant) return false;
+  if (!(variant in LABEL)) return false;
+  // Tow companies built before towing was its own kind still carry the repair list: reseed them once.
+  if (r.variant === variant && !(variant === "towing" && sameServices(r.services, seedAutoServices("tow_repair")))) return false;
   const ids = (list: Service[]) => list.map((x) => x.id).sort().join("|");
-  const untouched = !r.services?.length || ids(r.services) === ids(seedAutoServices(r.variant));
+  const untouched = !r.services?.length || ids(r.services) === ids(seedAutoServices(r.variant)) || ids(r.services) === ids(seedAutoServices("tow_repair"));
   r.variant = variant;
   if (untouched) r.services = seedAutoServices(variant);
   const auto = { ...((r.ext as { auto?: Record<string, unknown> }).auto ?? {}) };
@@ -67,13 +71,19 @@ export function setAutoVariant(r: BusinessRecord, variant: string): boolean {
   return true;
 }
 
+const sameServices = (a: Service[] | undefined, b: Service[]) => !!a?.length && a.map((x) => x.id).sort().join("|") === b.map((x) => x.id).sort().join("|");
+
+/** Tow companies and shops that tow as well as repair: both get the tow line strip and the 24/7 rules. */
+export const isTow = (variant: string) => variant === "towing" || variant === "tow_repair";
+
 const SEEDS: Record<string, string[]> = {
   general: ["Brakes", "Oil changes", "Check engine light & diagnostics", "Tires & alignment", "AC & heating", "Engine repair", "Suspension & steering", "Batteries & electrical"],
   tire: ["Tires", "Alignment", "Brakes", "Oil changes", "Check engine light & diagnostics", "Suspension & steering"],
   transmission: ["Transmission repair", "Transmission service", "Clutch repair", "Diagnostics", "Drivetrain repair", "Brakes"],
   diesel: ["Diesel repair", "Diagnostics", "Brakes", "Oil changes", "Engine repair", "Suspension & steering"],
   european: ["Diagnostics", "Brakes", "Oil changes", "Engine repair", "AC & heating", "Suspension & steering"],
-  towing: ["Towing", "Diagnostics", "Brakes", "Engine repair", "Tires", "Batteries & electrical"],
+  towing: ["Local towing", "Long-distance towing", "Roadside assistance", "Jump starts", "Lockouts", "Flat tire changes", "Accident recovery", "Winch-outs"],
+  tow_repair: ["Towing", "Diagnostics", "Brakes", "Engine repair", "Tires", "Batteries & electrical"],
   body: ["Collision repair", "Dent repair", "Auto painting", "Bumper repair", "Frame straightening", "Insurance claims help"],
   detailing: ["Interior detailing", "Exterior wash & wax", "Full detail", "Paint correction", "Ceramic coating", "Headlight restoration"],
   small_engine: ["Lawn mower repair", "Zero-turn & riding mowers", "Chainsaws & trimmers", "Tune-ups", "Blade sharpening", "Generators & pressure washers"],
@@ -82,7 +92,7 @@ const SEEDS: Record<string, string[]> = {
   parts: ["Brakes", "Batteries", "Filters", "Belts & hoses", "Starters & alternators", "Fluids & chemicals", "Tools", "Accessories"],
 };
 
-const FIX_TITLE: Record<string, string> = { detailing: "What we offer", small_engine: "What we work on", glass: "What we replace & repair", parts: "What we carry" };
+const FIX_TITLE: Record<string, string> = { towing: "What we do", detailing: "What we offer", small_engine: "What we work on", glass: "What we replace & repair", parts: "What we carry" };
 
 /** Counter services a parts store can tick in Edit. The defaults are the usual trio; the owner confirms the set before publish. */
 export const PARTS_COUNTER: Array<{ id: PartsCounterService; label: string; body: string; default: boolean }> = [
@@ -139,6 +149,12 @@ export function seedAutoServices(variant: string): Service[] {
 }
 
 const VARIANT_STEPS: Record<string, Array<{ title: string; body: string }>> = {
+  towing: [
+    { title: "Call us", body: "Tell us what happened and what you're driving." },
+    { title: "Tell us where you are", body: "A street, a mile marker or a landmark is enough." },
+    { title: "We head your way", body: "We let you know when to expect the truck." },
+    { title: "Where it needs to go", body: "Home, your mechanic or our lot: you choose." },
+  ],
   detailing: [
     { title: "Call or request", body: "Tell us what you'd like done and when works for you." },
     { title: "Drop it off", body: "Bring your vehicle by at the time we set." },
@@ -184,7 +200,7 @@ export const autoPack: CategoryPack = {
   hasForm: () => true,
   looks: ["auto.shop_floor", "auto.main_street_garage", "auto.clear_diagnostic", "auto.night_road"],
   defaultLook(r) {
-    if (r.variant === "towing" || r.variant === "tire" || r.variant === "diesel") return "auto.night_road";
+    if (isTow(r.variant) || r.variant === "tire" || r.variant === "diesel") return "auto.night_road";
     if (r.variant === "european" || r.variant === "detailing") return "auto.clear_diagnostic";
     if (r.ownershipTags.includes("family_owned") || (r.foundedYear && r.foundedYear < 2000)) return "auto.main_street_garage";
     return "auto.shop_floor";
@@ -212,7 +228,7 @@ export const autoPack: CategoryPack = {
           { label: "About", href: "/#about" },
           { label: "Hours & location", href: "/#visit" },
           { label: "FAQ", href: "/#faq" },
-          { label: ctx.r.variant === "tire" ? "Tire quote" : "Appointments", href: "/#contact" },
+          { label: ctx.r.variant === "tire" ? "Tire quote" : ctx.r.variant === "towing" ? "Request a tow" : "Appointments", href: "/#contact" },
         ],
   actionBar: (ctx) => actions(ctx.r, ["call", ...(ctx.r.smsEnabled ? (["text"] as const) : []), ctx.r.links.booking && ctx.r.variant !== "parts" ? "book" : "quote", "directions"]),
   homeFaq: (ctx) => ctx.copy.faq.slice(0, 6),
@@ -232,7 +248,7 @@ export const autoPack: CategoryPack = {
       actions: actions(r, ["call", second]),
       badge: r.foundedYear && ctx.theme.knobs.badge === "seal" ? `Serving ${r.address.city} since ${r.foundedYear}` : undefined,
     })}
-${r.variant === "towing" ? towStrip(ctx) : ""}
+${isTow(r.variant) ? towStrip(ctx) : ""}
 ${amenities.length ? html`<div class="amen" aria-label="Good to know"><div class="wrap"><span class="section__label">Good to know</span>${chips(amenities, "Good to know")}</div></div>` : ""}
 ${infoStrip(ctx, [])}
 <main id="main">
@@ -244,7 +260,7 @@ ${r.variant === "tire" ? tireExtras(ctx) : ""}
 </div></section>
 ${warrantyBand(ctx)}
 <section class="section section--band" id="how" aria-labelledby="how-title"><div class="wrap">
-<span class="section__label">How it works</span><h2 class="section__title" id="how-title">No surprises</h2>
+<span class="section__label">How it works</span><h2 class="section__title" id="how-title">${r.variant === "towing" ? "Stuck? Here's what happens" : "No surprises"}</h2>
 ${steps(ctx.copy.steps?.length ? ctx.copy.steps : (VARIANT_STEPS[r.variant] ?? STEPS))}
 </div></section>
 ${r.variant === "body" ? claimsBlock(ctx) : ""}
@@ -254,18 +270,18 @@ ${about(ctx, `About ${r.name}`)}
 ${visit(ctx)}
 ${serviceArea(ctx)}
 ${faq(ctx.copy.faq.slice(0, 6), true)}
-${r.variant === "tire" ? tireQuoteForm(ctx) : contactForm(ctx, r.services.map((s) => s.name), [], [{ name: "vehicle", label: r.variant === "small_engine" ? "Equipment (type, make, model)" : "Vehicle (year, make, model)", autocomplete: "off" }], r.variant === "small_engine" ? "Tell us what your equipment is doing and we'll call you back." : r.variant === "detailing" ? "Tell us about your vehicle and what you'd like done. We'll call you back." : r.variant === "body" ? (a.body?.estimateNote || "Tell us what happened and what the damage looks like. We'll call you back to set up an estimate.") : "Tell us what your car is doing and when you'd like to bring it in. We'll call you back.")}
+${r.variant === "tire" ? tireQuoteForm(ctx) : r.variant === "towing" ? towRequestForm(ctx) : contactForm(ctx, r.services.map((s) => s.name), [], [{ name: "vehicle", label: r.variant === "small_engine" ? "Equipment (type, make, model)" : "Vehicle (year, make, model)", autocomplete: "off" }], r.variant === "small_engine" ? "Tell us what your equipment is doing and we'll call you back." : r.variant === "detailing" ? "Tell us about your vehicle and what you'd like done. We'll call you back." : r.variant === "body" ? (a.body?.estimateNote || "Tell us what happened and what the damage looks like. We'll call you back to set up an estimate.") : "Tell us what your car is doing and when you'd like to bring it in. We'll call you back.")}
 ${ctaBand(ctx, actions(r, ["call", "directions"]))}
-${r.variant === "towing" ? towTodos(ctx) : ""}
+${isTow(r.variant) ? towTodos(ctx) : ""}
 </main>`;
   },
   pages: () => [],
   bannedPhrases: (r) => (r.variant === "parts" ? partsBannedPhrases(r) : autoBannedPhrases(r)),
-  copyBrief: (r) => r.variant === "parts" ? partsBrief(r) : ({
+  copyBrief: (r) => r.variant === "parts" ? partsBrief(r) : r.variant === "towing" ? towBrief(r) : ({
     voice:
       `Plain, confident and neighborly, like a trusted mechanic explaining things. Short sentences. Never mention ASE, warranties, programs, financing, years, family-owned, towing hours, shuttles, loaners, prices or 'estimate before any work' unless given in the facts. Never write "EV certified" or claim any hybrid or electric-vehicle credential; ${
         r.services.some((s) => /\b(hybrid|ev|electric)\b/i.test(s.name)) ? "the services list includes hybrids or EVs, so you may say at most that the shop works on hybrids and EVs." : "do not mention hybrids or EVs at all."
-      }${r.variant === "towing" ? ` Towing: ${r.ext.auto?.tow?.always ? "the tow line is staffed 24/7 (that fact is given, you may say it once)." : "never say 24/7, 24 hours or around the clock; the tow hours are not confirmed."}` : ""}${
+      }${isTow(r.variant) ? ` Towing: ${r.ext.auto?.tow?.always ? "the tow line is staffed 24/7 (that fact is given, you may say it once)." : "never say 24/7, 24 hours or around the clock; the tow hours are not confirmed."}` : ""}${
         r.ext.auto?.financing ? " Financing exists (say only that it's available through the lender named; never approval odds, credit checks or terms)." : ""
       }`,
     fields: {
@@ -295,7 +311,12 @@ export function autoBannedPhrases(r: BusinessRecord): RegExp[] {
     /\bev[- ]certified\b|\bcertified (ev|hybrid|electric)\b/i,
     /\b(no|without a) credit check\b|\b(instant|guaranteed|easy|quick) approval\b|\beveryone('s| is) approved\b/i,
   ];
-  if (!(r.variant === "towing" && r.ext.auto?.tow?.always)) out.push(ALWAYS_RE);
+  if (!(isTow(r.variant) && r.ext.auto?.tow?.always)) out.push(ALWAYS_RE);
+  if (r.variant === "towing") {
+    // A tow company: no repair work unless the owner lists it, and no arrival-time promises.
+    if (!r.services.some((s) => /repair|mechanic|diagnos|brake|engine|oil/i.test(s.name))) out.push(/\b(auto repair|repair shop|mechanics?|we (fix|repair)|repairs)\b/i);
+    out.push(/\b(within|in under|under) (\d+|fifteen|twenty|thirty|forty-five|sixty) minutes\b|\bminutes away\b|\bguaranteed (arrival|response)\b/i);
+  }
   return out;
 }
 
@@ -343,6 +364,41 @@ function towTodos(ctx: Ctx): Raw {
   if (!t?.phone) out.push(todo(ctx, "Is there a separate tow number?", `Right now the Need-a-tow strip calls ${r.phone.display}. If a different line is answered after hours, give us that number${t?.always ? "" : ", and tell us whether it's really staffed 24/7"}.`));
   if (!out.length) return raw("");
   return html`<section class="section" aria-label="Towing details to confirm"><div class="wrap narrow">${out}</div></section>`;
+}
+
+/** A tow company's words: a calm dispatcher, not a mechanic. */
+function towBrief(r: BusinessRecord) {
+  const always = !!r.ext.auto?.tow?.always;
+  return {
+    voice: `Calm, practical and reassuring, like a tow operator on the phone with someone stuck on the side of the road. Short sentences. This is a towing and roadside company, not a repair shop: never say they repair, fix or diagnose vehicles unless the services list says so. Never promise arrival times, response times, prices, payment terms, insurance billing, motor club or police-rotation work, years, family-owned or licenses unless given in the facts. ${always ? "The tow line is staffed 24/7 (that fact is given, you may say it once)." : "Never say 24/7, 24 hours, day or night or around the clock; the tow hours are not confirmed."}`,
+    fields: {
+      heroTagline: "One sentence (12-22 words) introducing the services list: towing and roadside help for drivers around town and on the nearby roads.",
+      heroSub: "One line (15-25 words) for someone who is stuck right now: what they do and that a call gets help moving. No superlatives, no time promises.",
+      serviceBlurbs: "For each service id, one plain line (10-20 words): what it covers and when you'd call for it. No prices, no numbers, no time promises.",
+      faq: "5-6 general questions people ask when they need a tow (what to do right after a breakdown, what to tell the dispatcher, flatbed vs wheel-lift, can I ride in the truck, what to do after a wreck, where my car can be towed) with helpful general answers (35-60 words). No prices, no arrival times, no claims about this company's policies. Where specifics matter, invite them to call.",
+      serviceAreaIntro: "One or two sentences about the roads and towns they cover around the town and the nearby communities listed.",
+      about: "Two short paragraphs (70-120 words total). The owner's story is unknown: write a neutral, true introduction (a towing and roadside company, who it helps, where). Do not invent history, people, trucks, years or credentials.",
+      cta: "ctaTitle: 3-7 words. ctaLine: one sentence, at most 18 words, inviting them to call when they need a tow.",
+      metaDescription: "140-155 characters: towing + town + one true fact + call to action.",
+    },
+  };
+}
+
+/** Request a tow (not urgent, scheduled moves): pick-up place, where it goes, the vehicle. Stuck now = call. */
+function towRequestForm(ctx: Ctx): Raw {
+  const r = ctx.r;
+  return contactForm(
+    ctx,
+    r.services.map((s) => s.name),
+    [],
+    [
+      { name: "vehicle", label: "Vehicle (year, make, model)", autocomplete: "off" },
+      { name: "address", label: "Where is it now?", autocomplete: "off" },
+      { name: "location", label: "Where should it go?", autocomplete: "off" },
+    ],
+    `Stuck right now? Call ${towLine(r).display}. For a tow you can plan ahead (a car that won't start, a move to the shop), tell us here and we'll call you back.`,
+    { title: "Request a tow", topic: "Tow request" },
+  );
 }
 
 /** Tire shops: brands as chips and a storefront link under the services list. */

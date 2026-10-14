@@ -2547,7 +2547,7 @@ async function viewLead(id, intent) {
   }
   /* ---------- auto repair shops: amenities, programs, financing, and the towing / tire / body modules (research/trends-2026 §1) ---------- */
   /** Kinds of auto business the auto template builds (mirrors AUTO_VARIANT_LABELS in packs/auto.ts). */
-  const AUTO_KINDS = [["general", "Auto Repair"], ["tire", "Tires & Auto Repair"], ["transmission", "Transmission Repair"], ["diesel", "Diesel & Auto Repair"], ["european", "Import Auto Repair"], ["towing", "Towing & Auto Repair"], ["body", "Auto Body & Collision Repair"], ["detailing", "Auto Detailing"], ["small_engine", "Small Engine Repair"], ["glass", "Auto Glass"], ["exhaust", "Muffler & Exhaust"], ["parts", "Auto Parts Store"]];
+  const AUTO_KINDS = [["general", "Auto Repair"], ["tire", "Tires & Auto Repair"], ["transmission", "Transmission Repair"], ["diesel", "Diesel & Auto Repair"], ["european", "Import Auto Repair"], ["towing", "Towing & Roadside"], ["tow_repair", "Towing & Auto Repair"], ["body", "Auto Body & Collision Repair"], ["detailing", "Auto Detailing"], ["small_engine", "Small Engine Repair"], ["glass", "Auto Glass"], ["exhaust", "Muffler & Exhaust"], ["parts", "Auto Parts Store"]];
   const autoKindField = (r) => `<label class="field">Kind of shop <select name="autoKind">${AUTO_KINDS.map(([k, l]) => `<option value="${k}"${r.variant === k ? " selected" : ""}>${l}</option>`).join("")}</select></label><p class="small muted">Change it if Google got it wrong (a parts store built as a repair shop sells parts, not repairs). The sections switch when you save and the text is rewritten for the new kind.</p>`;
   const AUTO_AMENITIES = [["loaner", "Loaner cars"], ["shuttle", "Shuttle service"], ["key_drop", "After-hours key drop"], ["wifi", "Waiting room with Wi-Fi"], ["digital_inspection", "Digital inspections texted to you"], ["second_opinion", "Free second opinions"], ["walk_ins", "Walk-ins welcome"], ["same_day", "Same-day service on most jobs"], ["towing", "Towing available"], ["spanish", "Spanish spoken"]];
   const AUTO_PROGRAMS = ["NAPA AutoCare", "TechNet", "Jasper", "AAA Approved Auto Repair", "Bosch Service", "ASE Blue Seal", "RepairPal Certified", "BBB Accredited"];
@@ -2569,7 +2569,7 @@ async function viewLead(id, intent) {
       ${AUTO_PROGRAMS.map((p, i) => cb("pg_" + i, p, programs.includes(p))).join("")}
       ${inp("autoProgramsOther", "Other programs (comma separated)", other.join(", "), "Mitchell 1, Interstate Batteries dealer")}
       <div class="row">${inp("autoFinLender", "Financing through <span class=\"hint\">lender name only; the site never states approval odds or “no credit check”</span>", fin.lender, "Synchrony Car Care")}${inp("autoFinUrl", "Apply link (optional)", fin.url, "https://", "url")}</div>
-      ${v === "towing" ? `<h3>Towing</h3>
+      ${v === "towing" || v === "tow_repair" ? `<h3>Towing</h3>
         ${inp("towPhone", "Tow line (if different from the shop number)", tow.phone, "(256) 555-0100", "tel")}
         ${cb("towAlways", "Tow line is staffed 24/7 (owner confirmed; required before the site may say 24/7)", !!tow.always)}
         ${inp("towYard", "Yard / pickup note (optional)", tow.yardNote, "Yard pickup weekdays 8 to 5; bring your ID and proof of ownership.")}` : ""}
@@ -2593,7 +2593,7 @@ async function viewLead(id, intent) {
       amenities: AUTO_AMENITIES.map(([id]) => id).filter((id) => on("am_" + id)),
       programs,
       financing: v("autoFinLender") ? { lender: v("autoFinLender"), url: v("autoFinUrl") || "" } : null,
-      tow: r.variant === "towing" ? { phone: v("towPhone") || "", always: !!on("towAlways"), yardNote: v("towYard") || "" } : undefined,
+      tow: r.variant === "towing" || r.variant === "tow_repair" ? { phone: v("towPhone") || "", always: !!on("towAlways"), yardNote: v("towYard") || "" } : undefined,
       tireBrands: r.variant === "tire" ? lines("tireBrands") : undefined,
       storeUrl: r.variant === "tire" ? v("tireStoreUrl") : undefined,
       body: r.variant === "body" ? { insurers: lines("bodyInsurers") || [], certifications: lines("bodyCerts") || [], rightToChooseConfirmed: !!on("bodyRight"), estimateNote: v("bodyEstimate") || "" } : undefined,

@@ -543,6 +543,8 @@ export async function runBuild(
       const detected = autoVariant(place.primaryType, place.types ?? [], record.name);
       if (detected !== "general") setAutoVariant(record, detected);
     }
+    // Tow companies built while "towing" still meant towing + repair: a rewrite swaps the untouched repair list for towing work.
+    if (lead.rewrite && category === "auto" && record.variant === "towing") setAutoVariant(record, "towing");
     // Same for restaurants built before a variant existed (the nutrition clubs built as plain restaurants).
     if (lead.rewrite && category === "restaurant" && record.variant === "other") {
       const detected = restaurantVariant(place.primaryType, place.types ?? [], record.name);

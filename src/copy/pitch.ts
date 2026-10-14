@@ -234,7 +234,7 @@ function previewFeatures(r: BusinessRecord, hasForm: boolean): string[] {
       f.push(
         `their Google rating and review count (${r.reputation.rating} · ${r.reputation.count} reviews) linked at the top of the page`,
       );
-    if (r.variant === "towing")
+    if (r.variant === "towing" || r.variant === "tow_repair")
       f.push(
         `a 'Need a tow?' strip under the opening with the tow number${a.tow?.always ? " and 24/7" : " (24/7 only once they confirm the line is staffed)"}${r.smsEnabled ? " and a 'text us your location' link" : ""}`,
       );

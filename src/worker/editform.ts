@@ -1338,7 +1338,7 @@ export function editForm(l: EditDetail): EditForm {
       }),
       url("autoFinUrl", "Apply link (optional)", fin.url || ""),
     ];
-    if (v === "towing")
+    if (v === "towing" || v === "tow_repair")
       f.push(
         h3("Towing"),
         txt(
@@ -2664,7 +2664,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
             ? { lender: v("autoFinLender"), url: v("autoFinUrl") || "" }
             : null,
           tow:
-            r.variant === "towing"
+            r.variant === "towing" || r.variant === "tow_repair"
               ? {
                   phone: v("towPhone") || "",
                   always: !!on("towAlways"),

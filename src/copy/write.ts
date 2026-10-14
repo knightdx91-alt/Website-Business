@@ -93,7 +93,7 @@ function facts(r: BusinessRecord, pack: CategoryPack, primaryTypeLabel?: string)
           amenities: autoAmenityLabels(r).length ? autoAmenityLabels(r) : undefined,
           programs: r.ext.auto?.programs?.length ? r.ext.auto.programs : undefined,
           financing_through: r.ext.auto?.financing?.lender,
-          ...(r.variant === "towing" ? { tow_line: r.ext.auto?.tow?.phone ? "separate number (shown on the page)" : "the shop's number", tow_24_7: r.ext.auto?.tow?.always ? true : "not confirmed (never claim it)", tow_notes: r.ext.auto?.tow?.yardNote } : {}),
+          ...(r.variant === "towing" || r.variant === "tow_repair" ? { tow_line: r.ext.auto?.tow?.phone ? "separate number (shown on the page)" : "the shop's number", tow_24_7: r.ext.auto?.tow?.always ? true : "not confirmed (never claim it)", tow_notes: r.ext.auto?.tow?.yardNote } : {}),
           ...(r.variant === "tire" ? { tire_brands: r.ext.auto?.tireBrands?.length ? r.ext.auto.tireBrands : undefined, online_tire_store: r.ext.auto?.storeUrl ? true : undefined } : {}),
           ...(r.variant === "body" ? { insurers_worked_with: r.ext.auto?.body?.insurers?.length ? r.ext.auto.body.insurers : undefined, certifications: r.ext.auto?.body?.certifications?.length ? r.ext.auto.body.certifications : undefined, estimate_note: r.ext.auto?.body?.estimateNote } : {}),
         }
