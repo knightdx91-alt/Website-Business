@@ -1,7 +1,7 @@
 /**
  * The mail-out / leave-behind flyer (Oct 2026): one Letter page with a white box for the business's 5-digit flyer code
  * (handwritten), the address to type it at (undergroundassociates.com/code), a QR code to that page, and how to reach us.
- *   npx tsx scripts/mailer-flyer.ts [--phone 256-636-5886] [--from 49] [--out app/public/flyers] [--png <file>]
+ *   npx tsx scripts/mailer-flyer.ts [--example <slug>] [--phone 256-636-5886] [--from 49] [--out app/public/flyers] [--png <file>]
  * Writes <out>/mailer.pdf (served at /flyers/mailer.pdf, linked from Settings on web + Android).
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -29,7 +29,8 @@ function qrSvg(text: string): string {
 
 const font = async (pkg: string, w: number) => (await readFile(`node_modules/@fontsource/${pkg}/files/${pkg}-latin-${w}-normal.woff2`)).toString("base64");
 const logo = (await readFile("app/public/brand/logo.svg", "utf8")).replace(/<\?xml[^>]*>/, "");
-const shot = (await readFile("app/public/examples/biscuit-hollow.jpg")).toString("base64");
+const example = opt("example", "green-acre-lawn");
+const shot = (await readFile(`app/public/examples/${example}.jpg`)).toString("base64");
 
 const css = `
 @font-face{font-family:B;font-weight:800;src:url(data:font/woff2;base64,${await font("bricolage-grotesque", 800)})}

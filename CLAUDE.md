@@ -1553,7 +1553,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   that matched or nearly matched real businesses (Magnolia Table, Cedar Creek Baptist, Crossroads Auto Care, Main Street Tees,
   Ivy & Iron, Willow & Wren) were renamed to Biscuit Hollow Cafe, Sweetgum Hill Church, Copperline Auto Care, Ink & Anvil Print
   Co, Thistle & Comb Barber Co and Juniper & Finch Boutique, each checked with a Places text search first. Check any new example
-  or flyer name the same way before using it.
+  or flyer name the same way before using it. The flyer's phone shows Green Acre Lawn (owner's pick; `--example <slug>` in
+  scripts/mailer-flyer.ts). The scene "general-open-sign-in-a-shop-window.jpg" carried a real company's logo (BNI) and was removed
+  from SCENES; the file name stays as a copy of the tool-wall photo so previews rendered before then don't show a broken image.
 - ✨ Describe the style they want (Oct 2026, owner's ask; Android 2.64): the lead page's Design card has a text box "Or describe the
   style they want" + idea chips (`STYLE_IDEAS` in app.js and LeadScreen.kt: Hippie, Bright and happy kids' play world, Clean and
   businesslike, Rustic country…) + "Also rewrite the words to match" (on by default) + "✨ Design it" = `POST /restyle {brief, rewrite}`
