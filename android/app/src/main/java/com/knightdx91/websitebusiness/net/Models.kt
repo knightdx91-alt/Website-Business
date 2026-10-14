@@ -102,6 +102,10 @@ data class Lead(
     val lastContact: Long?,
     val previewOpens: Int,
     val previewOpenedAt: Long?,
+    /** Flyer code for the mailed / left-behind flyer (undergroundassociates.com/code) and how often it was used. */
+    val mailCode: String? = null,
+    val mailOpens: Int = 0,
+    val mailOpenedAt: Long? = null,
     /** The practice lead (training aid): $1 payments, never expires, never counted, resettable. */
     val payTest: Boolean = false,
     val contact: String?,
@@ -144,6 +148,9 @@ data class Lead(
             previewOpens = j.optInt("previewOpens", 0),
             payTest = j.optBoolean("payTest"),
             previewOpenedAt = if (j.isNull("previewOpenedAt")) null else j.optLong("previewOpenedAt"),
+            mailCode = j.str("mailCode"),
+            mailOpens = j.optInt("mailOpens", 0),
+            mailOpenedAt = if (j.isNull("mailOpenedAt") || !j.has("mailOpenedAt")) null else j.optLong("mailOpenedAt"),
             contact = j.str("contact"),
             bestTime = j.str("bestTime"),
             unpaidSignup = j.optBoolean("unpaidSignup"),

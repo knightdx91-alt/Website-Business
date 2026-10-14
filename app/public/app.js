@@ -990,6 +990,7 @@ async function viewLead(id, intent) {
             ${l.salesStatus !== "live" ? `<button class="btn" type="button" data-flyer="${l.id}">Leave-behind flyer (QR)</button>` : ""}
           </div>
           ${l.salesStatus !== "live" ? `<div style="margin-top:10px">${shareButtonsHtml()}</div>` : ""}
+          ${l.salesStatus !== "live" ? `<div class="flyercode" data-mailcode-box style="margin-top:12px">${mailCodeHtml(l)}</div>` : ""}
           ${l.previewOpens ? `<p class="small" style="margin-top:8px">👀 They opened their preview ${l.previewOpens === 1 ? "once" : `${l.previewOpens} times`}, last ${ago(l.previewOpenedAt)}.</p>` : ""}` : ""}
         ${l.liveUrl ? `<p style="margin-top:12px">Live at <a href="${esc(l.liveUrl)}" target="_blank" rel="noopener">${esc(l.liveUrl.replace("https://", ""))}</a></p>` : ""}
       </section>`;
@@ -1189,6 +1190,14 @@ async function viewLead(id, intent) {
   // Flyer: POST marks the lead Shown (callers may), then the printable page opens in a new tab (GET has no side effects).
   // Older servers mark Shown on the GET itself, so a 404 on the POST is fine.
   function bindFlyer() {
+    $app.querySelectorAll("[data-mailcode]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        const r = await api(`/leads/${b.dataset.mailcode}/mailcode`, { method: "POST" });
+        const box = b.closest("[data-mailcode-box]");
+        if (box) box.innerHTML = mailCodeHtml({ mailCode: r.code, mailOpens: 0 });
+      } catch (err) { toast(err.message); b.disabled = false; }
+    }));
     $app.querySelectorAll("[data-flyer]").forEach((b) => b.addEventListener("click", async () => {
       const id = b.dataset.flyer;
       const w = window.open("", "_blank");
@@ -1709,6 +1718,14 @@ async function viewLead(id, intent) {
   }
 
   // "Text preview link" / "Copy preview link": a 14-day link that opens the preview without logging in.
+  // Flyer code: the 5 digits to hand-write in the box on a mailed or left-behind flyer (undergroundassociates.com/code).
+  function mailCodeHtml(l) {
+    if (!l.mailCode) return `<button class="btn" type="button" data-mailcode="${esc(l.id)}">📬 Get flyer code</button>
+      <p class="small muted">For the mail-out / leave-behind flyer: write the code in the white box. They type it at undergroundassociates.com/code to see this preview, and you get an alert.</p>`;
+    return `<p style="margin:0">📬 Flyer code: <strong style="font:800 1.6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.15em">${esc(l.mailCode)}</strong></p>
+      <p class="small muted" style="margin:4px 0 0">Write it in the box on their flyer. They enter it at undergroundassociates.com/code.${l.mailOpens ? ` Used ${l.mailOpens === 1 ? "once" : `${l.mailOpens} times`}, last ${ago(l.mailOpenedAt)}.` : " Not used yet."}</p>`;
+  }
+
   function shareButtonsHtml() {
     return `<div class="btns btns--full" data-share><button class="btn" type="button" data-share-sms>💬 Text preview link</button><button class="btn" type="button" data-share-copy>🔗 Copy message + link</button></div>
       <p class="small muted">Only text the link after they say it's OK. It works for 14 days, no login needed.</p>
@@ -3682,6 +3699,9 @@ async function viewLead(id, intent) {
       <section class="card"><h2>📖 Guides</h2>
         <p class="small muted">How to set up and sell what we offer, with the exact buttons to tap. Prices in the guides come from Settings.</p>
         <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/training">🎓 Training course</a><a class="btn" href="#/commission">💰 Commission calculator</a>${reportBtn()}</div></section>
+      <section class="card"><h2>📬 Flyer mail-out</h2>
+        <p class="small muted">Print the flyer, then write each business's 5-digit code in the white box. They type it at undergroundassociates.com/code, see their own sample site, and every phone gets an alert. The mail list is the best open leads with a street address, each with its code (codes stay the same; a coded preview is kept 90 days).</p>
+        <div class="btns btns--full"><a class="btn btn--primary" href="/flyers/mailer.pdf" target="_blank" rel="noopener">🖨️ Print the flyer (PDF)</a><a class="btn" href="/api/mailing.csv?limit=50">⬇ Mail list: next 50 (CSV)</a><a class="btn" href="/api/mailing.csv?limit=250&all=1">⬇ Every coded lead (CSV)</a></div></section>
       <section class="card"><h2>💵 Costs & usage</h2>
         <p class="small muted">Every outside service the app depends on: what it costs, what we've used this month, when it renews and what stops if it lapses. For whoever minds the bills.</p>
         <div class="btns btns--full"><a class="btn btn--primary" href="#/costs">💵 Open Costs & usage</a><a class="btn" href="#/guide/costs">📖 The guide</a></div></section>

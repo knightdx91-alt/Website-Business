@@ -127,7 +127,7 @@ import {
   windowSignPdf,
   priceTagsPdf,
 } from "./cards.ts";
-import { COMPANY_HOSTS, COMPANY_LEAD_ID, serveCompany } from "./company.ts";
+import { COMPANY_HOSTS, COMPANY_LEAD_ID, COMPANY_ORIGIN, serveCompany } from "./company.ts";
 import {
   addDomain,
   getDomain,
@@ -162,6 +162,7 @@ import {
 } from "./queue.ts";
 import { recordHit, siteReport } from "./stats.ts";
 import { EXPIRE_SQL } from "./expire.ts";
+import { assignMailCode, mailCsv, mailList, pruneCodeCounters } from "./mailcodes.ts";
 import {
   addonPrice,
   addUsage,
@@ -338,7 +339,7 @@ interface ActivityCols {
  * leads tab spin for seconds (Oct 2026). `has_pitch` stands in for pitch_json.
  */
 const LIST_COLS =
-  "id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, found_url, score, status, sales_status, look, lint_json, (pitch_json IS NOT NULL) AS has_pitch, follow_up, last_contact, contact, best_time, shown_at, lat, lng, custom_domain, preview_opens, preview_opened_at, error, rewrite, pages_project, live_url, published_at, fetched_at, created_at, updated_at";
+  "id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, found_url, score, status, sales_status, look, lint_json, (pitch_json IS NOT NULL) AS has_pitch, follow_up, last_contact, contact, best_time, shown_at, lat, lng, custom_domain, preview_opens, preview_opened_at, mail_code, mail_opens, mail_opened_at, error, rewrite, pages_project, live_url, published_at, fetched_at, created_at, updated_at";
 
 function summary(
   l: LeadRow & {
@@ -400,6 +401,10 @@ function summary(
     customDomain: l.custom_domain,
     previewOpens: l.preview_opens ?? 0,
     previewOpenedAt: l.preview_opened_at,
+    /** Flyer code written on a mailed / left-behind flyer (undergroundassociates.com/code), and how often it was used. */
+    mailCode: l.mail_code ?? null,
+    mailOpens: l.mail_opens ?? 0,
+    mailOpenedAt: l.mail_opened_at ?? null,
     contact: l.contact ?? null,
     bestTime: l.best_time ?? null,
     /** The newest sign-up exists and hasn't been paid: chase the payment. */
@@ -908,6 +913,16 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   const ownerOnly = () => {
     if (!isOwner) throw new HttpError(403, "Only the owner can do that");
   };
+
+  // Mail list for a flyer mail-out: the best open leads with a street address, each with its flyer code (owner).
+  if (path === "/mailing.csv" && m === "GET") {
+    ownerOnly();
+    const limit = Math.max(1, Math.min(250, Number(url.searchParams.get("limit")) || 50));
+    const rows = await mailList(env, { limit, includeMailed: url.searchParams.get("all") === "1" });
+    return new Response(mailCsv(rows), {
+      headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="mail-list-${localDate()}.csv"` },
+    });
+  }
 
   // The agreement a business would sign, before signing: owner and callers show it on the phone.
   if (path === "/ach.pdf" && m === "GET")
@@ -3075,6 +3090,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await siteUpdated(env, session, lead, [`refreshed from their Google page${changed.length ? ` (${changed.join(", ")})` : ""}: rewriting`]);
       return json({ ok: true, changed });
     }
+    // Flyer code: the 5 digits to write in the box on a flyer for this business (owner + callers).
+    if (action === "/mailcode" && m === "POST") {
+      if (lead.status !== "ready") throw new HttpError(409, "The preview has to finish building first");
+      return json({ code: await assignMailCode(env, lead.id), url: `${COMPANY_ORIGIN}/code` });
+    }
     // "Re-check website": run the web-presence search for this lead now (owner). Updates the card when a page is found.
     if (action === "/webcheck" && m === "POST") {
       if (!env.BRAVE_SEARCH_API_KEY)
@@ -3792,7 +3812,12 @@ async function serveShared(
       );
     const name = esc(lead?.name ?? "your business");
     const from = settings.companyName ? ` by ${esc(settings.companyName)}` : "";
-    const banner = `<div role="note" style="position:relative;z-index:60;background:#14213d;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 16px;text-align:center">Free preview made for ${name}${from}. Not live yet; photos and details will be checked with you first.</div>`;
+    // The way back to us: a prospect who likes it (from a flyer code or a texted link) can call or text right from the banner.
+    const digits = (settings.companyPhone ?? "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+    const reach = digits.length === 10
+      ? ` <span style="white-space:nowrap">Like it? <a href="tel:+1${digits}" style="color:#fca311">Call</a> or <a href="sms:+1${digits}" style="color:#fca311">text</a> ${esc(settings.companyPhone!)}.</span>`
+      : "";
+    const banner = `<div role="note" style="position:relative;z-index:60;background:#14213d;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 16px;text-align:center">Free preview made for ${name}${from}. Not live yet; photos and details will be checked with you first.${reach}</div>`;
     // Link-preview bots (texts, Facebook) fetch the page but don't run scripts, so only a real visit after a moment counts.
     const beacon = `<script>setTimeout(function(){try{if(sessionStorage.getItem("wbo"))return;sessionStorage.setItem("wbo","1")}catch(e){}if(document.visibilityState!=="hidden"&&navigator.sendBeacon)navigator.sendBeacon("/s/${token}/opened")},3000)</script>`;
     text = text
@@ -3868,6 +3893,7 @@ async function pruneOldRows(env: Env): Promise<void> {
     .run();
   await pruneLoginFailures(env);
   await pruneSpamCounters(env);
+  await pruneCodeCounters(env);
 }
 
 /* ---------- Backups ---------- */

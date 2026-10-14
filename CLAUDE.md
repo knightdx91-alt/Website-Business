@@ -1530,6 +1530,23 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   life knobs from `pickDna(lead.id)`, swaps a type-led opening for a photo-led one on New leads that now have a photo, and
   re-renders (no AI cost; the call guide is redone on next open). Sold / live sites are untouched until republished.
   `test/scenes.test.ts`, `test/dna.test.ts` "fifth round". Contact sheets / picks: scratchpad `scenes_fetch.py`, `scenes_picks.py`.
+- 📬 Flyer codes + mail-out flyer (Oct 2026, owner's ask; Android 2.66; migration 0022 `leads.mail_code / mail_code_at /
+  mail_opened_at / mail_opens`, `src/worker/mailcodes.ts`): every lead can get a random 5-digit code (`assignMailCode`, unique index,
+  never sequential) that the team hand-writes in the white box on the printed flyer (mailed or left behind). The business types it at
+  **undergroundassociates.com/code** (`codePage` in company.ts; `POST /code {c}` or `GET /code/12345`) → `useCode` counts it, alerts
+  everyone ("📬 X typed in their flyer code…", kind preview_open, once per 30 min) and 302s to a fresh 14-day share link on the app
+  host (the page's CSP `form-action` includes APP_ORIGIN for that redirect, `formToApp`). Wrong codes: friendly retry; 12 wrong per
+  address per hour locks (`code_ip:<ip>` settings keys, pruned by the daily cron); a taken-down lead says so with our number. A coded
+  lead doesn't expire inside the 90-day Google window (EXPIRE_SQL). The share banner now ends "Like it? Call or text <company
+  phone>" for every shared preview. App: lead page "📬 Get flyer code" / the code + how often it was used (web `mailCodeHtml`,
+  Android LeadScreen; `POST /api/leads/:id/mailcode`, owner + callers; `summary().mailCode/mailOpens/mailOpenedAt`); Settings →
+  "📬 Flyer mail-out" (web) / More (Android, owner): print the flyer and `GET /api/mailing.csv?limit=50[&all=1]` (owner; `mailList`:
+  best-scored ready New/Shown leads with a street address, not yet coded unless `all`, codes assigned on export; columns Business,
+  Street, City, State, ZIP, Flyer code, Kind, Status). The flyer: `scripts/mailer-flyer.ts` (Letter, brand navy/orange, headline
+  "We already built your business a website.", steps 1–2 with the code box, QR to /code, what it does, "from $49 a month, no setup
+  fee on 6/12-month", call/text footer; the phone mockup is labeled "An example of our work") → `app/public/flyers/mailer.pdf`
+  (served at app.undergroundassociates.com/flyers/mailer.pdf); rerun with `--phone` / `--from` when Settings change.
+  `test/worker/mailcodes.test.ts`.
 - ✨ Describe the style they want (Oct 2026, owner's ask; Android 2.64): the lead page's Design card has a text box "Or describe the
   style they want" + idea chips (`STYLE_IDEAS` in app.js and LeadScreen.kt: Hippie, Bright and happy kids' play world, Clean and
   businesslike, Rustic country…) + "Also rewrite the words to match" (on by default) + "✨ Design it" = `POST /restyle {brief, rewrite}`

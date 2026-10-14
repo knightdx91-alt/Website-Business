@@ -43,6 +43,10 @@ export interface LeadRow {
   gbp_json: string | null;
   preview_opens: number;
   preview_opened_at: number | null;
+  mail_code?: string | null;
+  mail_code_at?: number | null;
+  mail_opens?: number;
+  mail_opened_at?: number | null;
   error: string | null;
   rewrite: number;
   pages_project: string | null;

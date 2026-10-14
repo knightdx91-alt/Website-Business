@@ -1,5 +1,7 @@
 import { founderOffer, promoTerms, type FounderOffer } from "./referrals.ts";
 import { notify } from "./notify.ts";
+import { useCode } from "./mailcodes.ts";
+import { APP_ORIGIN } from "./tankboard.ts";
 import {
   isListPlan,
   addonPrice,
@@ -216,6 +218,7 @@ export async function serveCompany(
       : agreementPage(env, tok);
   }
   if (path === "/portfolio" && req.method === "GET") return portfolio(env);
+  if (path === "/code" || path === "/code/" || /^\/code\/\d{5}$/.test(path)) return codePage(env, req, url);
   if (path === "/pricing" && req.method === "GET") return pricingPage(env);
   if (path === "/price-list" && req.method === "GET") return priceListPage(env);
   if (path === "/tank-board" || path === "/live-price-list")
@@ -1381,6 +1384,7 @@ function marketingPage(
     bodyClass?: string;
     gaEvents?: GaEvent[];
     cache?: string;
+    formToApp?: boolean;
   },
 ): Response {
   const name = s.companyName || "Underground Associates";
@@ -1410,6 +1414,7 @@ ${phone ? `<nav class="bar" aria-label="Quick actions"><a href="${telHref(phone)
       "content-security-policy": csp(n, {
         ga: !!s.gaMeasurementId,
         turnstile: !!s.turnstileSiteKey,
+        formToApp: o.formToApp,
       }),
     },
   });
@@ -2457,6 +2462,48 @@ function exampleCard(
 }
 
 /** Portfolio: every example site, with its type and design. */
+/**
+ * Flyer codes: a business types the 5 digits written on the flyer we mailed or left and lands on its own sample site
+ * (a fresh share link). The team is alerted (mailcodes.ts). Wrong guesses are capped per address.
+ */
+async function codePage(env: Env, req: Request, url: URL): Promise<Response> {
+  const s = await getSettings(env);
+  const name = s.companyName || "Underground Associates";
+  const fromPath = /^\/code\/(\d{5})$/.exec(url.pathname)?.[1];
+  let code = fromPath ?? "";
+  if (req.method === "POST") {
+    const form = await req.formData().catch(() => null);
+    code = String(form?.get("c") ?? "").replace(/\D/g, "").slice(0, 5);
+  }
+  let note = "";
+  if (code) {
+    const r = await useCode(env, code, req.headers.get("cf-connecting-ip") ?? "");
+    if (r.kind === "open") return new Response(null, { status: 302, headers: { location: r.url, "cache-control": "no-store" } });
+    const call = s.companyPhone ? ` Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a> and we'll help.` : "";
+    note =
+      r.kind === "wrong"
+        ? `<p class="note note--warn" role="alert">That code didn't match. Check the 5 numbers on your flyer and try again.${call}</p>`
+        : r.kind === "locked"
+          ? `<p class="note note--warn" role="alert">Too many tries from this connection. Please wait an hour, or reach us directly.${call}</p>`
+          : `<p class="note" role="alert">The sample we made for ${e(r.name)} has been taken down.${call || " Get in touch and we'll make a fresh one."}</p>`;
+  }
+  const title = `Enter your code | ${name}`;
+  const description = `Got a flyer from ${name}? Type the 5-digit code to see the free sample website we built for your business.`;
+  const body = `<section class="sec sec--head"><div class="wrap narrow"><p class="eyebrow eyebrow--dark">Your free sample website</p>
+<h1>We built a website for your business.</h1>
+<p class="lead">Type the 5-digit code from your flyer to see it. It's free to look, and there's nothing to sign.</p>
+${note}
+<form class="codeform" method="post" action="/code">
+<label for="c">Your code</label>
+<input id="c" name="c" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" minlength="5" autocomplete="off" required placeholder="12345" value="${e(code)}">
+<button class="btn" type="submit">See my website</button>
+</form>
+<p class="small muted">No code? ${s.companyPhone ? `Call or text <a href="${telHref(s.companyPhone)}">${e(s.companyPhone)}</a>, or ` : ""}<a href="/#contact">ask for a free preview</a>.</p>
+</div></section>
+<style>.codeform{display:grid;gap:12px;max-width:360px;margin:24px 0}.codeform label{font-weight:700}.codeform input{font:800 2.4rem/1 ui-monospace,Menlo,monospace;letter-spacing:.3em;text-align:center;padding:14px 10px;border:3px solid #14213d;border-radius:12px;width:100%;box-sizing:border-box}.codeform input:focus{outline:3px solid #fca311;outline-offset:2px}.note{padding:12px 16px;border-radius:10px;background:#eef2f8}.note--warn{background:#fff4e0;border-left:5px solid #fca311}</style>`;
+  return marketingPage(s, { path: "/code", title, description, body, ld: pageLd(s, "/code", title, description), cache: "no-store", formToApp: true });
+}
+
 async function portfolio(env: Env): Promise<Response> {
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
@@ -2524,6 +2571,8 @@ function csp(
     stripe?: boolean;
     /** Pages with a form: Turnstile's script and its challenge frame (src/worker/spam.ts). */
     turnstile?: boolean;
+    /** The flyer-code form redirects to the app's share page; form-action also governs that redirect. */
+    formToApp?: boolean;
   } = {},
 ): string {
   // A nonce makes browsers ignore 'unsafe-inline', so pages with their own inline scripts keep 'unsafe-inline' instead.
@@ -2541,7 +2590,7 @@ function csp(
   ]
     .filter(Boolean)
     .join(" ");
-  return `default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:${o.ga ? ` ${GA_CONNECT}` : ""};${script ? ` script-src ${script};` : ""}${connect ? ` connect-src ${connect};` : ""}${o.turnstile ? ` frame-src ${TURNSTILE_HOST};` : ""} form-action 'self'${o.stripe ? " https://checkout.stripe.com" : ""}; base-uri 'none'; frame-ancestors 'none'`;
+  return `default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:${o.ga ? ` ${GA_CONNECT}` : ""};${script ? ` script-src ${script};` : ""}${connect ? ` connect-src ${connect};` : ""}${o.turnstile ? ` frame-src ${TURNSTILE_HOST};` : ""} form-action 'self'${o.stripe ? " https://checkout.stripe.com" : ""}${o.formToApp ? ` ${APP_ORIGIN}` : ""}; base-uri 'none'; frame-ancestors 'none'`;
 }
 
 const HEADERS = {

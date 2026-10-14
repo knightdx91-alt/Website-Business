@@ -585,6 +585,16 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                                     Text("Each one opens a text with a fresh preview link. Send it yourself; skip it if they asked you to stop.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
                                 }
                             }
+                            if (!live) {
+                                var flyerCode by remember(l.mailCode) { mutableStateOf(l.mailCode) }
+                                if (flyerCode == null) {
+                                    OutlinedButton(onClick = { act("mailcode") { flyerCode = state.api.postJson("/leads/$id/mailcode").optString("code").ifBlank { null } } }, enabled = busy == null, modifier = Modifier.padding(top = 10.dp)) { Text(if (busy == "mailcode") "Getting a code…" else "📬 Get flyer code") }
+                                    Text("For the mail-out / leave-behind flyer: write the code in the white box. They type it at undergroundassociates.com/code to see this preview, and you get an alert.", style = MaterialTheme.typography.bodySmall, color = muted)
+                                } else {
+                                    Text("📬 Flyer code: $flyerCode", style = MaterialTheme.typography.titleLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold), modifier = Modifier.padding(top = 10.dp))
+                                    Text("Write it in the box on their flyer. They enter it at undergroundassociates.com/code." + (if (l.mailOpens > 0) " Used ${if (l.mailOpens == 1) "once" else "${l.mailOpens} times"}, last ${ago(l.mailOpenedAt)}." else " Not used yet."), style = MaterialTheme.typography.bodySmall, color = muted)
+                                }
+                            }
                             if (l.previewOpens > 0) Text("👀 They opened their preview ${if (l.previewOpens == 1) "once" else "${l.previewOpens} times"}, last ${ago(l.previewOpenedAt)}.", style = MaterialTheme.typography.bodySmall, color = Good, modifier = Modifier.padding(top = 8.dp))
                         }
                         l.liveUrl?.let { u -> TextButton(onClick = { context.openUrl(u) }, contentPadding = PaddingValues(0.dp)) { Text("Live at ${u.removePrefix("https://")}") } }
@@ -966,7 +976,7 @@ private fun monthName(ym: String): String {
 }
 
 /** Writes a file into the phone's Downloads folder and answers with where it went. */
-private suspend fun saveToDownloads(context: Context, name: String, bytes: ByteArray, mime: String = "application/zip"): String = withContext(Dispatchers.IO) {
+internal suspend fun saveToDownloads(context: Context, name: String, bytes: ByteArray, mime: String = "application/zip"): String = withContext(Dispatchers.IO) {
     if (Build.VERSION.SDK_INT >= 29) {
         val resolver = context.contentResolver
         val values = ContentValues().apply {

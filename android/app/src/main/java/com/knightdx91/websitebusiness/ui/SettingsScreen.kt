@@ -655,6 +655,16 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                         OutlinedButton(onClick = { nav.navigate("guide/tankboard") }) { Text("📋 Live inventory guide") }
                         OutlinedButton(onClick = { nav.navigate("guide/pricetags") }) { Text("🏷️ QR price tags guide") }
                         OutlinedButton(onClick = { nav.navigate("guide/display") }) { Text("📺 Tablet display guide") }
+                        if (isOwner) OutlinedButton(onClick = { context.openUrl(state.api.origin + "/flyers/mailer.pdf") }) { Text("🖨️ Print the mail-out flyer") }
+                        if (isOwner) OutlinedButton(onClick = {
+                            scope.launch {
+                                try {
+                                    val bytes = state.api.bytes("/api/mailing.csv?limit=50")
+                                    val where = saveToDownloads(context, "mail-list.csv", bytes, "text/csv")
+                                    context.toast("Mail list saved: $where")
+                                } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't get the mail list") }
+                            }
+                        }) { Text("📬 Mail list: next 50 (CSV)") }
                         if (isOwner) OutlinedButton(onClick = { nav.navigate("costs") }) { Text("💵 Costs & usage") }
                         if (isOwner) OutlinedButton(onClick = { nav.navigate("guide/costs") }) { Text("📖 What keeps the app running") }
                         OutlinedButton(onClick = { nav.navigate("plans") }) { Text("📋 Show plans") }
