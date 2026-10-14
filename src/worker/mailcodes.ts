@@ -35,6 +35,8 @@ export async function assignMailCode(env: Env, leadId: string, o: { handedOut?: 
   }
   for (let i = 0; i < 20; i++) {
     const code = randomCode();
+    // A deleted lead's code is retired for good: never give it to another business.
+    if (await env.DB.prepare("SELECT 1 FROM retired_codes WHERE code = ?").bind(code).first()) continue;
     try {
       const r = await env.DB.prepare("UPDATE leads SET mail_code = ?, mail_code_at = ? WHERE id = ? AND mail_code IS NULL")
         .bind(code, o.handedOut ? now() : null, leadId)
@@ -89,6 +91,7 @@ export async function useCode(env: Env, code: string, ip: string, at = now()): P
         .bind(code)
         .first<{ id: string; name: string | null; status: string; mail_opened_at: number | null }>()
     : null;
+  if (!lead && (await env.DB.prepare("SELECT 1 FROM retired_codes WHERE code = ?").bind(code).first())) return { kind: "gone", name: "your business" };
   if (!lead) {
     await setSetting(env, ipKey(ip), JSON.stringify(prev ? { count: prev.count + 1, since: prev.since } : { count: 1, since: at }));
     return { kind: "wrong" };

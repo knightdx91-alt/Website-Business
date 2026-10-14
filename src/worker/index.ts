@@ -3014,6 +3014,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await deletePrefix(env, `previews/${id}/`);
       await deletePrefix(env, `owner/${id}/`);
       await env.DB.batch([
+        // Its flyer code is retired, never handed to another business (an old flyer must not open someone else's site).
+        env.DB.prepare("INSERT OR IGNORE INTO retired_codes (code, retired_at) SELECT mail_code, ? FROM leads WHERE id = ? AND mail_code IS NOT NULL").bind(now(), id),
         env.DB.prepare("DELETE FROM lead_notes WHERE lead_id = ?").bind(id),
         env.DB.prepare("DELETE FROM site_stats WHERE lead_id = ?").bind(id),
         env.DB.prepare("DELETE FROM leads WHERE id = ?").bind(id),

@@ -1548,7 +1548,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   (served at app.undergroundassociates.com/flyers/mailer.pdf); rerun with `--phone` / `--from` when Settings change.
   `test/worker/mailcodes.test.ts`. Since 2.67 every ready lead gets its code automatically (`backfillMailCodes`, minute cron, 50
   a tick), so it's always on the lead page; `mail_code_at` is stamped only when a code is handed out (mail list export, a logged
-  "Left a flyer"), and only that keeps the preview past the normal expiry.
+  "Left a flyer"), and only that keeps the preview past the normal expiry. Codes are never reused for another business: the unique
+  index stops two leads sharing one, an expired lead keeps its code (entering it says the sample was taken down), and deleting a
+  lead retires its code in `retired_codes` (migration 0023), which `assignMailCode` skips and `useCode` answers as "taken down".
 - Example businesses are invented (owner's rule, Oct 2026: we have no permission to use a real business's name). Six example names
   that matched or nearly matched real businesses (Magnolia Table, Cedar Creek Baptist, Crossroads Auto Care, Main Street Tees,
   Ivy & Iron, Willow & Wren) were renamed to Biscuit Hollow Cafe, Sweetgum Hill Church, Copperline Auto Care, Ink & Anvil Print
