@@ -1599,6 +1599,14 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   title / notes / date / time / who or delete it (`TaskEditDialog`, `Api.updateTask`). A time picked without a date means today
   (web and Android; the web used to drop it). Backup fix: `BACKUP_TABLES` listed `settings`, which overwrote the filtered settings
   dump (owner password hash and the saved Claude key were going into backups); removed.
+- 🚛 Towing is its own kind (Oct 2026, owner's call on Hays Towing; `test/towing.test.ts`): auto variant `towing` = "Towing & Roadside"
+  (a tow company: names with towing / wrecker / tow / roadside / recovery), `tow_repair` = "Towing & Auto Repair" (the same names
+  plus repair / automotive / garage / mechanic). `isTow()` covers both for the Need-a-tow strip, tow todos, the 24/7 rules, the tow
+  line fields (web + editform) and the call guide. Pure towing gets its own seed services (local / long-distance towing, roadside,
+  jump starts, lockouts, flat tires, accident recovery, winch-outs), "What we do", tow steps, nav "Request a tow", a Request-a-tow
+  form (vehicle, where it is, where it goes; "Stuck right now? Call …"), `towBrief` (dispatcher voice, never repairs unless listed,
+  no arrival times), and banned phrases for repair words and minute promises. Records built while `towing` meant tow + repair are
+  reseeded on a rewrite (`setAutoVariant(r, "towing")` when the services still equal the `tow_repair` seed). Hays was rebuilt this way.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
