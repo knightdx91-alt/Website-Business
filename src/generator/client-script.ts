@@ -260,6 +260,11 @@ for (var ci = 0; ci < cs.length; ci++) (function (c) {
   var step = function (dir) { tr.scrollBy({ left: dir * tr.clientWidth * 0.8, behavior: "smooth" }); };
   c.querySelector(".carousel__btn--prev").addEventListener("click", function () { step(-1); });
   c.querySelector(".carousel__btn--next").addEventListener("click", function () { step(1); });
+  // Arrows only when there is more to scroll to (one or two photos fit without them).
+  var fit = function () { c.classList.toggle("is-fit", tr.scrollWidth <= tr.clientWidth + 2); };
+  fit(); window.addEventListener("resize", fit);
+  var ims = tr.querySelectorAll("img");
+  for (var ii = 0; ii < ims.length; ii++) ims[ii].addEventListener("load", fit);
 })(cs[ci]);
 var zs = d.querySelectorAll("[data-zoom]");
 if (zs.length) {

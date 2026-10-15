@@ -114,7 +114,8 @@ export function addLife(ctx: Ctx, body: string): string {
   const dna = ctx.theme.dna;
   const edge = dna.edge && dna.edge !== "straight";
   const decor = dna.decor && dna.decor !== "none" ? dna.decor : null;
-  const pics = dna.pics && dna.pics !== "none" ? (ctx.photos ?? []) : [];
+  // Never a photo the page already shows (a What's new or gallery photo would appear twice, once huge).
+  const pics = dna.pics && dna.pics !== "none" ? (ctx.photos ?? []).filter((p) => !body.includes(`src="${esc(p.src)}"`) && !body.includes(`src="${p.src}"`)) : [];
   if (!edge && !decor && !pics.length) return body;
   const icons = tradeIcons(ctx.r);
   let n = 0;

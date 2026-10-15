@@ -362,7 +362,7 @@ html.notes .todo strong{display:block;margin-bottom:.25em}
 .carousel__cap{font-size:.92rem;color:var(--muted);margin:6px 0 0}
 .carousel__btn{display:none;position:absolute;top:calc(50% - 26px);z-index:2;width:44px;height:44px;border-radius:50%;border:0;background:var(--surface);color:var(--text);box-shadow:0 2px 10px rgba(0,0,0,.28);font-size:30px;line-height:40px;cursor:pointer}
 .carousel__btn--prev{left:-8px}.carousel__btn--next{right:-8px}
-@media (min-width:760px){.carousel.has-js .carousel__btn{display:block}}
+@media (min-width:760px){.carousel.has-js:not(.is-fit) .carousel__btn{display:block}}
 .lightbox{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:56px 12px}
 .lightbox[hidden]{display:none}
 .lightbox figure{margin:0;max-width:100%;max-height:100%;display:flex;flex-direction:column;align-items:center}
