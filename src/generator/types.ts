@@ -47,6 +47,8 @@ export interface Image {
   pairWith?: string;
   /** Which part of the photo stays in view when it's cropped ("50% 25%" keeps the upper middle), as CSS object-position. */
   focus?: string;
+  /** Phones only: how far to zoom in on `focus` (1.8 = 180%), so a sign or a detail stays big enough to read on a small screen. */
+  zoomPhone?: number;
   /** Shops: show this photo in the "What's new" carousel (tap to see it big) instead of the Photos grid. */
   whatsNew?: boolean;
 }

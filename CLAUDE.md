@@ -1651,7 +1651,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `leadActions` in salon.ts). The cover opening's fade is stronger (dna-css.ts: bottom-up on phones, left-to-right from 900 px)
   so a photo with its own lettering (Captivate's road sign) can't fight the name. The owner wanted the sign itself readable, so Captivate is on the `card`
   opening (photo full width and unfaded, the name on a card below it) with `Image.focus` "50% 38%" (`object-position` on the
-  opening photo, `NN% NN%` only; set by SQL for now, no Edit field yet) so the crop keeps the whole sign.
+  opening photo, `NN% NN%` only) plus `Image.zoomPhone` 1.6 (phones under 900 px: `transform: scale` around the focus in an
+  overflow-hidden frame, `data-zoom-phone`; the card then overlaps the photo by 16 px instead of 64) so the sign's small lettering is
+  readable on a phone. Both are set by SQL for now, no Edit field yet.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

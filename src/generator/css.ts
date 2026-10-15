@@ -351,6 +351,7 @@ html.notes .todo strong{display:block;margin-bottom:.25em}
 .pair__cap{margin:8px 0 0;font-weight:600}
 .gallery figure{margin:0}.gallery figcaption{font-size:.92rem;color:var(--muted);margin-top:6px}
 .gallery--more{margin-top:28px}
+@media (max-width:899px){.hero img[data-zoom-phone]{transform:scale(var(--zoom))}.hero .ph:has(img[data-zoom-phone]),.hero__media:has(img[data-zoom-phone]){overflow:hidden}html[data-hero="card"] .hero:has(img[data-zoom-phone]) .hero__in{margin-top:-16px}}
 .smenu{margin-top:20px}
 .smenu__nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
 .smenu__nav a{border:1px solid currentColor;border-radius:999px;padding:6px 14px;font-weight:600;font-size:.92rem;text-decoration:none;color:var(--heading)}

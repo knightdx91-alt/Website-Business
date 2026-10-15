@@ -165,7 +165,9 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   // The billboard / poster / statement H1 is sized to the screen; its longest word sets the ceiling so no word ever breaks.
   const longest = Math.max(1, ...h1Text.split(/\s+/).map((w) => w.length));
   const fit = kind === "billboard" || kind === "statement" || dna.scale === "poster" ? raw(` style="--h1-ch:${longest}"`) : "";
-  const focus = img?.focus && /^\d{1,3}% \d{1,3}%$/.test(img.focus) ? ` style="object-position:${img.focus}"` : "";
+  const fp = img?.focus && /^\d{1,3}% \d{1,3}%$/.test(img.focus) ? img.focus : undefined;
+  const zoom = img?.zoomPhone && img.zoomPhone > 1 && img.zoomPhone <= 3 ? img.zoomPhone : undefined;
+  const focus = fp || zoom ? ` style="${fp ? `object-position:${fp};` : ""}${zoom ? `--zoom:${zoom};transform-origin:${fp ?? "50% 50%"}` : ""}"${zoom ? " data-zoom-phone" : ""}` : "";
   const imgAttrs = raw(`src="${img?.src ?? ""}" alt="" width="${img?.width ?? 1200}" height="${img?.height ?? 800}" decoding="async"${focus}`);
   const media = backdrop ? html`<div class="hero__media"><img ${imgAttrs} fetchpriority="high"></div>` : "";
   const photo = showImg && !backdrop ? html`<div class="ph"><img ${imgAttrs} fetchpriority="high"></div>` : "";
