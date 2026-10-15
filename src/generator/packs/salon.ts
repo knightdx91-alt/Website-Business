@@ -176,15 +176,26 @@ ${ask}
 </div></section>`;
 }
 
+/** Appointment-only shops that take texts ("Text for Appt." on their sign) lead with a text; the call button comes second. */
+function textFirst(r: BusinessRecord): boolean {
+  return !r.links.booking && r.smsEnabled && r.ext.salon?.walkIns === "appointment_only";
+}
+
 function primary(r: BusinessRecord): ActionId {
-  return r.links.booking ? "book" : "call";
+  return r.links.booking ? "book" : textFirst(r) ? "text" : "call";
+}
+
+/** The opening's and closing band's two buttons. */
+function leadActions(r: BusinessRecord) {
+  const second: ActionId = primary(r) === "call" ? "directions" : "call";
+  return actions(r, [primary(r), second]).map((a) => (a.id === "text" && textFirst(r) ? { ...a, label: "Text for an appointment" } : a));
 }
 
 function dataFaq(r: BusinessRecord): Faq[] {
   const out: Faq[] = [];
   const w = r.ext.salon?.walkIns;
   if (w === "welcome") out.push({ q: "Do you take walk-ins?", a: "Yes, walk-ins are welcome. Call ahead if you'd like to check the wait." });
-  if (w === "appointment_only") out.push({ q: "Do you take walk-ins?", a: r.links.booking ? "We work by appointment. Book online or give us a call." : `We work by appointment. Call ${r.phone.display} to set one up.` });
+  if (w === "appointment_only") out.push({ q: "Do you take walk-ins?", a: r.links.booking ? "We work by appointment. Book online or give us a call." : r.smsEnabled ? `We work by appointment. Text or call ${r.phone.display} to set one up.` : `We work by appointment. Call ${r.phone.display} to set one up.` });
   if (w === "both") out.push({ q: "Do you take walk-ins?", a: "Yes. Walk-ins are welcome, and appointments get you in at a set time." });
   if (r.links.booking) out.push({ q: "How do I book?", a: "Tap Book online to pick a time that works for you, or call us." });
   if (hasAnyHours(r.hours)) out.push({ q: "When are you open?", a: "Our hours are listed below, with today highlighted." });
@@ -241,14 +252,14 @@ export const salonPack: CategoryPack = {
     if (r.ownershipTags.includes("family_owned")) trust.push("Family-owned");
     const prices = r.services.map(priceAndTime);
     const confirmed = r.confirmed.includes("services");
-    const ctaActs = [...actions(r, [primary(r), primary(r) === "book" ? "call" : "directions"]), ...actions(r, ["giftcard"])];
+    const ctaActs = [...leadActions(r), ...actions(r, ["giftcard"])];
     return html`${hero(ctx, {
       eyebrow: `${LABEL[r.variant] ?? "Hair salon"} · ${r.address.city}, ${r.address.state}`,
       h1: r.name,
       sub: ctx.copy.heroTagline,
       trust,
       showStatus: hasAnyHours(r.hours),
-      actions: actions(r, [primary(r), primary(r) === "book" ? "call" : "directions"]),
+      actions: leadActions(r),
       badge: r.foundedYear && ctx.theme.knobs.badge === "seal" ? `Since ${r.foundedYear}` : undefined,
     })}
 ${infoStrip(ctx, walk ? [WALK_IN_TEXT[walk]] : [])}

@@ -14,7 +14,8 @@ export function dnaCss(t: Theme): string {
   return `/* dna */
 /* opening: full-screen photo */
 html[data-hero="cover"] .hero--photo .hero__in{min-height:min(86vh,760px);min-height:min(86svh,760px);display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:40px}
-html[data-hero="cover"] .hero--photo .hero__media::after{background:linear-gradient(180deg,${withAlpha(c.heroBg, 0.1)} 0%,${withAlpha(c.heroBg, 0.45)} 45%,${withAlpha(c.heroBg, 0.97)} 100%)}
+html[data-hero="cover"] .hero--photo .hero__media::after{background:linear-gradient(180deg,${withAlpha(c.heroBg, 0.12)} 0%,${withAlpha(c.heroBg, 0.4)} 28%,${withAlpha(c.heroBg, 0.86)} 52%,${withAlpha(c.heroBg, 0.97)} 100%)}
+@media (min-width:900px){html[data-hero="cover"] .hero--photo .hero__media::after{background:linear-gradient(90deg,${withAlpha(c.heroBg, 0.96)} 0%,${withAlpha(c.heroBg, 0.9)} 45%,${withAlpha(c.heroBg, 0.55)} 70%,${withAlpha(c.heroBg, 0.2)} 100%)}}
 html[data-hero="cover"] .hero h1{font-size:clamp(2.4rem,9vw,5rem);line-height:1;max-width:16ch}
 html[data-hero="cover"] .hero__sub{font-size:clamp(1.15rem,3.4vw,1.45rem)}
 @media (min-width:900px){html[data-hero="cover"] .hero--photo .hero__in{padding-bottom:72px}}
