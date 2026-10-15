@@ -562,7 +562,16 @@ export const EditsSchema = z.object({
         .max(6)
         .optional(),
       towns: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
-      services: z.array(z.string().trim().min(1).max(60)).max(12).optional(),
+      services: z.array(z.string().trim().min(1).max(160)).max(120).optional(),
+      /** A new street address (the business moved, or Google has it wrong). */
+      address: z
+        .object({
+          street: z.string().trim().max(120),
+          city: z.string().trim().min(1).max(60),
+          state: z.string().trim().regex(/^[A-Za-z]{2}$/).optional(),
+          zip: z.string().trim().regex(/^\d{5}$/, "ZIP must be 5 digits").or(z.literal("")),
+        })
+        .optional(),
       menuText: z.string().max(20_000).optional(),
       hiring: z
         .object({
@@ -1246,17 +1255,54 @@ export function applyEdits(
       if (e.galleryAlts[p.src]) p.alt = e.galleryAlts[p.src]!;
   if (e.towns)
     r.serviceArea = { towns: e.towns, counties: r.serviceArea?.counties ?? [] };
+  if (e.address) {
+    const a = e.address;
+    const moved =
+      a.street !== (r.address.street ?? "") ||
+      a.city !== r.address.city ||
+      (a.zip || "") !== (r.address.zip ?? "") ||
+      (a.state && a.state.toUpperCase() !== r.address.state);
+    if (moved) {
+      r.address = {
+        ...r.address,
+        street: a.street || undefined,
+        city: a.city,
+        state: (a.state || r.address.state).toUpperCase(),
+        zip: a.zip || undefined,
+      } as typeof r.address;
+      r.addressEdited = true;
+    }
+  }
   if (e.services) {
     const keep = new Map(r.services.map((s) => [s.name.toLowerCase(), s]));
-    r.services = e.services.map((line) => {
+    // "# Color | Any lightening adds Olaplex ($40)" starts a group (with an optional note) for the lines under it.
+    let group: string | undefined;
+    const notes: Record<string, string> = {};
+    const lines: Array<{ line: string; group?: string }> = [];
+    for (const raw of e.services) {
+      const head = /^#\s*(.+)$/.exec(raw);
+      if (head) {
+        const [g, note] = head[1]!.split("|").map((x) => x.trim());
+        group = g?.slice(0, 60) || undefined;
+        if (group && note) notes[group] = note.slice(0, 200);
+        continue;
+      }
+      lines.push({ line: raw, group });
+    }
+    const ids = new Set<string>();
+    r.serviceNotes = Object.keys(notes).length ? notes : undefined;
+    r.services = lines.map(({ line, group: g }) => {
       const [rawName, rawPrice, rawDuration] = line
         .split("|")
         .map((x) => x.trim());
-      const name = rawName || line;
+      const name = (rawName || line).slice(0, 80);
       const existing = keep.get(name.toLowerCase());
-      const svc: Service = existing
+      let svc: Service = existing
         ? { ...existing, name }
         : { id: serviceId(name), name, featured: true };
+      if (ids.has(svc.id)) svc = { ...svc, id: `${svc.id}-${ids.size}` };
+      ids.add(svc.id);
+      svc.group = g;
       if (rawPrice !== undefined) svc.price = parsePrice(rawPrice);
       // Salons: a third part is the duration ("Haircut | $25 | 45 min").
       if (rawDuration !== undefined) {

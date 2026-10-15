@@ -573,6 +573,10 @@ export interface BusinessRecord {
   address: { street?: string; city: string; state: string; zip?: string; county?: string };
   showStreetAddress: boolean;
   geo: { lat: number; lng: number };
+  /** The owner typed a new address (Edit → Address): directions go to the address, not Google's pin for the old place. */
+  addressEdited?: boolean;
+  /** Grouped service menus: a line under each group heading ("Color" → "Any lightening adds Olaplex, $40"). */
+  serviceNotes?: Record<string, string>;
   timezone: string;
   mapsUrl: string;
   hours?: Hours;

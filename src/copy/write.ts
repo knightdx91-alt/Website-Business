@@ -76,7 +76,7 @@ function facts(r: BusinessRecord, pack: CategoryPack, primaryTypeLabel?: string)
     town: `${r.address.city}, ${r.address.state}`,
     county: r.address.county ? `${r.address.county} County` : undefined,
     hours: hasAnyHours(r.hours) ? hoursSummary(r.hours) : "unknown",
-    services: r.services.length ? r.services.map((s) => ({ id: s.id, name: s.name })) : undefined,
+    services: r.services.length ? r.services.map((s) => ({ id: s.id, name: s.name, ...(s.group ? { group: s.group } : {}) })) : undefined,
     service_area_towns: r.serviceArea?.towns,
     restaurant_options: so && Object.keys(so).length ? (r.category === "restaurant" && counterService(r) ? Object.fromEntries(Object.entries(so).filter(([k]) => k !== "dineIn" && k !== "takeout")) : so) : undefined,
     founded_year: r.foundedYear,

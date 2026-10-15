@@ -51,6 +51,9 @@ export function detectProvider(url: string): string | undefined {
 
 export function directionsUrl(r: BusinessRecord): string {
   const q = encodeURIComponent(r.showStreetAddress && r.address.street ? `${r.name}, ${r.address.street}, ${r.address.city}, ${r.address.state}` : r.name);
+  // A moved business: Google's place still points at the old address, so search the new one.
+  if (r.addressEdited && r.address.street)
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.address.street}, ${r.address.city}, ${r.address.state} ${r.address.zip ?? ""}`.trim())}`;
   return `https://www.google.com/maps/search/?api=1&query=${q}&query_place_id=${encodeURIComponent(r.placeId)}`;
 }
 

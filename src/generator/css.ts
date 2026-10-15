@@ -351,6 +351,25 @@ html.notes .todo strong{display:block;margin-bottom:.25em}
 .pair__cap{margin:8px 0 0;font-weight:600}
 .gallery figure{margin:0}.gallery figcaption{font-size:.92rem;color:var(--muted);margin-top:6px}
 .gallery--more{margin-top:28px}
+.smenu{margin-top:20px}
+.smenu__nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.smenu__nav a{border:1px solid currentColor;border-radius:999px;padding:6px 14px;font-weight:600;font-size:.92rem;text-decoration:none;color:var(--heading)}
+.smenu__g{border-top:2px solid var(--text);padding:4px 0 10px;scroll-margin-top:calc(var(--hdr-h,64px) + 12px)}
+.smenu__g:last-child{border-bottom:2px solid var(--text)}
+.smenu__g summary{display:flex;align-items:baseline;justify-content:space-between;gap:12px;cursor:pointer;list-style:none;padding:12px 0}
+.smenu__g summary::-webkit-details-marker{display:none}
+.smenu__g summary h3{margin:0;font-size:1.35rem}
+.smenu__g summary::after{content:"+";font:700 1.4rem var(--hf);color:var(--heading)}
+.smenu__g[open] summary::after{content:"–"}
+.smenu__n{margin-left:auto;color:var(--muted);font-size:.9rem;white-space:nowrap}
+.smenu__note{margin:0 0 10px;color:var(--muted);font-size:.95rem;font-style:italic;max-width:62ch}
+.smenu__list{list-style:none;margin:0;padding:0}
+.smenu__list li{display:flex;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid color-mix(in srgb,var(--text) 14%,transparent)}
+.smenu__list li:last-child{border-bottom:0}
+.smenu__nm{flex:0 1 auto;max-width:74%}
+.smenu__dots{flex:1;min-width:16px;border-bottom:2px dotted color-mix(in srgb,var(--text) 30%,transparent);transform:translateY(-.3em)}
+.smenu__pr{font-weight:700;white-space:nowrap;color:var(--heading);font-variant-numeric:tabular-nums}
+@media (min-width:900px){.smenu__list{columns:2;column-gap:56px}.smenu__list li{break-inside:avoid}}
 .zoomable{display:block;width:100%;padding:0;border:0;background:none;color:inherit;cursor:zoom-in;border-radius:var(--radius)}
 .carousel{position:relative;margin:24px 0 8px}
 .carousel__track{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;list-style:none;margin:0;padding:0 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}

@@ -5,6 +5,8 @@ export function parsePrice(text: string): Service["price"] {
   const t = text.toLowerCase().replace(/,/g, "");
   const nums = [...t.matchAll(/\$?\s*(\d+(?:\.\d{1,2})?)/g)].map((m) => Number(m[1]));
   if (/consult/.test(t)) return { mode: "quote" };
+  // "+$5": an add-on to another service (French tip on a manicure).
+  if (nums.length === 1 && /^\s*\+/.test(t)) return { mode: "exact", amount: nums[0], unit: "add-on" };
   if (nums.length >= 2) return { mode: "range", min: nums[0], max: nums[1] };
   if (nums.length === 1) return { mode: /from|start|\+/.test(t) ? "from" : "exact", amount: nums[0] };
   return undefined;

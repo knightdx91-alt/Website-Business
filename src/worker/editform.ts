@@ -302,7 +302,7 @@ export const photoKey = (src: string): string =>
 function priceOf(s: AnyRecord): string {
   const p = s.price;
   if (!p) return "";
-  if (p.mode === "exact") return `$${p.amount}`;
+  if (p.mode === "exact") return p.unit === "add-on" ? `+$${p.amount}` : `$${p.amount}`;
   if (p.mode === "from") return `from $${p.amount}`;
   if (p.mode === "range") return `$${p.min}-$${p.max}`;
   if (p.mode === "quote") return "consult";
@@ -419,16 +419,23 @@ export function editForm(l: EditDetail): EditForm {
   const t: AnyRecord[] = (r.testimonials || [])
     .concat([{}, {}, {}])
     .slice(0, 3);
+  const notes: AnyRecord = r.serviceNotes || {};
+  let lastGroup: string | undefined;
   const serviceLines = (r.services || [])
-    .map((s: AnyRecord) =>
-      isS
+    .map((s: AnyRecord) => {
+      const line = isS
         ? pipeJoin([
             s.name,
             priceOf(s),
             s.durationMin ? `${s.durationMin} min` : "",
           ])
-        : s.name,
-    )
+        : s.name;
+      if (s.group && s.group !== lastGroup) {
+        lastGroup = s.group;
+        return `# ${s.group}${notes[s.group] ? ` | ${notes[s.group]}` : ""}\n${line}`;
+      }
+      return line;
+    })
     .join("\n");
   const lic = (r.licenses || [])[0] || {};
   const w = ext.warranty || {};
@@ -449,6 +456,10 @@ export function editForm(l: EditDetail): EditForm {
       required: true,
     }),
     cb("smsEnabled", "This number takes texts", r.smsEnabled),
+    txt("addrStreet", "Street address", r.address?.street ?? "", { max: 120 }),
+    txt("addrCity", "Town", r.address?.city ?? "", { max: 60 }),
+    txt("addrZip", "ZIP", r.address?.zip ?? "", { max: 5 }),
+    note("Moved, or Google has the address wrong? Change it here: the site and its Directions buttons use the new address."),
     ...(serviceArea
       ? [
           cb(
@@ -2259,7 +2270,7 @@ export function editForm(l: EditDetail): EditForm {
         serviceLines,
         7,
         isS
-          ? { hint: "e.g. Haircut | $25 | 30 min or Color | from $80 | 90 min" }
+          ? { hint: "e.g. Haircut | $25 | 30 min or Color | from $80 | 90 min. A long menu: start each group with a line like # Color (add | a note under it), and +$5 for an add-on." }
           : {},
       ),
       ...(hasTowns
@@ -3052,6 +3063,10 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
             .filter(Boolean)
         : undefined,
     services: hasServices && has("services") ? lines("services") : undefined,
+    address:
+      has("addrCity") && v("addrCity")
+        ? { street: v("addrStreet") || "", city: v("addrCity")!, zip: v("addrZip") || "" }
+        : undefined,
     menuText: isR ? raw("menuText") : undefined,
     confirmed,
   });

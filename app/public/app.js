@@ -1400,13 +1400,18 @@ async function viewLead(id, intent) {
     const priceOf = (s) => {
       const p = s.price;
       if (!p) return "";
-      if (p.mode === "exact") return `$${p.amount}`;
+      if (p.mode === "exact") return p.unit === "add-on" ? `+$${p.amount}` : `$${p.amount}`;
       if (p.mode === "from") return `from $${p.amount}`;
       if (p.mode === "range") return `$${p.min}-$${p.max}`;
       if (p.mode === "quote") return "consult";
       return "";
     };
-    const serviceLines = r.services.map((s) => (isS ? [s.name, priceOf(s), s.durationMin ? `${s.durationMin} min` : ""].join(" | ").replace(/( \|\s*)+$/, "") : s.name)).join("\n");
+    let lastGroup;
+    const serviceLines = r.services.map((s) => {
+      const line = isS ? [s.name, priceOf(s), s.durationMin ? `${s.durationMin} min` : ""].join(" | ").replace(/( \|\s*)+$/, "") : s.name;
+      if (s.group && s.group !== lastGroup) { lastGroup = s.group; const n = (r.serviceNotes || {})[s.group]; return `# ${s.group}${n ? ` | ${n}` : ""}\n${line}`; }
+      return line;
+    }).join("\n");
     const lic = r.licenses[0] || {};
     const w = ext.warranty || {};
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p><h1>Edit ${esc(r.name)}</h1>
@@ -1414,6 +1419,8 @@ async function viewLead(id, intent) {
       <section class="card"><h2>Confirm with the owner</h2>
         <label class="field">Business name<input name="name" value="${esc(r.name)}" required></label>
         <label class="field">Phone<input name="phone" type="tel" value="${esc(r.phone.display)}" required></label>
+        <div class="row"><label class="field">Street address<input name="addrStreet" maxlength="120" value="${esc(r.address.street || "")}"></label><label class="field">Town<input name="addrCity" maxlength="60" value="${esc(r.address.city || "")}"></label><label class="field">ZIP<input name="addrZip" maxlength="5" inputmode="numeric" value="${esc(r.address.zip || "")}"></label></div>
+        <p class="hint">Moved, or Google has the address wrong? Change it here: the site and its Directions buttons use the new address.</p>
         ${cb("smsEnabled", "This number takes texts", r.smsEnabled)}
         ${serviceArea ? cb("showStreetAddress", "Show the street address (they have a storefront)", r.showStreetAddress) : ""}
         <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
@@ -1515,7 +1522,7 @@ async function viewLead(id, intent) {
         <label class="field"><span class="sr-only">Menu</span><textarea name="menuText" rows="12" placeholder="# Plates&#10;Pulled pork plate | $12 | Two sides and bread">${esc(l.menuText)}</textarea></label>
         ${menuItemsEditHtml(id, r)}</section>` : ""}
       ${hasServices && !isParts ? `<section class="card"><h2>${hasTowns ? "Services &amp; area" : "Services"}</h2>
-        <label class="field">${isS ? "Services, prices and how long, one per line <span class=\"hint\">e.g. <code>Haircut | $25 | 30 min</code> or <code>Color | from $80 | 90 min</code></span>" : "Services (one per line)"}<textarea name="services" rows="7">${esc(serviceLines)}</textarea></label>
+        <label class="field">${isS ? "Services, prices and how long, one per line <span class=\"hint\">e.g. <code>Haircut | $25 | 30 min</code> or <code>Color | from $80 | 90 min</code>. A long menu: start each group with a line like <code># Color</code> (add <code>| a note</code> under it), and <code>+$5</code> for an add-on.</span>" : "Services (one per line)"}<textarea name="services" rows="${isS ? 14 : 7}">${esc(serviceLines)}</textarea></label>
         ${hasTowns ? `<label class="field">Towns served (comma separated)<textarea name="towns" rows="3">${esc((r.serviceArea || { towns: [] }).towns.join(", "))}</textarea></label>` : ""}</section>` : ""}
       <section class="card"><h2>Customer quotes</h2><p class="small muted">Only real quotes the customer said you can use. Never copy Google reviews.</p>
         ${t.map((q, i) => `<label class="field">Quote ${i + 1}<textarea name="q${i}" rows="2">${esc(q.quote || "")}</textarea></label>
@@ -1663,6 +1670,7 @@ async function viewLead(id, intent) {
           testimonials,
           towns: hasTowns ? val("towns").split(",").map((s) => s.trim()).filter(Boolean) : undefined,
           services: hasServices ? val("services").split("\n").map((s) => s.trim()).filter(Boolean) : undefined,
+          address: val("addrCity") ? { street: val("addrStreet"), city: val("addrCity"), zip: val("addrZip") } : undefined,
           menuText: isR ? f.elements.menuText.value : undefined,
           confirmed,
         },

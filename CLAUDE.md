@@ -1638,6 +1638,15 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   has "🔎 Text them the stock lookup" / "Open the lookup here" (`POST /api/leads/:id/lookuplink`, owner + callers; web
   `data-lookuplink`, Android `Api.lookupLink`). Not built yet: the live QuickBooks Online connection (needs the owner's Intuit
   developer app); until then the shop re-uploads its export whenever it wants fresher counts.
+- 💇 Grouped service menus + address edits (Oct 2026, owner's ask for Captivate Salon; `test/worker/salon-menu.test.ts`). (1) The
+  services box (web + editform, every category) takes `# Group | optional note` lines: following lines get `Service.group`, notes go
+  to `record.serviceNotes`; up to 120 lines (was 12); `+$5` parses as an add-on (`price.unit "add-on"`, shown "+$5"). Salon sites
+  with groups render `groupedMenu()` (salon.ts): jump chips, one `<details>` per group (first open; the client script opens a group
+  when its chip is tapped), dotted-leader rows, "$110+" for from-prices, two columns from 900 px (`.smenu*` in css.ts). The editors
+  write the groups back as `# Group | note` lines. (2) Edit → Confirm card has Street address / Town / ZIP (web `addrStreet` etc.,
+  editform same names, edits `record.address`): a change sets `record.addressEdited`, `directionsUrl` then searches the new address
+  instead of Google's place pin, and `relocate()` (src/worker/relocate.ts) geocodes it with one Places text search (record `geo` +
+  `leads.lat/lng`). Captivate Salon (c4d698b9f5b64ffb) was moved to 1705 Co Rd 520, Hanceville with their 45-service price list.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

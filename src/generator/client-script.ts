@@ -252,6 +252,9 @@ if ("IntersectionObserver" in window && !(window.matchMedia && window.matchMedia
     mq.parentNode.classList.add("is-dup");
   }
 }
+// Grouped price menus: a chip opens its group as it scrolls there.
+var sm = d.querySelectorAll(".smenu__nav a");
+for (var si = 0; si < sm.length; si++) sm[si].addEventListener("click", function () { var g = d.getElementById(this.getAttribute("href").slice(1)); if (g) g.open = true; });
 // "What's new" photo row: arrows scroll it; any [data-zoom] photo opens big with previous / next, Esc and swipe.
 var cs = d.querySelectorAll("[data-carousel]");
 for (var ci = 0; ci < cs.length; ci++) (function (c) {

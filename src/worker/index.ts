@@ -1,3 +1,4 @@
+import { relocate } from "./relocate.ts";
 import { addEntry, chicagoDay, clockIn, clockOut, clockStatus, deleteEntry, editEntry, EntryInput, remindOpenShifts, setHourly, teamWeek, timesheetCsv } from "./clock.ts";
 import { AI_KEY_RE, aiKeyStatus, clearAiKey, saveAiKey, testAiKey, withAiKey } from "./ai-key.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
@@ -3302,6 +3303,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             `The "${LOOKS[parseDesign(next.look).look]?.name ?? "chosen"}" look is ${owner.name}'s now (they bought it). Pick another.`,
           );
       }
+      await relocate(env, id, JSON.parse(lead.record_json), next.record);
       await renderPreview(
         env,
         lead,
@@ -3349,6 +3351,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             `The "${LOOKS[parseDesign(next.look).look]?.name ?? "chosen"}" look is ${owner.name}'s now (they bought it). Pick another.`,
           );
       }
+      await relocate(env, id, JSON.parse(lead.record_json), next.record);
       await renderPreview(
         env,
         lead,

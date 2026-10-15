@@ -46,7 +46,7 @@ export function seedSalonServices(variant: string): Service[] {
 function priceText(s: Service): string | undefined {
   const p = s.price;
   if (!p || p.mode === "none") return undefined;
-  if (p.mode === "exact" && p.amount !== undefined) return `$${p.amount}`;
+  if (p.mode === "exact" && p.amount !== undefined) return p.unit === "add-on" ? `+$${p.amount}` : `$${p.amount}`;
   if (p.mode === "from" && p.amount !== undefined) return `From $${p.amount}`;
   if (p.mode === "range" && p.min !== undefined && p.max !== undefined) return `$${p.min}–$${p.max}`;
   if (p.mode === "quote") return "Price at consultation";
@@ -57,6 +57,37 @@ const WALK_IN_TEXT = { welcome: "Walk-ins welcome", appointment_only: "By appoin
 
 function ext(r: BusinessRecord): SalonExt {
   return r.ext.salon ?? {};
+}
+
+/**
+ * A long menu in groups (Color, Cuts & styling, Waxing, Nails…): jump chips, then one fold per group with a dotted-leader
+ * price list and the group's note. "From" prices read "$110+" here, the way salon menus print them.
+ */
+function groupedMenu(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const groups: Array<{ name: string; items: Service[] }> = [];
+  for (const s of r.services) {
+    const g = s.group ?? "More services";
+    const last = groups[groups.length - 1];
+    if (last && last.name === g) last.items.push(s);
+    else groups.push({ name: g, items: [s] });
+  }
+  const slug = (g: string) => `grp-${g.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+  const price = (s: Service) => {
+    const p = s.price;
+    const t = p?.mode === "from" && p.amount !== undefined ? `$${p.amount}+` : priceText(s);
+    return [t, s.durationMin ? `${s.durationMin} min` : undefined].filter(Boolean).join(" · ");
+  };
+  const notes = r.serviceNotes ?? {};
+  return html`<div class="smenu">
+<nav class="smenu__nav" aria-label="Service groups">${groups.map((g) => html`<a href="#${slug(g.name)}">${g.name}</a>`)}</nav>
+${groups.map(
+    (g, i) => html`<details class="smenu__g" id="${slug(g.name)}"${i === 0 ? raw(" open") : ""}><summary><h3>${g.name}</h3><span class="smenu__n">${g.items.length} ${g.items.length === 1 ? "service" : "services"}</span></summary>
+${notes[g.name] ? html`<p class="smenu__note">${notes[g.name]}</p>` : ""}<ul class="smenu__list">${g.items.map(
+      (s) => html`<li><span class="smenu__nm">${s.name}</span><span class="smenu__dots" aria-hidden="true"></span>${price(s) ? html`<span class="smenu__pr">${price(s)}</span>` : ""}</li>`,
+    )}</ul></details>`,
+  )}
+</div>`;
 }
 
 /** "$35 · 45 min": price and duration side by side when both are known. */
@@ -225,7 +256,7 @@ ${infoStrip(ctx, walk ? [WALK_IN_TEXT[walk]] : [])}
 <section class="section section--surface" id="services" aria-labelledby="services-title"><div class="wrap">
 ${sectionHead("Services", r.variant === "barber" ? "Cuts & prices" : "Services", undefined, "services-title")}
 ${ctx.copy.heroSub ? html`<p class="lead">${ctx.copy.heroSub}</p>` : ""}
-${serviceList(ctx, r.services.map((s, i) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], price: prices[i] })))}
+${r.services.some((s) => s.group) ? groupedMenu(ctx) : serviceList(ctx, r.services.map((s, i) => ({ title: s.name, body: ctx.copy.serviceBlurbs[s.id], price: prices[i] })))}
 ${confirmed ? "" : todo(ctx, "Send us your services and prices", "List what you offer and what you charge (or \"from $\" prices). We'll set it up so people can see it on their phones.", true)}
 ${walk ? "" : todo(ctx, "Walk-ins or appointments?", "Tell us whether you take walk-ins, appointments, or both. It's the first thing new customers want to know.", true)}
 ${r.variant === "massage" && !r.licenses.length ? todo(ctx, "Send us your Alabama license number", "Alabama asks massage businesses to show their license number in ads, so we'll put it at the bottom of every page.", true) : ""}
