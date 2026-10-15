@@ -2,6 +2,7 @@ import type { BusinessRecord } from "../generator/types.ts";
 import { AUTO_VARIANT_LABELS } from "../generator/packs/auto.ts";
 import { scanningOn } from "../generator/pricelist.ts";
 import { menuToText } from "../generator/menu.ts";
+import { stockPhotosOf } from "../generator/scenes.ts";
 /**
  * The site editor as data (Oct 2026): one description of every Edit card and field, built from a lead's detail, and the
  * reverse mapping from typed values back to the `PUT /edits` payload. The Android app renders the cards natively from
@@ -55,7 +56,7 @@ export interface Card {
   note?: string;
   fields: Field[];
   /** Cards with buttons of their own: the main photo, the gallery, the Spanish page, the design shuffle. */
-  kind?: "photo" | "gallery" | "spanish" | "design";
+  kind?: "photo" | "gallery" | "spanish" | "design" | "stock";
   /** photo: where the current main photo comes from. */
   hero?: "owner" | "google" | null;
   gallery?: GalleryPhoto[];
@@ -393,6 +394,28 @@ function confirmable(r: AnyRecord): Array<[string, string]> {
   return out;
 }
 
+/** Photo framing choices, shared by every photo's "Keep in view" picker (web app.js mirrors these). */
+export const FOCUS_OPTIONS: Array<[string, string]> = [
+  ["", "The middle"],
+  ["50% 0%", "The top"],
+  ["50% 30%", "Upper middle"],
+  ["50% 70%", "Lower middle"],
+  ["50% 100%", "The bottom"],
+  ["0% 50%", "The left side"],
+  ["100% 50%", "The right side"],
+];
+export const ZOOM_OPTIONS: Array<[string, string]> = [
+  ["", "No zoom"],
+  ["1.25", "A little (125%)"],
+  ["1.5", "More (150%)"],
+  ["1.75", "A lot (175%)"],
+  ["2", "The most (200%)"],
+];
+/** The list plus the saved value when it isn't one of them (set by hand), so opening Edit never loses it. */
+const withCurrent = (opts: Array<[string, string]>, cur: string): Array<[string, string]> =>
+  cur && !opts.some(([v]) => v === cur) ? [...opts, [cur, `As set (${cur})`]] : opts;
+const sceneKey = (file: string) => file.replace(/\.jpg$/, "");
+
 // ---- the form ----
 
 export function editForm(l: EditDetail): EditForm {
@@ -484,12 +507,19 @@ export function editForm(l: EditDetail): EditForm {
           ? "Using a Google photo (fine for the preview, but it must be replaced before publishing)."
           : hero
             ? "Using the owner's photo."
-            : "No photo yet.",
+            : "No photo of their own yet: the site uses a stock photo (see Stock photos).",
       ),
+      ...(hero
+        ? [
+            sel("heroFocus", "Keep in view (when the photo is cropped)", hero.focus || "", withCurrent(FOCUS_OPTIONS, hero.focus || "")),
+            sel("heroZoom", "Zoom in on phones (so a sign or detail is big enough to read)", hero.zoomPhone ? String(hero.zoomPhone) : "", withCurrent(ZOOM_OPTIONS, hero.zoomPhone ? String(hero.zoomPhone) : "")),
+          ]
+        : []),
     ],
     {
       kind: "photo",
       hero: hero ? (hero.source === "google" ? "google" : "owner") : null,
+      gallery: hero ? [{ key: "hero", src: hero.src, alt: hero.alt || "", caption: "", town: "", pairWith: "" }] : [],
     },
   );
 
@@ -510,6 +540,7 @@ export function editForm(l: EditDetail): EditForm {
         placeholder: "Hanceville",
       }),
     );
+    galleryFields.push(sel(`gfocus_${key}`, "Keep in view", p.focus || "", withCurrent(FOCUS_OPTIONS, p.focus || "")));
     galleryFields.push(cb(`gnew_${key}`, "Show in “What's new” (photo row: swipe or arrows, tap to see it big)", p.whatsNew));
     galleryFields.push(
       sel(`gpair_${key}`, "Before/after", p.pairWith || "", [
@@ -545,6 +576,24 @@ export function editForm(l: EditDetail): EditForm {
       })),
     },
   );
+
+  const stock = stockPhotosOf(r as BusinessRecord);
+  if (stock.length)
+    card(
+      "stock",
+      "Stock photos",
+      [
+        note(
+          "Pictures from our free photo library that fill in where the business has no photo of its own (the main photo, a wide photo strip, the closing section). Tick one off and the next best one takes its place. Their own photos always come first: upload them in Photo and Photo gallery.",
+        ),
+        ...stock.map((s) => cb(`noscene_${sceneKey(s.file)}`, "Don't use this one", s.hidden)),
+      ],
+      {
+        kind: "stock",
+        gallery: stock.map((s) => ({ key: sceneKey(s.file), src: s.src, alt: s.alt, caption: "", town: "", pairWith: "" })),
+        collapsed: true,
+      },
+    );
 
   card(
     "es",
@@ -2483,6 +2532,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
       town: v("gtown_" + key) || "",
       pairWith: v("gpair_" + key) || "",
       ...(has("gnew_" + key) ? { whatsNew: !!on("gnew_" + key) } : {}),
+      ...(has("gfocus_" + key) ? { focus: v("gfocus_" + key) || "" } : {}),
     };
   }
 
@@ -3063,6 +3113,13 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
             .filter(Boolean)
         : undefined,
     services: hasServices && has("services") ? lines("services") : undefined,
+    heroFocus: has("heroFocus") ? v("heroFocus") || "" : undefined,
+    heroZoom: has("heroZoom") ? (v("heroZoom") ? Number(v("heroZoom")) : null) : undefined,
+    hiddenScenes: Object.keys(values).some((k) => k.startsWith("noscene_"))
+      ? Object.keys(values)
+          .filter((k) => k.startsWith("noscene_") && on(k))
+          .map((k) => `${k.slice(8)}.jpg`)
+      : undefined,
     address:
       has("addrCity") && v("addrCity")
         ? { street: v("addrStreet") || "", city: v("addrCity")!, zip: v("addrZip") || "" }

@@ -1302,18 +1302,35 @@ async function viewLead(id, intent) {
 
   // Edit-screen cards that other actions (photo upload, gallery, Spanish page) change: each is re-rendered on its own
   // from a fresh lead, so the rest of the form keeps whatever's been typed.
-  function photoCardHtml(r) {
+  // Photo framing choices (editform.ts FOCUS_OPTIONS / ZOOM_OPTIONS hold the same lists for the phone app).
+  const FOCUS_OPTIONS = [["", "The middle"], ["50% 0%", "The top"], ["50% 30%", "Upper middle"], ["50% 70%", "Lower middle"], ["50% 100%", "The bottom"], ["0% 50%", "The left side"], ["100% 50%", "The right side"]];
+  const ZOOM_OPTIONS = [["", "No zoom"], ["1.25", "A little (125%)"], ["1.5", "More (150%)"], ["1.75", "A lot (175%)"], ["2", "The most (200%)"]];
+  const optsWith = (opts, cur) => (cur && !opts.some(([v]) => v === cur) ? opts.concat([[cur, `As set (${cur})`]]) : opts).map(([v, t]) => `<option value="${esc(v)}"${v === (cur || "") ? " selected" : ""}>${esc(t)}</option>`).join("");
+  function photoCardHtml(r, id) {
+    const h = r.media.hero;
     return `<section class="card" id="card-photo"><h2>Photo</h2>
-        <p class="small muted">${r.media.hero && r.media.hero.source === "google" ? "Using a Google photo (fine for the preview, but it must be replaced before publishing)." : r.media.hero ? "Using the owner's photo." : "No photo yet."}</p>
+        <p class="small muted">${h && h.source === "google" ? "Using a Google photo (fine for the preview, but it must be replaced before publishing)." : h ? "Using the owner's photo." : "No photo of their own yet: the site uses a stock photo (see Stock photos)."}</p>
+        ${h && id ? `<img src="/p/${id}${esc(h.src)}" alt="" style="width:100%;max-width:320px;border-radius:10px;display:block;margin:0 0 8px">` : ""}
+        ${h ? `<label class="field">Keep in view <span class="hint">when the photo is cropped</span><select name="heroFocus">${optsWith(FOCUS_OPTIONS, h.focus || "")}</select></label>
+        <label class="field">Zoom in on phones <span class="hint">so a sign or detail is big enough to read</span><select name="heroZoom">${optsWith(ZOOM_OPTIONS, h.zoomPhone ? String(h.zoomPhone) : "")}</select></label>
+        ${h.source !== "google" ? `<button class="linkbtn" type="button" data-eact="delhero">Remove main photo</button>` : ""}` : ""}
         <label class="field">Main photo<input type="file" id="photo" accept="image/*"></label>
         <label class="field">Describe the photo<input id="photoAlt" placeholder="e.g. Freshly mowed front lawn in Cullman"></label>
         <button class="btn btn--small" type="button" data-eact="upload">Upload photo</button>
       </section>`;
   }
+  function stockCardHtml(id, l) {
+    const list = l.stockPhotos || [];
+    if (!list.length) return `<section class="card" id="card-stock" hidden></section>`;
+    return `<section class="card" id="card-stock"><h2>Stock photos</h2>
+        <p class="small muted">Pictures from our free photo library that fill in where the business has no photo of its own (the main photo, a wide photo strip, the closing section). Tick one off and the next best one takes its place. Their own photos always come first.</p>
+        <ul class="thumbs" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">${list.map((s) => `<li><img src="/p/${id}${esc(s.src)}" alt="${esc(s.alt)}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px${s.hidden ? ";opacity:.4" : ""}"><label class="check small"><input type="checkbox" name="noscene_${esc(s.file.replace(/\.jpg$/, ""))}"${s.hidden ? " checked" : ""}> Don't use this one</label></li>`).join("")}</ul>
+      </section>`;
+  }
   function galleryCardHtml(id, r) {
     return `<section class="card" id="card-gallery"><h2>Photo gallery</h2>
         <p class="small muted">Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site.</p>${r.media.gallery.some((p) => p.source === "google") ? `<p class="small muted">${r.media.gallery.filter((p) => p.source === "google").length} of these came from their Google listing (Import from their Google page). They show in the preview only and are left out of the live site. <button class="linkbtn" type="button" data-eact="delphoto" data-photo="google">Remove all Google photos</button></p>` : ""}
-        ${r.media.gallery.length ? `<ul class="thumbs" style="grid-template-columns:1fr">${r.media.gallery.map((p) => { const key = photoKey(p.src); return `<li style="text-align:left"><div class="row" style="align-items:flex-start"><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy" style="width:88px;flex:none"><div style="flex:1;min-width:0"><div class="row"><label class="field">Caption<input name="gcap_${esc(key)}" maxlength="80" value="${esc(p.caption || "")}" placeholder="Patio"></label><label class="field">Town<input name="gtown_${esc(key)}" maxlength="40" value="${esc(p.town || "")}" placeholder="Hanceville"></label></div><label class="check"><input type="checkbox" name="gnew_${esc(key)}"${p.whatsNew ? " checked" : ""}> Show in “What's new” (photo row: swipe or arrows, tap to see it big)</label>
+        ${r.media.gallery.length ? `<ul class="thumbs" style="grid-template-columns:1fr">${r.media.gallery.map((p) => { const key = photoKey(p.src); return `<li style="text-align:left"><div class="row" style="align-items:flex-start"><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy" style="width:88px;flex:none"><div style="flex:1;min-width:0"><div class="row"><label class="field">Caption<input name="gcap_${esc(key)}" maxlength="80" value="${esc(p.caption || "")}" placeholder="Patio"></label><label class="field">Town<input name="gtown_${esc(key)}" maxlength="40" value="${esc(p.town || "")}" placeholder="Hanceville"></label></div><label class="check"><input type="checkbox" name="gnew_${esc(key)}"${p.whatsNew ? " checked" : ""}> Show in “What's new” (photo row: swipe or arrows, tap to see it big)</label><label class="field">Keep in view<select name="gfocus_${esc(key)}">${optsWith(FOCUS_OPTIONS, p.focus || "")}</select></label>
             <label class="field">Before/after<select name="gpair_${esc(key)}"><option value="">Not a “before” photo</option>${r.media.gallery.filter((o) => o !== p).map((o) => { const ok = photoKey(o.src); return `<option value="${esc(ok)}"${p.pairWith === ok ? " selected" : ""}>This is the BEFORE of: ${esc(o.caption || o.alt || ok)}</option>`; }).join("")}</select></label>
             <button class="linkbtn" type="button" data-eact="delphoto" data-photo="${esc(key)}">Remove</button></div></div></li>`; }).join("")}</ul>
         <p class="small muted">Captions show under the photo (“Patio, Hanceville”). Pick a photo's “after” to show the two side by side.</p>` : ""}
@@ -1347,7 +1364,7 @@ async function viewLead(id, intent) {
   }
 
   /** Edit card heading → editform card id, so a checklist line (#/edit/<id>/<card>) can open the right card. */
-  const EDIT_CARD_ID = { "Confirm with the owner": "confirm", "Design": "design", "Facts (only if the owner says so)": "facts", "Links": "links", "Text": "text", "Menu": "menu", "Services": "services", "Services & area": "services", "Customer quotes": "quotes", "Photo": "photo", "Photo gallery": "gallery", "Spanish page": "es", "We're hiring": "hiring", "Events & specials": "events", "Awards & proof": "proof", "Closures, parking & payment": "visit", "Auto parts details": "parts", "Auto shop details": "auto", "Church & nonprofit details": "church", "Commercial cleaning details": "cleaning", "What's included": "cleaning", "Contractor details": "contractor", "Lawn & landscape details": "landscaping", "Live price list & QR labels": "pricelist", "Kind of business": "kind", "Plans & pricing": "plans", "Print shop details": "print", "Restaurant details": "restaurant", "Shop details": "retail", "Tax & finance details": "finance", "Salon details": "salon", "Massage details": "salon", "Grooming details": "salon", "Their current website": "site" };
+  const EDIT_CARD_ID = { "Confirm with the owner": "confirm", "Design": "design", "Facts (only if the owner says so)": "facts", "Links": "links", "Text": "text", "Menu": "menu", "Services": "services", "Services & area": "services", "Customer quotes": "quotes", "Photo": "photo", "Photo gallery": "gallery", "Stock photos": "stock", "Spanish page": "es", "We're hiring": "hiring", "Events & specials": "events", "Awards & proof": "proof", "Closures, parking & payment": "visit", "Auto parts details": "parts", "Auto shop details": "auto", "Church & nonprofit details": "church", "Commercial cleaning details": "cleaning", "What's included": "cleaning", "Contractor details": "contractor", "Lawn & landscape details": "landscaping", "Live price list & QR labels": "pricelist", "Kind of business": "kind", "Plans & pricing": "plans", "Print shop details": "print", "Restaurant details": "restaurant", "Shop details": "retail", "Tax & finance details": "finance", "Salon details": "salon", "Massage details": "salon", "Grooming details": "salon", "Their current website": "site" };
   function tagEditCards(jumpTo) {
     $app.querySelectorAll("section.card").forEach((card) => {
       const h = card.querySelector(":scope > h2");
@@ -1426,8 +1443,9 @@ async function viewLead(id, intent) {
         <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
         ${confirmable.map(([k, label]) => cb("confirm_" + k, label, conf.has(k))).join("")}
       </section>
-      ${photoCardHtml(r)}
+      ${photoCardHtml(r, id)}
       ${galleryCardHtml(id, r)}
+      ${stockCardHtml(id, l)}
       ${esCardHtml(id, c)}
       <section class="card"><h2>We're hiring</h2>
         <p class="small muted">Optional. Adds a “We're hiring” section with Call/Text buttons. Leave the jobs empty to remove it.</p>
@@ -1553,7 +1571,7 @@ async function viewLead(id, intent) {
     const refreshCards = async (...ids) => {
       const fresh = await api("/leads/" + id);
       if (stale(my)) return;
-      const html = { "card-photo": () => photoCardHtml(fresh.record), "card-gallery": () => galleryCardHtml(id, fresh.record), "card-es": () => esCardHtml(id, fresh.copy) };
+      const html = { "card-photo": () => photoCardHtml(fresh.record, id), "card-gallery": () => galleryCardHtml(id, fresh.record), "card-stock": () => stockCardHtml(id, fresh), "card-es": () => esCardHtml(id, fresh.copy) };
       for (const cid of ids) { const el = document.getElementById(cid); if (el) el.outerHTML = html[cid](); }
     };
     form.addEventListener("click", async (e) => {
@@ -1584,7 +1602,7 @@ async function viewLead(id, intent) {
           const alt = $app.querySelector("#photoAlt").value || r.name;
           await api(`/leads/${id}/photo?w=${pw}&h=${ph}&alt=${encodeURIComponent(alt)}`, { method: "POST", body: blob, type: "image/jpeg" });
           toast("Photo saved");
-          await refreshCards("card-photo");
+          await refreshCards("card-photo", "card-stock");
         } else if (act === "gupload") {
           const files = [...$app.querySelector("#gallery").files];
           if (!files.length) return toast("Choose photos first");
@@ -1596,6 +1614,11 @@ async function viewLead(id, intent) {
           }
           toast(files.length === 1 ? "Photo added" : `${files.length} photos added`);
           await refreshCards("card-gallery");
+        } else if (act === "delhero") {
+          if (!confirm("Remove the main photo? The site goes back to a stock photo until you upload another.")) return;
+          await api(`/leads/${id}/photo`, { method: "DELETE" });
+          toast("Main photo removed");
+          await refreshCards("card-photo", "card-stock");
         } else if (act === "delphoto") {
           if (!confirm(b.dataset.photo === "google" ? "Remove every Google photo from the gallery?" : "Remove this photo from the site?")) return;
           await api(`/leads/${id}/gallery/${b.dataset.photo}`, { method: "DELETE" });
@@ -1671,6 +1694,9 @@ async function viewLead(id, intent) {
           towns: hasTowns ? val("towns").split(",").map((s) => s.trim()).filter(Boolean) : undefined,
           services: hasServices ? val("services").split("\n").map((s) => s.trim()).filter(Boolean) : undefined,
           address: val("addrCity") ? { street: val("addrStreet"), city: val("addrCity"), zip: val("addrZip") } : undefined,
+          heroFocus: f.elements.heroFocus ? f.elements.heroFocus.value : undefined,
+          heroZoom: f.elements.heroZoom ? (f.elements.heroZoom.value ? Number(f.elements.heroZoom.value) : null) : undefined,
+          hiddenScenes: f.querySelector('[name^="noscene_"]') ? [...f.querySelectorAll('[name^="noscene_"]')].filter((x) => x.checked).map((x) => x.name.slice(8) + ".jpg") : undefined,
           menuText: isR ? f.elements.menuText.value : undefined,
           confirmed,
         },
@@ -2405,6 +2431,7 @@ async function viewLead(id, intent) {
       if (!f.elements["gcap_" + key]) continue;
       out[p.src] = { caption: f.elements["gcap_" + key].value.trim(), town: (f.elements["gtown_" + key] || { value: "" }).value.trim(), pairWith: (f.elements["gpair_" + key] || { value: "" }).value };
       if (f.elements["gnew_" + key]) out[p.src].whatsNew = f.elements["gnew_" + key].checked;
+      if (f.elements["gfocus_" + key]) out[p.src].focus = f.elements["gfocus_" + key].value;
     }
     return Object.keys(out).length ? out : undefined;
   }

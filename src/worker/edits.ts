@@ -563,6 +563,11 @@ export const EditsSchema = z.object({
         .optional(),
       towns: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
       services: z.array(z.string().trim().min(1).max(160)).max(120).optional(),
+      /** The main photo's framing: which part stays in view ("50% 30%"; "" = the middle) and how far phones zoom in (null = none). */
+      heroFocus: z.string().trim().regex(/^(\d{1,3}% \d{1,3}%)?$/).optional(),
+      heroZoom: z.number().min(1).max(3).nullable().optional(),
+      /** Stock photos turned off for this site (file names); the list replaces the old one. */
+      hiddenScenes: z.array(z.string().regex(/^[\w.-]{1,120}\.jpg$/)).max(100).optional(),
       /** A new street address (the business moved, or Google has it wrong). */
       address: z
         .object({
@@ -661,6 +666,7 @@ export const EditsSchema = z.object({
               town: z.string().trim().max(40),
               pairWith: z.string().trim().max(80),
               whatsNew: z.boolean(),
+              focus: z.string().trim().regex(/^(\d{1,3}% \d{1,3}%)?$/),
             })
             .partial(),
         )
@@ -1255,6 +1261,9 @@ export function applyEdits(
       if (e.galleryAlts[p.src]) p.alt = e.galleryAlts[p.src]!;
   if (e.towns)
     r.serviceArea = { towns: e.towns, counties: r.serviceArea?.counties ?? [] };
+  if (r.media.hero && e.heroFocus !== undefined) r.media.hero.focus = e.heroFocus || undefined;
+  if (r.media.hero && e.heroZoom !== undefined) r.media.hero.zoomPhone = e.heroZoom && e.heroZoom > 1 ? e.heroZoom : undefined;
+  if (e.hiddenScenes !== undefined) r.hiddenScenes = e.hiddenScenes.length ? [...new Set(e.hiddenScenes)] : undefined;
   if (e.address) {
     const a = e.address;
     const moved =
@@ -1438,6 +1447,7 @@ function applyTlcEdits(
       if (m.caption !== undefined) p.caption = clear(m.caption);
       if (m.town !== undefined) p.town = clear(m.town);
       if (m.whatsNew !== undefined) p.whatsNew = m.whatsNew || undefined;
+      if (m.focus !== undefined) p.focus = m.focus || undefined;
       // A pair only points at another photo that is on the record (and not at itself).
       if (m.pairWith !== undefined) {
         const key = clear(m.pairWith);

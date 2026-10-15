@@ -273,7 +273,9 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String, jumpTo: Stri
                             if (!isOpen) return@Column
                             when (card.kind) {
                                 "photo" -> {
+                                    card.gallery.firstOrNull()?.let { g -> AuthImage(state.api, "/p/$id${g.src}", Modifier.fillMaxWidth().height(180.dp), maxPx = 900) }
                                     card.fields.forEach { f -> FieldView(f, values) { dirty = true } }
+                                    if (card.hero != null && card.hero != "google") TextButton(onClick = { act("Removing the main photo…") { state.api.deleteJson("/leads/$id/photo") } }) { Text("Remove main photo") }
                                     OutlinedTextField(photoAlt, { photoAlt = it }, label = { Text("Describe the photo") }, placeholder = { Text("e.g. Freshly mowed front lawn in Cullman") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                                     OutlinedButton(onClick = { photoPicker.launch("image/*") }, enabled = busy == null, modifier = Modifier.padding(top = 6.dp)) { Text(if (card.hero == "owner") "Replace main photo" else "Upload main photo") }
                                 }
@@ -285,13 +287,23 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String, jumpTo: Stri
                                             AuthImage(state.api, "/p/$id${g.src}", Modifier.size(88.dp), maxPx = 200)
                                             Spacer(Modifier.width(10.dp))
                                             Column(Modifier.weight(1f)) {
-                                                card.fields.filter { it.name == "gcap_${g.key}" || it.name == "gtown_${g.key}" || it.name == "gpair_${g.key}" || it.name == "gnew_${g.key}" }.forEach { f -> FieldView(f, values) { dirty = true } }
+                                                card.fields.filter { it.name?.endsWith("_${g.key}") == true }.forEach { f -> FieldView(f, values) { dirty = true } }
                                                 TextButton(onClick = { act("Removing photo…") { state.api.deleteJson("/leads/$id/gallery/${g.key}") } }) { Text("Remove") }
                                             }
                                         }
                                     }
                                     OutlinedTextField(galleryAlt, { galleryAlt = it }, label = { Text("Describe them (used for every photo in this batch)") }, placeholder = { Text("e.g. Fresh fade at the shop") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                                     OutlinedButton(onClick = { galleryPicker.launch("image/*") }, enabled = busy == null, modifier = Modifier.padding(top = 6.dp)) { Text("Add photos") }
+                                }
+                                "stock" -> {
+                                    card.fields.filter { it.type == "note" }.forEach { FieldView(it, values) {} }
+                                    card.gallery.forEach { g ->
+                                        Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            AuthImage(state.api, "/p/$id${g.src}", Modifier.size(width = 120.dp, height = 90.dp), maxPx = 300)
+                                            Spacer(Modifier.width(10.dp))
+                                            Column(Modifier.weight(1f)) { card.fields.filter { it.name == "noscene_${g.key}" }.forEach { f -> FieldView(f, values) { dirty = true } } }
+                                        }
+                                    }
                                 }
                                 "spanish" -> {
                                     card.fields.forEach { FieldView(it, values) {} }

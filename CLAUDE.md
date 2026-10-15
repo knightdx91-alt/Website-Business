@@ -1653,7 +1653,18 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   opening (photo full width and unfaded, the name on a card below it) with `Image.focus` "50% 38%" (`object-position` on the
   opening photo, `NN% NN%` only) plus `Image.zoomPhone` 1.6 (phones under 900 px: `transform: scale` around the focus in an
   overflow-hidden frame, `data-zoom-phone`; the card then overlaps the photo by 16 px instead of 64) so the sign's small lettering is
-  readable on a phone. Both are set by SQL for now, no Edit field yet.
+  readable on a phone.
+- 📷 Photo controls (Oct 2026, owner's ask: "a control so I can edit each photo that appears on the site"; Android 2.73;
+  `test/worker/photo-controls.test.ts`): Edit → **Photo** shows the main photo with "Keep in view" (`heroFocus`, `FOCUS_OPTIONS`:
+  middle / top / upper middle / lower middle / bottom / left / right → `Image.focus`) and "Zoom in on phones" (`heroZoom`,
+  `ZOOM_OPTIONS` 125–200% → `Image.zoomPhone`), plus "Remove main photo" (`DELETE /api/leads/:id/photo`, owner or site photo; the
+  site falls back to stock). A value set by hand shows as "As set (…)" (`withCurrent`). **Photo gallery**: each photo has its own
+  "Keep in view" (`gfocus_<key>` → `galleryMeta[src].focus`; `imageTag` adds `object-position`). **Stock photos** (new card, folded):
+  the library photos the site uses now (`stockPhotosOf(record)` in scenes.ts = `scenesFor` + the turned-off ones, `detail().stockPhotos`)
+  with "Don't use this one" (`noscene_<file>` → `record.hiddenScenes`; `scenesFor` skips them, the next best fills in). Web: app.js
+  `FOCUS_OPTIONS` / `ZOOM_OPTIONS` mirror editform.ts, `stockCardHtml`, `data-eact="delhero"`, `EDIT_CARD_ID` "Stock photos": "stock".
+  Android: EditScreen photo kind shows the photo (card `gallery[0]`) + Remove; gallery per-photo fields match any `_<key>` suffix;
+  card kind `stock` shows thumbnails with their checkbox.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

@@ -226,8 +226,9 @@ const hash = (s: string) => {
 };
 
 /** The scenes that fit this business, best fit first, in a stable order per seed so neighbours differ. */
-export function scenesFor(r: Pick<BusinessRecord, "category" | "variant" | "typeLabel" | "name">, seed: string, max = 4): Image[] {
-  const pool = SCENES.filter((s) => s.cats.includes(r.category));
+export function scenesFor(r: Pick<BusinessRecord, "category" | "variant" | "typeLabel" | "name"> & { hiddenScenes?: string[] }, seed: string, max = 4): Image[] {
+  const off = new Set(r.hiddenScenes ?? []);
+  const pool = SCENES.filter((s) => s.cats.includes(r.category) && !off.has(s.file));
   if (!pool.length) return [];
   const words = `${r.variant ?? ""} ${r.typeLabel ?? ""} ${r.name}`.toLowerCase();
   const fits = (s: Scene) => (s.fits ?? []).some((f) => words.includes(f));
@@ -235,6 +236,16 @@ export function scenesFor(r: Pick<BusinessRecord, "category" | "variant" | "type
   const exact = order(pool.filter(fits));
   const general = order(pool.filter((s) => !s.fits?.length));
   return [...exact, ...general].slice(0, max).map((s) => ({ src: `/assets/scene/${s.file}`, alt: s.alt, source: "stock", width: s.w, height: s.h }));
+}
+
+/** For the editors: the stock photos this site uses now, then the ones the owner turned off (so they can be turned back on). */
+export function stockPhotosOf(r: BusinessRecord): Array<{ file: string; src: string; alt: string; hidden: boolean }> {
+  const used = scenesFor(r, r.placeId || r.name).map((i) => ({ file: i.src.split("/").pop()!, src: i.src, alt: i.alt, hidden: false }));
+  const off = (r.hiddenScenes ?? []).map((file) => {
+    const s = SCENES.find((x) => x.file === file);
+    return { file, src: `/assets/scene/${file}`, alt: s?.alt ?? file, hidden: true };
+  });
+  return [...used, ...off];
 }
 
 export function hasScenes(r: Pick<BusinessRecord, "category" | "variant" | "typeLabel" | "name">): boolean {

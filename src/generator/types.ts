@@ -579,6 +579,8 @@ export interface BusinessRecord {
   geo: { lat: number; lng: number };
   /** The owner typed a new address (Edit → Address): directions go to the address, not Google's pin for the old place. */
   addressEdited?: boolean;
+  /** Stock photos (file names under /assets/scene/) the owner turned off for this site; the next best ones take their place. */
+  hiddenScenes?: string[];
   /** Grouped service menus: a line under each group heading ("Color" → "Any lightening adds Olaplex, $40"). */
   serviceNotes?: Record<string, string>;
   timezone: string;

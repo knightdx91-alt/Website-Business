@@ -1,0 +1,60 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { buildSite } from "../../src/generator/render.ts";
+import { stockPhotosOf } from "../../src/generator/scenes.ts";
+import { applyEdits } from "../../src/worker/edits.ts";
+import { editForm, editsFromForm } from "../../src/worker/editform.ts";
+import { categoryRecord, sampleCopy } from "../fixtures.ts";
+
+const DETAIL = { menuText: "", looks: [], layouts: [], dnaOrder: [], dna: null, layout: "classic", lookBase: "" };
+const fields = (r: ReturnType<typeof categoryRecord>) =>
+  editForm({ record: r, copy: sampleCopy(), ...DETAIL } as never).cards.flatMap((c) => c.fields.map((f) => ({ card: c.id, ...f })));
+
+function salonWithPhotos() {
+  const r = categoryRecord("salon");
+  r.media.hero = { src: "/assets/owner/hero.jpg", alt: "Sign", source: "owner", width: 960, height: 960 };
+  r.media.gallery = [{ src: "/assets/owner/g1.jpg", alt: "Chair", source: "owner", width: 800, height: 600 }];
+  return r;
+}
+
+test("main photo framing and phone zoom: editor fields, saving, and the built page", async () => {
+  const r0 = salonWithPhotos();
+  const f = fields(r0);
+  assert.ok(f.some((x) => x.name === "heroFocus" && x.card === "photo"));
+  assert.ok(f.some((x) => x.name === "heroZoom"));
+  assert.ok(f.some((x) => x.name === "gfocus_g1"));
+  const built = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { heroFocus: "50% 30%", heroZoom: "1.5", gcap_g1: "", gfocus_g1: "50% 100%" });
+  const { record: r } = applyEdits(r0, sampleCopy(), built.edits as never);
+  assert.equal(r.media.hero!.focus, "50% 30%");
+  assert.equal(r.media.hero!.zoomPhone, 1.5);
+  assert.equal(r.media.gallery[0]!.focus, "50% 100%");
+  // Back to the defaults.
+  const off = applyEdits(r, sampleCopy(), { record: { heroFocus: "", heroZoom: null } } as never).record;
+  assert.equal(off.media.hero!.focus, undefined);
+  assert.equal(off.media.hero!.zoomPhone, undefined);
+  const html = String((await buildSite({ record: r, copy: sampleCopy(), site: { slug: "s", look: "salon.blush_hour~circle~h5n2b3s4v4c0f1a1p0t0r0k1d2o0m0q0g0e0u0w0x3y4z2" }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
+  assert.match(html, /src="\/assets\/owner\/hero\.jpg"[^>]*style="object-position:50% 30%;--zoom:1\.5;transform-origin:50% 30%" data-zoom-phone/);
+  assert.match(html, /src="\/assets\/owner\/g1\.jpg"[^>]*style="object-position:50% 100%"/);
+  // A value set by hand stays selectable.
+  const custom = fields({ ...r, media: { ...r.media, hero: { ...r.media.hero!, focus: "50% 38%" } } } as never).find((x) => x.name === "heroFocus") as { options?: Array<{ value: string }> };
+  assert.ok(custom.options!.some((o) => o.value === "50% 38%"));
+});
+
+test("stock photos: listed in Edit, a ticked one is replaced by the next, and can be turned back on", async () => {
+  const r0 = categoryRecord("salon");
+  const before = stockPhotosOf(r0);
+  assert.ok(before.length >= 2);
+  const first = before[0]!.file;
+  const f = fields(r0);
+  assert.ok(f.some((x) => x.card === "stock" && x.name === `noscene_${first.replace(/\.jpg$/, "")}`));
+  const built = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { [`noscene_${first.replace(/\.jpg$/, "")}`]: true, [`noscene_${before[1]!.file.replace(/\.jpg$/, "")}`]: false });
+  const { record: r } = applyEdits(r0, sampleCopy(), built.edits as never);
+  assert.deepEqual(r.hiddenScenes, [first]);
+  const after = stockPhotosOf(r);
+  assert.ok(!after.filter((s) => !s.hidden).some((s) => s.file === first));
+  assert.ok(after.some((s) => s.file === first && s.hidden));
+  const html = String((await buildSite({ record: r, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
+  assert.ok(!html.includes(first));
+  const back = applyEdits(r, sampleCopy(), { record: { hiddenScenes: [] } } as never).record;
+  assert.equal(back.hiddenScenes, undefined);
+});

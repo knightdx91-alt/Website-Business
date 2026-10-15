@@ -761,7 +761,8 @@ ${sectionHead("Jobs", "We're hiring", h.how || "Want to work with us? Get in tou
 }
 
 export function imageTag(img: Image, opts: { lazy?: boolean; cls?: string } = {}): Html {
-  return html`<img src="${img.src}" alt="${img.alt}"${img.width ? raw(` width="${img.width}" height="${img.height}"`) : ""}${
+  const pos = img.focus && /^\d{1,3}% \d{1,3}%$/.test(img.focus) ? raw(` style="object-position:${img.focus}"`) : "";
+  return html`<img src="${img.src}" alt="${img.alt}"${pos}${img.width ? raw(` width="${img.width}" height="${img.height}"`) : ""}${
     opts.lazy === false ? "" : raw(' loading="lazy" decoding="async"')
   }${opts.cls ? raw(` class="${opts.cls}"`) : ""}>`;
 }

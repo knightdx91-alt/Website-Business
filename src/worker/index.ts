@@ -1,4 +1,5 @@
 import { relocate } from "./relocate.ts";
+import { stockPhotosOf } from "../generator/scenes.ts";
 import { addEntry, chicagoDay, clockIn, clockOut, clockStatus, deleteEntry, editEntry, EntryInput, remindOpenShifts, setHourly, teamWeek, timesheetCsv } from "./clock.ts";
 import { AI_KEY_RE, aiKeyStatus, clearAiKey, saveAiKey, testAiKey, withAiKey } from "./ai-key.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
@@ -585,6 +586,7 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?:
       })(),
     siteImport: record?.siteImport ?? null,
     googleImportedAt: record?.googleImportedAt ?? null,
+    stockPhotos: record ? stockPhotosOf(record) : [],
     /** Typed in by hand: no Google Maps listing, so no Google import, review link or Google photos. */
     notOnGoogle: isManualPlaceId(l.place_id),
     existingSite: record?.existingSite
@@ -3410,6 +3412,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         JSON.parse(lead.copy_json),
         lead.look ?? "",
       );
+      await siteUpdated(env, session, lead, ["main photo"]);
+      return json(detail((await getLead(env, id))!));
+    }
+    if (action === "/photo" && m === "DELETE") {
+      // Back to no main photo of their own: the site falls back to its stock photo (or Google's in previews).
+      if (!lead.record_json || !lead.copy_json)
+        throw new HttpError(409, "This site hasn't finished building yet");
+      const record = JSON.parse(lead.record_json) as BusinessRecord;
+      if (!record.media.hero || record.media.hero.source === "google") throw new HttpError(409, "There's no uploaded main photo to remove");
+      await deletePrefix(env, `owner/${id}/hero.`);
+      record.media.hero = undefined;
+      await renderPreview(env, lead, record, JSON.parse(lead.copy_json), lead.look ?? "");
       await siteUpdated(env, session, lead, ["main photo"]);
       return json(detail((await getLead(env, id))!));
     }
