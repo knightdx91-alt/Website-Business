@@ -63,7 +63,7 @@ test("the Google import puts every listing photo in the gallery for the preview 
 
   const site = { slug: "t", look: "restaurant.garden_table" };
   const prev = String((await buildSite({ record: r, copy: sampleCopy(), site, mode: "preview" })).files.get("index.html"));
-  assert.equal((prev.match(/\/assets\/img\/google-\d\.jpg/g) ?? []).length, 5, "the preview shows them");
+  assert.equal((prev.match(/src="\/assets\/img\/google-\d\.jpg/g) ?? []).length, 5, "the preview shows them");
   assert.match(prev, /Send us your own photos/);
   const pubRecord = { ...r, confirmed: ["name", "phone", "address", "hours"] as never, media: { ...r.media, hero: { src: "/assets/owner/h.jpg", alt: "front", source: "owner" as const } } };
   const pub = await buildSite({ record: pubRecord, copy: sampleCopy({ approved: true }), site: { ...site, origin: "https://x.pages.dev" }, mode: "publish" }).catch((e: Error) => e);

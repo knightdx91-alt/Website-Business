@@ -1617,7 +1617,8 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   EditScreen's per-photo filter, edits `galleryMeta[src].whatsNew`) leaves the Photos grid and shows in the retail #new section as
   `newArrivals()` (components.ts): a scroll-snap row (78% wide tiles on phones, three across with ‹ › arrows from 760 px), each
   photo a `[data-zoom]` button; the client script opens any `[data-zoom]` in a full-screen lightbox (previous / next, Esc, swipe,
-  focus returns). With only What's new photos, the Photos to-do is dropped. `test/worker/whats-new.test.ts`. The hero photo
+  focus returns; it shows the button's own `<img>` `currentSrc`, since previews prefix image paths and `data-zoom` doesn't). Every
+  Photos-grid and before/after photo is a `.zoomable` `[data-zoom]` button too, so any photo on a site opens big. With only What's new photos, the Photos to-do is dropped. `test/worker/whats-new.test.ts`. The hero photo
   is still the Edit → Photo upload; an owner photo keeps the design's opening and scrim.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).

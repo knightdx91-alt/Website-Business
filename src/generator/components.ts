@@ -670,13 +670,18 @@ export function gallery(ctx: Ctx, todoTitle?: string, todoBody?: string): Raw {
   return html`<section class="section" id="photos" aria-labelledby="photos-title"><div class="wrap">
 ${sectionHead("Photos", pairs.length ? "Before and after" : "Take a look", undefined, "photos-title")}
 ${pairs.length ? html`<ul class="pairs">${pairs.map(
-    (p) => html`<li class="pair"><div class="pair__pics"><figure><img src="${p.before.src}" alt="${p.before.alt}"${p.before.width ? raw(` width="${p.before.width}" height="${p.before.height}"`) : ""} loading="lazy" decoding="async"><figcaption>Before</figcaption></figure><figure><img src="${p.after.src}" alt="${p.after.alt}"${p.after.width ? raw(` width="${p.after.width}" height="${p.after.height}"`) : ""} loading="lazy" decoding="async"><figcaption>After</figcaption></figure></div>${
+    (p) => html`<li class="pair"><div class="pair__pics"><figure>${zoomable(p.before, ["Before", cap(p.before)].filter(Boolean).join(": "))}<figcaption>Before</figcaption></figure><figure>${zoomable(p.after, ["After", cap(p.after) || cap(p.before)].filter(Boolean).join(": "))}<figcaption>After</figcaption></figure></div>${
       cap(p.before) || cap(p.after) ? html`<p class="pair__cap">${cap(p.before) || cap(p.after)}</p>` : ""
     }</li>`,
   )}</ul>` : ""}
-${rest.length ? html`<ul class="gallery${pairs.length ? " gallery--more" : ""}">${rest.map((p) => html`<li>${cap(p) ? html`<figure>${imageTag(p)}<figcaption>${cap(p)}</figcaption></figure>` : imageTag(p)}</li>`)}</ul>` : ""}
+${rest.length ? html`<ul class="gallery${pairs.length ? " gallery--more" : ""}">${rest.map((p) => html`<li>${cap(p) ? html`<figure>${zoomable(p, cap(p))}<figcaption>${cap(p)}</figcaption></figure>` : zoomable(p, "")}</li>`)}</ul>` : ""}
 ${photos.some((p) => p.source === "google") ? todo(ctx, "Send us your own photos", "The photos in this gallery come from your Google listing and show in this preview only. The live site uses your own photos (or stock): text us 5 to 10 phone photos of your place, your work and your team.") : ""}
 </div></section>`;
+}
+
+/** A photo that opens big when tapped (the client script's lightbox picks up every `[data-zoom]`). */
+function zoomable(p: Image, caption: string): Html {
+  return html`<button type="button" class="zoomable" data-zoom="${p.src}" data-cap="${caption}" aria-label="${caption ? `See it bigger: ${caption}` : "See this photo bigger"}">${imageTag(p)}</button>`;
 }
 
 /**

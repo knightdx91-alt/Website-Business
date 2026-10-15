@@ -247,10 +247,10 @@ test("gallery captions and before/after pairs", async () => {
   assert.deepEqual(out.lint.errors, []);
   assert.match(html, /Before and after[\s\S]*class="pairs"[\s\S]*g1\.jpg[\s\S]*<figcaption>Before<\/figcaption>[\s\S]*g2\.jpg[\s\S]*<figcaption>After<\/figcaption>[\s\S]*class="pair__cap">Driveway, Hanceville/);
   assert.match(html, /class="gallery gallery--more"[\s\S]*<figcaption>Deck, Cullman<\/figcaption>/);
-  assert.equal((html.match(/g2\.jpg/g) ?? []).length, 1, "the after photo leaves the grid");
+  assert.equal((html.match(/src="[^"]*g2\.jpg/g) ?? []).length, 1, "the after photo leaves the grid");
   assert.match(html, /g4\.jpg/, "a dangling pair still shows as a plain photo");
   const plain = await home(categoryRecord("cleaning", { media: { gallery: [owner("/assets/owner/g1.jpg", "One")] } }));
-  assert.match(plain.html, /class="gallery"><li><img/);
+  assert.match(plain.html, /class="gallery"><li><button type="button" class="zoomable"[^>]*><img/);
   assert.doesNotMatch(plain.html, /pairs|figcaption/);
 });
 

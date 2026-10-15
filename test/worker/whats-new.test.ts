@@ -21,6 +21,8 @@ test("What's new photos: a carousel with zoom buttons; they leave the Photos gri
   const ph = html.slice(html.indexOf('id="photos"'));
   assert.ok(html.includes('id="photos"'));
   assert.ok(ph.includes("/assets/owner/g3.jpg") && !ph.slice(0, ph.indexOf("</section>")).includes("/assets/owner/g1.jpg"));
+  // Photos in the regular grid open big too.
+  assert.match(ph, /class="zoomable" data-zoom="\/assets\/owner\/g3.jpg"/);
   // No ticked photos: no carousel.
   r.media.gallery = [photo(3)];
   const plain = String((await buildSite({ record: r, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview", formEndpoint: "https://app.example/f/1" })).files.get("index.html"));

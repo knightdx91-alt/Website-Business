@@ -273,7 +273,8 @@ if (zs.length) {
   var lbShow = function (i) {
     lbCur = (i + zs.length) % zs.length;
     var b = zs[lbCur], im = b.querySelector("img");
-    lbImg.src = b.getAttribute("data-zoom"); lbImg.alt = im ? im.alt : "";
+    // The photo the page already shows (previews prefix every address, so data-zoom alone can point at the wrong folder).
+    lbImg.src = (im && (im.currentSrc || im.src)) || b.getAttribute("data-zoom"); lbImg.alt = im ? im.alt : "";
     lbCap.textContent = b.getAttribute("data-cap") || "";
   };
   var lbClose = function () { lb.hidden = true; root.style.overflow = ""; if (lbBack) lbBack.focus(); };

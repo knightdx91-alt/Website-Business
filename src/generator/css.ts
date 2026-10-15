@@ -270,8 +270,8 @@ ${divider}
 .card,.tile,.plan,.svc--scroll li,.svc--bento li{transition:transform .25s var(--ease),box-shadow .25s ease}
 .card:hover,.tile:hover,.plan:hover,.svc--scroll li:hover,.svc--bento li:hover{transform:translateY(-3px);box-shadow:0 14px 30px ${withAlpha(c.text, 0.12)}}
 .gallery li{overflow:hidden;border-radius:var(--radius)}
-.gallery li>img,.tile__img{transition:transform .6s var(--ease)}
-.gallery li:hover>img,.tile:hover .tile__img{transform:scale(1.04)}
+.gallery li img,.tile__img{transition:transform .6s var(--ease)}
+.gallery li:hover img,.tile:hover .tile__img{transform:scale(1.04)}
 }
 .motion .reveal{opacity:0;translate:0 18px;transition:opacity .6s ease,translate .7s var(--ease);transition-delay:calc(var(--i,0)*70ms)}
 .motion .reveal.is-in{opacity:1;translate:0 0}
@@ -351,6 +351,7 @@ html.notes .todo strong{display:block;margin-bottom:.25em}
 .pair__cap{margin:8px 0 0;font-weight:600}
 .gallery figure{margin:0}.gallery figcaption{font-size:.92rem;color:var(--muted);margin-top:6px}
 .gallery--more{margin-top:28px}
+.zoomable{display:block;width:100%;padding:0;border:0;background:none;color:inherit;cursor:zoom-in;border-radius:var(--radius)}
 .carousel{position:relative;margin:24px 0 8px}
 .carousel__track{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;list-style:none;margin:0;padding:0 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
 .carousel__track>li{flex:0 0 78%;scroll-snap-align:start;min-width:0}
