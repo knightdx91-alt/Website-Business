@@ -38,8 +38,13 @@ export interface Task {
   notes: string;
   due: string | null;
   dueTime: string | null;
+  /** First person it's for (older app builds read only this). */
   assignee: string | null;
+  /** Everyone it's for, joined with commas ("Chris, Brenda"); null = anyone. */
   assigneeName: string | null;
+  /** Everyone it's for (Oct 2026: a task can be for several people); empty = anyone. */
+  assignees: string[];
+  assigneeNames: string[];
   leadId: string | null;
   leadName: string | null;
   createdBy: string;
@@ -68,6 +73,8 @@ export const TaskInput = z.object({
     .nullable()
     .optional(),
   assignee: z.string().trim().max(40).nullable().optional(),
+  /** Several people (wins over `assignee`); empty or null = anyone. */
+  assignees: z.array(z.string().trim().min(1).max(40)).max(20).nullable().optional(),
   leadId: z.string().trim().max(40).nullable().optional(),
 });
 export const TaskPatch = TaskInput.partial().extend({
@@ -75,6 +82,16 @@ export const TaskPatch = TaskInput.partial().extend({
 });
 
 type Names = Map<string, string>;
+
+/** The `assignee` column holds one id or several, comma-joined (no migration; older builds send one). */
+export const assigneeIds = (v: string | null | undefined): string[] => (v ? v.split(",").map((x) => x.trim()).filter(Boolean) : []);
+
+/** The column value from a create / patch: `assignees` when sent, else `assignee`; undefined = not touched. */
+function assigneeValue(input: { assignee?: string | null; assignees?: string[] | null }): string | null | undefined {
+  if (input.assignees !== undefined) return input.assignees?.length ? [...new Set(input.assignees)].join(",") : null;
+  if (input.assignee !== undefined) return input.assignee || null;
+  return undefined;
+}
 
 /** Validates with a 400 and a readable message instead of a crash. */
 function parse<T>(schema: z.ZodType<T>, raw: unknown): T {
@@ -105,8 +122,11 @@ function toTask(
     notes: r.notes ?? "",
     due: r.due,
     dueTime: r.due_time,
-    assignee: r.assignee,
-    assigneeName: r.assignee ? (names.get(r.assignee) ?? "Someone") : null,
+    ...(() => {
+      const list = assigneeIds(r.assignee);
+      const nameList = list.map((id) => names.get(id) ?? "Someone");
+      return { assignee: list[0] ?? null, assigneeName: nameList.length ? nameList.join(", ") : null, assignees: list, assigneeNames: nameList };
+    })(),
     leadId: r.lead_id,
     leadName: r.lead_name ?? null,
     createdBy: r.created_by,
@@ -136,8 +156,8 @@ export async function listTasks(
   ];
   const binds: unknown[] = [];
   if (o.assignee) {
-    where.push("(t.assignee = ? OR t.assignee IS NULL)");
-    binds.push(o.assignee);
+    where.push("(t.assignee IS NULL OR instr(',' || t.assignee || ',', ?) > 0)");
+    binds.push(`,${o.assignee},`);
   }
   if (o.leadId) {
     where.push("t.lead_id = ?");
@@ -176,7 +196,7 @@ async function checkRefs(
     dueTime?: string | null;
   },
 ) {
-  if (input.assignee && !names.has(input.assignee))
+  if (assigneeIds(input.assignee).some((id) => !names.has(id)))
     throw new HttpError(400, "That person isn't on the team");
   if (input.leadId) {
     const lead = await env.DB.prepare("SELECT id FROM leads WHERE id = ?")
@@ -208,7 +228,8 @@ export async function createTask(
   session: Session,
   raw: unknown,
 ): Promise<Task> {
-  const input = parse(TaskInput, raw);
+  const parsed = parse(TaskInput, raw);
+  const input = { ...parsed, assignee: assigneeValue(parsed) ?? null };
   const names = await teamNames(env);
   await checkRefs(env, names, input);
   const id = newId();
@@ -232,11 +253,11 @@ export async function createTask(
     .run();
   const row = (await getTask(env, id))!;
   const task = toTask(row, names);
-  const forWhom = task.assignee
-    ? task.assignee === session.userId
+  const forWhom = !task.assignees.length
+    ? "anyone"
+    : task.assignees.length === 1 && task.assignees[0] === session.userId
       ? "themselves"
-      : task.assigneeName
-    : "anyone";
+      : task.assigneeNames.join(" & ");
   await notify(env, {
     kind: "task",
     actor: session,
@@ -262,8 +283,7 @@ export async function updateTask(
     notes: patch.notes !== undefined ? patch.notes : (before.notes ?? ""),
     due: patch.due !== undefined ? patch.due : before.due,
     dueTime: patch.dueTime !== undefined ? patch.dueTime : before.due_time,
-    assignee:
-      patch.assignee !== undefined ? patch.assignee || null : before.assignee,
+    assignee: assigneeValue(patch) !== undefined ? assigneeValue(patch)! : before.assignee,
     leadId: patch.leadId !== undefined ? patch.leadId || null : before.lead_id,
   };
   if (!next.due) next.dueTime = null;
@@ -331,7 +351,8 @@ export async function deleteTask(
 
 /** Tasks that belong on the owner's calendar: for the owner (or anyone), dated, not done. */
 function wantsCalendar(r: TaskRow): boolean {
-  return !!r.due && !r.done_at && (!r.assignee || r.assignee === "owner");
+  const who = assigneeIds(r.assignee);
+  return !!r.due && !r.done_at && (!who.length || who.includes("owner"));
 }
 
 /** Sends an invite, an update or a cancellation as the task changes. Never throws. */

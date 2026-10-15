@@ -62,7 +62,7 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
     var due by remember { mutableStateOf<String?>(null) }
     var dueTime by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<Task?>(null) }
-    var assignee by remember { mutableStateOf<String?>(null) }
+    var assignees by remember { mutableStateOf<Set<String>>(emptySet()) }
     var busy by remember { mutableStateOf(false) }
     val meta = state.meta
 
@@ -81,8 +81,8 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
             try {
                 // A time without a date means today.
                 val day = due ?: if (dueTime != null) dayFromNow(0) else null
-                state.api.addTask(title.trim(), notes.trim(), day, if (day != null) dueTime else null, assignee, leadId)
-                title = ""; notes = ""; due = null; dueTime = null
+                state.api.addTask(title.trim(), notes.trim(), day, if (day != null) dueTime else null, assignees.toList(), leadId)
+                title = ""; notes = ""; due = null; dueTime = null; assignees = emptySet()
                 load()
                 context.toast("Added")
             } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't add") } finally { busy = false }
@@ -116,10 +116,10 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
                         }
                         if (dueTime != null && due == null) Text("No date picked: it'll be for today.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (meta != null && meta.team.size > 1) {
-                            Text("For:", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
+                            Text("For (tap everyone it's for):", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                FilterChip(selected = assignee == null, onClick = { assignee = null }, label = { Text("Anyone") })
-                                meta.team.forEach { t -> FilterChip(selected = assignee == t.id, onClick = { assignee = t.id }, label = { Text(t.name) }) }
+                                FilterChip(selected = assignees.isEmpty(), onClick = { assignees = emptySet() }, label = { Text("Anyone") })
+                                meta.team.forEach { t -> FilterChip(selected = t.id in assignees, onClick = { assignees = if (t.id in assignees) assignees - t.id else assignees + t.id }, label = { Text(t.name) }) }
                             }
                         }
                         Button(onClick = { add() }, enabled = !busy && title.isNotBlank(), modifier = Modifier.padding(top = 8.dp)) { Text("Add") }
@@ -160,7 +160,7 @@ private fun TaskEditDialog(t: Task, team: List<Pair<String, String>>, canDelete:
     var notes by remember { mutableStateOf(t.notes) }
     var due by remember { mutableStateOf(t.due) }
     var time by remember { mutableStateOf(t.dueTime) }
-    var assignee by remember { mutableStateOf(t.assignee) }
+    var assignees by remember { mutableStateOf(t.assignees.toSet()) }
     var confirmDelete by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -171,9 +171,10 @@ private fun TaskEditDialog(t: Task, team: List<Pair<String, String>>, canDelete:
                 OutlinedTextField(notes, { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth())
                 DateButton(due, { due = it })
                 TimeButton(time, { time = it })
+                if (team.size > 1) Text("For (tap everyone it's for):", style = MaterialTheme.typography.labelLarge)
                 if (team.size > 1) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(selected = assignee == null, onClick = { assignee = null }, label = { Text("Anyone") })
-                    team.forEach { (id, name) -> FilterChip(selected = assignee == id, onClick = { assignee = id }, label = { Text(name) }) }
+                    FilterChip(selected = assignees.isEmpty(), onClick = { assignees = emptySet() }, label = { Text("Anyone") })
+                    team.forEach { (id, name) -> FilterChip(selected = id in assignees, onClick = { assignees = if (id in assignees) assignees - id else assignees + id }, label = { Text(name) }) }
                 }
                 if (canDelete) TextButton(onClick = { if (confirmDelete) onDelete() else confirmDelete = true }) { Text(if (confirmDelete) "Tap again to delete" else "Delete task", color = Warn) }
             }
@@ -185,7 +186,7 @@ private fun TaskEditDialog(t: Task, team: List<Pair<String, String>>, canDelete:
                     JSONObject().put("title", title.trim()).put("notes", notes.trim())
                         .put("due", day ?: JSONObject.NULL)
                         .put("dueTime", if (day != null && time != null) time else JSONObject.NULL)
-                        .put("assignee", assignee ?: JSONObject.NULL),
+                        .put("assignees", org.json.JSONArray(assignees.toList())),
                 )
             }) { Text("Save") }
         },

@@ -40,3 +40,11 @@ test("task invites are valid iCalendar: timed and all-day, request and cancel", 
   assert.match(cancel, /SEQUENCE:2/);
   assert.match(cancel, /STATUS:CANCELLED/);
 });
+
+test("a task can be for several people (comma-joined in the assignee column)", async () => {
+  const { assigneeIds } = await import("../../src/worker/tasks.ts");
+  assert.deepEqual(assigneeIds("u1,owner"), ["u1", "owner"]);
+  assert.deepEqual(assigneeIds("u1"), ["u1"]);
+  assert.deepEqual(assigneeIds(null), []);
+  assert.deepEqual(assigneeIds(""), []);
+});

@@ -1607,6 +1607,11 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   form (vehicle, where it is, where it goes; "Stuck right now? Call …"), `towBrief` (dispatcher voice, never repairs unless listed,
   no arrival times), and banned phrases for repair words and minute promises. Records built while `towing` meant tow + repair are
   reseeded on a rewrite (`setAutoVariant(r, "towing")` when the services still equal the `tow_repair` seed). Hays was rebuilt this way.
+- 👥 Tasks for several people (Oct 2026, owner's ask; Android 2.70): the `tasks.assignee` column holds one id or several comma-joined
+  (no migration; `assigneeIds()` in tasks.ts). API takes `assignees: string[]` (wins) or the old single `assignee`; a task carries
+  `assignees` + `assigneeNames`, `assignee` (first, for old builds) and `assigneeName` (names joined). "Mine" = unassigned or
+  listed (`instr(',' || assignee || ',', ',<id>,')`, not LIKE); the owner's calendar invite goes out when "owner" is among them.
+  Web: tick boxes under "For" (`.chipbox`, none = anyone); Android: multi-select chips on Add and in the tap-to-edit dialog.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

@@ -196,11 +196,11 @@ class Api(context: Context) {
     suspend fun tasks(scope: String = "open", leadId: String? = null): List<Task> =
         get("/tasks" + q("scope" to scope, "lead" to leadId)).optJSONArray("tasks").objects().map { Task.from(it) }
 
-    suspend fun addTask(title: String, notes: String, due: String?, dueTime: String?, assignee: String?, leadId: String?): Task {
+    suspend fun addTask(title: String, notes: String, due: String?, dueTime: String?, assignees: List<String>, leadId: String?): Task {
         val b = JSONObject().put("title", title).put("notes", notes)
         if (due != null) b.put("due", due)
         if (dueTime != null) b.put("dueTime", dueTime)
-        if (assignee != null) b.put("assignee", assignee)
+        if (assignees.isNotEmpty()) b.put("assignees", org.json.JSONArray(assignees))
         if (leadId != null) b.put("leadId", leadId)
         return Task.from(post("/tasks", b).getJSONObject("task"))
     }

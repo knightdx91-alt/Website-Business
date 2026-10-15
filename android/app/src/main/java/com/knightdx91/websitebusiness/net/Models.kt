@@ -300,6 +300,8 @@ data class Task(
     val dueTime: String?,
     val assignee: String?,
     val assigneeName: String?,
+    /** Everyone it's for (a task can be for several people); empty = anyone. */
+    val assignees: List<String> = emptyList(),
     val leadId: String?,
     val leadName: String?,
     val createdByName: String?,
@@ -315,6 +317,8 @@ data class Task(
             dueTime = j.str("dueTime"),
             assignee = j.str("assignee"),
             assigneeName = j.str("assigneeName"),
+            assignees = j.optJSONArray("assignees")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() } }
+                ?: listOfNotNull(j.str("assignee")),
             leadId = j.str("leadId"),
             leadName = j.str("leadName"),
             createdByName = j.str("createdByName"),

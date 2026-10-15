@@ -295,3 +295,10 @@ body.showing .top { display: none; }
 .funnel__bar { height: 10px; border-radius: 5px; background: var(--chip); overflow: hidden; margin-top: 4px; }
 .funnel__bar i { display: block; height: 100%; background: var(--primary, #fca311); }
 .linkbtn.small { font-size: .85rem; }
+/* Task "For": tick several people (none = anyone). */
+.taskfor { border: 0; padding: 0; margin: 6px 0; }
+.taskfor legend { font-weight: 600; margin-bottom: 4px; }
+.chipboxes { display: flex; flex-wrap: wrap; gap: 6px; }
+.chipbox { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--chip); font-size: .9rem; font-weight: 600; cursor: pointer; }
+.chipbox input { margin: 0; }
+.chipbox:has(input:checked) { outline: 2px solid var(--accent, currentColor); }

@@ -4357,7 +4357,8 @@ async function viewLead(id, intent) {
   function taskLi(t, full) {
     const g = taskGroup(t);
     const done = !!t.doneAt;
-    const who = t.assigneeName ? (t.assignee === meta.me.id ? "You" : t.assigneeName) : "Anyone";
+    const ids = taskWho(t);
+    const who = ids.length ? ids.map((id, i) => (id === meta.me.id ? "You" : (t.assigneeNames || [])[i] || t.assigneeName)).join(", ") : "Anyone";
     const meta2 = [
       t.due ? `<span class="chip${g === "overdue" && !done ? " chip--warn" : ""}">${esc(taskWhen(t))}</span>` : "",
       `<span class="small muted">${esc(who)}</span>`,
@@ -4377,7 +4378,7 @@ async function viewLead(id, intent) {
 
   /** Home card: what's overdue or due today (yours, or unassigned), plus a link to everything. */
   function tasksHomeHtml(tasks) {
-    const mine = tasks.filter((t) => (!t.assignee || t.assignee === meta.me.id) && t.due && t.due <= dayFromNow(0));
+    const mine = tasks.filter((t) => (!taskWho(t).length || taskWho(t).includes(meta.me.id)) && t.due && t.due <= dayFromNow(0));
     const others = tasks.length - mine.length;
     if (!mine.length) return tasks.length ? `<p class="small muted" style="margin:-6px 0 12px"><a href="#/tasks">📝 ${tasks.length} open task${tasks.length === 1 ? "" : "s"}</a></p>` : "";
     return `<section class="card due"><h2>📝 Tasks: ${mine.length} for today</h2>
@@ -4394,15 +4395,18 @@ async function viewLead(id, intent) {
     }));
   }
 
+  // A task can be for several people (Oct 2026); older servers sent only `assignee`.
+  const taskWho = (t) => (t.assignees ? t.assignees : t.assignee ? [t.assignee] : []);
   function taskFormHtml(t, leadName) {
-    const team = (meta.team || []).map((p) => `<option value="${esc(p.id)}"${(t.assignee || "") === p.id ? " selected" : ""}>${esc(p.id === meta.me.id ? `${p.name} (me)` : p.name)}</option>`).join("");
+    const picked = taskWho(t);
+    const team = (meta.team || []).map((p) => `<label class="chipbox"><input type="checkbox" name="assignees" value="${esc(p.id)}"${picked.includes(p.id) ? " checked" : ""}> ${esc(p.id === meta.me.id ? `${p.name} (me)` : p.name)}</label>`).join("");
     return `<form class="taskform" data-task-form="${esc(t.id || "")}">
       <label class="field"><span class="sr-only">Task</span><input name="title" required maxlength="200" placeholder="What needs doing?" value="${esc(t.title || "")}" autocomplete="off"></label>
       <div class="row">
         <label class="field">When<input name="due" type="date" value="${esc(t.due || "")}"></label>
         <label class="field">Time<input name="dueTime" type="time" value="${esc(t.dueTime || "")}"></label>
-        <label class="field">For<select name="assignee"><option value="">Anyone</option>${team}</select></label>
       </div>
+      ${team ? `<fieldset class="field taskfor"><legend>For <span class="hint">tick everyone it's for; none = anyone</span></legend><div class="chipboxes">${team}</div></fieldset>` : ""}
       <label class="field"><span class="sr-only">Notes</span><textarea name="notes" rows="2" maxlength="2000" placeholder="Notes (optional)" style="min-height:48px">${esc(t.notes || "")}</textarea></label>
       ${leadName ? `<p class="small muted">About: <strong>${esc(leadName)}</strong></p>` : ""}
       <div class="btns"><button class="btn btn--primary" type="submit">${t.id ? "Save" : "Add task"}</button>${t.id ? `<button class="btn" type="button" data-cancel>Cancel</button>` : ""}</div>
@@ -4413,7 +4417,7 @@ async function viewLead(id, intent) {
     // A time picked without a date means today (it used to be dropped silently).
     due: f.due.value || (f.dueTime.value ? dayFromNow(0) : null),
     dueTime: f.dueTime.value || null,
-    assignee: f.assignee.value || null,
+    assignees: [...f.querySelectorAll("[name=assignees]:checked")].map((x) => x.value),
     notes: f.notes.value.trim(),
   });
 
