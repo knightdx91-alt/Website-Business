@@ -1649,7 +1649,9 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `leads.lat/lng`). Captivate Salon (c4d698b9f5b64ffb) was moved to 1705 Co Rd 520, Hanceville with their 45-service price list. Appointment-only salons that take texts
   (`walkIns: appointment_only` + `smsEnabled`, no booking link) lead with "Text for an appointment", Call second (`textFirst` /
   `leadActions` in salon.ts). The cover opening's fade is stronger (dna-css.ts: bottom-up on phones, left-to-right from 900 px)
-  so a photo with its own lettering (Captivate's road sign) can't fight the name.
+  so a photo with its own lettering (Captivate's road sign) can't fight the name. The owner wanted the sign itself readable, so Captivate is on the `card`
+  opening (photo full width and unfaded, the name on a card below it) with `Image.focus` "50% 38%" (`object-position` on the
+  opening photo, `NN% NN%` only; set by SQL for now, no Edit field yet) so the crop keeps the whole sign.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

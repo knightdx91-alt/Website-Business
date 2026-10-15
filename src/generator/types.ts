@@ -45,6 +45,8 @@ export interface Image {
   town?: string;
   /** This photo is the "before" of a pair: the file name (without folder or extension) of its "after" photo. */
   pairWith?: string;
+  /** Which part of the photo stays in view when it's cropped ("50% 25%" keeps the upper middle), as CSS object-position. */
+  focus?: string;
   /** Shops: show this photo in the "What's new" carousel (tap to see it big) instead of the Photos grid. */
   whatsNew?: boolean;
 }

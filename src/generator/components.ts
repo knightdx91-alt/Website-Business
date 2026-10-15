@@ -165,7 +165,8 @@ export function hero(ctx: Ctx, o: HeroOpts): Raw {
   // The billboard / poster / statement H1 is sized to the screen; its longest word sets the ceiling so no word ever breaks.
   const longest = Math.max(1, ...h1Text.split(/\s+/).map((w) => w.length));
   const fit = kind === "billboard" || kind === "statement" || dna.scale === "poster" ? raw(` style="--h1-ch:${longest}"`) : "";
-  const imgAttrs = raw(`src="${img?.src ?? ""}" alt="" width="${img?.width ?? 1200}" height="${img?.height ?? 800}" decoding="async"`);
+  const focus = img?.focus && /^\d{1,3}% \d{1,3}%$/.test(img.focus) ? ` style="object-position:${img.focus}"` : "";
+  const imgAttrs = raw(`src="${img?.src ?? ""}" alt="" width="${img?.width ?? 1200}" height="${img?.height ?? 800}" decoding="async"${focus}`);
   const media = backdrop ? html`<div class="hero__media"><img ${imgAttrs} fetchpriority="high"></div>` : "";
   const photo = showImg && !backdrop ? html`<div class="ph"><img ${imgAttrs} fetchpriority="high"></div>` : "";
   const credit = showImg && img!.attribution ? html`<p class="hero__credit">Photo: ${img!.attribution.uri ? html`<a href="${img!.attribution.uri}" target="_blank" rel="noopener">${img!.attribution.name}</a>` : img!.attribution.name}</p>` : "";
