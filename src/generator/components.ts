@@ -27,6 +27,8 @@ export interface Ctx {
   hasForm: boolean;
   /** Set once the photo gallery is on the page, so render.ts doesn't add it twice. */
   galleryShown?: boolean;
+  /** The "What's new" photo row is on the page (the retail pack places it; gallery() adds it for everyone else). */
+  newShown?: boolean;
   credit?: { company: string; url: string; changeUrl: string };
   /** False for categories that may not show reviews anywhere (financial advisors, churches). */
   reviewsAllowed?: boolean;
@@ -659,15 +661,22 @@ export function actionBar(acts: Action[], dna?: Dna): Raw {
 
 /** Owner photos in a grid, or (with none yet) the pack's "send us photos" to-do in its place. */
 export function gallery(ctx: Ctx, todoTitle?: string, todoBody?: string): Raw {
+  const row = ctx.newShown ? raw("") : photoRow(ctx);
   const photos = ctx.r.media.gallery.filter((p) => !p.whatsNew && (ctx.mode === "preview" || p.source !== "google"));
-  if (!photos.length) return todoTitle ? todoBlock(ctx, todoTitle, todoBody ?? "") : raw("");
+  if (!photos.length) {
+    if (row.value) {
+      ctx.galleryShown = true;
+      return row;
+    }
+    return todoTitle ? todoBlock(ctx, todoTitle, todoBody ?? "") : raw("");
+  }
   ctx.galleryShown = true;
   // Before/after pairs first (the "after" photo leaves the grid), then the rest with their captions.
   const pairs = photoPairs(photos);
   const inPair = new Set(pairs.flatMap((p) => [p.before, p.after]));
   const rest = photos.filter((p) => !inPair.has(p));
   const cap = (p: Image) => [p.caption, p.town].filter(Boolean).join(", ");
-  return html`<section class="section" id="photos" aria-labelledby="photos-title"><div class="wrap">
+  return html`${row}<section class="section" id="photos" aria-labelledby="photos-title"><div class="wrap">
 ${sectionHead("Photos", pairs.length ? "Before and after" : "Take a look", undefined, "photos-title")}
 ${pairs.length ? html`<ul class="pairs">${pairs.map(
     (p) => html`<li class="pair"><div class="pair__pics"><figure>${zoomable(p.before, ["Before", cap(p.before)].filter(Boolean).join(": "))}<figcaption>Before</figcaption></figure><figure>${zoomable(p.after, ["After", cap(p.after) || cap(p.before)].filter(Boolean).join(": "))}<figcaption>After</figcaption></figure></div>${
@@ -691,6 +700,7 @@ function zoomable(p: Image, caption: string): Html {
 export function newArrivals(ctx: Ctx): Raw {
   const photos = ctx.r.media.gallery.filter((p) => p.whatsNew && (ctx.mode === "preview" || p.source !== "google"));
   if (!photos.length) return raw("");
+  ctx.newShown = true;
   const cap = (p: Image) => [p.caption, p.town].filter(Boolean).join(", ");
   return html`<div class="carousel" data-carousel>
 <button type="button" class="carousel__btn carousel__btn--prev" aria-label="Earlier photos">‹</button>
@@ -699,6 +709,16 @@ export function newArrivals(ctx: Ctx): Raw {
   )}</ul>
 <button type="button" class="carousel__btn carousel__btn--next" aria-label="More photos">›</button>
 </div>`;
+}
+
+/** Every other kind of business: the photo row as its own section, just before the Photos grid. */
+function photoRow(ctx: Ctx): Raw {
+  const row = newArrivals(ctx);
+  if (!row.value) return raw("");
+  return html`<section class="section" id="latest" aria-labelledby="latest-title"><div class="wrap">
+${sectionHead("What's new", "Our latest photos", undefined, "latest-title")}
+${row}
+</div></section>`;
 }
 
 /** The file name a gallery photo is known by in Edit and in `Image.pairWith`: "/assets/owner/g3.jpg" → "g3". */

@@ -499,8 +499,7 @@ export function editForm(l: EditDetail): EditForm {
         placeholder: "Hanceville",
       }),
     );
-    if (r.category === "retail")
-      galleryFields.push(cb(`gnew_${key}`, "Show in “What's new” (photo row, tap to see it big)", p.whatsNew));
+    galleryFields.push(cb(`gnew_${key}`, "Show in “What's new” (photo row: swipe or arrows, tap to see it big)", p.whatsNew));
     galleryFields.push(
       sel(`gpair_${key}`, "Before/after", p.pairWith || "", [
         ["", "Not a “before” photo"],

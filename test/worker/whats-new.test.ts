@@ -37,6 +37,20 @@ test("What's new photos: a carousel with zoom buttons; they leave the Photos gri
   new Function(CLIENT_SCRIPT);
 });
 
+test("other kinds of business get the photo row as its own section before the Photos grid", async () => {
+  for (const cat of ["contractor", "salon", "cleaning", "general"] as const) {
+    const r = categoryRecord(cat);
+    r.media.gallery = [photo(1, { whatsNew: true }), photo(2, { whatsNew: true }), photo(3)];
+    const html = String((await buildSite({ record: r, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview", formEndpoint: "https://app.example/f/1" })).files.get("index.html"));
+    assert.equal((html.match(/data-carousel/g) ?? []).length, 1, cat);
+    assert.ok(html.indexOf('id="latest"') >= 0 && html.indexOf('id="latest"') < html.indexOf('id="photos"'), cat);
+    // Only row photos: the row still shows.
+    r.media.gallery = [photo(1, { whatsNew: true })];
+    const only = String((await buildSite({ record: r, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview", formEndpoint: "https://app.example/f/1" })).files.get("index.html"));
+    assert.equal((only.match(/data-carousel/g) ?? []).length, 1, cat);
+  }
+});
+
 test("galleryMeta edits tick and untick What's new", () => {
   const r = categoryRecord("retail");
   r.media.gallery = [photo(1)];

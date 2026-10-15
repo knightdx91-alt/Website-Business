@@ -1613,7 +1613,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   listed (`instr(',' || assignee || ',', ',<id>,')`, not LIKE); the owner's calendar invite goes out when "owner" is among them.
   Web: tick boxes under "For" (`.chipbox`, none = anyone); Android: multi-select chips on Add and in the tap-to-edit dialog.
 - 🖼️ What's new photos (Oct 2026, owner's ask for Thrift & More; Android 2.71): a gallery photo ticked "Show in “What's new”"
-  (`Image.whatsNew`; Edit → Photo gallery per photo, retail only: web checkbox `gnew_<key>`, editform `gnew_<key>`, Android
+  (`Image.whatsNew`; every category since the same day: retail places the row in its #new section, every other pack gets it from
+  gallery() as its own `#latest` section "Our latest photos" before the Photos grid, `ctx.newShown` keeps it to one; arrows + dots
+  show at every width whenever the row overflows (`is-fit` otherwise), swiping always works; the design's photo band / closing
+  photo never reuse a photo already on the page (`addLife` filters `ctx.photos` by the body's `src=`); Edit → Photo gallery per photo: web checkbox `gnew_<key>`, editform `gnew_<key>`, Android
   EditScreen's per-photo filter, edits `galleryMeta[src].whatsNew`) leaves the Photos grid and shows in the retail #new section as
   `newArrivals()` (components.ts): a scroll-snap row (78% wide tiles on phones, three across with ‹ › arrows from 760 px), each
   photo a `[data-zoom]` button; the client script opens any `[data-zoom]` in a full-screen lightbox (previous / next, Esc, swipe,

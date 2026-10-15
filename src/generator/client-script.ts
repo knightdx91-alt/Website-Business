@@ -260,8 +260,24 @@ for (var ci = 0; ci < cs.length; ci++) (function (c) {
   var step = function (dir) { tr.scrollBy({ left: dir * tr.clientWidth * 0.8, behavior: "smooth" }); };
   c.querySelector(".carousel__btn--prev").addEventListener("click", function () { step(-1); });
   c.querySelector(".carousel__btn--next").addEventListener("click", function () { step(1); });
-  // Arrows only when there is more to scroll to (one or two photos fit without them).
-  var fit = function () { c.classList.toggle("is-fit", tr.scrollWidth <= tr.clientWidth + 2); };
+  // Arrows and dots only when there is more to scroll to (one or two photos may fit without them).
+  var items = tr.children, dots = d.createElement("div");
+  dots.className = "carousel__dots";
+  for (var di = 0; di < items.length; di++) (function (i) {
+    var bt = d.createElement("button");
+    bt.type = "button"; bt.setAttribute("aria-label", "Photo " + (i + 1) + " of " + items.length);
+    bt.addEventListener("click", function () { tr.scrollTo({ left: items[i].offsetLeft - tr.offsetLeft, behavior: "smooth" }); });
+    dots.appendChild(bt);
+  })(di);
+  c.appendChild(dots);
+  var mark = function () {
+    var at = 0, best = 1e9;
+    for (var k = 0; k < items.length; k++) { var dd = Math.abs(items[k].offsetLeft - tr.offsetLeft - tr.scrollLeft); if (dd < best) { best = dd; at = k; } }
+    if (tr.scrollLeft + tr.clientWidth >= tr.scrollWidth - 4) at = items.length - 1;
+    for (var m2 = 0; m2 < dots.children.length; m2++) dots.children[m2].setAttribute("aria-current", m2 === at ? "true" : "false");
+  };
+  tr.addEventListener("scroll", mark, { passive: true });
+  var fit = function () { c.classList.toggle("is-fit", tr.scrollWidth <= tr.clientWidth + 2); mark(); };
   fit(); window.addEventListener("resize", fit);
   var ims = tr.querySelectorAll("img");
   for (var ii = 0; ii < ims.length; ii++) ims[ii].addEventListener("load", fit);
