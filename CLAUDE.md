@@ -1623,6 +1623,21 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   focus returns; it shows the button's own `<img>` `currentSrc`, since previews prefix image paths and `data-zoom` doesn't). Every
   Photos-grid and before/after photo is a `.zoomable` `[data-zoom]` button too, so any photo on a site opens big. With only What's new photos, the Photos to-do is dropped. `test/worker/whats-new.test.ts`. The hero photo
   is still the Edit → Photo upload; an owner photo keeps the design's opening and scrim.
+- 🔎 Stock lookup (Oct 2026, owner's ask for Tire Barn Plus, who keeps inventory in QuickBooks and "needs a way to make it searchable";
+  Android 2.72; `src/worker/lookup.ts`, `test/worker/lookup.test.ts`): `/c/<token>/find/` (same private token as the board; manifest at
+  `/find/manifest.webmanifest`, add-to-home-screen bar) = one big search box over the board's list (`/c/<token>/data`), results
+  in-stock first with a big count badge, price, group, note, card facts, part #. `MATCH_SRC` (browser JS, tests eval it): tire sizes
+  match however typed (`sizeKeys`: 265/70R17, 265 70 17, 2657017, LT265/75-16, 33x12.50R20; digit words also match the start of a
+  size, so "265/70" works), other words must all appear. "⬆️ Update the list from QuickBooks": pick the QuickBooks export (.xlsx read
+  in the browser by `XLSX_SRC`: zip central directory + `DecompressionStream("deflate-raw")`, first sheet, shared/inline strings; or
+  .csv) → the board's `/import` with mode replace (dry run first: "Found N items … Replace the list"). The import learned accounting
+  exports (stock-import.ts): `skipPreamble` drops report title lines above the heading row, QuickBooks headings (Product/Service Name,
+  Sales Description, Sales Price / Rate, Quantity On Hand), value / total / cost / account / reorder columns skipped, "4.00" and
+  "(2.00)" counts, "1,204.50" prices, "Total …" lines skipped, a row named by a later "Total <name>" becomes the section for the rows
+  under it, "Parent:Child" names split into section + item, Service / Other Charge / Discount rows dropped. App: the lead's board card
+  has "🔎 Text them the stock lookup" / "Open the lookup here" (`POST /api/leads/:id/lookuplink`, owner + callers; web
+  `data-lookuplink`, Android `Api.lookupLink`). Not built yet: the live QuickBooks Online connection (needs the owner's Intuit
+  developer app); until then the shop re-uploads its export whenever it wants fresher counts.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

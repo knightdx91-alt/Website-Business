@@ -1034,7 +1034,7 @@ async function viewLead(id, intent) {
         ${owner ? `<p class="small">When a trainee is done: <button class="btn btn--small" type="button" data-practice-reset>🔁 Reset for the next run</button> <span class="muted">refunds their $1, clears the sign-ups, call log and tasks, takes down anything published, forgets board links and photos, and puts fresh sample items back.</span></p>` : `<p class="small muted">When you're done, the owner resets it for the next person.</p>`}</section>` : ""}`;
     C.board = `${ready ? `<section class="card"><h2>📋 ${esc(l.boardName || "Stock board")}</h2>
         <p class="muted small">Their own page for what's in each tank, case, bench or shelf: name, price, how many, a photo, sold out. No login. Changes show on the website's price page within a minute, and the QR price tags point at it. Set "What's on it" in Edit → Live price list.</p>
-        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their ${esc((l.boardName || "Stock board").toLowerCase())} link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the ${esc(l.boardName || "Stock board")} page</button>${work ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
+        <div class="btns btns--full"><button class="btn" type="button" data-clientlink>💬 Text them their ${esc((l.boardName || "Stock board").toLowerCase())} link</button><button class="btn" type="button" data-clientlink="open">Open it here</button><button class="btn" type="button" data-lookuplink>🔎 Text them the stock lookup</button><button class="btn" type="button" data-lookuplink="open">Open the lookup here</button><button class="btn" type="button" data-textpitch-lead>💬 Text them the ${esc(l.boardName || "Stock board")} page</button>${work ? `<button class="btn btn--small" type="button" data-clientrevoke>Revoke old links</button>` : ""}</div>
         ${work ? `<p class="small" style="margin-top:8px">${l.sampleStock ? `🧪 <strong>Sample items are on the price list</strong> (preview only; publishing is blocked until they go). ` : `Showing it to someone interested? Fill the preview's price page, board and tablet with made-up stock for their kind of business. `}<button class="btn btn--small" type="button" data-samplestock="${l.sampleStock ? "remove" : "add"}">${l.sampleStock ? "Remove sample items" : "🧪 Add sample items (preview only)"}</button></p>` : ""}
         <p class="muted small">A tablet beside a tank, case or shelf shows it live and lets staff update it (the 📺 link on each one in the board). Sell it as the <strong>Price list</strong> plan when they don't want a whole website.</p></section>` : ""}`;
     C.more = `${work ? `<section class="card"><h2>More</h2><div class="btns">
@@ -3255,6 +3255,15 @@ async function viewLead(id, intent) {
   });
 
   function bindReviewAsk(l) {
+    $app.querySelectorAll("[data-lookuplink]").forEach((lb) => lb.addEventListener("click", async () => {
+      const open = lb.dataset.lookuplink === "open";
+      const win = open ? window.open("", "_blank") : null;
+      lb.disabled = true;
+      try {
+        const { url, text } = await api(`/leads/${l.id}/lookuplink`, { method: "POST" });
+        if (win) win.location.href = url; else location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(text)}`;
+      } catch (err) { if (win) win.close(); toast(err.message); } finally { lb.disabled = false; }
+    }));
     $app.querySelectorAll("[data-clientlink]").forEach((cb) => cb.addEventListener("click", async () => {
       cb.disabled = true;
       try {

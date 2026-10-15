@@ -216,6 +216,9 @@ suspend fun Api.extrasLink(id: String): String = postJson("/leads/$id/extraslink
 /** Tank board: the client's own live price-list editor (retail). Returns the link and a ready-to-send text. */
 suspend fun Api.clientLink(id: String): Pair<String, String> = postJson("/leads/$id/clientlink").let { it.optString("url") to it.optString("text") }
 
+/** Stock lookup: one search box over the board's list (`/c/<token>/find/`). Returns the link and a ready-to-send text. */
+suspend fun Api.lookupLink(id: String): Pair<String, String> = postJson("/leads/$id/lookuplink").let { it.optString("url") to it.optString("text") }
+
 /** The practice lead only (owner): refunds, sign-ups, notes, tasks, published site, uploads and samples go back to square one. */
 suspend fun Api.resetPractice(id: String): JSONObject = postJson("/leads/$id/practice/reset")
 

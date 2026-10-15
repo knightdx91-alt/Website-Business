@@ -3591,6 +3591,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       });
       return json({ url: link, text });
     }
+    if (action === "/lookuplink" && m === "POST") {
+      // The stock lookup: one search box over the board's list, for a shop that only wants to know "do we have it?" (lookup.ts).
+      const link = (await clientLink(env, lead, url.origin)).replace(/\/?$/, "/find/");
+      const text = `Hi! Here's your ${lead.name} stock lookup: ${link}  Type a size or name and it shows how many you have. Tap "Add" when it offers your home screen so it opens like an app. To refresh it, export your item list from QuickBooks and pick the file under "Update the list".`;
+      await notify(env, {
+        kind: "status",
+        actor: session,
+        leadId: lead.id,
+        text: `${session.name} sent ${lead.name} their stock lookup link`,
+      });
+      return json({ url: link, text });
+    }
     if (action === "/practice" && sub === "reset" && m === "POST") {
       // The training aid goes back to square one for the next trainee (refunds, sign-ups, notes, tasks, Pages project, uploads, fresh samples).
       const out = await resetPracticeLead(env, lead, session.name);

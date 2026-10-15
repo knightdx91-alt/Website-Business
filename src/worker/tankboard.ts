@@ -1,3 +1,4 @@
+import { lookupPage } from "./lookup.ts";
 import { z } from "zod";
 import { hmac, safeEqual } from "./auth.ts";
 import { getLead, updateLead, type LeadRow } from "./db.ts";
@@ -34,6 +35,7 @@ import {
   fieldChoices,
   importRows,
   parseTable,
+  skipPreamble,
   rowsFrom,
   type Field,
 } from "./stock-import.ts";
@@ -222,7 +224,9 @@ export function runImport(
 ) {
   const kind = listKind(record);
   const W = kindWords(record);
-  const { rows, delimiter } = parseTable(body.text);
+  const table = parseTable(body.text);
+  const delimiter = table.delimiter;
+  const rows = skipPreamble(table.rows, kind);
   if (!rows.length)
     throw new HttpError(
       422,
@@ -528,6 +532,18 @@ export async function serveTankBoard(
       image: `${origin}/l/${leadId}/photo/${key}.${ext}`,
     });
   }
+  // The stock lookup: one search box over this list (see lookup.ts).
+  if (rest === "/find") return Response.redirect(`${origin}${base}/find/`, 301);
+  if (rest === "/find/" && req.method === "GET") return lookupPage(record, base);
+  if (rest === "/find/manifest.webmanifest" && req.method === "GET")
+    return webManifest({
+      name: `${record.name} · Stock lookup`,
+      shortName: record.name.length <= 14 ? record.name : "Lookup",
+      description: `Is it in stock at ${record.name}? Type it and see.`,
+      startUrl: `${base}/find/`,
+      scope: `${base}/find/`,
+      iconUrl: `${base}/icon.svg`,
+    });
   if (rest && rest !== "/") return Response.redirect(`${origin}${base}/`, 302);
   if (!rest) return Response.redirect(`${origin}${base}/`, 301);
   return boardPage(record, base, leadId);

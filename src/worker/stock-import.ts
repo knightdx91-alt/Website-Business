@@ -45,17 +45,17 @@ const HEADERS: Array<[Field, RegExp]> = [
   ],
   [
     "qty",
-    /^(qty|quantity|on ?hand|onhand|stock|in ?stock|count|available|avail|inventory|units|how many|left)$/i,
+    /^(qty|quantity|on ?hand|onhand|stock|in ?stock|count|available|avail|inventory|units|how many|left|(qty|quantity) on ?hand|qty available|quantity available)$/i,
   ],
   [
     "price",
-    /^(price|retail|retail price|sell(ing)? price|unit price|msrp|list price|price each|each|\$)$/i,
+    /^(price|retail|retail price|sell(ing)? price|unit price|msrp|list price|price each|each|\$|sales price|sales price ?\/ ?rate|price ?\/ ?rate|rate)$/i,
   ],
   [
     "name",
-    /^(name|item|item name|product|product name|title|description|desc|part name|part|what)$/i,
+    /^(name|item|item name|product|product name|title|description|desc|part name|part|what|product ?\/ ?service|product ?\/ ?service name)$/i,
   ],
-  ["note", /^(note|notes|details|size|comment|comments|remarks|memo|info)$/i],
+  ["note", /^(note|notes|details|size|comment|comments|remarks|memo|info|sales description)$/i],
 ];
 
 function guessField(header: string, kind: ListKind): Field | null {
@@ -75,7 +75,7 @@ function guessField(header: string, kind: ListKind): Field | null {
   if (/fits|application|compat/.test(h)) return "info:fits";
   if (/condition|grade/.test(h)) return "info:condition";
   if (/warranty/.test(h)) return "info:warranty";
-  if (/\bcost\b|wholesale/.test(h)) return "skip";
+  if (/\bcost\b|wholesale|\bvalue\b|%|\btot(al)?\b|reorder|account/.test(h)) return "skip";
   return null;
 }
 
@@ -142,6 +142,18 @@ const looksPrice = (v: string) =>
   v.trim() !== "";
 const looksInt = (v: string) => /^\d{1,4}$/.test(v.trim());
 const looksCode = (v: string) => /^\d{8,14}$/.test(v.trim());
+
+/**
+ * Accounting exports (QuickBooks reports) start with title lines: the company name, the report name, the date. The heading row is
+ * the first one, within the first 15, with two or more cells we recognise; everything above it goes.
+ */
+export function skipPreamble(rows: string[][], kind: ListKind): string[][] {
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    const known = rows[i]!.filter((v) => v && guessField(v, kind) !== null).length;
+    if (known >= 2) return i ? rows.slice(i) : rows;
+  }
+  return rows;
+}
 
 /** Reads the first row as headers when it has no numbers; otherwise guesses from the data (name = first text column, …). */
 export function detectColumns(
@@ -210,7 +222,7 @@ export interface ImportRow {
 }
 
 function cleanPrice(v: string): string | undefined {
-  const t = v.trim();
+  const t = v.trim().replace(/^(\$?\s*\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?)$/, (m) => m.replace(/,/g, ""));
   if (!t) return undefined;
   const m = t.match(
     /^\$?\s*(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:\/\s*(\w+)|(each|ea\.?))?$/i,
@@ -231,15 +243,39 @@ export function rowsFrom(
   const out: ImportRow[] = [];
   const data = hasHeader ? rows.slice(1) : rows;
   const ix = (f: Field) => columns.indexOf(f);
+  // Accounting exports (QuickBooks): group rows ("Tires" with nothing else filled in) become the section for the rows under them,
+  // "Total …" lines are skipped, "Tires:Goodyear:265/70R17" names split into a section and the item, labour / service rows go.
+  const noSectionColumn = ix("section") < 0;
+  // Only names a report closes with a "Total <name>" line count as groups, so a plain list's blank-count rows stay items.
+  const totals = new Set(
+    data
+      .map((r) => /^total\s+(.+)$/i.exec((ix("name") >= 0 ? (r[ix("name")] ?? "") : "").trim())?.[1]?.toLowerCase())
+      .filter(Boolean) as string[],
+  );
+  let group = "";
   for (const r of data) {
     const cell = (f: Field) => (ix(f) >= 0 ? (r[ix(f)] ?? "").trim() : "");
-    const name = cell("name").slice(0, 120);
+    let name = cell("name").slice(0, 120);
     if (!name) continue;
-    const qtyText = cell("qty").replace(/[^\d-]/g, "");
+    if (/^total\b/i.test(name)) continue;
+    if (/^(service|other charge|discount|subtotal|payment|sales tax item|group|bundle)$/i.test(cell("section"))) continue;
+    const others = r.filter((v, i) => i !== ix("name") && (v ?? "").trim() !== "").length;
+    if (noSectionColumn && others === 0 && totals.has(name.toLowerCase())) {
+      group = name.slice(0, 60);
+      continue;
+    }
+    let section = cell("section") || group;
+    if (noSectionColumn && /^[^:]{1,60}:\S/.test(name)) {
+      const parts = name.split(":").map((x) => x.trim()).filter(Boolean);
+      name = parts.pop()!.slice(0, 120);
+      section = parts.join(" · ").slice(0, 60) || section;
+    }
+    const qtyText = cell("qty").replace(/,/g, "").replace(/^\((.*)\)$/, "-$1");
+    const qtyNum = parseFloat(qtyText.replace(/[^\d.-]/g, ""));
     const qty =
-      qtyText === ""
+      qtyText === "" || Number.isNaN(qtyNum)
         ? undefined
-        : Math.max(0, Math.min(9999, parseInt(qtyText, 10) || 0));
+        : Math.max(0, Math.min(9999, Math.round(qtyNum)));
     const facts: ImportRow["facts"] = [];
     columns.forEach((f, i) => {
       if (f.startsWith("info:") && (r[i] ?? "").trim())
@@ -249,7 +285,7 @@ export function rowsFrom(
         });
     });
     out.push({
-      section: (cell("section") || fallback).slice(0, 60),
+      section: (section || fallback).slice(0, 60),
       name,
       price: cleanPrice(cell("price")),
       qty,

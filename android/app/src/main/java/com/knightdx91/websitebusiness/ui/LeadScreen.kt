@@ -88,6 +88,7 @@ import com.knightdx91.websitebusiness.net.deleteNote
 import com.knightdx91.websitebusiness.net.domain
 import com.knightdx91.websitebusiness.net.extrasLink
 import com.knightdx91.websitebusiness.net.clientLink
+import com.knightdx91.websitebusiness.net.lookupLink
 import com.knightdx91.websitebusiness.net.boardLink
 import com.knightdx91.websitebusiness.net.resetPractice
 import com.knightdx91.websitebusiness.net.revokeClientLink
@@ -826,6 +827,8 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
                             OutlinedButton(onClick = { act("clientlink") { val (_, text) = state.api.clientLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them their ${detail.boardName.lowercase()} link") }
                             OutlinedButton(onClick = { act("clientopen") { val (url, _) = state.api.clientLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open it here") }
+                            OutlinedButton(onClick = { act("lookuplink") { val (_, text) = state.api.lookupLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("🔎 Text them the stock lookup") }
+                            OutlinedButton(onClick = { act("lookupopen") { val (url, _) = state.api.lookupLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open the lookup here") }
                             OutlinedButton(onClick = { act("boardpitch") { val (_, text) = state.api.boardLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them the ${detail.boardName} page") }
                             if (isOwner) OutlinedButton(onClick = {
                                 ask = Ask("Revoke old board links", "Stop every ${detail.boardName.lowercase()} link sent so far? You'll text them a new one.", "Revoke", danger = true) {
