@@ -659,7 +659,7 @@ export function actionBar(acts: Action[], dna?: Dna): Raw {
 
 /** Owner photos in a grid, or (with none yet) the pack's "send us photos" to-do in its place. */
 export function gallery(ctx: Ctx, todoTitle?: string, todoBody?: string): Raw {
-  const photos = ctx.r.media.gallery.filter((p) => ctx.mode === "preview" || p.source !== "google");
+  const photos = ctx.r.media.gallery.filter((p) => !p.whatsNew && (ctx.mode === "preview" || p.source !== "google"));
   if (!photos.length) return todoTitle ? todoBlock(ctx, todoTitle, todoBody ?? "") : raw("");
   ctx.galleryShown = true;
   // Before/after pairs first (the "after" photo leaves the grid), then the rest with their captions.
@@ -677,6 +677,23 @@ ${pairs.length ? html`<ul class="pairs">${pairs.map(
 ${rest.length ? html`<ul class="gallery${pairs.length ? " gallery--more" : ""}">${rest.map((p) => html`<li>${cap(p) ? html`<figure>${imageTag(p)}<figcaption>${cap(p)}</figcaption></figure>` : imageTag(p)}</li>`)}</ul>` : ""}
 ${photos.some((p) => p.source === "google") ? todo(ctx, "Send us your own photos", "The photos in this gallery come from your Google listing and show in this preview only. The live site uses your own photos (or stock): text us 5 to 10 phone photos of your place, your work and your team.") : ""}
 </div></section>`;
+}
+
+/**
+ * "What's new" photos (Oct 2026, Thrift & More): gallery photos ticked "Show in What's new", in a row that swipes on phones
+ * and has arrows on wider screens; tapping a photo opens it big (lightbox in the client script, `[data-zoom]`).
+ */
+export function newArrivals(ctx: Ctx): Raw {
+  const photos = ctx.r.media.gallery.filter((p) => p.whatsNew && (ctx.mode === "preview" || p.source !== "google"));
+  if (!photos.length) return raw("");
+  const cap = (p: Image) => [p.caption, p.town].filter(Boolean).join(", ");
+  return html`<div class="carousel" data-carousel>
+<button type="button" class="carousel__btn carousel__btn--prev" aria-label="Earlier photos">‹</button>
+<ul class="carousel__track" aria-label="New arrivals">${photos.map(
+    (p, i) => html`<li><button type="button" class="carousel__item" data-zoom="${p.src}" data-cap="${cap(p)}" aria-label="${cap(p) ? `See it bigger: ${cap(p)}` : "See this photo bigger"}">${imageTag(p, { lazy: i > 2 })}</button>${cap(p) ? html`<p class="carousel__cap">${cap(p)}</p>` : ""}</li>`,
+  )}</ul>
+<button type="button" class="carousel__btn carousel__btn--next" aria-label="More photos">›</button>
+</div>`;
 }
 
 /** The file name a gallery photo is known by in Edit and in `Image.pairWith`: "/assets/owner/g3.jpg" → "g3". */

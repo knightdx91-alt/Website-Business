@@ -252,6 +252,51 @@ if ("IntersectionObserver" in window && !(window.matchMedia && window.matchMedia
     mq.parentNode.classList.add("is-dup");
   }
 }
+// "What's new" photo row: arrows scroll it; any [data-zoom] photo opens big with previous / next, Esc and swipe.
+var cs = d.querySelectorAll("[data-carousel]");
+for (var ci = 0; ci < cs.length; ci++) (function (c) {
+  var tr = c.querySelector(".carousel__track");
+  c.classList.add("has-js");
+  var step = function (dir) { tr.scrollBy({ left: dir * tr.clientWidth * 0.8, behavior: "smooth" }); };
+  c.querySelector(".carousel__btn--prev").addEventListener("click", function () { step(-1); });
+  c.querySelector(".carousel__btn--next").addEventListener("click", function () { step(1); });
+})(cs[ci]);
+var zs = d.querySelectorAll("[data-zoom]");
+if (zs.length) {
+  var lb = d.createElement("div");
+  lb.className = "lightbox"; lb.hidden = true;
+  lb.setAttribute("role", "dialog"); lb.setAttribute("aria-modal", "true"); lb.setAttribute("aria-label", "Photo");
+  lb.innerHTML = '<button type="button" class="lightbox__close" aria-label="Close">×</button><button type="button" class="lightbox__nav lightbox__nav--prev" aria-label="Previous photo">‹</button><figure><img alt=""><figcaption></figcaption></figure><button type="button" class="lightbox__nav lightbox__nav--next" aria-label="Next photo">›</button>';
+  d.body.appendChild(lb);
+  if (zs.length < 2) { var nv = lb.querySelectorAll(".lightbox__nav"); for (var ni = 0; ni < nv.length; ni++) nv[ni].hidden = true; }
+  var lbImg = lb.querySelector("img"), lbCap = lb.querySelector("figcaption"), lbCur = 0, lbBack = null, lbX = null;
+  var lbShow = function (i) {
+    lbCur = (i + zs.length) % zs.length;
+    var b = zs[lbCur], im = b.querySelector("img");
+    lbImg.src = b.getAttribute("data-zoom"); lbImg.alt = im ? im.alt : "";
+    lbCap.textContent = b.getAttribute("data-cap") || "";
+  };
+  var lbClose = function () { lb.hidden = true; root.style.overflow = ""; if (lbBack) lbBack.focus(); };
+  for (var zi = 0; zi < zs.length; zi++) (function (i) {
+    zs[i].addEventListener("click", function () { lbBack = zs[i]; lbShow(i); lb.hidden = false; root.style.overflow = "hidden"; lb.querySelector(".lightbox__close").focus(); });
+  })(zi);
+  lb.addEventListener("click", function (e) {
+    var t = e.target;
+    if (t === lb || t.closest(".lightbox__close")) lbClose();
+    else if (t.closest(".lightbox__nav--prev")) lbShow(lbCur - 1);
+    else if (t.closest(".lightbox__nav--next")) lbShow(lbCur + 1);
+  });
+  d.addEventListener("keydown", function (e) {
+    if (lb.hidden) return;
+    if (e.key === "Escape") lbClose(); else if (e.key === "ArrowLeft") lbShow(lbCur - 1); else if (e.key === "ArrowRight") lbShow(lbCur + 1);
+  });
+  lb.addEventListener("touchstart", function (e) { lbX = e.touches[0].clientX; }, { passive: true });
+  lb.addEventListener("touchend", function (e) {
+    if (lbX === null) return;
+    var dx = e.changedTouches[0].clientX - lbX; lbX = null;
+    if (Math.abs(dx) > 50) lbShow(lbCur + (dx < 0 ? 1 : -1));
+  });
+}
 var fy = d.querySelectorAll("[data-year]");
 for (var y = 0; y < fy.length; y++) fy[y].textContent = String(new Date().getFullYear());
 })();

@@ -499,6 +499,8 @@ export function editForm(l: EditDetail): EditForm {
         placeholder: "Hanceville",
       }),
     );
+    if (r.category === "retail")
+      galleryFields.push(cb(`gnew_${key}`, "Show in “What's new” (photo row, tap to see it big)", p.whatsNew));
     galleryFields.push(
       sel(`gpair_${key}`, "Before/after", p.pairWith || "", [
         ["", "Not a “before” photo"],
@@ -529,6 +531,7 @@ export function editForm(l: EditDetail): EditForm {
         caption: p.caption || "",
         town: p.town || "",
         pairWith: p.pairWith || "",
+        whatsNew: !!p.whatsNew,
       })),
     },
   );
@@ -2469,6 +2472,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
       caption: v("gcap_" + key) || "",
       town: v("gtown_" + key) || "",
       pairWith: v("gpair_" + key) || "",
+      ...(has("gnew_" + key) ? { whatsNew: !!on("gnew_" + key) } : {}),
     };
   }
 

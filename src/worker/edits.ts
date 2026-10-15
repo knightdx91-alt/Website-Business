@@ -651,6 +651,7 @@ export const EditsSchema = z.object({
               caption: z.string().trim().max(80),
               town: z.string().trim().max(40),
               pairWith: z.string().trim().max(80),
+              whatsNew: z.boolean(),
             })
             .partial(),
         )
@@ -1390,6 +1391,7 @@ function applyTlcEdits(
       if (!m) continue;
       if (m.caption !== undefined) p.caption = clear(m.caption);
       if (m.town !== undefined) p.town = clear(m.town);
+      if (m.whatsNew !== undefined) p.whatsNew = m.whatsNew || undefined;
       // A pair only points at another photo that is on the record (and not at itself).
       if (m.pairWith !== undefined) {
         const key = clear(m.pairWith);

@@ -285,7 +285,7 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String, jumpTo: Stri
                                             AuthImage(state.api, "/p/$id${g.src}", Modifier.size(88.dp), maxPx = 200)
                                             Spacer(Modifier.width(10.dp))
                                             Column(Modifier.weight(1f)) {
-                                                card.fields.filter { it.name == "gcap_${g.key}" || it.name == "gtown_${g.key}" || it.name == "gpair_${g.key}" }.forEach { f -> FieldView(f, values) { dirty = true } }
+                                                card.fields.filter { it.name == "gcap_${g.key}" || it.name == "gtown_${g.key}" || it.name == "gpair_${g.key}" || it.name == "gnew_${g.key}" }.forEach { f -> FieldView(f, values) { dirty = true } }
                                                 TextButton(onClick = { act("Removing photo…") { state.api.deleteJson("/leads/$id/gallery/${g.key}") } }) { Text("Remove") }
                                             }
                                         }

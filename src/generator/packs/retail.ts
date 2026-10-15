@@ -1,5 +1,5 @@
 import { action, actions, donationsOn, type ActionId } from "../actions.ts";
-import { about, announcements, button, contactForm, ctaBand, factList, faq, gallery, hero, imageTag, infoStrip, reviews, sectionHead, serviceList, todo, visit, type Ctx } from "../components.ts";
+import { about, announcements, button, contactForm, ctaBand, factList, faq, gallery, hero, imageTag, infoStrip, newArrivals, reviews, sectionHead, serviceList, todo, visit, type Ctx } from "../components.ts";
 import type { PageSpec } from "./types.ts";
 import { hasAnyHours } from "../hours.ts";
 import { html, raw, type Raw } from "../html.ts";
@@ -303,6 +303,7 @@ ${r.variant === "farm_feed" || r.variant === "hardware" || r.variant === "pet" ?
 ${occasionTiles(ctx)}
 <section class="section section--band" id="new" aria-labelledby="new-title"><div class="wrap">
 ${sectionHead("What's new", r.variant === "florist" ? "See our latest arrangements" : r.variant === "farm_feed" || r.variant === "hardware" || r.variant === "pet" ? "In stock now" : "New things come in all the time", ext(r).dropDay ? ext(r).dropDay : social.length ? "We post new arrivals on social media first. Follow along so you don't miss them." : `Stop by or give us a call at ${r.phone.display} to ask what just came in.`, "new-title")}
+${newArrivals(ctx)}
 ${ext(r).dropDay && social.length ? html`<p>We post new arrivals on social media first. Follow along so you don't miss them.</p>` : ""}
 ${ext(r).holdNote ? html`<p><strong>${ext(r).holdNote}</strong> <a href="${action(r, "call")!.href}">Call ${r.phone.display}</a>.</p>` : ""}
 <div class="btns">${social.map(([k, u]) => html`<a class="btn btn--secondary" href="${u}" target="_blank" rel="noopener"><span>Follow us on ${SOCIAL_LABEL[k] ?? k}</span><span class="sr"> (opens in new tab)</span></a>`)}${actions(r, ["shop", "giftcard"]).map((a) => html`<a class="btn btn--ghost" href="${a.href}" target="_blank" rel="noopener"><span>${a.label}</span><span class="sr"> (opens in new tab)</span></a>`)}</div>
@@ -312,7 +313,7 @@ ${r.ext.retail?.shopUrl ? "" : todo(ctx, "Do you sell online?", r.variant === "f
 ${donationsSection(ctx)}
 ${vendorsSection(ctx)}
 ${deliveryFinancing(ctx)}
-${gallery(ctx, "Send photos of your shop", "Three to six photos of your store, displays and front door. People want to see what it's like inside before they drive over.")}
+${r.media.gallery.some((p) => p.whatsNew) ? gallery(ctx) : gallery(ctx, "Send photos of your shop", "Three to six photos of your store, displays and front door. People want to see what it's like inside before they drive over.")}
 ${reviews(ctx)}
 ${about(ctx, `About ${r.name}`, "Our story")}
 ${visit(ctx, "Come see us")}

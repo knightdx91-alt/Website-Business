@@ -1612,6 +1612,13 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `assignees` + `assigneeNames`, `assignee` (first, for old builds) and `assigneeName` (names joined). "Mine" = unassigned or
   listed (`instr(',' || assignee || ',', ',<id>,')`, not LIKE); the owner's calendar invite goes out when "owner" is among them.
   Web: tick boxes under "For" (`.chipbox`, none = anyone); Android: multi-select chips on Add and in the tap-to-edit dialog.
+- 🖼️ What's new photos (Oct 2026, owner's ask for Thrift & More; Android 2.71): a gallery photo ticked "Show in “What's new”"
+  (`Image.whatsNew`; Edit → Photo gallery per photo, retail only: web checkbox `gnew_<key>`, editform `gnew_<key>`, Android
+  EditScreen's per-photo filter, edits `galleryMeta[src].whatsNew`) leaves the Photos grid and shows in the retail #new section as
+  `newArrivals()` (components.ts): a scroll-snap row (78% wide tiles on phones, three across with ‹ › arrows from 760 px), each
+  photo a `[data-zoom]` button; the client script opens any `[data-zoom]` in a full-screen lightbox (previous / next, Esc, swipe,
+  focus returns). With only What's new photos, the Photos to-do is dropped. `test/worker/whats-new.test.ts`. The hero photo
+  is still the Edit → Photo upload; an owner photo keeps the design's opening and scrim.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

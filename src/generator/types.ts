@@ -45,6 +45,8 @@ export interface Image {
   town?: string;
   /** This photo is the "before" of a pair: the file name (without folder or extension) of its "after" photo. */
   pairWith?: string;
+  /** Shops: show this photo in the "What's new" carousel (tap to see it big) instead of the Photos grid. */
+  whatsNew?: boolean;
 }
 
 export type PriceMode = "none" | "exact" | "from" | "range" | "quote";

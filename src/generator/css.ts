@@ -351,6 +351,25 @@ html.notes .todo strong{display:block;margin-bottom:.25em}
 .pair__cap{margin:8px 0 0;font-weight:600}
 .gallery figure{margin:0}.gallery figcaption{font-size:.92rem;color:var(--muted);margin-top:6px}
 .gallery--more{margin-top:28px}
+.carousel{position:relative;margin:24px 0 8px}
+.carousel__track{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;list-style:none;margin:0;padding:0 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.carousel__track>li{flex:0 0 78%;scroll-snap-align:start;min-width:0}
+@media (min-width:760px){.carousel__track>li{flex-basis:calc((100% - 24px)/3)}}
+.carousel__item{display:block;width:100%;padding:0;border:0;background:none;cursor:zoom-in;border-radius:var(--radius);overflow:hidden}
+.carousel__item img{display:block;width:100%;height:auto;aspect-ratio:4/5;object-fit:cover;transition:transform .6s var(--ease)}
+.carousel__item:hover img{transform:scale(1.04)}
+.carousel__cap{font-size:.92rem;color:var(--muted);margin:6px 0 0}
+.carousel__btn{display:none;position:absolute;top:calc(50% - 26px);z-index:2;width:44px;height:44px;border-radius:50%;border:0;background:var(--surface);color:var(--text);box-shadow:0 2px 10px rgba(0,0,0,.28);font-size:30px;line-height:40px;cursor:pointer}
+.carousel__btn--prev{left:-8px}.carousel__btn--next{right:-8px}
+@media (min-width:760px){.carousel.has-js .carousel__btn{display:block}}
+.lightbox{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:56px 12px}
+.lightbox[hidden]{display:none}
+.lightbox figure{margin:0;max-width:100%;max-height:100%;display:flex;flex-direction:column;align-items:center}
+.lightbox img{max-width:min(1200px,100%);max-height:calc(100vh - 140px);object-fit:contain;border-radius:6px}
+.lightbox figcaption{color:#fff;margin-top:10px;text-align:center}
+.lightbox button{position:absolute;border:0;background:rgba(255,255,255,.16);color:#fff;width:48px;height:48px;border-radius:50%;font-size:30px;line-height:44px;cursor:pointer}
+.lightbox__close{top:10px;right:10px}
+.lightbox__nav--prev{left:8px;top:calc(50% - 24px)}.lightbox__nav--next{right:8px;top:calc(50% - 24px)}
 /* emergency line (contractors) */
 .emerg{background:var(--secondary);color:var(--on-secondary)}
 .emerg__in{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;justify-content:space-between;padding:10px 20px}
