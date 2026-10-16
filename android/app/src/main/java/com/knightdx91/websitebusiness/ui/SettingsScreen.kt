@@ -655,6 +655,7 @@ fun SettingsScreen(state: AppState, nav: NavHostController) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedButton(onClick = { nav.navigate("playbook") }) { Text("💬 Plans & answers") }
                         OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
+                        OutlinedButton(onClick = { nav.navigate("guide/launch") }) { Text("🚀 From yes to live") }
                         OutlinedButton(onClick = { nav.navigate("changelog") }) { Text("📋 What's new") }
                         OutlinedButton(onClick = { nav.navigate("commission") }) { Text("💰 Commission calculator") }
                         OutlinedButton(onClick = { nav.navigate("guide/words") }) { Text("📖 What the words mean") }

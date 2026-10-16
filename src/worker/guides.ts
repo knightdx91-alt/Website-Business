@@ -1,4 +1,4 @@
-import { addonPrice, type AppSettings } from "./db.ts";
+import { addonPrice, isDomainAddon, type AppSettings } from "./db.ts";
 import { escHtml, page } from "./page.ts";
 import { APP_ORIGIN } from "./tankboard.ts";
 import { KINDS } from "../generator/pricelist.ts";
@@ -32,6 +32,7 @@ export const GUIDE_IDS = [
   "display",
   "costs",
   "words",
+  "launch",
 ] as const;
 
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
@@ -408,7 +409,111 @@ export function guideById(id: string, s: AppSettings): Guide | null {
   if (id === "display") return displayGuide(s);
   if (id === "costs") return costsGuide(s);
   if (id === "words") return wordsGuide(s);
+  if (id === "launch") return launchGuide(s);
   return null;
+}
+
+/**
+ * 🚀 From yes to live (owner's ask, Oct 2026): everything after a business says yes, in order: sign-up, making the site theirs,
+ * publishing, their own domain, getting found on Google, Google Analytics, after launch, and the one-time setups behind it.
+ * Button names here must match the apps; prices and plan names come from Settings.
+ */
+export function launchGuide(s: AppSettings): Guide {
+  const domain = s.addons.find((a) => isDomainAddon(a));
+  const pro = s.plans.find((p) => p.id === "pro")?.name || "Pro";
+  const domainPrice = domain ? addonPrice(domain) : "$2/month";
+  return {
+    id: "launch",
+    title: "🚀 From yes to live: site, domain, Google & analytics",
+    intro:
+      "Everything after a business says yes, in order: sign them up, make the site what they want, publish it, put it on their own domain, get it found on Google, and turn on Google Analytics. The button names below are the ones in the app, on the web and the phone.",
+    sections: [
+      {
+        title: "1. Sign them up",
+        numbered: true,
+        steps: [
+          'On the lead page, tap "Sign them up" (or "Change plan or way to pay" for another plan or way to pay).',
+          'They read "In short", type their name and sign with a finger.',
+          'Take payment: 💳 Tap card on this phone, card entry on the phone, or "Text them the payment link".',
+          `Ask about the domain now: the free .pages.dev address, or their own (like theirbusiness.com) = the "${domain?.name ?? "Domain name, bought for you"}" extra, ${domainPrice}, free on ${pro}.`,
+        ],
+        note: "The lead turns Sold and a green ✅ Client card appears at the top.",
+      },
+      {
+        title: "2. Make the site what they want",
+        steps: [
+          "Tap Edit. Each card saves and the preview updates.",
+          "Confirm with the owner: business name, phone, address (a new address moves the map pin).",
+          "Text: headline, intro, about, closing. Change any wording they don't like.",
+          'Services: one per line, like "Haircut | $25 | 45 min". A line like "# Color" starts a group.',
+          "Hours.",
+          "Photo: their main photo. Keep in view picks what stays in the frame; Zoom in on phones makes a sign readable.",
+          'Photo gallery: their photos. Tick "Show in What\'s new" for the swipeable row. Stock photos: "Don\'t use this one" on any they don\'t like.',
+          "Links: Facebook, booking, ordering. Leave Google Analytics ID blank; the app fills it in.",
+          'Design (lead page): Try another design, or type a style ("rustic country") and tap ✨ Design it.',
+          "Spanish page (only if they bought it): Write Spanish page translates the whole site.",
+          "Show them with Preview: 📱 / 🖥️ for phone and desktop, 📝 Show notes for the to-do notes customers never see.",
+        ],
+      },
+      {
+        title: "3. Publish",
+        numbered: true,
+        steps: [
+          "The 🚀 Finish & publish card lists anything still missing. Each line opens the card that fixes it.",
+          "When the list is empty, tap Publish to Cloudflare.",
+          "Within a minute it's live at something like theirbusiness.pages.dev. That address keeps working forever.",
+          "Google Analytics is set up at this moment by itself (see 6).",
+        ],
+      },
+      {
+        title: "4. Their own domain",
+        numbered: true,
+        steps: [
+          "Open the 🌐 Their domain card (before or after publishing). It suggests names marked Free or Taken; tap Use this on theirs.",
+          "Tap Copy name & open Cloudflare, paste the name and register it. The client is the registrant contact (the domain is theirs). Leave auto-renew on.",
+          "Back in the app, tap I bought it.",
+          "Within minutes (sometimes an hour) the card says ● Working, the site switches to the new address and everyone gets an alert. No DNS records to type.",
+        ],
+        note: "Forgot step 3? The app checks every 5 minutes anyway.",
+      },
+      {
+        title: "5. Get it found on Google",
+        steps: [
+          "Google finds new sites by itself, but it can take weeks. These get them showing up for their own name in days.",
+          'Their Google Business Profile (the biggest one): the lead\'s Google profile tools → text the owner the "add us as Manager" steps. Once you have access, put the site address in the profile\'s Website field.',
+          "Google Search Console (search.google.com/search-console, our company Google account): Add property → URL prefix → https://theirdomain.com → HTML tag → copy only the code inside content=\"…\".",
+          "In the app: Edit → Links → Search Console code, paste, save, then tap Republish changes on the lead page.",
+          "Back in Search Console: Verify → Sitemaps → submit sitemap.xml → URL inspection on the home page → Request indexing. Add the client as a user if they want to see it.",
+          "Get listed everywhere (on the lead): Bing Places (import from their Google profile) and Apple Business Connect.",
+        ],
+        note: "Their name usually shows the site within a few days to two weeks. Ranking for \"pizza near me\" style searches takes longer and comes mostly from their Google profile and reviews.",
+      },
+      {
+        title: "6. Google Analytics",
+        steps: [
+          "Already on the site from publishing: the app gives every published site its own Google Analytics property.",
+          "Client site → 📊 Google Analytics → Give the owner access, with their Gmail. They see their reports at analytics.google.com.",
+          "Open their reports shows you their numbers. Visits show within a day; calls, texts, Directions taps and form sends are counted too.",
+          "If the business already has its own Google Analytics, type their ID in Edit → Links → Google Analytics ID instead.",
+        ],
+      },
+      {
+        title: "7. After launch",
+        steps: [
+          "Changes: Edit, then Republish changes. Clients can also use \"Request a change\" in their site's footer; it lands in the Inbox.",
+          "Text monthly report: their visits and calls.",
+          "Ask for a review and Review cards (QR): more reviews help them on Google too.",
+        ],
+      },
+      {
+        title: "One-time setups (owner)",
+        steps: [
+          'Google Analytics: analytics.google.com → Admin → Create account → copy the Account ID into Settings → Website → "Google Analytics account for client sites". Then the Connections strip at the top of Settings shows the last two steps: switch on the Google Analytics Admin API, and add the app\'s service account email as Administrator.',
+          "Cloudflare token: Cloudflare → My Profile → API Tokens → edit the app's token → add Zone · DNS · Edit and Zone · Zone · Read, both for All zones. Without it a bought domain can get stuck on Connecting.",
+        ],
+      },
+    ],
+  };
 }
 
 /** 💵 What keeps the app running, what each piece costs, and the monthly check (for whoever minds the bills). */

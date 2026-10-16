@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 48,
+    date: "2026-10-16",
+    android: "2.79",
+    title: "Guide: from yes to live",
+    items: [
+      "A new step-by-step guide covers everything after a business says yes: sign-up, editing their site, publishing, their own domain, getting found on Google, and Google Analytics.",
+      "Open it from Settings → 🚀 From yes to live, or from the \"🚀 The whole path, step by step\" link on the lead page's Finish & publish card.",
+    ],
+  },
+  {
     n: 47,
     date: "2026-10-16",
     android: "2.78",

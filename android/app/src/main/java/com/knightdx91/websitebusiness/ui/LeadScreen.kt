@@ -500,6 +500,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                         // Finish & publish: every blocker with the Edit card that fixes it (tap a line to open that card).
                         val items = detail.checklist.ifEmpty { blockers.map { ChecklistItem(it, "text", "todo") } }
                         Text(if (items.isNotEmpty()) "🚀 Finish & publish · ${items.size} to fix" else "🚀 Ready to publish", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        TextButton(onClick = { nav.navigate("guide/launch") }, contentPadding = PaddingValues(0.dp)) { Text("🚀 The whole path, step by step") }
                         if (items.isNotEmpty()) {
                             items.forEachIndexed { i, it ->
                                 Row(Modifier.fillMaxWidth().padding(top = 6.dp).clickable { nav.navigate("edit/$id?card=${it.card}") }, verticalAlignment = Alignment.Top) {

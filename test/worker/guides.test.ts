@@ -57,3 +57,11 @@ test("barcode scanning is in the Tank board guide, the display guide, the custom
   const pitch = customerBoardPitch(s, { business: "King Fish Aquatics", live: true });
   assert.match(pitch.sections[0]!.steps.join("\n"), /barcode/i);
 });
+
+test("From yes to live: every stage in order, prices from Settings", () => {
+  const g = guideById("launch", settings({ plans: [{ id: "pro", name: "Premium", setup: 0, monthly: 149, includes: "" }] } as Partial<AppSettings>))!;
+  assert.deepEqual(g.sections.map((x) => x.title.replace(/^\d\. /, "")), ["Sign them up", "Make the site what they want", "Publish", "Their own domain", "Get it found on Google", "Google Analytics", "After launch", "One-time setups (owner)"]);
+  const text = JSON.stringify(g);
+  for (const b of ["Publish to Cloudflare", "I bought it", "Republish changes", "Give the owner access", "Search Console code"]) assert.ok(text.includes(b), b);
+  assert.match(text, /free on Premium/);
+});

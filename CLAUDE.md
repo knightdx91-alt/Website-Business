@@ -1740,6 +1740,12 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   itself for a same-account zone, and when it doesn't the card says `records: "no-permission"` with the fix (token → Zone · DNS · Edit
   + Zone · Zone · Read, All zones). The token's zone read must cover new zones too (All zones), or bought domains stay at "buy".
   Training lesson "Their own domain and email" rewritten for this flow.
+- 🚀 Guide "From yes to live" (Oct 2026, owner's ask; Android 2.79): `launchGuide(s)` in guides.ts (id `launch`): sign-up → editing
+  (every Edit card by its real label) → publish → 🌐 Their domain → getting found on Google (GBP website field, Search Console
+  HTML-tag code in Edit → Links + Republish changes + sitemap + Request indexing, Get listed everywhere) → Google Analytics →
+  after launch → the owner's one-time setups (GA account + Admin API + service account; Cloudflare token DNS/Zone permissions).
+  Domain extra price and the Pro plan name come from Settings. Buttons: web Settings guides (owner) + Help (callers), the lead
+  page's Finish & publish card; Android Settings → More + the Finish & publish card. When a button it names is renamed, update it.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

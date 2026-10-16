@@ -1079,6 +1079,7 @@ async function viewLead(id, intent) {
     C.log = `<div id="logslot-side">${l.salesStatus !== "live" ? logCardHtml(l) : ""}</div>`;
     C.publish = ready && work ? `<section class="card" id="publishcard"><h2>${items.length ? `🚀 Finish &amp; publish · ${items.length} to fix` : "🚀 Ready to publish"}</h2>
         ${items.length ? `<ol class="checklist">${items.map((it) => `<li><a href="#/edit/${l.id}/${esc(it.card)}">${esc(it.text)}</a><span class="small muted"> → Edit · ${esc(CARD_NAME[it.card] || it.card)}</span></li>`).join("")}</ol><p class="small muted">Each line opens the right card in Edit. Publish unlocks when the list is empty.</p>` : `<p class="muted">Everything's confirmed. Publishing puts the site on the internet.</p>`}
+        <p class="small"><a href="#/guide/launch">🚀 The whole path, step by step: publish, domain, Google, analytics</a></p>
         ${(lint.suggestions || []).length ? `<details class="more"><summary>Good to add (talking points, ${lint.suggestions.length})</summary><ul class="list small">${lint.suggestions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>` : ""}
         <div class="btns btns--full">
           <button class="btn btn--good" data-act="publish"${items.length ? " disabled" : ""}>${l.liveUrl ? "Republish changes" : "Publish to Cloudflare"}</button>
@@ -3889,7 +3890,7 @@ async function viewLead(id, intent) {
         <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
       <section class="card"><h2>📖 Guides</h2>
         <p class="small muted">How to set up and sell what we offer, with the exact buttons to tap. Prices in the guides come from Settings.</p>
-        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/training">🎓 Training course</a><a class="btn" href="#/changelog">📋 What's new</a><a class="btn" href="#/commission">💰 Commission calculator</a>${reportBtn()}</div></section>
+        <div class="btns btns--full"><a class="btn" href="#/guide/launch">🚀 From yes to live: site, domain, Google & analytics</a><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/training">🎓 Training course</a><a class="btn" href="#/changelog">📋 What's new</a><a class="btn" href="#/commission">💰 Commission calculator</a>${reportBtn()}</div></section>
       <section class="card"><h2>📬 Flyer mail-out</h2>
         <p class="small muted">Print the flyer, then write each business's 5-digit code in the white box. They type it at undergroundassociates.com/code, see their own sample site, and every phone gets an alert. The mail list is the best open leads with a street address, each with its code (codes stay the same; a coded preview is kept 90 days).</p>
         <div class="btns btns--full"><a class="btn btn--primary" href="/flyers/mailer.pdf" target="_blank" rel="noopener">🖨️ Print the flyer (PDF)</a><a class="btn" href="/api/mailing.csv?limit=50">⬇ Mail list: next 50 (CSV)</a><a class="btn" href="/api/mailing.csv?limit=250&all=1">⬇ Every coded lead (CSV)</a></div></section>
@@ -4242,7 +4243,7 @@ async function viewLead(id, intent) {
     meta = await api("/meta");
     if (stale(my)) return;
     if (!isOwner()) {
-      $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}<section class="card"><h2>Help</h2><div class="btns btns--full"><a class="btn" href="#/commission">💰 What I'd earn</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/changelog">📋 What's new</a>${reportBtn()}</div><p class="small muted">Something didn't work? Report it and the owner sees the screen, the step and the error.</p></section></div>`;
+      $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}<section class="card"><h2>Help</h2><div class="btns btns--full"><a class="btn" href="#/commission">💰 What I'd earn</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/launch">🚀 From yes to live</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/changelog">📋 What's new</a>${reportBtn()}</div><p class="small muted">Something didn't work? Report it and the owner sees the screen, the step and the error.</p></section></div>`;
       return bindDevice();
     }
     const [{ last30Days: u }, { callers }] = await Promise.all([api("/usage"), api("/callers")]);
