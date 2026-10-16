@@ -169,7 +169,7 @@ suspend fun Api.siteStats(id: String): SiteStats {
 }
 
 /** The client's own domain on the Pages project: null `domain` means none is attached yet. */
-data class DomainInfo(val domain: String?, val status: String?, val error: String?, val target: String?) {
+data class DomainInfo(val domain: String?, val status: String?, val error: String?, val target: String?, val stage: String = "none", val buyUrl: String? = null, val records: String? = null) {
     val active get() = status == "active"
 
     /** The DNS record name to add: the subdomain ("www"), or "@" for a bare domain. */
@@ -177,13 +177,25 @@ data class DomainInfo(val domain: String?, val status: String?, val error: Strin
     val bare get() = (domain ?: "").split(".").size <= 2
 
     companion object {
-        fun from(j: JSONObject) = DomainInfo(j.str("domain"), j.str("status"), j.str("error"), j.str("target"))
+        fun from(j: JSONObject) = DomainInfo(j.str("domain"), j.str("status"), j.str("error"), j.str("target"), j.str("stage") ?: if (j.str("domain") == null) "none" else "connecting", j.str("buyUrl"), j.str("records"))
     }
 }
 
 suspend fun Api.domain(id: String): DomainInfo = DomainInfo.from(getJson("/leads/$id/domain"))
 suspend fun Api.addDomain(id: String, domain: String): DomainInfo = DomainInfo.from(putJson("/leads/$id/domain", JSONObject().put("domain", domain)))
 suspend fun Api.removeDomain(id: String) { deleteJson("/leads/$id/domain") }
+
+/** A name idea for their domain and whether it's free (true), taken (false) or unknown (null). */
+data class DomainIdea(val domain: String, val available: Boolean?)
+
+suspend fun Api.domainIdeas(id: String, q: String? = null): List<DomainIdea> {
+    val j = getJson("/leads/$id/domain/suggest" + (q?.let { "?q=" + java.net.URLEncoder.encode(it, "UTF-8") } ?: ""))
+    return j.optJSONArray("suggestions").objects().map { DomainIdea(it.optString("domain"), if (it.isNull("available")) null else it.optBoolean("available")) }
+}
+
+/** "I bought it" / "Check now": hook the domain up now instead of waiting for the 5-minute check. */
+suspend fun Api.checkDomain(id: String): DomainInfo = DomainInfo.from(postJson("/leads/$id/domain/check"))
+
 
 /** A new look + layout + structure (nothing given), the same colors with a new structure, or a named structure (recipe). */
 suspend fun Api.restyle(id: String, recipe: String? = null, structureOnly: Boolean = false, brief: String? = null, rewrite: Boolean = false): JSONObject {

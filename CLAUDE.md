@@ -1726,6 +1726,20 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   before the first publish. The minute cron's `checkDomains` (every fifth minute, 10 waiting domains) asks Cloudflare, and on
   `active` sets `domain_active = 1` + `prices_dirty = 1` (republishDirty republishes), adds a call-log note and notifies ("🌐 X is
   live"). Domains already connected before 0025 were marked active by the migration. `detail().domainActive`. `test/worker/domain.test.ts`.
+- 🌐 Domains in three taps (Oct 2026, owner's rule: every domain is bought on our Cloudflare account, in the client's name; Android
+  2.78; `src/worker/domains.ts`, `test/worker/domain.test.ts`): Sold / Live leads get a "🌐 Their domain" card (web `domainCardHtml` /
+  `bindDomain`, layout key `domain`; Android `ui/DomainCard.kt`; the old CNAME box in the Client site card is gone). Stages from
+  `domainStatus()`: none → name ideas (`GET /api/leads/:id/domain/suggest[?q=]` = `suggestDomains` + `domainAvailable`, public RDAP
+  rdap.org: 404 free / 200 taken / else unknown) with "Use this" (PUT /domain, stored bare) → buy ("Copy name & open Cloudflare" →
+  `buyUrl` = dash.cloudflare.com/<account>/domains/register; "I bought it" = `POST /domain/check`) → publish (in our account, site not
+  live) → connecting → working. `wireDomain()` (on save, on publish, in "I bought it" and in the 5-minute `checkDomains`): finds the
+  zone in our account (`ourZone`), adds the bare name AND www to the Pages project, `ensureRecords` adds proxied CNAMEs to
+  <project>.pages.dev when none exist, then Cloudflare's status decides `domain_active` (`domainWorking()` → address switch, republish,
+  call-log note, alert). Cloudflare has no API for buying domains, so the purchase is the one manual tap. The app's API token (Oct
+  2026) can read zones and run Pages but NOT edit DNS or create zones ("Authentication error"); Cloudflare usually adds the record
+  itself for a same-account zone, and when it doesn't the card says `records: "no-permission"` with the fix (token → Zone · DNS · Edit
+  + Zone · Zone · Read, All zones). The token's zone read must cover new zones too (All zones), or bought domains stay at "buy".
+  Training lesson "Their own domain and email" rewritten for this flow.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

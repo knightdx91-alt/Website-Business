@@ -1,3 +1,4 @@
+import { wireDomain } from "./domains.ts";
 import { ensureAnalytics } from "./analytics.ts";
 import { syncSpanish } from "./spanish-sync.ts";
 import { zipSync } from "fflate";
@@ -10,7 +11,7 @@ import type { Place } from "../places/client.ts";
 import { getSettings, updateLead, type LeadRow } from "./db.ts";
 import { COMPANY_ORIGIN } from "./company.ts";
 import { HttpError, now, type Env } from "./env.ts";
-import { addDomain, deploy, ensureProject, projectName, type PagesAuth } from "./pages.ts";
+import { deploy, ensureProject, projectName, type PagesAuth } from "./pages.ts";
 
 async function loadFontFrom(env: Env, origin: string) {
   return async (_pkg: string, file: string): Promise<Uint8Array> => {
@@ -156,9 +157,9 @@ export async function publishLead(
   // A domain typed in before the first publish (Edit → Their domain name) is connected now.
   if (lead.custom_domain) {
     try {
-      const d = await addDomain(auth, project.name, lead.custom_domain);
+      const w = await wireDomain(auth, project.name, lead.custom_domain);
       // Working already (e.g. a domain on our own Cloudflare): use it as the address now; else the cron switches it over later.
-      if (d?.status === "active" && !lead.domain_active) {
+      if (w.stage === "working" && !lead.domain_active) {
         await updateLead(env, lead.id, { domain_active: 1 });
         lead = { ...lead, domain_active: 1 };
       }

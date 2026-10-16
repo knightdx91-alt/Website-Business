@@ -1,3 +1,4 @@
+import { bareDomain, buyUrl, domainAvailable, DOMAIN_RE, suggestDomains, ourZone, wireDomain, type DomainStage } from "./domains.ts";
 import { gaLastError, gaServiceAccount, gaState, grantViewer, queueGaBackfill, reportsUrl } from "./analytics.ts";
 import { CHANGELOG, LATEST_CHANGE, changelogSeenKey, changesSince, unseenChanges } from "./changelog.ts";
 import { relocate } from "./relocate.ts";
@@ -559,27 +560,44 @@ const DOMAIN_NAME = z
   .transform((d) => d.replace(/^https?:\/\//, "").replace(/\/.*$/, ""))
   .pipe(z.string().max(253).regex(/^(?!-)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/, "Type a domain like www.example.com"));
 
-/** Where a site's own domain stands: connected (Cloudflare's status + the DNS record to add) or waiting for the first publish. */
+/** Where a site's own domain stands, as one stage the lead page and Edit can show (see domains.ts). */
 async function domainStatus(env: Env, lead: LeadRow) {
-  if (!lead.pages_project)
-    return { domain: lead.custom_domain, status: lead.custom_domain ? "waiting to publish" : null, error: null, target: null, pending: true };
   const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
-  const d = lead.custom_domain ? await getDomain(auth, lead.pages_project, lead.custom_domain) : null;
+  const domain = lead.custom_domain;
+  const base = { domain, buyUrl: buyUrl(env.CF_ACCOUNT_ID), target: lead.pages_project ? `${lead.pages_project}.pages.dev` : null };
+  if (!domain) return { ...base, stage: "none" as DomainStage, status: null, error: null, ours: false, pending: !lead.pages_project };
+  const zone = await ourZone(auth, domain).catch(() => null);
+  if (!lead.pages_project)
+    return { ...base, stage: (zone ? "publish" : "buy") as DomainStage, status: "waiting to publish", error: null, ours: !!zone, pending: true };
+  const d = await getDomain(auth, lead.pages_project, domain).catch(() => null);
+  const stage: DomainStage = d?.status === "active" ? "working" : zone ? "connecting" : "buy";
   return {
-    domain: d?.name ?? lead.custom_domain,
+    ...base,
+    stage,
     status: d?.status ?? null,
     error: d?.verification_data?.error_message ?? d?.validation_data?.error_message ?? null,
-    target: `${lead.pages_project}.pages.dev`,
+    ours: !!zone,
     pending: false,
   };
 }
 
+/** Marks a client's domain working: it becomes the site's address, the live site republishes, the team is told. */
+async function domainWorking(env: Env, lead: LeadRow): Promise<void> {
+  if (lead.domain_active) return;
+  await env.DB.prepare("UPDATE leads SET domain_active = 1, prices_dirty = CASE WHEN live_url IS NOT NULL THEN 1 ELSE prices_dirty END WHERE id = ?").bind(lead.id).run();
+  await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")
+    .bind(newId(), lead.id, "App", `🌐 ${lead.custom_domain} is working. The site uses it as its address now.`, now())
+    .run();
+  await notify(env, { kind: "published", leadId: lead.id, text: `🌐 ${lead.custom_domain} is live: ${lead.name ?? "The site"} now uses its own domain.` });
+}
+
 /**
- * Sets (or clears, with null) the client's own domain. Before the first publish it is only remembered and publishing connects
- * it; on a published site it is added to the Pages project at once and the site is republished (its canonical links,
- * sitemap and schema carry the address). Shared by the lead page's domain card, Edit (web) and the editor data (Android).
+ * Sets (or clears, with null) the client's own domain (stored bare: "reyespizza.com"; www is connected too). Before the first
+ * publish it is only remembered and publishing connects it; on a published site it is hooked up at once (domains.ts
+ * wireDomain) and becomes the site's address when Cloudflare says it works (now, or later through checkDomains).
  */
-async function setLeadDomain(env: Env, lead: LeadRow, domain: string | null, origin: string): Promise<Record<string, unknown>> {
+async function setLeadDomain(env: Env, lead: LeadRow, typed: string | null, origin: string): Promise<Record<string, unknown>> {
+  const domain = typed ? bareDomain(typed) : null;
   const prev = lead.custom_domain;
   const changed = (prev ?? null) !== (domain ?? null);
   if (!lead.pages_project) {
@@ -587,11 +605,12 @@ async function setLeadDomain(env: Env, lead: LeadRow, domain: string | null, ori
     return await domainStatus(env, { ...lead, custom_domain: domain });
   }
   const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
-  if (prev && changed) await removeDomain(auth, lead.pages_project, prev);
-  const added = domain ? await addDomain(auth, lead.pages_project, domain) : null;
-  // The domain becomes the site's address only once Cloudflare says it works (a domain on our own Cloudflare can be at once);
-  // otherwise the minute cron's checkDomains switches it over later. The site keeps its .pages.dev address meanwhile.
-  const activeNow = !!domain && added?.status === "active";
+  if (prev && changed) {
+    await removeDomain(auth, lead.pages_project, prev).catch(() => null);
+    await removeDomain(auth, lead.pages_project, `www.${bareDomain(prev)}`).catch(() => null);
+  }
+  const wired = domain ? await wireDomain(auth, lead.pages_project, domain) : null;
+  const activeNow = wired?.stage === "working";
   const wasActive = !!prev && !!lead.domain_active;
   await updateLead(env, lead.id, { custom_domain: domain, domain_active: activeNow || (!changed && wasActive) ? 1 : 0 });
   let republish: string | undefined;
@@ -603,12 +622,16 @@ async function setLeadDomain(env: Env, lead: LeadRow, domain: string | null, ori
       republish = `failed: ${(err as Error).message}`;
     }
   }
-  return { ...(await domainStatus(env, { ...lead, custom_domain: domain })), ...(republish ? { republish } : {}) };
+  if (activeNow && changed)
+    await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")
+      .bind(newId(), lead.id, "App", `🌐 ${domain} is working. The site uses it as its address now.`, now())
+      .run();
+  return { ...(await domainStatus(env, { ...lead, custom_domain: domain, domain_active: activeNow ? 1 : 0 })), ...(republish ? { republish } : {}), ...(wired?.records ? { records: wired.records } : {}) };
 }
 
 /**
- * Minute cron (every fifth minute): client domains still waiting are checked with Cloudflare; once one works it becomes the
- * site's address (domain_active = 1), the live site is republished through republishDirty, and the team is told.
+ * Minute cron (every fifth minute): client domains not working yet are hooked up again (a domain bought since shows up in our
+ * account now) and checked; once one works it becomes the site's address and the team is told.
  */
 async function checkDomains(env: Env): Promise<number> {
   if (new Date().getUTCMinutes() % 5 !== 0) return 0;
@@ -619,13 +642,9 @@ async function checkDomains(env: Env): Promise<number> {
   let n = 0;
   for (const lead of rows.results) {
     try {
-      const d = await getDomain(auth, lead.pages_project!, lead.custom_domain!);
-      if (d?.status !== "active") continue;
-      await env.DB.prepare("UPDATE leads SET domain_active = 1, prices_dirty = CASE WHEN live_url IS NOT NULL THEN 1 ELSE prices_dirty END WHERE id = ?").bind(lead.id).run();
-      await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")
-        .bind(newId(), lead.id, "App", `🌐 ${lead.custom_domain} is working. The site uses it as its address now.`, now())
-        .run();
-      await notify(env, { kind: "published", leadId: lead.id, text: `🌐 ${lead.custom_domain} is live: ${lead.name ?? "The site"} now uses its own domain.` });
+      const w = await wireDomain(auth, lead.pages_project!, lead.custom_domain!);
+      if (w.stage !== "working") continue;
+      await domainWorking(env, lead);
       n++;
     } catch (err) {
       console.error("domain check", lead.id, (err as Error).message);
@@ -3014,6 +3033,29 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     }
     if (action === "/stats" && m === "GET")
       return json(await siteReport(env, id));
+    // Name ideas for their domain with whether each is free (public RDAP), and where to buy it (our Cloudflare).
+    if (action === "/domain" && sub === "suggest" && m === "GET") {
+      const q = url.searchParams.get("q");
+      const record = lead.record_json ? (JSON.parse(lead.record_json) as BusinessRecord) : null;
+      // A typed full name ("reyespizza.com") is checked first, then ideas from its words; plain words give ideas only.
+      const typed = q ? bareDomain(q) : "";
+      const names = q
+        ? [...(DOMAIN_RE.test(typed) ? [typed] : []), ...suggestDomains(typed.replace(/\.[a-z.]+$/, "").replace(/[-.]/g, " "))]
+        : suggestDomains(record?.name ?? lead.name ?? "", record?.address.city);
+      const list = [...new Set(names)].slice(0, 6);
+      const avail = await Promise.all(list.map((d) => domainAvailable(d)));
+      return json({ suggestions: list.map((domain, i) => ({ domain, available: avail[i] })), buyUrl: buyUrl(env.CF_ACCOUNT_ID) });
+    }
+    // "I bought it": hook it up now instead of waiting for the 5-minute check.
+    if (action === "/domain" && sub === "check" && m === "POST") {
+      if (lead.custom_domain && lead.pages_project) {
+        const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
+        const w = await wireDomain(auth, lead.pages_project, lead.custom_domain);
+        if (w.stage === "working") await domainWorking(env, lead);
+        return json({ ...(await domainStatus(env, (await getLead(env, id))!)), records: w.records });
+      }
+      return json(await domainStatus(env, lead));
+    }
     if (action === "/domain") {
       if (m === "GET") return json(await domainStatus(env, lead));
       if (m === "PUT") {

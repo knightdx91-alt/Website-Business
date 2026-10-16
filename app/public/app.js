@@ -831,8 +831,7 @@
         <a class="btn" href="/api/leads/${l.id}/pricetags.pdf" target="_blank" rel="noopener">QR price tags</a></div>
       <h3 style="margin-top:16px">📊 Google Analytics</h3>
       ${analyticsHtml(l)}
-      <h3 style="margin-top:16px">Their own domain</h3>
-      <div id="domain"><p class="muted small">Checking…</p></div></section>`;
+      </section>`;
   }
 
   // Google Analytics on the live site (src/worker/analytics.ts): the ID, the reports link and sharing with the owner.
@@ -843,6 +842,73 @@
     return `<p class="small">On every page of the live site: <strong>${esc(a.id)}</strong>${a.auto ? " (made by the app)" : " (their own)"}.</p>
       <div class="btns">${a.reportsUrl ? `<a class="btn btn--small" href="${esc(a.reportsUrl)}" target="_blank" rel="noopener">Open their reports</a><button class="btn btn--small" type="button" data-ga-access>Give the owner access</button>` : ""}</div>
       ${a.auto ? `<p class="small muted">Give the owner access with their Google (Gmail) address and they can open their own reports at analytics.google.com.</p>` : ""}`;
+  }
+
+  // 🌐 Their domain (src/worker/domains.ts): pick a name (free or taken), buy it on our Cloudflare, the app hooks it up.
+  function domainCardHtml() {
+    return `<section class="card" id="domcard"><h2>🌐 Their domain</h2><div id="domain"><p class="muted small"><span class="spin"></span> Checking…</p></div></section>`;
+  }
+
+  async function bindDomain(l) {
+    const box = document.getElementById("domain");
+    if (!box) return;
+    const name = l.record ? l.record.name : l.name;
+    const fail = (err) => toast(err.message);
+    const ideas = async (q) => {
+      const list = box.querySelector("#domideas");
+      list.innerHTML = `<p class="muted small"><span class="spin"></span> Checking which names are free…</p>`;
+      try {
+        const r = await api(`/leads/${l.id}/domain/suggest${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+        list.innerHTML = r.suggestions.length ? `<ul class="list">${r.suggestions.map((x) => `<li class="row" style="justify-content:space-between;gap:8px"><span><strong>${esc(x.domain)}</strong> ${x.available === true ? '<span class="chip chip--good">Free</span>' : x.available === false ? '<span class="chip">Taken</span>' : '<span class="chip chip--warn">Couldn\'t check</span>'}</span>${x.available === false ? "" : `<button class="btn btn--small" type="button" data-usedom="${esc(x.domain)}">Use this</button>`}</li>`).join("")}</ul>` : `<p class="small muted">No ideas from that. Type a full name like theirbusiness.com.</p>`;
+        list.querySelectorAll("[data-usedom]").forEach((b) => b.addEventListener("click", async () => {
+          b.disabled = true;
+          try { draw(await api(`/leads/${l.id}/domain`, { method: "PUT", json: { domain: b.dataset.usedom } })); } catch (err) { fail(err); b.disabled = false; }
+        }));
+      } catch (err) { list.innerHTML = `<p class="small muted">${esc(err.message)}</p>`; }
+    };
+    const removeBtn = `<button class="btn btn--small btn--danger" type="button" data-dom="remove">Change / remove</button>`;
+    const draw = (d) => {
+      const dn = d && d.domain ? esc(d.domain) : "";
+      const stage = (d && d.stage) || "none";
+      if (stage === "none") {
+        box.innerHTML = `<p class="small">Every domain is bought on our Cloudflare, in the client's name, so the app can hook it up by itself. Pick one:</p>
+          <div id="domideas"></div>
+          <form id="domq" class="row" style="margin-top:8px"><label class="field" style="margin:0;flex:1"><span class="sr-only">Try a name</span><input name="q" placeholder="Try another name, e.g. reyespizza.com" autocapitalize="off" autocomplete="off" spellcheck="false"></label><button class="btn" style="flex:none">Check</button></form>
+          <p class="small muted">The free .pages.dev address works the whole time. A domain is the "Domain name, bought for you" extra on their order ($2 a month, included with Pro).</p>`;
+        box.querySelector("#domq").addEventListener("submit", (e) => { e.preventDefault(); const q = e.target.q.value.trim(); if (q) ideas(q); });
+        ideas("");
+      } else if (stage === "buy") {
+        box.innerHTML = `<p><strong>${dn}</strong> <span class="chip chip--warn">Not bought yet</span></p>
+          <ol class="small" style="padding-left:20px">
+            <li>Tap <strong>Copy name &amp; open Cloudflare</strong> and register <strong>${dn}</strong> there (it's pasted for you). Put <strong>the client</strong> as the registrant contact: the domain is theirs. Leave auto-renew on.</li>
+            <li>Come back and tap <strong>I bought it</strong>. The app connects it to ${esc(name)}'s site${l.liveUrl ? "" : " when it's published"}, and switches the site over once it works (it also checks every 5 minutes on its own).</li>
+          </ol>
+          <div class="btns"><button class="btn btn--primary" type="button" data-dom="buy">Copy name &amp; open Cloudflare</button><button class="btn" type="button" data-dom="check">I bought it</button>${removeBtn}</div>`;
+      } else if (stage === "publish") {
+        box.innerHTML = `<p><strong>${dn}</strong> <span class="chip chip--good">Bought</span></p><p class="small">It's in our Cloudflare. Publishing the site hooks it up by itself; until then nothing to do.</p><div class="btns">${removeBtn}</div>`;
+      } else if (stage === "connecting") {
+        box.innerHTML = `<p><strong>${dn}</strong> <span class="chip chip--warn">Connecting</span></p><p class="small">Cloudflare is setting it up (usually a few minutes, sometimes an hour). The site keeps its .pages.dev address until it works, then switches by itself and you get an alert.${d.error ? ` <span class="muted">Last check: ${esc(d.error)}</span>` : ""}</p>
+          ${d.records === "no-permission" ? `<p class="small bad">The app couldn't add the domain's records. Owner: Cloudflare → My Profile → API Tokens → edit the app's token → add <strong>Zone · DNS · Edit</strong> and <strong>Zone · Zone · Read</strong> for <strong>All zones</strong>, then tap Check now.</p>` : ""}
+          <div class="btns"><button class="btn btn--small" type="button" data-dom="check">Check now</button>${removeBtn}</div>`;
+      } else {
+        box.innerHTML = `<p><a href="https://${dn}" target="_blank" rel="noopener"><strong>${dn}</strong></a> <span class="chip chip--good">● Working</span></p><p class="small muted">The site's address is ${dn} (www.${dn} goes there too). The .pages.dev address still works.</p><div class="btns">${removeBtn}</div>`;
+      }
+      box.querySelectorAll("[data-dom]").forEach((b) => b.addEventListener("click", async () => {
+        try {
+          if (b.dataset.dom === "remove") {
+            if (!confirm(`Take ${d.domain} off this site? (It stays in Cloudflare; this only disconnects it.)`)) return;
+            await api(`/leads/${l.id}/domain`, { method: "DELETE" }); draw({ stage: "none" });
+          } else if (b.dataset.dom === "buy") {
+            try { await navigator.clipboard.writeText(d.domain); toast(`${d.domain} copied. Paste it in Cloudflare's search.`); } catch (e) { /* clipboard blocked */ }
+            window.open(d.buyUrl, "_blank", "noopener");
+          } else {
+            b.disabled = true; b.textContent = "Checking…";
+            draw(await api(`/leads/${l.id}/domain/check`, { method: "POST" }));
+          }
+        } catch (err) { fail(err); }
+      }));
+    };
+    try { draw(await api(`/leads/${l.id}/domain`)); } catch (err) { box.innerHTML = `<p class="small muted">${esc(err.message)}</p>`; }
   }
 
   async function bindLive(l) {
@@ -866,30 +932,6 @@
       const msg = `Hi! Your website report for ${name}, ${label}${from}: ${t.views} visits, ${t.calls} people tapped Call, ${t.directions} got directions${t.requests ? `, and ${t.requests} sent a request through the site` : ""}. Let us know if you'd like anything updated!`;
       location.href = `sms:+1${phoneDigits(l)}?body=${encodeURIComponent(msg)}`;
     });
-    const domEl = document.getElementById("domain");
-    const renderDomain = (d) => {
-      const steps = d && d.domain
-        ? `<p><strong>${esc(d.domain)}</strong> ${d.status === "active" ? '<span class="chip chip--good">● Working</span>' : `<span class="chip chip--warn">${esc(d.status || "waiting")}</span>`}</p>
-          ${d.status === "active" ? "" : `<p class="small">Where the domain lives (our Cloudflare if we bought it, else their GoDaddy, Namecheap…), add this DNS record:</p>
-          <p class="small"><code>CNAME</code> · name <code>${esc(d.domain.split(".").length > 2 ? d.domain.split(".")[0] : "@")}</code> · value <code>${esc(d.target)}</code></p>
-          <p class="small muted">${d.domain.split(".").length > 2 ? "" : "A bare domain (no www) works best if the domain uses Cloudflare's nameservers. Using www.yourdomain.com is easiest. "}It can take a few hours. HTTPS is set up automatically. Until it works, the site keeps its .pages.dev address; it switches by itself (checked every 5 minutes) and you get an alert.${d.error ? " Last check: " + esc(d.error) : ""}</p>`}
-          <div class="btns"><button class="btn btn--small" data-dom="check">Check again</button><button class="btn btn--small btn--danger" data-dom="remove">Remove</button></div>`
-        : `<form id="domf" class="row"><label class="field" style="margin:0"><span class="sr-only">Domain</span><input name="domain" placeholder="www.theirbusiness.com" autocapitalize="off" autocomplete="off" inputmode="url"></label><button class="btn" style="flex:none">Add</button></form>
-          <p class="small muted">Three ways: the free .pages.dev address (nothing to add), a domain they buy in their name (about $10–15 a year at Cloudflare, GoDaddy or Namecheap), or we buy it in their name on our Cloudflare (the Domain name extra on their order; included with Pro). Either way it's theirs. Then add it here.</p>`;
-      domEl.innerHTML = steps;
-      const f = domEl.querySelector("#domf");
-      if (f) f.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        try { renderDomain(await api(`/leads/${l.id}/domain`, { method: "PUT", json: { domain: f.domain.value.trim() } })); } catch (err) { toast(err.message); }
-      });
-      domEl.querySelectorAll("[data-dom]").forEach((b) => b.addEventListener("click", async () => {
-        try {
-          if (b.dataset.dom === "remove") { if (!confirm("Remove this domain from the site?")) return; await api(`/leads/${l.id}/domain`, { method: "DELETE" }); renderDomain(null); }
-          else renderDomain(await api(`/leads/${l.id}/domain`));
-        } catch (err) { toast(err.message); }
-      }));
-    };
-    try { renderDomain(await api(`/leads/${l.id}/domain`)); } catch (err) { domEl.innerHTML = `<p class="small muted">${esc(err.message)}</p>`; }
   }
 
   /* ---------- lead detail ---------- */
@@ -1027,6 +1069,7 @@ async function viewLead(id, intent) {
     C.signup = ready ? signupCardHtml(l) : "";
     C.referral = referralCardHtml(l);
     C.live = l.salesStatus === "live" && work ? liveCardHtml(l) : "";
+    C.domain = (l.salesStatus === "live" || l.salesStatus === "sold") && work ? domainCardHtml() : "";
     C.gbp = (l.salesStatus === "live" || l.salesStatus === "sold") && work && ready ? gbpCardHtml(l) : "";
     C.extras = `${l.salesStatus === "live" || l.salesStatus === "sold" ? `<section class="card"><h2>🛒 Extras</h2><p class="small muted">Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${meta.checkout && meta.checkout.online ? " online" : ""}. Good for 30 days.</p>
         <div class="btns btns--full"><button class="btn" type="button" data-extraslink>💬 Text “Buy extras” link</button></div></section>` : ""}`;
@@ -1056,8 +1099,8 @@ async function viewLead(id, intent) {
     const stage = l.salesStatus === "live" ? "live" : l.salesStatus === "sold" ? "sold" : l.salesStatus === "not_interested" ? "closed" : "open";
     const LAYOUT = {
       open:   { left: ["head", "step", "practice", "logtop", "website", "status", "notes"], right: ["signup", "log"], more: ["design", "board", "referral", "more"] },
-      sold:   { left: ["head", "step", "practice", "client", "logtop", "publish", "website", "notes"], right: ["signup", "log"], more: ["status", "design", "referral", "gbp", "extras", "review", "billing", "board", "more"] },
-      live:   { left: ["head", "step", "practice", "client", "live", "website", "notes"], right: ["review", "extras", "billing", "gbp"], more: ["signup", "referral", "board", "publish", "more"] },
+      sold:   { left: ["head", "step", "practice", "client", "logtop", "publish", "domain", "website", "notes"], right: ["signup", "log"], more: ["status", "design", "referral", "gbp", "extras", "review", "billing", "board", "more"] },
+      live:   { left: ["head", "step", "practice", "client", "live", "domain", "website", "notes"], right: ["review", "extras", "billing", "gbp"], more: ["signup", "referral", "board", "publish", "more"] },
       closed: { left: ["head", "step", "practice", "logtop", "status", "website", "notes"], right: ["log"], more: ["signup", "design", "board", "referral", "more"] },
     }[stage];
     C.logtop = `<div id="logslot-top"></div>`;
@@ -1076,6 +1119,7 @@ async function viewLead(id, intent) {
     bindContact(l);
     bindFlyer();
     if (l.salesStatus === "live" && owner) bindLive(l);
+    if (C.domain) bindDomain(l);
     // Phones: the log card goes right under the header so a call can be logged without scrolling past everything.
     // Unfolded: it stays in the right column. Moving the node keeps anything already typed.
     if (viewLead.unplace) viewLead.unplace();

@@ -18,6 +18,18 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 47,
+    date: "2026-10-16",
+    android: "2.78",
+    title: "Domains in three taps",
+    items: [
+      "Sold and live leads have a \"🌐 Their domain\" card. It suggests names (reyespizza.com, reyespizzahanceville.com…) and shows which are Free or Taken. Type your own idea and tap Check.",
+      "Tap Use this, then Copy name & open Cloudflare: buy it there with the client as the registrant (every domain is bought on our Cloudflare, in their name).",
+      "Back in the app, tap I bought it. The app connects the domain and www to the site by itself: no DNS records to type. The site switches over once it works, and everyone gets an alert.",
+      "Not live yet? Buy it anyway: publishing hooks it up. The training lesson \"Their own domain and email\" walks through it.",
+    ],
+  },
+  {
     n: 46,
     date: "2026-10-16",
     android: "2.77",

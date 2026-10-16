@@ -191,7 +191,6 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
     LaunchedEffect(liveOwner) {
         if (!liveOwner) return@LaunchedEffect
         try { stats = state.api.siteStats(id); statsError = null } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { statsError = e.message ?: "Couldn't load the visits" }
-        try { dom = state.api.domain(id); domError = null } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { domError = e.message ?: "Couldn't check the domain" }
     }
 
     suspend fun content(): Content = AppContent.load(state.api)
@@ -805,40 +804,12 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                             confirmButton = { TextButton(onClick = { val e = gaEmail; gaAsk = false; act("gaaccess") { state.api.analyticsAccess(id, e); context.toast("Done. $e can open analytics.google.com.") } }, enabled = gaEmail.contains("@")) { Text("Give access") } },
                             dismissButton = { TextButton(onClick = { gaAsk = false }) { Text("Cancel") } },
                         )
-                        Text("Their own domain", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
-                        val info = dom
-                        when {
-                            info == null && domError != null -> Text(domError ?: "", style = MaterialTheme.typography.bodySmall, color = muted)
-                            info == null -> Text("Checking…", style = MaterialTheme.typography.bodySmall, color = muted)
-                            info.domain != null -> {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                                    Text(info.domain, fontWeight = FontWeight.Bold)
-                                    Spacer(Modifier.width(8.dp))
-                                    if (info.active) Text("● Working", color = Good, style = MaterialTheme.typography.labelLarge) else Text(info.status ?: "waiting", color = Warn, style = MaterialTheme.typography.labelLarge)
-                                }
-                                if (!info.active) {
-                                    Text("Where the domain lives (our Cloudflare if we bought it, else their GoDaddy, Namecheap…), add this DNS record:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
-                                    Text("CNAME · name ${info.recordName} · value ${info.target ?: ""}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 2.dp))
-                                    TextButton(onClick = { context.copyText("DNS value", info.target ?: ""); context.toast("Copied") }, contentPadding = PaddingValues(0.dp)) { Text("Copy the value") }
-                                    Text((if (info.bare) "A bare domain (no www) works best if the domain uses Cloudflare's nameservers. Using www.yourdomain.com is easiest. " else "") + "It can take a few hours. HTTPS is set up automatically. Until it works, the site keeps its .pages.dev address; it switches by itself (checked every 5 minutes) and you get an alert." + (info.error?.let { " Last check: $it" } ?: ""), style = MaterialTheme.typography.bodySmall, color = muted)
-                                }
-                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                                    OutlinedButton(onClick = { act("domain") { dom = state.api.domain(id); domError = null } }, enabled = busy == null) { Text("Check again") }
-                                    OutlinedButton(onClick = { ask = Ask("Remove domain", "Remove this domain from the site?", "Remove", danger = true) { act("domain") { state.api.removeDomain(id); dom = DomainInfo(null, null, null, null); context.toast("Removed") } } }, enabled = busy == null, colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Remove") }
-                                }
-                            }
-                            else -> {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                                    OutlinedTextField(domDraft, { domDraft = it }, placeholder = { Text("www.theirbusiness.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.weight(1f))
-                                    Spacer(Modifier.width(8.dp))
-                                    Button(onClick = { act("domain") { dom = state.api.addDomain(id, domDraft.trim().lowercase()); domDraft = ""; context.toast("Domain added") } }, enabled = busy == null && domDraft.isNotBlank()) { Text("Add") }
-                                }
-                                Text("Three ways: the free .pages.dev address (nothing to add), a domain they buy in their name (about \$10–15 a year at Cloudflare, GoDaddy or Namecheap), or we buy it in their name on our Cloudflare (the Domain name extra on their order; included with Pro). Either way it's theirs. Then add it here.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
-                            }
-                        }
                     }
                 }
             }
+
+            // ---- their domain: pick a name, buy it on our Cloudflare, the app hooks it up (sold + live) ----
+            if (client && canWork) item { DomainCard(state, id, l.name, l.liveUrl != null) }
 
             // ---- referrals: who sent them, and the credits a client earned ----
             detail.detail.referral?.let { r -> if (ready && showMore) item {
