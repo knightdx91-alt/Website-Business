@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 51,
+    date: "2026-10-16",
+    title: "Tasks now go straight onto your Google Calendar",
+    items: [
+      "A task with a date goes straight onto the calendar of everyone it's for, the moment it's saved. Nothing to accept.",
+      "You also get a short email, \"📅 On your calendar: …\", so your phone lets you know it's there. You get another if the date or time changes. The person who adds the task doesn't get one.",
+      "Timed tasks remind you 30 minutes before. Finishing or deleting a task takes it off everyone's calendar.",
+    ],
+  },
+  {
     n: 50,
     date: "2026-10-16",
     title: "Tasks can go straight onto your calendar",

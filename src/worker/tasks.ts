@@ -270,7 +270,7 @@ export async function createTask(
     leadId: task.leadId,
     text: `📝 ${session.name} added a task for ${forWhom}: ${task.title}${task.due ? ` (${when(task.due, task.dueTime)})` : ""}`,
   });
-  await syncCalendar(env, row);
+  await syncCalendar(env, row, null, session);
   return withNoCalendar(env, task, row, names);
 }
 
@@ -333,7 +333,7 @@ export async function updateTask(
       text: `✅ ${session.name} finished: ${task.title}`,
     });
   }
-  await syncCalendar(env, row, before);
+  await syncCalendar(env, row, before, session);
   return withNoCalendar(env, task, row, names);
 }
 
@@ -453,6 +453,8 @@ export async function syncCalendar(
   env: Env,
   row: TaskRow,
   before?: TaskRow | null,
+  /** Who made the change: everyone else written straight into their calendar gets a short heads-up email. */
+  by?: Pick<Session, "userId" | "name">,
 ): Promise<void> {
   try {
     const s = await getSettings(env);
@@ -475,10 +477,14 @@ export async function syncCalendar(
     const now = new Map(heldOf);
     for (const e of plan.cancel) if (await takeOff(env, row, heldOf.get(e)!, seq)) now.delete(e);
     const ev = row.due ? await calEvent(env, row) : null;
+    const actor = by ? (await calendarRecipients(env, by.userId, s)).emails[0] : undefined;
+    const moved = !!before && (before.due !== row.due || before.due_time !== row.due_time);
     for (const e of [...plan.request, ...upgrade]) {
       const had = heldOf.get(e);
       if (ev && onDomain(e, domain) && (await gcalUpsert(env, e, row.id, ev))) {
         if (had === e) await sendInvite(env, row, "CANCEL", seq, e); // the emailed copy it replaces
+        // A direct write makes no sound in Google Calendar, so tell them it's there (never the person who did it).
+        if (by && e !== actor && (!had || (moved && had === `g:${e}`))) await sendNotice(env, row, e, had ? "moved" : "added", by.name);
         now.set(e, `g:${e}`);
       } else if (plan.request.includes(e) && (await sendInvite(env, row, "REQUEST", seq, e))) now.set(e, e);
     }
@@ -487,6 +493,25 @@ export async function syncCalendar(
       .run();
   } catch (err) {
     console.error("calendar sync failed", err);
+  }
+}
+
+/** "📅 Added to your calendar: …" (or "Moved") email for a task written straight into someone's calendar. Never throws. */
+async function sendNotice(env: Env, row: TaskRow, to: string, kind: "added" | "moved", byName: string): Promise<void> {
+  try {
+    const s = await getSettings(env);
+    if (!s.companyEmail) return;
+    const whenText = when(row.due, row.due_time);
+    const link = row.lead_id ? `https://app.undergroundassociates.com/#/lead/${row.lead_id}` : "https://app.undergroundassociates.com/#/tasks";
+    await sendEmailDetailed(env, {
+      from: s.companyEmail,
+      fromName: `${s.companyName || "Underground Associates"} tasks`,
+      to,
+      subject: `📅 ${kind === "added" ? "On your calendar" : "Moved"}: ${row.title} (${whenText})`,
+      text: `${byName} ${kind === "added" ? "added a task to your calendar" : "moved a task on your calendar"}:\n\n${row.title}\n${whenText}${row.notes ? `\n\n${row.notes}` : ""}\n\nOpen it in the app: ${link}\n\nIt's already on your Google Calendar; there's nothing to accept.`,
+    });
+  } catch (err) {
+    console.error("task notice failed", err);
   }
 }
 

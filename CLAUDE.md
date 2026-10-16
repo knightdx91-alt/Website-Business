@@ -1723,7 +1723,11 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   copy is replaced (mail CANCEL) the first time the direct write works. Last try in settings key `gcal_last`; health item `calendar`
   (section Team sign-in) carries the setup: Google Cloud → enable Google Calendar API; admin.google.com → Security → API controls →
   Domain-wide delegation → Add new: the service account's client ID (shown in the health line), scope
-  https://www.googleapis.com/auth/calendar.events. `test/worker/gcal.test.ts`.
+  https://www.googleapis.com/auth/calendar.events. `test/worker/gcal.test.ts`. Live since 16 Oct 2026 (service account project
+  475092517584, owned by a different Google account than the Firebase project "underground-associates"). A direct write makes no
+  sound in Google Calendar, so `sendNotice()` emails "📅 On your calendar: <task> (<when>)" to each person newly written (and
+  "Moved" when date / time change), never to the person who saved it (`syncCalendar(…, by)` from create / update; the cron passes
+  none). `upgradeCalendars()` (minute cron, every third minute, 5 tasks) moves emailed / missing invites into calendars.
 - 🌐 Their domain name in Edit (Oct 2026, owner's ask "a place to put their purchased domain name"): Edit card "Their domain name"
   (web section + `EDIT_CARD_ID` `domain`; editform card `domain`, field `customDomain`, so Android's Edit has it with no app build).
   `setLeadDomain(env, lead, domain|null, origin)` + `domainStatus()` in index.ts (shared by `/domain` GET/PUT/DELETE, the web Edit save,
