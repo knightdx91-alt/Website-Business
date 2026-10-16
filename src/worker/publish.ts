@@ -1,3 +1,4 @@
+import { ensureAnalytics } from "./analytics.ts";
 import { syncSpanish } from "./spanish-sync.ts";
 import { zipSync } from "fflate";
 import { lockDesign } from "./exclusive.ts";
@@ -154,6 +155,8 @@ export async function publishLead(
     await updateLead(env, lead.id, { pages_project: project.name });
   const pagesOrigin = `https://${project.subdomain}`;
   const origin = siteOrigin(lead, pagesOrigin);
+  // Its own Google Analytics property the first time it goes live (never blocks the publish; see analytics.ts).
+  lead = await ensureAnalytics(env, lead, origin);
   const built = await buildForPublish(
     env,
     { ...lead, pages_project: project.name },

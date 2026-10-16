@@ -644,6 +644,9 @@ export interface AppSettings {
   /** Cloudflare Turnstile site key (public) for the company website's forms; the secret is the Worker secret
    * TURNSTILE_SECRET_KEY. Both set = the widget shows and every post is verified (src/worker/spam.ts). */
   turnstileSiteKey?: string;
+  /** Google Analytics account (the number in Admin → Account settings) under which every published client site gets its own
+   * property (src/worker/analytics.ts). Blank = no automatic analytics. */
+  gaAccountId?: string;
   fcmAppId?: string;
   fcmApiKey?: string;
   fcmProjectId?: string;

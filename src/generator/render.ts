@@ -89,7 +89,7 @@ ${ogImage ? html`<meta property="og:image" content="${ogImage}">${heroImg!.width
 <link rel="icon" href="${faviconDataUrl(ctx.r.name, ctx.theme.colors.heroBg, ctx.theme.colors.onHero)}">
 <link rel="preload" href="/assets/fonts/${fontFileName(headingFont, headingFont.weights[0]!)}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/site.css">
-<script defer src="/assets/site.js"></script>
+${gaTag(ctx)}<script defer src="/assets/site.js"></script>
 <script type="application/ld+json">${jsonForScript(o.jsonLd)}</script>
 ${hasAnyHours(ctx.r.hours) ? html`<script type="application/json" id="hours-data">${jsonForScript({ tz: ctx.r.timezone, hours: ctx.r.hours })}</script>` : ""}
 </head><body>
@@ -132,12 +132,19 @@ function withExtras(ctx: Ctx, body: Raw): Raw {
   return raw(out);
 }
 
+/** The Google tag on live pages of a site with a Google Analytics ID (never previews, so our own looks don't count). */
+function gaTag(ctx: Ctx): Raw {
+  const id = ctx.r.seo?.gaId;
+  if (ctx.mode !== "publish" || !id || !/^G-[A-Z0-9]{4,15}$/.test(id)) return raw("");
+  return raw(`<script async src="https://www.googletagmanager.com/gtag/js?id=${id}"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","${id}");</script>\n`);
+}
+
 function privacyBody(ctx: Ctx): Raw {
   return html`<main id="main" class="section"><div class="wrap narrow">
 <h1>Privacy</h1>
 <p>When you send a request through this website, ${ctx.r.name} receives the details you enter (your name, phone number, email if given, and your message) so we can get back to you. We use them only to answer your request.</p>
 <p>We don't sell your information or share it with anyone else, except the service that delivers the message to us.</p>
-<p>This site doesn't use advertising or tracking cookies. We count visits and button taps anonymously, without cookies or any personal details, so we know the site is helping.</p>
+${ctx.mode === "publish" && ctx.r.seo?.gaId ? html`<p>This site uses Google Analytics, which sets cookies to count visits and see which pages and buttons people use. Google collects this for us; it doesn't tell us who you are. You can turn it off with Google's opt-out add-on (tools.google.com/dlpage/gaoptout) or by blocking cookies in your browser. We also count visits and button taps anonymously, without cookies.</p>` : html`<p>This site doesn't use advertising or tracking cookies. We count visits and button taps anonymously, without cookies or any personal details, so we know the site is helping.</p>`}
 <p>Questions? Call us at <a href="tel:${ctx.r.phone.e164}">${ctx.r.phone.display}</a>.</p>
 </div></main>`;
 }

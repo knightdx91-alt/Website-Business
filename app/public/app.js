@@ -829,8 +829,20 @@
         <a class="btn" href="/api/leads/${l.id}/tents" target="_blank" rel="noopener">QR table tents</a>
         <a class="btn" href="/api/leads/${l.id}/window" target="_blank" rel="noopener">Window sign (QR)</a>
         <a class="btn" href="/api/leads/${l.id}/pricetags.pdf" target="_blank" rel="noopener">QR price tags</a></div>
+      <h3 style="margin-top:16px">📊 Google Analytics</h3>
+      ${analyticsHtml(l)}
       <h3 style="margin-top:16px">Their own domain</h3>
       <div id="domain"><p class="muted small">Checking…</p></div></section>`;
+  }
+
+  // Google Analytics on the live site (src/worker/analytics.ts): the ID, the reports link and sharing with the owner.
+  function analyticsHtml(l) {
+    const a = l.analytics;
+    if (!a) return `<p class="small muted">Not on this site yet. It's added by itself when the site is published once Google Analytics is connected (Settings → Website).</p>
+      <div class="btns"><button class="btn btn--small" type="button" data-ga-now>Set it up now</button></div>`;
+    return `<p class="small">On every page of the live site: <strong>${esc(a.id)}</strong>${a.auto ? " (made by the app)" : " (their own)"}.</p>
+      <div class="btns">${a.reportsUrl ? `<a class="btn btn--small" href="${esc(a.reportsUrl)}" target="_blank" rel="noopener">Open their reports</a><button class="btn btn--small" type="button" data-ga-access>Give the owner access</button>` : ""}</div>
+      ${a.auto ? `<p class="small muted">Give the owner access with their Google (Gmail) address and they can open their own reports at analytics.google.com.</p>` : ""}`;
   }
 
   async function bindLive(l) {
@@ -1522,6 +1534,7 @@ async function viewLead(id, intent) {
         ${isA && !isParts ? `<p class="small muted">Ask which shop software they use. Tekmetric: Settings → Online Booking gives a public “direct link” (or an embed; use the link). Shopmonkey: the Work Request form has a shareable public URL. ShopGenie: the online scheduling page has its own link. AutoLeap: the online booking page URL. Paste that link here and the site's main button becomes Book online.</p>` : ""}
         <label class="field">Facebook page<input name="facebook" type="url" value="${esc(r.links.social.facebook || "")}" placeholder="https://facebook.com/…"></label>
         <label class="field">Search Console code <span class="hint">Google Search Console → Add property → URL prefix (the live address) → HTML tag: paste only the code between content="…". Goes on the live site, never the preview. Then submit /sitemap.xml.</span><input name="gsc" value="${esc((r.seo && r.seo.googleSiteVerification) || "")}" maxlength="120" placeholder="AbC123…" autocapitalize="off" spellcheck="false"></label>
+        <label class="field">Google Analytics ID <span class="hint">Filled in by the app when the site is published (its own Google Analytics property). Only type one if the business already has its own Google Analytics; leave it blank otherwise.</span><input name="gaId" value="${esc((r.seo && r.seo.gaId) || "")}" maxlength="20" placeholder="G-…" autocapitalize="characters" spellcheck="false"></label>
         <label class="field">Instagram<input name="instagram" type="url" value="${esc(r.links.social.instagram || "")}" placeholder="https://instagram.com/…"></label>
       </section>
     </div><div>
@@ -1669,7 +1682,7 @@ async function viewLead(id, intent) {
           suppliesIncluded: on("suppliesIncluded"),
           petSafe: on("petSafe"),
           links: { order: val("order"), reserve: val("reserve"), booking: val("booking"), facebook: val("facebook"), instagram: val("instagram"), ...(isRt ? { shop: val("shop") } : {}), ...(isR || isS || isRt ? { giftCards: val("giftCards") } : {}) },
-          seo: { googleSiteVerification: val("gsc") },
+          seo: { googleSiteVerification: val("gsc"), gaId: val("gaId") },
           proof: proofEditValues(f),
           ...visitEditValues(f),
           ...(isR ? { restaurant: restaurantEditValues(f), menuItems: menuItemsEditValues(f) } : {}),
@@ -3398,6 +3411,20 @@ async function viewLead(id, intent) {
       ss.disabled = true;
       try { const r = await api(`/leads/${l.id}/samplestock`, { method: add ? "POST" : "DELETE" }); toast(add ? `${r.items} sample items added. The preview is rebuilding.` : "Sample items removed. The preview is rebuilding."); setTimeout(() => render(), 400); } catch (err) { toast(err.message); ss.disabled = false; }
     });
+    const gaNow = $app.querySelector("[data-ga-now]");
+    if (gaNow) gaNow.addEventListener("click", async () => {
+      gaNow.disabled = true; gaNow.textContent = "Setting up… (about 20 seconds)";
+      try { const r = await api(`/leads/${l.id}/analytics`, { method: "POST" }); toast(`Google Analytics is on the live site (${r.analytics.id}).`); setTimeout(() => render(), 300); }
+      catch (err) { toast(err.message); gaNow.disabled = false; gaNow.textContent = "Set it up now"; }
+    });
+    const gaAccess = $app.querySelector("[data-ga-access]");
+    if (gaAccess) gaAccess.addEventListener("click", async () => {
+      const email = (prompt("The owner's Google address (Gmail or Google Workspace). They'll be able to see their own reports:", "") || "").trim();
+      if (!email) return;
+      gaAccess.disabled = true;
+      try { await api(`/leads/${l.id}/analytics/access`, { method: "POST", json: { email } }); toast(`Done. ${email} can open analytics.google.com and see ${l.record ? l.record.name : l.name}.`); }
+      catch (err) { toast(err.message); } finally { gaAccess.disabled = false; }
+    });
     const xb = $app.querySelector("[data-extraslink]");
     if (xb) xb.addEventListener("click", async () => {
       xb.disabled = true;
@@ -4196,6 +4223,7 @@ async function viewLead(id, intent) {
         <label class="field">Client quotes <span class="hint">One per line: <code>Quote | Name, Business</code>. Only real clients who said it; the first shows under the top of the home page, the rest on the pricing page.</span><textarea name="siteTestimonials" rows="3" maxlength="3000" placeholder="They had the site done before I'd even decided. | Jane Doe, Doe's Diner">${esc(s.siteTestimonials || "")}</textarea></label>
         <label class="field">Towns served <span class="hint">Comma-separated. The "where we work" page, the footer and what Google is told you serve.</span><input name="siteTowns" value="${esc(s.siteTowns || "")}" maxlength="400" placeholder="Cullman, Hanceville, Good Hope, Vinemont, Holly Pond, Hartselle, Arab"></label>
         <label class="field">Turnstile site key <span class="hint">Stops bots on the website's forms (free, from Cloudflare). Dashboard → Turnstile → Add widget, hostname undergroundassociates.com → paste the <strong>Site key</strong> here, and add the <strong>Secret key</strong> to the Worker as the secret TURNSTILE_SECRET_KEY (Workers &amp; Pages → website-business → Settings → Variables and Secrets). Blank = off; the hidden-field, timing and content checks still run. Blocked messages are counted in the Inbox.</span><input name="turnstileSiteKey" value="${esc(s.turnstileSiteKey || "")}" maxlength="80" placeholder="0x4AAAAAAA…" autocomplete="off"></label>
+        <label class="field">Google Analytics account for client sites <span class="hint">Every site we publish gets its own Google Analytics property under this account, with the tag on every page. analytics.google.com → Admin → Create account (e.g. "Underground Associates Clients") → Account settings → copy the Account ID (a number) here. The connections strip at the top of Settings shows the two other steps (switch on the Admin API, add our service account as Administrator). Blank = off.</span><input name="gaAccountId" value="${esc(s.gaAccountId || "")}" maxlength="30" inputmode="numeric" placeholder="123456789" autocomplete="off"></label>
         <h2 style="margin-top:18px">Team sign-in (Google)</h2>
         <p class="small muted">Everyone signs in with their company Google account. One-time setup in Google Cloud (see the Android app card below for the steps), then paste the web client ID here.</p>
         <label class="field">Google client ID <span class="hint">The OAuth “Web application” client, ends in .apps.googleusercontent.com</span><input name="googleClientId" value="${esc(s.googleClientId || "")}" placeholder="1234567890-abc.apps.googleusercontent.com" autocomplete="off"></label>
@@ -4343,6 +4371,7 @@ async function viewLead(id, intent) {
             siteTestimonials: v("siteTestimonials") || null,
             siteTowns: v("siteTowns") || null,
             turnstileSiteKey: v("turnstileSiteKey") || null,
+            gaAccountId: v("gaAccountId") || null,
             companyReviewUrl: v("companyReviewUrl") || null,
             companyFacebookUrl: v("companyFacebookUrl") || null,
             gaMeasurementId: v("gaMeasurementId").toUpperCase() || null,

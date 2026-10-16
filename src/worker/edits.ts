@@ -362,6 +362,12 @@ export const EditsSchema = z.object({
               /^[A-Za-z0-9_-]*$/,
               'Just the code from content="…" in Google\'s tag',
             ),
+          /** Google Analytics measurement ID; blank = the one the app makes on publish. */
+          gaId: z
+            .string()
+            .trim()
+            .toUpperCase()
+            .regex(/^(G-[A-Z0-9]{4,15})?$/, "A Google Analytics ID looks like G-ABC123XYZ"),
         })
         .partial()
         .optional(),
@@ -1225,8 +1231,11 @@ export function applyEdits(
   }
   applyFsrpEdits(r, e);
   if (e.seo) {
-    const code = e.seo.googleSiteVerification || undefined;
-    r.seo = code ? { ...r.seo, googleSiteVerification: code } : undefined;
+    // Each field on its own, so saving one never wipes the other (or the Google Analytics property the app made).
+    const seo = { ...(r.seo ?? {}) };
+    if (e.seo.googleSiteVerification !== undefined) seo.googleSiteVerification = e.seo.googleSiteVerification || undefined;
+    if (e.seo.gaId !== undefined) seo.gaId = e.seo.gaId || undefined;
+    r.seo = seo.googleSiteVerification || seo.gaId || seo.ga ? seo : undefined;
   }
   if (e.links) {
     const l = e.links;

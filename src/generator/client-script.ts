@@ -163,6 +163,18 @@ if (sm && navigator.sendBeacon) {
     else if (h.indexOf("google.com/maps") > -1 || h.indexOf("maps.apple.com") > -1) hit("directions");
   });
 }
+/* Google Analytics (live sites with a Google tag): calls, texts, Directions and form sends become events. */
+if (typeof window.gtag === "function") {
+  d.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a");
+    if (!a) return;
+    var h = a.getAttribute("href") || "";
+    if (h.indexOf("tel:") === 0) window.gtag("event", "call_click");
+    else if (h.indexOf("sms:") === 0) window.gtag("event", "text_click");
+    else if (h.indexOf("google.com/maps") > -1 || h.indexOf("maps.apple.com") > -1) window.gtag("event", "directions_click");
+  });
+  if (location.pathname.slice(-8) === "/thanks/") window.gtag("event", "generate_lead");
+}
 var evs = d.querySelectorAll("[data-event-end]");
 if (evs.length) {
   try {

@@ -406,6 +406,8 @@ export interface HealthInput {
   plansPriced: number;
   /** Spam protection on the public forms: Turnstile's state (src/worker/spam.ts) and this month's blocked count. */
   spam: { turnstile: "on" | "key" | "secret" | "off"; blocked: number };
+  /** Google Analytics for client sites (src/worker/analytics.ts): setup state, the service account to add, the last failure. */
+  analytics?: { state: "on" | "account" | "secret" | "off"; serviceEmail: string | null; lastError: string | null; sites: number };
 }
 
 /** The health strip at the top of Settings: is every outside piece connected, and which ones are optional. */
@@ -529,6 +531,22 @@ export function healthItems(h: HealthInput): HealthItem[] {
       }${h.spam.blocked ? ` ${h.spam.blocked} blocked this month (see the Inbox).` : ""}`,
       section: "Website",
     },
+    ...(h.analytics
+      ? [
+          {
+            id: "analytics",
+            label: "Google Analytics on client sites",
+            state: (h.analytics.state === "on" && !h.analytics.lastError ? "ok" : "warn") as HealthItem["state"],
+            detail:
+              h.analytics.state === "on"
+                ? h.analytics.lastError
+                  ? `Connected, but the last setup failed: ${h.analytics.lastError}`
+                  : `Every published site gets its own Google Analytics property (${h.analytics.sites} so far).`
+                : `Not set up yet. (1) analytics.google.com → Admin → Create account "Underground Associates Clients"; copy its Account ID into Settings → Website → "Google Analytics account for client sites". (2) In Google Cloud (the project of ${h.analytics.serviceEmail ?? "the service account"}), switch on "Google Analytics Admin API". (3) Google Analytics → Admin → Account access management → add ${h.analytics.serviceEmail ?? "the service account's email"} as Administrator.${h.analytics.state === "account" ? " Step 1 is the one missing." : h.analytics.state === "secret" ? " The Worker has no service account (GA_SERVICE_ACCOUNT or FCM_SERVICE_ACCOUNT)." : ""}`,
+            section: "Website",
+          },
+        ]
+      : []),
   ];
 }
 

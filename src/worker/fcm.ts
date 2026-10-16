@@ -10,7 +10,7 @@ import type { Env } from "./env.ts";
  * secret every function here is a no-op and the app falls back to its 15-minute polling.
  */
 
-interface ServiceAccount {
+export interface ServiceAccount {
   client_email: string;
   private_key: string;
   project_id: string;
@@ -72,12 +72,13 @@ export function serviceAccountProblem(env: Env): string | null {
 export async function fcmJwt(
   sa: ServiceAccount,
   now = Math.floor(Date.now() / 1000),
+  scope: string = SCOPE,
 ): Promise<string> {
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = b64url(
     JSON.stringify({
       iss: sa.client_email,
-      scope: SCOPE,
+      scope,
       aud: TOKEN_URL,
       iat: now,
       exp: now + 3600,

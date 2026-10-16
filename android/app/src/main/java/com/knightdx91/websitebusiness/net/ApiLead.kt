@@ -69,6 +69,10 @@ data class LeadFull(
     val notOnGoogle: Boolean = false,
     /** The site has a Spanish page (/es/): the share buttons offer a Spanish link. */
     val hasSpanish: Boolean = false,
+    /** Google Analytics on the live site: the ID, whether the app made the property, its reports link. */
+    val gaId: String? = null,
+    val gaAuto: Boolean = false,
+    val gaReportsUrl: String? = null,
     /** Items on the live price list; >0 = the shop uses the inventory system, so the board card sits up top. */
     val priceListItems: Int = 0,
     /** Finish & publish: every blocker with the Edit card that fixes it (empty = Publish works). */
@@ -134,6 +138,9 @@ data class LeadFull(
                 sampleStock = j.optBoolean("sampleStock"),
                 notOnGoogle = j.optBoolean("notOnGoogle"),
                 hasSpanish = j.optBoolean("hasSpanish"),
+                gaId = j.optJSONObject("analytics")?.optString("id")?.ifBlank { null },
+                gaAuto = j.optJSONObject("analytics")?.optBoolean("auto") ?: false,
+                gaReportsUrl = j.optJSONObject("analytics")?.let { a -> if (a.isNull("reportsUrl")) null else a.optString("reportsUrl").ifBlank { null } },
                 priceListItems = j.optInt("priceListItems", 0),
                 checklist = j.optJSONArray("checklist").objects().map { ChecklistItem(it.optString("text"), it.optString("card"), it.optString("kind")) },
                 existingSiteLine = j.optJSONObject("existingSite")?.let { x ->
@@ -261,3 +268,9 @@ suspend fun Api.refund(signupId: String, chargeId: String, amountCents: Long, ca
 suspend fun Api.webcheck(id: String): JSONObject = postJson("/leads/$id/webcheck")
 /** Import from their Google page: the listing's latest facts + a rewrite. Returns {changed: [..]}. */
 suspend fun Api.googleImport(id: String): JSONObject = postJson("/leads/$id/googleimport")
+
+/** Google Analytics now for a live site (property + republish with the tag); returns the measurement ID. */
+suspend fun Api.analyticsNow(id: String): String = postJson("/leads/$id/analytics").optJSONObject("analytics")?.optString("id") ?: ""
+
+/** "Give the owner access": their Google address becomes a viewer on the property the app made. */
+suspend fun Api.analyticsAccess(id: String, email: String) { postJson("/leads/$id/analytics/access", org.json.JSONObject().put("email", email)) }

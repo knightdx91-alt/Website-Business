@@ -201,6 +201,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
     var siteTestimonials by mutableStateOf(s.txt("siteTestimonials"))
     var siteTowns by mutableStateOf(s.txt("siteTowns"))
     var turnstileSiteKey by mutableStateOf(s.txt("turnstileSiteKey"))
+    var gaAccountId by mutableStateOf(s.txt("gaAccountId"))
     var gbpEmail by mutableStateOf(s.txt("gbpEmail"))
     var callerName by mutableStateOf(s.txt("callerName"))
     var googleClientId by mutableStateOf(s.txt("googleClientId"))
@@ -293,6 +294,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         putStr("siteTestimonials", siteTestimonials)
         putStr("siteTowns", siteTowns)
         putStr("turnstileSiteKey", turnstileSiteKey)
+        putStr("gaAccountId", gaAccountId)
         putStr("companyFacebookUrl", companyFacebookUrl)
         putStr("gaMeasurementId", gaMeasurementId) { it.uppercase(Locale.US) }
         putStr("calendarEmail", calendarEmail)
@@ -799,6 +801,7 @@ private fun WebsiteCard(f: SettingsForm) {
         Field(f.siteTestimonials, { f.siteTestimonials = it.take(3000) }, "Client quotes", hint = "One per line: Quote | Name, Business. Only real clients who said it.", caps = KeyboardCapitalization.Sentences, singleLine = false, minLines = 4)
         Field(f.siteTowns, { f.siteTowns = it.take(400) }, "Towns served", hint = "Comma-separated: the where-we-work page, the footer and what Google is told you serve.", placeholder = "Cullman, Hanceville, Good Hope, Vinemont", caps = KeyboardCapitalization.Words)
         Field(f.turnstileSiteKey, { f.turnstileSiteKey = it.trim().take(80) }, "Turnstile site key", hint = "Stops bots on the website's forms (free, from Cloudflare). Dashboard → Turnstile → Add widget, hostname undergroundassociates.com → paste the Site key here, and add the Secret key to the Worker as the secret TURNSTILE_SECRET_KEY (Workers & Pages → website-business → Settings → Variables and Secrets). Blank = off; the hidden-field, timing and content checks still run. Blocked messages are counted in the Inbox.", placeholder = "0x4AAAAAAA…")
+        Field(f.gaAccountId, { f.gaAccountId = it.filter { c -> c.isDigit() }.take(20) }, "Google Analytics account for client sites", hint = "Every site we publish gets its own Google Analytics property under this account, with the tag on every page. analytics.google.com → Admin → Create account (e.g. \"Underground Associates Clients\") → Account settings → copy the Account ID (a number) here. The Connections card shows the two other steps. Blank = off.", placeholder = "123456789")
     }
 }
 

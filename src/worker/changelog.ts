@@ -18,6 +18,20 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 44,
+    date: "2026-10-16",
+    android: "2.76",
+    title: "Google Analytics on every client site, set up by itself",
+    items: [
+      "When a site is published, the app creates that business its own Google Analytics and puts it on every page (Spanish pages too). Previews never count.",
+      "Calls, texts, Directions taps and form sends show up in Google Analytics as events.",
+      "Lead page → Client site → 📊 Google Analytics: Open their reports, or Give the owner access with their Gmail so they can see their own numbers.",
+      "Sites already live get it on their next republish (all of them at once, as soon as it's connected).",
+      "Owner: one-time setup in Settings → Website → \"Google Analytics account for client sites\". The Connections strip at the top of Settings lists the steps.",
+      "If a business already has its own Google Analytics, type their ID in Edit → Links instead.",
+    ],
+  },
+  {
     n: 43,
     date: "2026-10-16",
     title: "Spanish sites translate the whole site",

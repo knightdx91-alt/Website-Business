@@ -89,6 +89,8 @@ import com.knightdx91.websitebusiness.net.domain
 import com.knightdx91.websitebusiness.net.extrasLink
 import com.knightdx91.websitebusiness.net.clientLink
 import com.knightdx91.websitebusiness.net.lookupLink
+import com.knightdx91.websitebusiness.net.analyticsNow
+import com.knightdx91.websitebusiness.net.analyticsAccess
 import com.knightdx91.websitebusiness.net.boardLink
 import com.knightdx91.websitebusiness.net.resetPractice
 import com.knightdx91.websitebusiness.net.revokeClientLink
@@ -776,6 +778,33 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                             OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/window.pdf", "Window sign")) }) { Text("Window sign (QR)") }
                             OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/pricetags.pdf", "QR price tags")) }) { Text("QR price tags") }
                         }
+                        Text("📊 Google Analytics", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
+                        var gaAsk by remember { mutableStateOf(false) }
+                        var gaEmail by remember { mutableStateOf("") }
+                        if (detail.gaId == null) {
+                            Text("Not on this site yet. It's added by itself when the site is published once Google Analytics is connected (Settings → Website).", style = MaterialTheme.typography.bodySmall, color = muted)
+                            OutlinedButton(onClick = { act("ganow") { val gid = state.api.analyticsNow(id); context.toast("Google Analytics is on the live site ($gid)."); load() } }, enabled = busy == null) { Text(if (busy == "ganow") "Setting up…" else "Set it up now") }
+                        } else {
+                            Text("On every page of the live site: ${detail.gaId}" + if (detail.gaAuto) " (made by the app)" else " (their own)", style = MaterialTheme.typography.bodySmall)
+                            detail.gaReportsUrl?.let { u ->
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                    OutlinedButton(onClick = { context.openUrl(u) }) { Text("Open their reports") }
+                                    OutlinedButton(onClick = { gaAsk = true }, enabled = busy == null) { Text("Give the owner access") }
+                                }
+                            }
+                        }
+                        if (gaAsk) AlertDialog(
+                            onDismissRequest = { gaAsk = false },
+                            title = { Text("Give the owner access") },
+                            text = {
+                                Column {
+                                    Text("Their Google address (Gmail or Google Workspace). They'll see their own reports at analytics.google.com.", style = MaterialTheme.typography.bodySmall)
+                                    OutlinedTextField(gaEmail, { gaEmail = it.trim() }, label = { Text("Google address") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                                }
+                            },
+                            confirmButton = { TextButton(onClick = { val e = gaEmail; gaAsk = false; act("gaaccess") { state.api.analyticsAccess(id, e); context.toast("Done. $e can open analytics.google.com.") } }, enabled = gaEmail.contains("@")) { Text("Give access") } },
+                            dismissButton = { TextButton(onClick = { gaAsk = false }) { Text("Cancel") } },
+                        )
                         Text("Their own domain", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
                         val info = dom
                         when {

@@ -18,6 +18,8 @@ export interface Env {
   BRAVE_SEARCH_API_KEY?: string;
   /** Firebase service-account JSON: instant pushes to the Android app (src/worker/fcm.ts). Optional. */
   FCM_SERVICE_ACCOUNT?: string;
+  /** Google service-account JSON for creating client sites' Google Analytics properties (analytics.ts); falls back to FCM_SERVICE_ACCOUNT. */
+  GA_SERVICE_ACCOUNT?: string;
   /** Email provider for messages clients ask for (e.g. their Buy extras link): MailerSend or Resend. Optional. */
   MAILERSEND_API_KEY?: string;
   RESEND_API_KEY?: string;

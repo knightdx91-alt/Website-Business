@@ -1,3 +1,4 @@
+import { gaLastError, gaServiceAccount, gaState, grantViewer, queueGaBackfill, reportsUrl } from "./analytics.ts";
 import { CHANGELOG, LATEST_CHANGE, changelogSeenKey, changesSince, unseenChanges } from "./changelog.ts";
 import { relocate } from "./relocate.ts";
 import { stockPhotosOf } from "../generator/scenes.ts";
@@ -592,6 +593,10 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?:
     notOnGoogle: isManualPlaceId(l.place_id),
     /** The site has a Spanish page at /es/ (share buttons offer a Spanish link). */
     hasSpanish: !!copy?.es,
+    /** Google Analytics on the live site: the ID in use, and the reports link + sharing when the app made the property. */
+    analytics: record?.seo?.gaId
+      ? { id: record.seo.gaId, auto: record.seo.ga?.measurementId === record.seo.gaId, reportsUrl: record.seo.ga?.measurementId === record.seo.gaId ? reportsUrl(record.seo.ga.property) : null }
+      : null,
     existingSite: record?.existingSite
       ? {
           url: record.existingSite.url,
@@ -1307,6 +1312,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           turnstile: turnstileState(env, settings),
           blocked: (await blockedSummary(env)).month,
         },
+        analytics: {
+          state: gaState(env, settings),
+          serviceEmail: gaServiceAccount(env)?.client_email ?? null,
+          lastError: (await gaLastError(env))?.error ?? null,
+          sites:
+            (await env.DB.prepare("SELECT COUNT(*) AS n FROM leads WHERE json_extract(record_json, '$.seo.ga.property') IS NOT NULL").first<{ n: number }>())?.n ?? 0,
+        },
       }),
     });
   }
@@ -1575,6 +1587,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             /^[0-9A-Za-z_-]{10,80}$/,
             "A Turnstile site key looks like 0x4AAAAAAA… (from Cloudflare → Turnstile)",
           )
+          .nullish(),
+        gaAccountId: z
+          .string()
+          .trim()
+          .regex(/^(accounts\/)?\d{4,20}$/, "The Google Analytics Account ID is a number (Admin → Account settings)")
           .nullish(),
         fcmAppId: z
           .string()
@@ -3774,6 +3791,31 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       });
       return json(out);
     }
+    // Google Analytics: "Give the owner access" (their Google address becomes a viewer on the property the app made).
+    if (action === "/analytics" && sub === "access" && m === "POST") {
+      const { email } = await body(req, z.object({ email: z.string().trim().toLowerCase().email().max(200) }));
+      if (!lead.record_json) throw new HttpError(409, "This site hasn't finished building yet");
+      try {
+        await grantViewer(env, JSON.parse(lead.record_json) as BusinessRecord, email);
+      } catch (err) {
+        throw new HttpError(502, (err as Error).message);
+      }
+      await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")
+        .bind(newId(), id, session.name, `📊 Gave ${email} access to their Google Analytics.`, now())
+        .run();
+      return json({ ok: true });
+    }
+    // Google Analytics now (live sites without it): set the property up and republish with the tag.
+    if (action === "/analytics" && !sub && m === "POST") {
+      if (!lead.live_url) throw new HttpError(409, "Publish the site first; Google Analytics is set up when it goes live");
+      const s = await getSettings(env);
+      if (gaState(env, s) !== "on") throw new HttpError(409, "Google Analytics isn't connected yet: see Settings → Website");
+      const out = await publishLead(env, lead, url.origin);
+      const after = (await getLead(env, id))!;
+      const rec = after.record_json ? (JSON.parse(after.record_json) as BusinessRecord) : null;
+      if (!rec?.seo?.gaId) throw new HttpError(502, (await gaLastError(env))?.error ?? "Google Analytics couldn't be set up");
+      return json({ ...out, analytics: detail(after).analytics });
+    }
     if (action === "/share" && m === "POST") {
       if (lead.status !== "ready")
         throw new HttpError(409, "The preview isn't ready yet");
@@ -4362,6 +4404,8 @@ async function handleScheduled(
   if (event.cron === CRON_MINUTE) {
     // A new Android build in R2 → one push to every phone (no-op without the Firebase secret).
     await announceUpdate(env);
+    // Once Google Analytics is connected, every live site is republished once to get its own property (analytics.ts).
+    await queueGaBackfill(env).catch((e) => console.error("ga backfill", e));
     await republishDirty(env);
     await requeueStuck(env);
     await queueRelive(env);

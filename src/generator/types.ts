@@ -607,6 +607,11 @@ export interface BusinessRecord {
   seo?: {
     /** The `content` of Google Search Console's HTML-tag verification for this site (published pages only). */
     googleSiteVerification?: string;
+    /** Google Analytics measurement ID (G-…): the Google tag goes on every published page. Set by the app on publish
+     * (src/worker/analytics.ts) or typed in Edit when the client has their own. */
+    gaId?: string;
+    /** The Google Analytics property and stream the app made for this site (for the reports link and sharing). */
+    ga?: { property: string; stream: string; measurementId: string; at?: number };
   };
   /** Optional "We're hiring" section: the jobs open and how to apply, in the owner's words. */
   hiring?: { roles: string[]; how?: string };

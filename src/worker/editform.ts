@@ -2215,6 +2215,10 @@ export function editForm(l: EditDetail): EditForm {
     txt("gsc", "Search Console code", r.seo?.googleSiteVerification || "", {
       placeholder: "AbC123…",
     }),
+    txt("gaId", "Google Analytics ID", r.seo?.gaId || "", { placeholder: "G-…" }),
+    note(
+      "Filled in by the app when the site is published (its own Google Analytics property). Only type one here if the business already has its own Google Analytics; leave it blank otherwise.",
+    ),
     note(
       'Google Search Console → Add property → URL prefix (the live address) → HTML tag: paste only the code between content="…". It goes on the live site, never the preview. Then submit /sitemap.xml.',
     ),
@@ -3070,7 +3074,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
       shop: isRt ? v("shop") : undefined,
       giftCards: isR || isS || isRt ? v("giftCards") : undefined,
     }),
-    seo: has("gsc") ? { googleSiteVerification: v("gsc") } : undefined,
+    seo: has("gsc") ? { googleSiteVerification: v("gsc"), ...(has("gaId") ? { gaId: v("gaId") } : {}) } : undefined,
     proof: has("prAwards") ? proof : undefined,
     closures: has("vsClosures") ? closures : undefined,
     visit: has("vsPay") ? visit : undefined,

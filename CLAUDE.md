@@ -1691,6 +1691,24 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `strings` to {} (fresh translation). The page script says its own lines in Spanish on lang="es" pages (`L()` in client-script.ts:
   open now, today's hours, next service, photo buttons). Without `strings` the old summary page (`spanishPage`) still renders.
   `test/translate.test.ts` builds every example with a fake map and checks each /es/ page has the same sections and no English left.
+- 📊 Google Analytics on every client site (Oct 2026, owner's pick "set it up automatically"; Android 2.76; `src/worker/analytics.ts`,
+  `test/worker/analytics.test.ts`): `publishLead` calls `ensureAnalytics` before the real build: a live site with no `seo.gaId` gets its
+  own GA4 property (`accounts/<Settings gaAccountId>`, "<Name> (<City>, AL)", America/Chicago, USD) + web data stream (defaultUri = the
+  live origin) through the Analytics Admin API v1beta (`createProperty`), stored as `record.seo.gaId` + `seo.ga {property, stream,
+  measurementId, at}` with a call-log note. Auth: service-account JWT (scope analytics.edit, `fcmJwt(sa, now, scope)`) from Worker
+  secret `GA_SERVICE_ACCOUNT`, else the Firebase `FCM_SERVICE_ACCOUNT`. Never blocks a publish: failures go to settings key
+  `ga_last_error` (health item `analytics`, section Website, with the setup steps and the service account email to add). `buildSite`
+  publish mode writes the gtag snippet (`gaTag` in render.ts, G- IDs only; never previews); the client script sends `call_click` /
+  `text_click` / `directions_click` and `generate_lead` on /thanks/; the privacy page switches to Google Analytics wording. Edit →
+  Links "Google Analytics ID" (web + editform `gaId`): the client's own ID overrides; blank = the app's one again on the next publish
+  (edits now set `seo` fields one by one, so saving the Search Console code never wipes the GA). Lead page → Client site → 📊 Google
+  Analytics (`detail().analytics {id, auto, reportsUrl}`): Open their reports, "Give the owner access" (`POST /api/leads/:id/analytics/
+  access {email}` → v1alpha accessBindings, predefinedRoles/viewer) and "Set it up now" (`POST /api/leads/:id/analytics`, republishes);
+  web `analyticsHtml`, Android LeadScreen + `Api.analyticsNow` / `analyticsAccess`. Settings → Website "Google Analytics account for
+  client sites" (`gaAccountId`, web + Android). The minute cron's `queueGaBackfill` (key `ga_backfill_v1`) marks every live site
+  `prices_dirty` once the setup is complete, so `republishDirty` gives each its property. Owner setup: analytics.google.com → Admin →
+  Create account → Account ID into Settings; Google Cloud (the service account's project) → enable "Google Analytics Admin API"; GA
+  Admin → Account access management → add the service account email as Administrator.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
