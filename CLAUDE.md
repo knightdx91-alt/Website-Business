@@ -1732,6 +1732,15 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   marks who an alert is for; `prefFilter` always lets those through whatever the alert mode and `pushAll` pushes to them past
   `wantsPush`. Tasks set it on create (assignees minus the creator) and on update for people newly added ("put X on a task")
   or when the day / time moves ("📅 moved a task to …").
+  Google Tasks (same day, owner's ask; migration 0028 `tasks.gtasks_json` {email: Google task id}): `syncGoogleTasks()` runs before
+  `syncCalendar` on create / update and puts every task (dated or not) in the default Tasks list of each domain assignee
+  (`gtaskUpsert` POST / PATCH, `gtaskBody`: date only, time as "⏰ 2:30 PM" first in the notes, link to the lead), ticks it
+  off when finished, deletes it for people taken off or on delete. A date-only task held in someone's Google Tasks gets no
+  calendar event for them (Google shows the task on the calendar); timed tasks keep the event. `pollGoogleTasks()` (minute cron,
+  every third minute, ≤20 checks) finishes a task ticked off in the Tasks app ("✅ X finished: … (in Google Tasks)").
+  `upgradeCalendars()` also backfills open tasks into Google Tasks. Needs the Google Tasks API enabled in project 475092517584
+  and scope https://www.googleapis.com/auth/tasks added to the same delegation entry; health item `gtasks`, settings key
+  `gtasks_last`. Without it everything stays on calendar events.
 - 🌐 Their domain name in Edit (Oct 2026, owner's ask "a place to put their purchased domain name"): Edit card "Their domain name"
   (web section + `EDIT_CARD_ID` `domain`; editform card `domain`, field `customDomain`, so Android's Edit has it with no app build).
   `setLeadDomain(env, lead, domain|null, origin)` + `domainStatus()` in index.ts (shared by `/domain` GET/PUT/DELETE, the web Edit save,

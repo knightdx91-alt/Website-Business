@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 52,
+    date: "2026-10-16",
+    title: "Tasks show in the Google Tasks app",
+    items: [
+      "Your tasks now show in the Google Tasks app on Android and iPhone, and in the Tasks list in Gmail and Google Calendar. That includes tasks with no date.",
+      "Tick a task off in Google Tasks and it's marked finished in our app within a few minutes. Finishing it in our app ticks it off in Google Tasks.",
+      "Google Tasks only keeps the day, so a task's time is shown first in its notes (⏰ 2:30 PM). Tasks with a time also stay on Google Calendar as events, with the 30-minute reminder. Date-only tasks show on the calendar as tasks instead of events.",
+    ],
+  },
+  {
     n: 51,
     date: "2026-10-16",
     title: "Tasks now go straight onto your Google Calendar",

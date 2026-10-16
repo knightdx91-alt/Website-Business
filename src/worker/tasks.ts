@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Session } from "./auth.ts";
 import { getSettings } from "./db.ts";
 import { HttpError, newId, now, type Env } from "./env.ts";
-import { gcalDelete, gcalUpsert, onDomain, type CalEvent } from "./gcal.ts";
+import { gcalDelete, gcalUpsert, gtaskDelete, gtaskDone, gtaskUpsert, onDomain, type CalEvent } from "./gcal.ts";
 import { sendEmailDetailed } from "./mail.ts";
 import { notify } from "./notify.ts";
 
@@ -34,6 +34,7 @@ export interface TaskRow {
   cal_uid: string | null;
   cal_seq: number;
   cal_to?: string | null;
+  gtasks_json?: string | null;
 }
 
 export interface Task {
@@ -272,7 +273,8 @@ export async function createTask(
     // Everyone it's for gets the phone notification even if their alerts are set to "my leads" or "important only".
     forIds: task.assignees.filter((id) => id !== session.userId),
   });
-  await syncCalendar(env, row, null, session);
+  const synced = await syncGoogleTasks(env, row);
+  await syncCalendar(env, synced, null, session);
   return withNoCalendar(env, task, row, names);
 }
 
@@ -359,7 +361,8 @@ export async function updateTask(
       text: `✅ ${session.name} finished: ${task.title}`,
     });
   }
-  await syncCalendar(env, row, before, session);
+  const synced = await syncGoogleTasks(env, row, before);
+  await syncCalendar(env, synced, before, session);
   return withNoCalendar(env, task, row, names);
 }
 
@@ -380,6 +383,7 @@ export async function deleteTask(
     const s = await getSettings(env);
     for (const h of heldBy(row, s)) await takeOff(env, row, h, row.cal_seq + 1).catch(() => false);
   }
+  for (const [email, gid] of Object.entries(gtasksOf(row))) await gtaskDelete(env, email, gid).catch(() => false);
 }
 
 /* ---------- calendar invites ---------- */
@@ -487,7 +491,12 @@ export async function syncCalendar(
     const domain = s.googleDomain || "undergroundassociates.com";
     const held = heldBy(row, s);
     const heldOf = new Map(held.map((h) => [bare(h), h]));
-    const want = row.due && !row.done_at ? (await calendarRecipients(env, row.assignee, s)).emails : [];
+    const inTasks = gtasksOf(row);
+    // A dated task without a time lives in Google Tasks (which shows on the calendar too); only timed ones get an event.
+    const want =
+      row.due && !row.done_at
+        ? (await calendarRecipients(env, row.assignee, s)).emails.filter((e) => row.due_time || !inTasks[e])
+        : [];
     const changed =
       !before ||
       before.title !== row.title ||
@@ -520,6 +529,113 @@ export async function syncCalendar(
   } catch (err) {
     console.error("calendar sync failed", err);
   }
+}
+
+/* ---------- Google Tasks ---------- */
+
+/** {email: Google task id} for everyone this task is in Google Tasks for. */
+export function gtasksOf(r: TaskRow): Record<string, string> {
+  try {
+    return r.gtasks_json ? (JSON.parse(r.gtasks_json) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Puts the task in the Google Tasks list of everyone on the company domain it's for (dated or not), updates it when it
+ * changes, ticks it off when it's finished and removes it for people taken off. Returns the row with `gtasks_json`
+ * updated. Never throws.
+ */
+export async function syncGoogleTasks(env: Env, row: TaskRow, before?: TaskRow | null): Promise<TaskRow> {
+  try {
+    const s = await getSettings(env);
+    const domain = s.googleDomain || "undergroundassociates.com";
+    const held = gtasksOf(row);
+    const want = (await calendarRecipients(env, row.assignee, s)).emails.filter((e) => onDomain(e, domain));
+    const changed =
+      !before ||
+      before.title !== row.title ||
+      before.notes !== row.notes ||
+      before.due !== row.due ||
+      before.due_time !== row.due_time ||
+      !!before.done_at !== !!row.done_at;
+    const next: Record<string, string> = { ...held };
+    for (const [e, gid] of Object.entries(held)) if (!want.includes(e) && (await gtaskDelete(env, e, gid))) delete next[e];
+    const todo = want.filter((e) => changed || !held[e]);
+    if (todo.length) {
+      const lead = row.lead_id
+        ? await env.DB.prepare("SELECT name FROM leads WHERE id = ?").bind(row.lead_id).first<{ name: string | null }>()
+        : null;
+      const t = {
+        title: row.title,
+        notes: row.notes ?? "",
+        due: row.due,
+        dueTime: row.due_time,
+        done: !!row.done_at,
+        leadName: lead?.name ?? null,
+        link: row.lead_id ? `https://app.undergroundassociates.com/#/lead/${row.lead_id}` : "https://app.undergroundassociates.com/#/tasks",
+      };
+      // A finished task nobody had in Google Tasks isn't added just to be ticked off.
+      for (const e of todo) {
+        if (row.done_at && !held[e]) continue;
+        const gid = await gtaskUpsert(env, e, held[e] ?? null, t);
+        if (gid) next[e] = gid;
+      }
+    }
+    const json = Object.keys(next).length ? JSON.stringify(next) : null;
+    if (json !== (row.gtasks_json ?? null)) {
+      await env.DB.prepare("UPDATE tasks SET gtasks_json = ? WHERE id = ?").bind(json, row.id).run();
+      return { ...row, gtasks_json: json };
+    }
+    return row;
+  } catch (err) {
+    console.error("google tasks sync failed", err);
+    return row;
+  }
+}
+
+/**
+ * Ticked off in the Google Tasks app → finished here too (and off everyone's calendar and lists). Minute cron, every
+ * third minute, up to 20 checks a run.
+ */
+export async function pollGoogleTasks(env: Env): Promise<number> {
+  const rows = await env.DB.prepare(`${SELECT} WHERE t.done_at IS NULL AND t.gtasks_json IS NOT NULL ORDER BY t.updated_at DESC LIMIT 20`).all<
+    TaskRow & { lead_name: string | null }
+  >();
+  const names = await teamNames(env);
+  const s = await getSettings(env);
+  let checks = 0;
+  let finished = 0;
+  for (const row of rows.results) {
+    for (const [email, gid] of Object.entries(gtasksOf(row))) {
+      if (checks++ >= 20) return finished;
+      if ((await gtaskDone(env, email, gid)) !== true) continue;
+      const who = await personFor(env, email, s, names);
+      const t = now();
+      await env.DB.prepare("UPDATE tasks SET done_at = ?, done_by_name = ?, updated_at = ? WHERE id = ? AND done_at IS NULL")
+        .bind(t, who.name, t, row.id)
+        .run();
+      const after = (await getTask(env, row.id))!;
+      await notify(env, {
+        kind: "task",
+        actor: { userId: who.id, name: who.name },
+        leadId: row.lead_id,
+        text: `✅ ${who.name} finished: ${row.title} (in Google Tasks)`,
+      });
+      const synced = await syncGoogleTasks(env, after, row);
+      await syncCalendar(env, synced, row);
+      finished++;
+      break;
+    }
+  }
+  return finished;
+}
+
+async function personFor(env: Env, email: string, s: CalSettings, names: Names): Promise<{ id: string; name: string }> {
+  if (email === ownerCal(s)) return { id: "owner", name: names.get("owner") ?? "Owner" };
+  const u = await env.DB.prepare("SELECT id, name FROM users WHERE lower(email) = ?").bind(email).first<{ id: string; name: string }>();
+  return u ? { id: u.id, name: u.name } : { id: "owner", name: email };
 }
 
 /** "📅 Added to your calendar: …" (or "Moved") email for a task written straight into someone's calendar. Never throws. */
@@ -730,10 +846,23 @@ export async function upgradeCalendars(env: Env): Promise<number> {
     .bind(today)
     .all<TaskRow & { lead_name: string | null }>();
   let n = 0;
+  // Open tasks (dated or not) not yet in everyone's Google Tasks.
+  const open = await env.DB.prepare(`${SELECT} WHERE t.done_at IS NULL ORDER BY t.updated_at DESC LIMIT 50`).all<TaskRow & { lead_name: string | null }>();
+  for (const row of open.results) {
+    if (n >= 5) break;
+    const inTasks = gtasksOf(row);
+    const want = (await calendarRecipients(env, row.assignee, s)).emails.filter((e) => onDomain(e, domain));
+    if (!want.some((e) => !inTasks[e])) continue;
+    n++;
+    const synced = await syncGoogleTasks(env, row, row);
+    // A date-only task now in Google Tasks leaves the calendar (it shows there as a task).
+    if (synced.gtasks_json !== row.gtasks_json) await syncCalendar(env, synced, row);
+  }
   for (const row of rows.results) {
     if (n >= 5) break;
     const held = heldBy(row, s);
-    const want = (await calendarRecipients(env, row.assignee, s)).emails.filter((e) => onDomain(e, domain));
+    const inTasks = gtasksOf(row);
+    const want = (await calendarRecipients(env, row.assignee, s)).emails.filter((e) => onDomain(e, domain) && (row.due_time || !inTasks[e]));
     if (!want.some((e) => !held.includes(`g:${e}`))) continue;
     n++;
     // Same row as "before": nothing changed, so only people not yet in their calendar are written.

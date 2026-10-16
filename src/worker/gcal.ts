@@ -73,14 +73,15 @@ export function onDomain(email: string, domain: string): boolean {
 
 const tokens = new Map<string, { token: string; exp: number }>();
 
-async function tokenFor(sa: ServiceAccount, email: string): Promise<string> {
-  const hit = tokens.get(email);
+async function tokenFor(sa: ServiceAccount, email: string, scope = CAL_SCOPE): Promise<string> {
+  const key = `${scope} ${email}`;
+  const hit = tokens.get(key);
   if (hit && hit.exp > Date.now() + 60_000) return hit.token;
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     body: new URLSearchParams({
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: await fcmJwt(sa, undefined, CAL_SCOPE, email),
+      assertion: await fcmJwt(sa, undefined, scope, email),
     }),
     signal: AbortSignal.timeout(8000),
   });
@@ -88,10 +89,10 @@ async function tokenFor(sa: ServiceAccount, email: string): Promise<string> {
   if (!res.ok || !j.access_token)
     throw new Error(
       j.error === "unauthorized_client"
-        ? "domain-wide delegation isn't set up for the calendar yet"
+        ? `domain-wide delegation isn't set up for ${scope.endsWith("/tasks") ? "Google Tasks" : "the calendar"} yet`
         : `Google sign-in ${res.status}: ${j.error_description ?? j.error ?? "no token"}`,
     );
-  tokens.set(email, { token: j.access_token, exp: Date.now() + (j.expires_in ?? 3600) * 1000 });
+  tokens.set(key, { token: j.access_token, exp: Date.now() + (j.expires_in ?? 3600) * 1000 });
   return j.access_token;
 }
 
@@ -162,5 +163,108 @@ export async function gcalDelete(env: Env, email: string, taskId: string): Promi
     return res.ok || res.status === 404 || res.status === 410;
   } catch {
     return false;
+  }
+}
+
+/* ---------- Google Tasks (the Tasks app on Android / iPhone, and the task list in Gmail / Calendar) ---------- */
+
+export const TASKS_SCOPE = "https://www.googleapis.com/auth/tasks";
+const TASKS_API = "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks";
+const TASKS_LAST = "gtasks_last";
+
+export interface GTask {
+  title: string;
+  notes: string;
+  due: string | null;
+  dueTime: string | null;
+  done: boolean;
+  leadName: string | null;
+  link: string;
+}
+
+/** The Tasks API body. Google Tasks keeps only the date, so a time goes first in the notes. */
+export function gtaskBody(t: GTask): Record<string, unknown> {
+  const time = t.dueTime ? `⏰ ${fmtTime(t.dueTime)}` : "";
+  const notes = [time, t.notes, t.leadName ? `About: ${t.leadName}` : "", t.link].filter(Boolean).join("\n");
+  return {
+    title: t.title,
+    notes: notes.slice(0, 8000),
+    status: t.done ? "completed" : "needsAction",
+    due: t.due ? `${t.due}T00:00:00.000Z` : null,
+  };
+}
+
+function fmtTime(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number) as [number, number];
+  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h >= 12 ? "PM" : "AM"}`;
+}
+
+async function recordTasks(env: Env, v: { ok: boolean; email: string; error?: string }) {
+  await env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .bind(TASKS_LAST, JSON.stringify({ ...v, at: Date.now() }))
+    .run()
+    .catch(() => {});
+}
+
+export async function gtasksLast(env: Env): Promise<{ ok: boolean; email: string; error?: string; at: number } | null> {
+  const r = await env.DB.prepare("SELECT value FROM settings WHERE key = ?").bind(TASKS_LAST).first<{ value: string }>().catch(() => null);
+  try {
+    return r ? JSON.parse(r.value) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Creates or updates the task in this person's Google Tasks. Returns its Google id, or null when that can't be done. */
+export async function gtaskUpsert(env: Env, email: string, id: string | null, t: GTask): Promise<string | null> {
+  const sa = gaServiceAccount(env);
+  if (!sa) return null;
+  try {
+    const token = await tokenFor(sa, email, TASKS_SCOPE);
+    const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+    const body = JSON.stringify(gtaskBody(t));
+    let res = id ? await fetch(`${TASKS_API}/${encodeURIComponent(id)}`, { method: "PATCH", headers, body, signal: AbortSignal.timeout(8000) }) : null;
+    // Never made, or they deleted it in the Tasks app: make it again.
+    if (!res || res.status === 404 || res.status === 400) res = await fetch(TASKS_API, { method: "POST", headers, body, signal: AbortSignal.timeout(8000) });
+    const j = (await res.json().catch(() => ({}))) as { id?: string; error?: { message?: string } };
+    if (!res.ok || !j.id) throw new Error(`Tasks ${res.status}: ${j.error?.message ?? "refused"}`);
+    await recordTasks(env, { ok: true, email });
+    return j.id;
+  } catch (err) {
+    await recordTasks(env, { ok: false, email, error: (err as Error).message });
+    return null;
+  }
+}
+
+/** Removes it from their Google Tasks. True = gone. */
+export async function gtaskDelete(env: Env, email: string, id: string): Promise<boolean> {
+  const sa = gaServiceAccount(env);
+  if (!sa) return false;
+  try {
+    const token = await tokenFor(sa, email, TASKS_SCOPE);
+    const res = await fetch(`${TASKS_API}/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    return res.ok || res.status === 404 || res.status === 410;
+  } catch {
+    return false;
+  }
+}
+
+/** Was it ticked off in the Tasks app? true / false, or null when Google couldn't say (deleted there = null). */
+export async function gtaskDone(env: Env, email: string, id: string): Promise<boolean | null> {
+  const sa = gaServiceAccount(env);
+  if (!sa) return null;
+  try {
+    const token = await tokenFor(sa, email, TASKS_SCOPE);
+    const res = await fetch(`${TASKS_API}/${encodeURIComponent(id)}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { status?: string; deleted?: boolean };
+    if (j.deleted) return null;
+    return j.status === "completed";
+  } catch {
+    return null;
   }
 }

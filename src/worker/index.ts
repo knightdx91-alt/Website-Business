@@ -1,4 +1,4 @@
-import { gcalClientId, gcalLast } from "./gcal.ts";
+import { gcalClientId, gcalLast, gtasksLast } from "./gcal.ts";
 import { bareDomain, buyUrl, domainAvailable, DOMAIN_RE, suggestDomains, ourZone, wireDomain, type DomainStage } from "./domains.ts";
 import { gaLastError, gaServiceAccount, gaState, grantViewer, queueGaBackfill, reportsUrl } from "./analytics.ts";
 import { CHANGELOG, LATEST_CHANGE, changelogSeenKey, changesSince, unseenChanges } from "./changelog.ts";
@@ -241,7 +241,7 @@ import { extraTerms } from "./contract.ts";
 import { appContent } from "./content.ts";
 import { plansOptions } from "./plan-options.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
-import { createTask, deleteTask, listTasks, updateTask, upgradeCalendars } from "./tasks.ts";
+import { createTask, deleteTask, listTasks, pollGoogleTasks, updateTask, upgradeCalendars } from "./tasks.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
 import {
   chooseLook,
@@ -1424,7 +1424,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           sites:
             (await env.DB.prepare("SELECT COUNT(*) AS n FROM leads WHERE json_extract(record_json, '$.seo.ga.property') IS NOT NULL").first<{ n: number }>())?.n ?? 0,
         },
-        calendar: { serviceAccount: !!gaServiceAccount(env), clientId: gcalClientId(env), last: await gcalLast(env) },
+        calendar: { serviceAccount: !!gaServiceAccount(env), clientId: gcalClientId(env), last: await gcalLast(env), tasks: await gtasksLast(env) },
       }),
     });
   }
@@ -4494,7 +4494,11 @@ async function handleScheduled(
     // Client domains waiting on their DNS record: switch the site over once Cloudflare says it works.
     await checkDomains(env).catch((e) => console.error("domain check", e));
     // Tasks still on someone's calendar as an emailed invite move straight into it once Google allows it (gcal.ts).
-    if (new Date().getUTCMinutes() % 3 === 0) await upgradeCalendars(env).catch((e) => console.error("calendar upgrade", e));
+    if (new Date().getUTCMinutes() % 3 === 0) {
+      await upgradeCalendars(env).catch((e) => console.error("calendar upgrade", e));
+      // Ticked off in the Google Tasks app → finished in ours (gcal.ts / tasks.ts).
+      await pollGoogleTasks(env).catch((e) => console.error("google tasks poll", e));
+    }
     await republishDirty(env);
     await requeueStuck(env);
     await queueRelive(env);

@@ -409,7 +409,13 @@ export interface HealthInput {
   /** Google Analytics for client sites (src/worker/analytics.ts): setup state, the service account to add, the last failure. */
   analytics?: { state: "on" | "account" | "secret" | "off"; serviceEmail: string | null; lastError: string | null; sites: number };
   /** Tasks written straight into Google Calendar (gcal.ts): service account present, its client ID, the last try. */
-  calendar?: { serviceAccount: boolean; clientId: string | null; last: { ok: boolean; email: string; error?: string } | null };
+  calendar?: {
+    serviceAccount: boolean;
+    clientId: string | null;
+    last: { ok: boolean; email: string; error?: string } | null;
+    /** Google Tasks (same service account, scope …/auth/tasks). */
+    tasks?: { ok: boolean; email: string; error?: string } | null;
+  };
 }
 
 /** The health strip at the top of Settings: is every outside piece connected, and which ones are optional. */
@@ -558,6 +564,15 @@ export function healthItems(h: HealthInput): HealthItem[] {
             detail: h.calendar.last?.ok
               ? "Tasks go straight onto the team's Google Calendars, nothing to accept."
               : `Tasks reach calendars as emailed invites for now (each person accepts once). To put them straight on everyone's calendar: (1) Google Cloud (the service account's project) → APIs → enable "Google Calendar API". (2) admin.google.com → Security → Access and data control → API controls → Manage domain-wide delegation → Add new: Client ID ${h.calendar.clientId ?? "(the service account's client ID)"}, scope https://www.googleapis.com/auth/calendar.events. Then add or change any dated task.${h.calendar.last?.error ? ` Last try: ${h.calendar.last.error}` : ""}${h.calendar.serviceAccount ? "" : " The Worker has no service account (GA_SERVICE_ACCOUNT or FCM_SERVICE_ACCOUNT)."}`,
+            section: "Team sign-in",
+          },
+          {
+            id: "gtasks",
+            label: "Tasks in the Google Tasks app",
+            state: (h.calendar.tasks?.ok ? "ok" : "warn") as HealthItem["state"],
+            detail: h.calendar.tasks?.ok
+              ? "Every task shows in the Google Tasks app of the people it's for, and ticking it off there finishes it here."
+              : `Not on yet. (1) Google Cloud project 475092517584 → APIs → enable "Google Tasks API". (2) admin.google.com → Security → API controls → Manage domain-wide delegation → edit the entry for Client ID ${h.calendar.clientId ?? "(the service account's)"} and make the scopes https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/tasks${h.calendar.tasks?.error ? ` Last try: ${h.calendar.tasks.error}` : ""}`,
             section: "Team sign-in",
           },
         ]

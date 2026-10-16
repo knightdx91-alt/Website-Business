@@ -36,3 +36,14 @@ test("only company addresses are reached directly; the JWT acts as that person",
   assert.equal(claims.sub, "chris@undergroundassociates.com");
   assert.equal(claims.scope, "https://www.googleapis.com/auth/calendar.events");
 });
+
+test("Google Tasks bodies: date only (the time goes first in the notes), done state, link", async () => {
+  const { gtaskBody } = await import("../../src/worker/gcal.ts");
+  const b = gtaskBody({ title: "Call Reyes", notes: "Ask for Maria", due: "2026-10-20", dueTime: "14:30", done: false, leadName: "Reyes pizza", link: "https://app.undergroundassociates.com/#/lead/x" }) as any;
+  assert.equal(b.due, "2026-10-20T00:00:00.000Z");
+  assert.equal(b.status, "needsAction");
+  assert.equal(b.notes, "⏰ 2:30 PM\nAsk for Maria\nAbout: Reyes pizza\nhttps://app.undergroundassociates.com/#/lead/x");
+  const undated = gtaskBody({ title: "Order cards", notes: "", due: null, dueTime: null, done: true, leadName: null, link: "l" }) as any;
+  assert.equal(undated.due, null);
+  assert.equal(undated.status, "completed");
+});
