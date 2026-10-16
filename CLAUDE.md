@@ -1709,6 +1709,13 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `prices_dirty` once the setup is complete, so `republishDirty` gives each its property. Owner setup: analytics.google.com → Admin →
   Create account → Account ID into Settings; Google Cloud (the service account's project) → enable "Google Analytics Admin API"; GA
   Admin → Account access management → add the service account email as Administrator.
+- 🌐 Their domain name in Edit (Oct 2026, owner's ask "a place to put their purchased domain name"): Edit card "Their domain name"
+  (web section + `EDIT_CARD_ID` `domain`; editform card `domain`, field `customDomain`, so Android's Edit has it with no app build).
+  `setLeadDomain(env, lead, domain|null, origin)` + `domainStatus()` in index.ts (shared by `/domain` GET/PUT/DELETE, the web Edit save,
+  which calls `/domain` only when the value changed, and the `/editform` PUT): before the first publish the domain is only stored in
+  `leads.custom_domain` (status "waiting to publish") and `publishLead` connects it (`addDomain` right after `ensureProject`, errors
+  logged, never blocking); after publishing it's added to the Pages project at once and the live site republishes. `DOMAIN_NAME`
+  strips https:// and paths. The lead page's Client site → Their own domain card still shows the CNAME to add.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

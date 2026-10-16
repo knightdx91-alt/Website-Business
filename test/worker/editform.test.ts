@@ -101,3 +101,10 @@ test("dnaCode is empty for all-classic picks and encodes the rest in order", () 
   assert.equal(dnaCode({ dna_hero: "cover" }, order), "~h1n0");
   assert.equal(dnaCode({ dna_hero: "stack", dna_nav: "utility" }, order), "~h0n1");
 });
+
+test("Edit has a Their domain name box with the saved domain", () => {
+  const d = { ...detailOf(EXAMPLES[0]!), customDomain: "www.reyespizza.com" };
+  const card = editForm(d).cards.find((c) => c.id === "domain")!;
+  assert.equal(card.title, "Their domain name");
+  assert.equal(card.fields.find((f) => f.name === "customDomain")!.value, "www.reyespizza.com");
+});

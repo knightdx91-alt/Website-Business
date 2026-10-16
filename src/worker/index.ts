@@ -549,6 +549,56 @@ async function chargeAi(
 const CATEGORY_IDS = ["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning", "print", "retail", "finance", "church", "general"] as const;
 
 /** `o.sold`: the category's sold / live clients, so the look picker can mark their looks (GET lead and the editor data pass it). */
+/** A client's domain name as typed in the app ("www.theirbusiness.com"). */
+const DOMAIN_NAME = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .transform((d) => d.replace(/^https?:\/\//, "").replace(/\/.*$/, ""))
+  .pipe(z.string().max(253).regex(/^(?!-)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/, "Type a domain like www.example.com"));
+
+/** Where a site's own domain stands: connected (Cloudflare's status + the DNS record to add) or waiting for the first publish. */
+async function domainStatus(env: Env, lead: LeadRow) {
+  if (!lead.pages_project)
+    return { domain: lead.custom_domain, status: lead.custom_domain ? "waiting to publish" : null, error: null, target: null, pending: true };
+  const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
+  const d = lead.custom_domain ? await getDomain(auth, lead.pages_project, lead.custom_domain) : null;
+  return {
+    domain: d?.name ?? lead.custom_domain,
+    status: d?.status ?? null,
+    error: d?.verification_data?.error_message ?? d?.validation_data?.error_message ?? null,
+    target: `${lead.pages_project}.pages.dev`,
+    pending: false,
+  };
+}
+
+/**
+ * Sets (or clears, with null) the client's own domain. Before the first publish it is only remembered and publishing connects
+ * it; on a published site it is added to the Pages project at once and the site is republished (its canonical links,
+ * sitemap and schema carry the address). Shared by the lead page's domain card, Edit (web) and the editor data (Android).
+ */
+async function setLeadDomain(env: Env, lead: LeadRow, domain: string | null, origin: string): Promise<Record<string, unknown>> {
+  const prev = lead.custom_domain;
+  if (!lead.pages_project) {
+    await updateLead(env, lead.id, { custom_domain: domain });
+    return await domainStatus(env, { ...lead, custom_domain: domain });
+  }
+  const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
+  if (prev && prev !== domain) await removeDomain(auth, lead.pages_project, prev);
+  if (domain) await addDomain(auth, lead.pages_project, domain);
+  await updateLead(env, lead.id, { custom_domain: domain });
+  let republish: string | undefined;
+  if (prev !== domain && lead.sales_status === "live" && lead.live_url) {
+    try {
+      await publishLead(env, (await getLead(env, lead.id))!, origin);
+      republish = "ok";
+    } catch (err) {
+      republish = `failed: ${(err as Error).message}`;
+    }
+  }
+  return { ...(await domainStatus(env, { ...lead, custom_domain: domain })), ...(republish ? { republish } : {}) };
+}
+
 function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?: SoldDesign[] } = {}) {
   const record = l.record_json
     ? (JSON.parse(l.record_json) as BusinessRecord)
@@ -2930,69 +2980,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (action === "/stats" && m === "GET")
       return json(await siteReport(env, id));
     if (action === "/domain") {
-      if (!lead.pages_project)
-        throw new HttpError(409, "Publish the site first, then add its domain");
-      const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
-      const describe = (d: PagesDomain | null) => ({
-        domain: d?.name ?? lead.custom_domain,
-        status: d?.status ?? null,
-        error:
-          d?.verification_data?.error_message ??
-          d?.validation_data?.error_message ??
-          null,
-        target: `${lead.pages_project}.pages.dev`,
-      });
-      // The site's canonical links, sitemap and schema carry its address, so a domain change rebuilds and redeploys it.
-      const republish = async (): Promise<Record<string, string>> => {
-        if (lead.sales_status !== "live" || !lead.live_url) return {};
-        try {
-          await publishLead(env, (await getLead(env, id))!, url.origin);
-          return { republish: "ok" };
-        } catch (err) {
-          return { republish: `failed: ${(err as Error).message}` };
-        }
-      };
-      if (m === "GET")
-        return json(
-          describe(
-            lead.custom_domain
-              ? await getDomain(auth, lead.pages_project, lead.custom_domain)
-              : null,
-          ),
-        );
+      if (m === "GET") return json(await domainStatus(env, lead));
       if (m === "PUT") {
-        const { domain } = await body(
-          req,
-          z.object({
-            domain: z
-              .string()
-              .trim()
-              .toLowerCase()
-              .max(253)
-              .regex(
-                /^(?!-)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/,
-                "Type a domain like www.example.com",
-              ),
-          }),
-        );
-        if (lead.custom_domain && lead.custom_domain !== domain)
-          await removeDomain(auth, lead.pages_project, lead.custom_domain);
-        const d = await addDomain(auth, lead.pages_project, domain);
-        await updateLead(env, id, { custom_domain: domain });
-        return json({
-          ...describe(d),
-          ...(lead.custom_domain === domain ? {} : await republish()),
-        });
+        const { domain } = await body(req, z.object({ domain: DOMAIN_NAME }));
+        return json(await setLeadDomain(env, lead, domain, url.origin));
       }
-      if (m === "DELETE") {
-        if (lead.custom_domain)
-          await removeDomain(auth, lead.pages_project, lead.custom_domain);
-        await updateLead(env, id, { custom_domain: null });
-        return json({
-          ok: true,
-          ...(lead.custom_domain ? await republish() : {}),
-        });
-      }
+      if (m === "DELETE") return json({ ok: true, ...(await setLeadDomain(env, lead, null, url.origin)) });
     }
     if (action === "/log" && m === "POST") {
       const input = await body(
@@ -3354,6 +3347,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         next.copy,
         next.look ?? lead.look ?? "",
       );
+      // Edit → Their domain name: a changed domain is remembered (before publishing) or connected + republished (after).
+      let domainNote: string | null = null;
+      if (typeof values.customDomain === "string") {
+        const typed = values.customDomain.trim();
+        const parsed = typed ? DOMAIN_NAME.safeParse(typed) : null;
+        if (parsed && !parsed.success) throw new HttpError(400, "Their domain name: type a domain like www.theirbusiness.com");
+        const domain = parsed ? parsed.data : null;
+        if ((domain ?? null) !== (lead.custom_domain ?? null)) {
+          await setLeadDomain(env, (await getLead(env, id))!, domain, url.origin);
+          domainNote = domain ? `domain ${domain}` : "domain removed";
+        }
+      }
       // A new kind of shop needs new words: queue a rewrite (the preview above already has the new sections).
       if (
         edits.record?.autoKind &&
@@ -3370,6 +3375,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         await recategorizeLead(env, (await getLead(env, id))!, kind as CategoryId);
         words.push(`kind of business changed to ${packFor(kind as CategoryId).label.toLowerCase()}: rebuilding`);
       }
+      if (domainNote) words.push(domainNote);
       await siteUpdated(env, session, lead, words);
       return json({
         ...detail((await getLead(env, id))!),

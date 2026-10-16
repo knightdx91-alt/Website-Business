@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 45,
+    date: "2026-10-16",
+    title: "A place for their domain name",
+    items: [
+      "Edit → \"Their domain name\": type the domain the business bought (or we bought for them), like www.theirbusiness.com. Works on the web app and the phone.",
+      "You can type it before the site is published: publishing connects it. Typed after publishing, it's connected right away and the site republishes.",
+      "Then add the DNS record shown on the lead page (Client site → Their own domain). Clear the box to go back to the free .pages.dev address.",
+    ],
+  },
+  {
     n: 44,
     date: "2026-10-16",
     android: "2.76",

@@ -1376,7 +1376,7 @@ async function viewLead(id, intent) {
   }
 
   /** Edit card heading → editform card id, so a checklist line (#/edit/<id>/<card>) can open the right card. */
-  const EDIT_CARD_ID = { "Confirm with the owner": "confirm", "Design": "design", "Facts (only if the owner says so)": "facts", "Links": "links", "Text": "text", "Menu": "menu", "Services": "services", "Services & area": "services", "Customer quotes": "quotes", "Photo": "photo", "Photo gallery": "gallery", "Stock photos": "stock", "Spanish page": "es", "We're hiring": "hiring", "Events & specials": "events", "Awards & proof": "proof", "Closures, parking & payment": "visit", "Auto parts details": "parts", "Auto shop details": "auto", "Church & nonprofit details": "church", "Commercial cleaning details": "cleaning", "What's included": "cleaning", "Contractor details": "contractor", "Lawn & landscape details": "landscaping", "Live price list & QR labels": "pricelist", "Kind of business": "kind", "Plans & pricing": "plans", "Print shop details": "print", "Restaurant details": "restaurant", "Shop details": "retail", "Tax & finance details": "finance", "Salon details": "salon", "Massage details": "salon", "Grooming details": "salon", "Their current website": "site" };
+  const EDIT_CARD_ID = { "Confirm with the owner": "confirm", "Design": "design", "Facts (only if the owner says so)": "facts", "Links": "links", "Text": "text", "Menu": "menu", "Services": "services", "Services & area": "services", "Customer quotes": "quotes", "Photo": "photo", "Photo gallery": "gallery", "Stock photos": "stock", "Spanish page": "es", "We're hiring": "hiring", "Events & specials": "events", "Awards & proof": "proof", "Closures, parking & payment": "visit", "Auto parts details": "parts", "Auto shop details": "auto", "Church & nonprofit details": "church", "Commercial cleaning details": "cleaning", "What's included": "cleaning", "Contractor details": "contractor", "Lawn & landscape details": "landscaping", "Live price list & QR labels": "pricelist", "Kind of business": "kind", "Plans & pricing": "plans", "Print shop details": "print", "Restaurant details": "restaurant", "Shop details": "retail", "Tax & finance details": "finance", "Salon details": "salon", "Massage details": "salon", "Grooming details": "salon", "Their current website": "site", "Their domain name": "domain" };
   function tagEditCards(jumpTo) {
     $app.querySelectorAll("section.card").forEach((card) => {
       const h = card.querySelector(":scope > h2");
@@ -1536,6 +1536,9 @@ async function viewLead(id, intent) {
         <label class="field">Search Console code <span class="hint">Google Search Console → Add property → URL prefix (the live address) → HTML tag: paste only the code between content="…". Goes on the live site, never the preview. Then submit /sitemap.xml.</span><input name="gsc" value="${esc((r.seo && r.seo.googleSiteVerification) || "")}" maxlength="120" placeholder="AbC123…" autocapitalize="off" spellcheck="false"></label>
         <label class="field">Google Analytics ID <span class="hint">Filled in by the app when the site is published (its own Google Analytics property). Only type one if the business already has its own Google Analytics; leave it blank otherwise.</span><input name="gaId" value="${esc((r.seo && r.seo.gaId) || "")}" maxlength="20" placeholder="G-…" autocapitalize="characters" spellcheck="false"></label>
         <label class="field">Instagram<input name="instagram" type="url" value="${esc(r.links.social.instagram || "")}" placeholder="https://instagram.com/…"></label>
+      </section>
+      <section class="card"><h2>Their domain name</h2>
+        <label class="field">Domain name <span class="hint">The domain they bought (or we bought for them, in their name). Type it before or after publishing: before, publishing connects it; after, it's connected right away and the site republishes. Blank = the free .pages.dev address. Then add the DNS record the lead page shows (Client site → Their own domain).</span><input name="customDomain" value="${esc(l.customDomain || "")}" placeholder="www.theirbusiness.com" autocapitalize="off" autocomplete="off" inputmode="url" spellcheck="false"></label>
       </section>
     </div><div>
       <section class="card"><h2>Text</h2>
@@ -1730,6 +1733,12 @@ async function viewLead(id, intent) {
       btn.disabled = true;
       try {
         await api(`/leads/${id}/edits`, { method: "PUT", json: edits });
+        // Their domain name: only when it changed (remembered before publishing, connected + republished after).
+        const typedDomain = (val("customDomain") || "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+        if (typedDomain !== (l.customDomain || "")) {
+          if (typedDomain) await api(`/leads/${id}/domain`, { method: "PUT", json: { domain: typedDomain } });
+          else await api(`/leads/${id}/domain`, { method: "DELETE" });
+        }
         dirty = false;
         try { sessionStorage.removeItem(draftKey(id)); } catch (e) { /* storage blocked */ }
         toast("Saved. Preview updated.");

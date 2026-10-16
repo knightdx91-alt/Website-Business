@@ -10,7 +10,7 @@ import type { Place } from "../places/client.ts";
 import { getSettings, updateLead, type LeadRow } from "./db.ts";
 import { COMPANY_ORIGIN } from "./company.ts";
 import { HttpError, now, type Env } from "./env.ts";
-import { deploy, ensureProject, projectName, type PagesAuth } from "./pages.ts";
+import { addDomain, deploy, ensureProject, projectName, type PagesAuth } from "./pages.ts";
 
 async function loadFontFrom(env: Env, origin: string) {
   return async (_pkg: string, file: string): Promise<Uint8Array> => {
@@ -153,6 +153,14 @@ export async function publishLead(
   // Remember the project at once: if the deploy below fails, a retry reuses it instead of orphaning it.
   if (lead.pages_project !== project.name)
     await updateLead(env, lead.id, { pages_project: project.name });
+  // A domain typed in before the first publish (Edit → Their domain name) is connected now.
+  if (lead.custom_domain) {
+    try {
+      await addDomain(auth, project.name, lead.custom_domain);
+    } catch (err) {
+      console.error("connecting the domain failed", lead.id, (err as Error).message);
+    }
+  }
   const pagesOrigin = `https://${project.subdomain}`;
   const origin = siteOrigin(lead, pagesOrigin);
   // Its own Google Analytics property the first time it goes live (never blocks the publish; see analytics.ts).

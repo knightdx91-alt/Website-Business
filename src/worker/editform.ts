@@ -84,6 +84,8 @@ interface AnyRecord {
 
 export interface EditDetail {
   record: AnyRecord;
+  /** The client's own domain (leads.custom_domain), for Edit → Their domain name. */
+  customDomain?: string | null;
   copy: AnyRecord;
   menuText?: string;
   looks: Array<{ id: string; name: string; soldTo?: string }>;
@@ -2221,6 +2223,13 @@ export function editForm(l: EditDetail): EditForm {
     ),
     note(
       'Google Search Console → Add property → URL prefix (the live address) → HTML tag: paste only the code between content="…". It goes on the live site, never the preview. Then submit /sitemap.xml.',
+    ),
+  ]);
+
+  card("domain", "Their domain name", [
+    txt("customDomain", "Domain name", l.customDomain || "", { placeholder: "www.theirbusiness.com" }),
+    note(
+      "The domain they bought (or we bought for them, in their name). Type it before or after publishing: before, publishing connects it; after, it's connected right away and the site republishes. Blank = the free .pages.dev address. Then add the DNS record the lead page shows (Client site → Their own domain).",
     ),
   ]);
 
