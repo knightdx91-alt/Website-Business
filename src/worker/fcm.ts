@@ -73,11 +73,14 @@ export async function fcmJwt(
   sa: ServiceAccount,
   now = Math.floor(Date.now() / 1000),
   scope: string = SCOPE,
+  /** Acting as this Workspace user (domain-wide delegation, used by the Calendar sync in gcal.ts). */
+  sub?: string,
 ): Promise<string> {
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = b64url(
     JSON.stringify({
       iss: sa.client_email,
+      ...(sub ? { sub } : {}),
       scope,
       aud: TOKEN_URL,
       iat: now,

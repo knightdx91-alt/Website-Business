@@ -408,6 +408,8 @@ export interface HealthInput {
   spam: { turnstile: "on" | "key" | "secret" | "off"; blocked: number };
   /** Google Analytics for client sites (src/worker/analytics.ts): setup state, the service account to add, the last failure. */
   analytics?: { state: "on" | "account" | "secret" | "off"; serviceEmail: string | null; lastError: string | null; sites: number };
+  /** Tasks written straight into Google Calendar (gcal.ts): service account present, its client ID, the last try. */
+  calendar?: { serviceAccount: boolean; clientId: string | null; last: { ok: boolean; email: string; error?: string } | null };
 }
 
 /** The health strip at the top of Settings: is every outside piece connected, and which ones are optional. */
@@ -544,6 +546,19 @@ export function healthItems(h: HealthInput): HealthItem[] {
                   : `Every published site gets its own Google Analytics property (${h.analytics.sites} so far).`
                 : `Not set up yet. (1) analytics.google.com → Admin → Create account "Underground Associates Clients"; copy its Account ID into Settings → Website → "Google Analytics account for client sites". (2) In Google Cloud (the project of ${h.analytics.serviceEmail ?? "the service account"}), switch on "Google Analytics Admin API". (3) Google Analytics → Admin → Account access management → add ${h.analytics.serviceEmail ?? "the service account's email"} as Administrator.${h.analytics.state === "account" ? " Step 1 is the one missing." : h.analytics.state === "secret" ? " The Worker has no service account (GA_SERVICE_ACCOUNT or FCM_SERVICE_ACCOUNT)." : ""}`,
             section: "Website",
+          },
+        ]
+      : []),
+    ...(h.calendar
+      ? [
+          {
+            id: "calendar",
+            label: "Tasks on Google Calendar",
+            state: (h.calendar.last?.ok ? "ok" : "warn") as HealthItem["state"],
+            detail: h.calendar.last?.ok
+              ? "Tasks go straight onto the team's Google Calendars, nothing to accept."
+              : `Tasks reach calendars as emailed invites for now (each person accepts once). To put them straight on everyone's calendar: (1) Google Cloud (the service account's project) → APIs → enable "Google Calendar API". (2) admin.google.com → Security → Access and data control → API controls → Manage domain-wide delegation → Add new: Client ID ${h.calendar.clientId ?? "(the service account's client ID)"}, scope https://www.googleapis.com/auth/calendar.events. Then add or change any dated task.${h.calendar.last?.error ? ` Last try: ${h.calendar.last.error}` : ""}${h.calendar.serviceAccount ? "" : " The Worker has no service account (GA_SERVICE_ACCOUNT or FCM_SERVICE_ACCOUNT)."}`,
+            section: "Team sign-in",
           },
         ]
       : []),

@@ -1716,6 +1716,14 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   CANCEL to all; `cal_to` = who holds it now (NULL on older rows = the owner's address). One email per person (attendee = them,
   same UID). Create / update return `noCalendar` (names with no email) → the "Task added" / "Saved" toast says to add their email
   (web `calNote`, Android `Task.calNote()`). `test/worker/tasks.test.ts`.
+  Straight into the calendar (same day, `src/worker/gcal.ts`, owner's ask "integrated so it automatically does it"): for addresses on
+  `googleDomain`, `syncCalendar` first writes the event with the Calendar API acting as that person (Workspace domain-wide delegation:
+  `fcmJwt(sa, now, CAL_SCOPE, sub)`, service account GA_SERVICE_ACCOUNT else FCM_SERVICE_ACCOUNT, event id `uatask<taskId>`, PUT then
+  POST on 404, DELETE to take off); held as `g:<email>` in `cal_to`. Anyone else, or any failure, gets the emailed invite; an emailed
+  copy is replaced (mail CANCEL) the first time the direct write works. Last try in settings key `gcal_last`; health item `calendar`
+  (section Team sign-in) carries the setup: Google Cloud → enable Google Calendar API; admin.google.com → Security → API controls →
+  Domain-wide delegation → Add new: the service account's client ID (shown in the health line), scope
+  https://www.googleapis.com/auth/calendar.events. `test/worker/gcal.test.ts`.
 - 🌐 Their domain name in Edit (Oct 2026, owner's ask "a place to put their purchased domain name"): Edit card "Their domain name"
   (web section + `EDIT_CARD_ID` `domain`; editform card `domain`, field `customDomain`, so Android's Edit has it with no app build).
   `setLeadDomain(env, lead, domain|null, origin)` + `domainStatus()` in index.ts (shared by `/domain` GET/PUT/DELETE, the web Edit save,

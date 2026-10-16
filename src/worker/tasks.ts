@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Session } from "./auth.ts";
 import { getSettings } from "./db.ts";
 import { HttpError, newId, now, type Env } from "./env.ts";
+import { gcalDelete, gcalUpsert, onDomain, type CalEvent } from "./gcal.ts";
 import { sendEmailDetailed } from "./mail.ts";
 import { notify } from "./notify.ts";
 
@@ -351,7 +352,7 @@ export async function deleteTask(
   await env.DB.prepare("DELETE FROM tasks WHERE id = ?").bind(id).run();
   if (row.cal_uid) {
     const s = await getSettings(env);
-    for (const to of heldBy(row, s)) await sendInvite(env, row, "CANCEL", row.cal_seq + 1, to).catch(() => false);
+    for (const h of heldBy(row, s)) await takeOff(env, row, h, row.cal_seq + 1).catch(() => false);
   }
 }
 
@@ -368,15 +369,36 @@ async function withNoCalendar(env: Env, task: Task, row: TaskRow, names: Names):
   }
 }
 
-type CalSettings = { calendarEmail?: string | null; directEmail?: string | null };
+type CalSettings = { calendarEmail?: string | null; directEmail?: string | null; googleDomain?: string | null };
 const ownerCal = (s: CalSettings) => (s.calendarEmail || s.directEmail || "").trim().toLowerCase();
 const splitTo = (v: string | null | undefined) => (v ? v.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean) : []);
 
-/** Who holds the invite now (older rows: the owner's calendar, the only one invited before). */
+/** Who holds the task now: "g:<email>" = written straight into their calendar (gcal.ts), "<email>" = an emailed invite.
+ * Older rows: the owner's calendar, the only one invited before. */
 function heldBy(r: TaskRow, s: CalSettings): string[] {
   if (r.cal_to != null) return splitTo(r.cal_to);
   const o = ownerCal(s);
   return r.cal_uid && o ? [o] : [];
+}
+const bare = (h: string) => h.replace(/^g:/, "");
+
+/** Takes it off one person's calendar the way it got there. */
+async function takeOff(env: Env, row: TaskRow, held: string, seq: number): Promise<boolean> {
+  return held.startsWith("g:") ? gcalDelete(env, bare(held), row.id) : sendInvite(env, row, "CANCEL", seq, held);
+}
+
+async function calEvent(env: Env, row: TaskRow): Promise<CalEvent> {
+  const lead = row.lead_id
+    ? await env.DB.prepare("SELECT name FROM leads WHERE id = ?").bind(row.lead_id).first<{ name: string | null }>()
+    : null;
+  return {
+    title: row.title,
+    notes: row.notes ?? "",
+    due: row.due!,
+    dueTime: row.due_time,
+    leadName: lead?.name ?? null,
+    leadUrl: row.lead_id ? `https://app.undergroundassociates.com/#/lead/${row.lead_id}` : null,
+  };
 }
 
 /** Calendar addresses of everyone a task is for (anyone = the owner), plus the names that have no email on file. */
@@ -422,7 +444,11 @@ export function calendarPlan(held: string[], want: string[], changed: boolean): 
   };
 }
 
-/** Sends invites, updates and cancellations as the task changes. Never throws. */
+/**
+ * Puts the task on, updates it on, or takes it off everyone's calendar as it changes. People on the company Google domain get
+ * it written straight into their calendar (nothing to accept) once the owner's one-time setup is done (gcal.ts); everyone
+ * else, and everyone until then, gets an emailed invite. Never throws.
+ */
 export async function syncCalendar(
   env: Env,
   row: TaskRow,
@@ -430,7 +456,9 @@ export async function syncCalendar(
 ): Promise<void> {
   try {
     const s = await getSettings(env);
+    const domain = s.googleDomain || "undergroundassociates.com";
     const held = heldBy(row, s);
+    const heldOf = new Map(held.map((h) => [bare(h), h]));
     const want = row.due && !row.done_at ? (await calendarRecipients(env, row.assignee, s)).emails : [];
     const changed =
       !before ||
@@ -439,15 +467,23 @@ export async function syncCalendar(
       before.due !== row.due ||
       before.due_time !== row.due_time ||
       !row.cal_uid;
-    const plan = calendarPlan(held, want, changed);
-    if (!plan.request.length && !plan.cancel.length) return;
-    if (!s.companyEmail) return;
+    const plan = calendarPlan([...heldOf.keys()], want, changed);
+    // An emailed invite to someone on the domain is moved into their calendar directly once that works.
+    const upgrade = want.filter((e) => !plan.request.includes(e) && heldOf.get(e) === e && onDomain(e, domain));
+    if (!plan.request.length && !plan.cancel.length && !upgrade.length) return;
     const seq = row.cal_uid ? row.cal_seq + 1 : 0;
-    const now = new Set(held);
-    for (const to of plan.cancel) if (await sendInvite(env, row, "CANCEL", seq, to)) now.delete(to);
-    for (const to of plan.request) if (await sendInvite(env, row, "REQUEST", seq, to)) now.add(to);
+    const now = new Map(heldOf);
+    for (const e of plan.cancel) if (await takeOff(env, row, heldOf.get(e)!, seq)) now.delete(e);
+    const ev = row.due ? await calEvent(env, row) : null;
+    for (const e of [...plan.request, ...upgrade]) {
+      const had = heldOf.get(e);
+      if (ev && onDomain(e, domain) && (await gcalUpsert(env, e, row.id, ev))) {
+        if (had === e) await sendInvite(env, row, "CANCEL", seq, e); // the emailed copy it replaces
+        now.set(e, `g:${e}`);
+      } else if (plan.request.includes(e) && (await sendInvite(env, row, "REQUEST", seq, e))) now.set(e, e);
+    }
     await env.DB.prepare("UPDATE tasks SET cal_uid = ?, cal_seq = ?, cal_to = ? WHERE id = ?")
-      .bind(row.cal_uid ?? `task-${row.id}@undergroundassociates.com`, seq, [...now].join(",") || null, row.id)
+      .bind(row.cal_uid ?? `task-${row.id}@undergroundassociates.com`, seq, [...now.values()].join(",") || null, row.id)
       .run();
   } catch (err) {
     console.error("calendar sync failed", err);

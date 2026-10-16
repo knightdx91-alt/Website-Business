@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 50,
+    date: "2026-10-16",
+    title: "Tasks can go straight onto your calendar",
+    items: [
+      "Once the owner finishes a one-time Google setup, tasks go straight onto your Google Calendar: nothing to accept, and changes show up right away.",
+      "Until then, tasks keep arriving as calendar invites by email.",
+      "Owner: Settings → the \"Tasks on Google Calendar\" line in the Connections strip has the two steps (turn on the Calendar API, then allow it in the Google Admin console).",
+    ],
+  },
+  {
     n: 49,
     date: "2026-10-16",
     android: "2.80",

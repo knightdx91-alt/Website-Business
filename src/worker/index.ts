@@ -1,3 +1,4 @@
+import { gcalClientId, gcalLast } from "./gcal.ts";
 import { bareDomain, buyUrl, domainAvailable, DOMAIN_RE, suggestDomains, ourZone, wireDomain, type DomainStage } from "./domains.ts";
 import { gaLastError, gaServiceAccount, gaState, grantViewer, queueGaBackfill, reportsUrl } from "./analytics.ts";
 import { CHANGELOG, LATEST_CHANGE, changelogSeenKey, changesSince, unseenChanges } from "./changelog.ts";
@@ -1423,6 +1424,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           sites:
             (await env.DB.prepare("SELECT COUNT(*) AS n FROM leads WHERE json_extract(record_json, '$.seo.ga.property') IS NOT NULL").first<{ n: number }>())?.n ?? 0,
         },
+        calendar: { serviceAccount: !!gaServiceAccount(env), clientId: gcalClientId(env), last: await gcalLast(env) },
       }),
     });
   }
