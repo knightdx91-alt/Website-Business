@@ -2229,7 +2229,7 @@ export function editForm(l: EditDetail): EditForm {
   card("domain", "Their domain name", [
     txt("customDomain", "Domain name", l.customDomain || "", { placeholder: "www.theirbusiness.com" }),
     note(
-      "The domain they bought (or we bought for them, in their name). Type it before or after publishing: before, publishing connects it; after, it's connected right away and the site republishes. Blank = the free .pages.dev address. Then add the DNS record the lead page shows (Client site → Their own domain).",
+      "The domain they bought (or we bought for them, in their name). Type it before or after publishing: publishing (or saving, on a live site) connects it, and the site switches to it by itself once the domain works. Blank = the free .pages.dev address. Then add the DNS record the lead page shows (Client site → Their own domain).",
     ),
   ]);
 

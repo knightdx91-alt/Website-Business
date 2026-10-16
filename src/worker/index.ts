@@ -345,7 +345,7 @@ interface ActivityCols {
  * leads tab spin for seconds (Oct 2026). `has_pitch` stands in for pitch_json.
  */
 const LIST_COLS =
-  "id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, found_url, score, status, sales_status, look, lint_json, (pitch_json IS NOT NULL) AS has_pitch, follow_up, last_contact, contact, best_time, shown_at, lat, lng, custom_domain, preview_opens, preview_opened_at, mail_code, mail_opens, mail_opened_at, error, rewrite, pages_project, live_url, published_at, fetched_at, created_at, updated_at";
+  "id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, found_url, score, status, sales_status, look, lint_json, (pitch_json IS NOT NULL) AS has_pitch, follow_up, last_contact, contact, best_time, shown_at, lat, lng, custom_domain, domain_active, preview_opens, preview_opened_at, mail_code, mail_opens, mail_opened_at, error, rewrite, pages_project, live_url, published_at, fetched_at, created_at, updated_at";
 
 function summary(
   l: LeadRow & {
@@ -405,6 +405,8 @@ function summary(
     lat: l.lat,
     lng: l.lng,
     customDomain: l.custom_domain,
+    /** The custom domain works and is the site's address (else it is waiting on its DNS record). */
+    domainActive: !!l.domain_active,
     previewOpens: l.preview_opens ?? 0,
     previewOpenedAt: l.preview_opened_at,
     /** Flyer code written on a mailed / left-behind flyer (undergroundassociates.com/code), and how often it was used. */
@@ -579,16 +581,21 @@ async function domainStatus(env: Env, lead: LeadRow) {
  */
 async function setLeadDomain(env: Env, lead: LeadRow, domain: string | null, origin: string): Promise<Record<string, unknown>> {
   const prev = lead.custom_domain;
+  const changed = (prev ?? null) !== (domain ?? null);
   if (!lead.pages_project) {
-    await updateLead(env, lead.id, { custom_domain: domain });
+    await updateLead(env, lead.id, { custom_domain: domain, ...(changed ? { domain_active: 0 } : {}) });
     return await domainStatus(env, { ...lead, custom_domain: domain });
   }
   const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
-  if (prev && prev !== domain) await removeDomain(auth, lead.pages_project, prev);
-  if (domain) await addDomain(auth, lead.pages_project, domain);
-  await updateLead(env, lead.id, { custom_domain: domain });
+  if (prev && changed) await removeDomain(auth, lead.pages_project, prev);
+  const added = domain ? await addDomain(auth, lead.pages_project, domain) : null;
+  // The domain becomes the site's address only once Cloudflare says it works (a domain on our own Cloudflare can be at once);
+  // otherwise the minute cron's checkDomains switches it over later. The site keeps its .pages.dev address meanwhile.
+  const activeNow = !!domain && added?.status === "active";
+  const wasActive = !!prev && !!lead.domain_active;
+  await updateLead(env, lead.id, { custom_domain: domain, domain_active: activeNow || (!changed && wasActive) ? 1 : 0 });
   let republish: string | undefined;
-  if (prev !== domain && lead.sales_status === "live" && lead.live_url) {
+  if (changed && (activeNow || wasActive) && lead.sales_status === "live" && lead.live_url) {
     try {
       await publishLead(env, (await getLead(env, lead.id))!, origin);
       republish = "ok";
@@ -597,6 +604,34 @@ async function setLeadDomain(env: Env, lead: LeadRow, domain: string | null, ori
     }
   }
   return { ...(await domainStatus(env, { ...lead, custom_domain: domain })), ...(republish ? { republish } : {}) };
+}
+
+/**
+ * Minute cron (every fifth minute): client domains still waiting are checked with Cloudflare; once one works it becomes the
+ * site's address (domain_active = 1), the live site is republished through republishDirty, and the team is told.
+ */
+async function checkDomains(env: Env): Promise<number> {
+  if (new Date().getUTCMinutes() % 5 !== 0) return 0;
+  const rows = await env.DB.prepare(
+    "SELECT * FROM leads WHERE custom_domain IS NOT NULL AND pages_project IS NOT NULL AND COALESCE(domain_active, 0) = 0 AND status != 'expired' ORDER BY updated_at DESC LIMIT 10",
+  ).all<LeadRow>();
+  const auth = { accountId: env.CF_ACCOUNT_ID, token: env.CF_API_TOKEN };
+  let n = 0;
+  for (const lead of rows.results) {
+    try {
+      const d = await getDomain(auth, lead.pages_project!, lead.custom_domain!);
+      if (d?.status !== "active") continue;
+      await env.DB.prepare("UPDATE leads SET domain_active = 1, prices_dirty = CASE WHEN live_url IS NOT NULL THEN 1 ELSE prices_dirty END WHERE id = ?").bind(lead.id).run();
+      await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")
+        .bind(newId(), lead.id, "App", `🌐 ${lead.custom_domain} is working. The site uses it as its address now.`, now())
+        .run();
+      await notify(env, { kind: "published", leadId: lead.id, text: `🌐 ${lead.custom_domain} is live: ${lead.name ?? "The site"} now uses its own domain.` });
+      n++;
+    } catch (err) {
+      console.error("domain check", lead.id, (err as Error).message);
+    }
+  }
+  return n;
 }
 
 function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?: SoldDesign[] } = {}) {
@@ -2711,7 +2746,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         updateLead(env, id, { gbp_json: JSON.stringify(s) });
       const settings = await getSettings(env);
       const ai = () => new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-      const website = lead.custom_domain
+      const website = lead.custom_domain && lead.domain_active
         ? `https://${lead.custom_domain}`
         : (lead.live_url ?? undefined);
       if (m === "GET" && !sub)
@@ -2886,7 +2921,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if ((action === "/tents.pdf" || action === "/window.pdf") && m === "GET") {
       if (isManualPlaceId(lead.place_id))
         throw new HttpError(409, NOT_ON_GOOGLE);
-      const siteUrl = lead.custom_domain
+      const siteUrl = lead.custom_domain && lead.domain_active
         ? `https://${lead.custom_domain}/`
         : lead.live_url;
       if (!siteUrl)
@@ -2911,7 +2946,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       );
     }
     if (action === "/pricetags.pdf" && m === "GET") {
-      const siteUrl = lead.custom_domain
+      const siteUrl = lead.custom_domain && lead.domain_active
         ? `https://${lead.custom_domain}/`
         : lead.live_url;
       if (!siteUrl)
@@ -2956,7 +2991,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if ((action === "/tents" || action === "/window") && m === "GET") {
       if (isManualPlaceId(lead.place_id))
         throw new HttpError(409, NOT_ON_GOOGLE);
-      const siteUrl = lead.custom_domain
+      const siteUrl = lead.custom_domain && lead.domain_active
         ? `https://${lead.custom_domain}/`
         : lead.live_url;
       if (!siteUrl)
@@ -4412,6 +4447,8 @@ async function handleScheduled(
     await announceUpdate(env);
     // Once Google Analytics is connected, every live site is republished once to get its own property (analytics.ts).
     await queueGaBackfill(env).catch((e) => console.error("ga backfill", e));
+    // Client domains waiting on their DNS record: switch the site over once Cloudflare says it works.
+    await checkDomains(env).catch((e) => console.error("domain check", e));
     await republishDirty(env);
     await requeueStuck(env);
     await queueRelive(env);

@@ -1716,6 +1716,16 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `leads.custom_domain` (status "waiting to publish") and `publishLead` connects it (`addDomain` right after `ensureProject`, errors
   logged, never blocking); after publishing it's added to the Pages project at once and the live site republishes. `DOMAIN_NAME`
   strips https:// and paths. The lead page's Client site → Their own domain card still shows the CNAME to add.
+- 🌐 Domains switch over only once they work (Oct 2026, owner's question "doesn't it need to check we own it?"; Android 2.77;
+  migration 0025 `leads.domain_active`): adding a domain to a Pages project only registers it; it serves nothing until whoever
+  controls the domain adds the CNAME, which is the ownership check. `siteOrigin()` (publish.ts) and every link builder that used
+  `custom_domain` (QR tents / window sign / review card / flyer links in index.ts, the price feed's `siteUrl` in tankboard.ts) now
+  use the domain only when `domain_active = 1`; until then the site keeps its .pages.dev address (no canonical / sitemap / QR
+  pointing at a dead address). `setLeadDomain` sets it at once when Cloudflare already answers `active` (a domain on our own
+  Cloudflare) and republishes only then (or when an active domain is removed); `publishLead` does the same for a domain typed
+  before the first publish. The minute cron's `checkDomains` (every fifth minute, 10 waiting domains) asks Cloudflare, and on
+  `active` sets `domain_active = 1` + `prices_dirty = 1` (republishDirty republishes), adds a call-log note and notifies ("🌐 X is
+  live"). Domains already connected before 0025 were marked active by the migration. `detail().domainActive`. `test/worker/domain.test.ts`.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

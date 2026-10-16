@@ -27,8 +27,10 @@ test("the live feed hides sold-out and empty tanks, serves owner photos through 
   assert.deepEqual(feed.sections.map((s) => s.name), ["Freshwater"], "Saltwater's only item has qty 0, so the section is gone");
   assert.deepEqual(feed.sections[0]!.items.map((i) => i.name), ["Neon tetra"], "the sold-out Corydoras is hidden");
   assert.equal(feed.sections[0]!.items[0]!.image, `${ORIGIN}/l/lead1/photo/c1.jpg`);
-  const all = pricesFeed(lead({ custom_domain: "kingfish.example" }), shop(), ORIGIN, true);
+  const all = pricesFeed(lead({ custom_domain: "kingfish.example", domain_active: 1 }), shop(), ORIGIN, true);
   assert.equal(all.siteUrl, "https://kingfish.example/prices/");
+  // A domain still waiting on its DNS record isn't the address yet: links keep the .pages.dev one.
+  assert.equal(pricesFeed(lead({ custom_domain: "kingfish.example", domain_active: 0 }), shop(), ORIGIN, true).siteUrl, "https://shop.pages.dev/prices/");
   assert.equal(all.sections.length, 2);
   assert.equal(all.sections[0]!.items[1]!.soldOut, true);
   assert.equal(all.sections[1]!.items[0]!.qty, 0);

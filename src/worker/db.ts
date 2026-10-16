@@ -40,6 +40,8 @@ export interface LeadRow {
   lat: number | null;
   lng: number | null;
   custom_domain: string | null;
+  /** 1 once Cloudflare reports the custom domain working (migration 0025); only then is it the site's address. */
+  domain_active?: number | null;
   gbp_json: string | null;
   preview_opens: number;
   preview_opened_at: number | null;

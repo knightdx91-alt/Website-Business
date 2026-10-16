@@ -18,6 +18,18 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 46,
+    date: "2026-10-16",
+    android: "2.77",
+    title: "Domains switch over only once they work",
+    items: [
+      "Typing in a client's domain no longer changes the site's address right away. The site keeps its free .pages.dev address until Cloudflare says the domain works.",
+      "The app checks every 5 minutes. When the domain works, the site switches to it by itself, it's noted in the call log, and everyone gets an alert (\"🌐 … is live\").",
+      "QR codes, review cards and the price list links use the domain only once it works, so nothing ever points at an address that doesn't load.",
+      "Nothing can be published to a domain we don't control: it only works after someone with access to the domain adds the DNS record shown on the lead page.",
+    ],
+  },
+  {
     n: 45,
     date: "2026-10-16",
     title: "A place for their domain name",

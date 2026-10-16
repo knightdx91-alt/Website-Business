@@ -149,7 +149,7 @@ export function pricesFeed(
     },
     public: pl.public !== false,
     updatedAt: pl.lastUpdated,
-    siteUrl: lead.custom_domain
+    siteUrl: lead.custom_domain && lead.domain_active
       ? `https://${lead.custom_domain}/prices/`
       : lead.live_url
         ? `${lead.live_url.replace(/\/$/, "")}/prices/`

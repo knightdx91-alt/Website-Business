@@ -133,10 +133,10 @@ async function pickProjectName(
 
 /** The address the live site is built for: the client's own domain once attached, else the Pages subdomain. */
 export function siteOrigin(
-  lead: Pick<LeadRow, "custom_domain">,
+  lead: Pick<LeadRow, "custom_domain" | "domain_active">,
   pagesOrigin: string,
 ): string {
-  return lead.custom_domain ? `https://${lead.custom_domain}` : pagesOrigin;
+  return lead.custom_domain && lead.domain_active ? `https://${lead.custom_domain}` : pagesOrigin;
 }
 
 export async function publishLead(
@@ -156,7 +156,12 @@ export async function publishLead(
   // A domain typed in before the first publish (Edit → Their domain name) is connected now.
   if (lead.custom_domain) {
     try {
-      await addDomain(auth, project.name, lead.custom_domain);
+      const d = await addDomain(auth, project.name, lead.custom_domain);
+      // Working already (e.g. a domain on our own Cloudflare): use it as the address now; else the cron switches it over later.
+      if (d?.status === "active" && !lead.domain_active) {
+        await updateLead(env, lead.id, { domain_active: 1 });
+        lead = { ...lead, domain_active: 1 };
+      }
     } catch (err) {
       console.error("connecting the domain failed", lead.id, (err as Error).message);
     }
