@@ -58,6 +58,11 @@ import com.knightdx91.websitebusiness.ui.CostsScreen
 import com.knightdx91.websitebusiness.ui.GuideScreen
 import com.knightdx91.websitebusiness.ui.ShowBoardScreen
 import com.knightdx91.websitebusiness.ui.UpdateDialog
+import com.knightdx91.websitebusiness.ui.ChangelogScreen
+import com.knightdx91.websitebusiness.ui.WhatsNewDialog
+import com.knightdx91.websitebusiness.net.ChangeEntry
+import com.knightdx91.websitebusiness.net.changelog
+import com.knightdx91.websitebusiness.net.changelogSeen
 import com.knightdx91.websitebusiness.ui.PreviewScreen
 import com.knightdx91.websitebusiness.ui.LeadScreen
 import com.knightdx91.websitebusiness.ui.LoginScreen
@@ -135,6 +140,8 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
     val state = remember { AppState(Api(context)) }
     val nav = rememberNavController()
     val scope = rememberCoroutineScope()
+    // What's new: change-log entries this person hasn't seen yet (shown once after an update).
+    var whatsNew by remember { mutableStateOf<List<ChangeEntry>>(emptyList()) }
 
     LaunchedEffect(state.loggedIn) {
         if (state.loggedIn) {
@@ -142,6 +149,7 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
             coroutineScope {
                 launch { state.refreshMeta(); Push.configure(context, state.meta?.fcm) }
                 launch { state.update = Updater.newerBuild(state.api) }
+                launch { runCatching { state.api.changelog() }.getOrNull()?.let { c -> if (c.seen == null || c.seen < c.latest) whatsNew = c.unseen } }
             }
             if (startLead != null) nav.navigate("lead/$startLead")
             // While the app stays open, keep looking: a new build shows up within 15 minutes without closing the app.
@@ -166,6 +174,10 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
         }
     }
     state.update?.let { u -> UpdateDialog(state.api, u) { state.update = null } }
+    if (state.update == null && whatsNew.isNotEmpty() && state.loggedIn) WhatsNewDialog(whatsNew, onSeeAll = { nav.navigate("changelog") }) {
+        whatsNew = emptyList()
+        scope.launch { runCatching { state.api.changelogSeen() } }
+    }
     LifecycleResumeEffect(state.loggedIn) {
         if (state.loggedIn) {
             state.unread = state.unread // refreshed by screens on resume
@@ -193,6 +205,7 @@ fun AppRoot(startLead: String?, wantUpdate: MutableState<Boolean>) {
             composable("edit/{id}?card={card}", arguments = listOf(navArgument("card") { type = NavType.StringType; nullable = true; defaultValue = null })) { e -> EditScreen(state, nav, e.arguments?.getString("id") ?: "", e.arguments?.getString("card")) }
             composable("playbook") { PlaybookScreen(state, nav) }
             composable("training") { TrainingScreen(state, nav) }
+            composable("changelog") { ChangelogScreen(state, nav) }
             composable("commission") { com.knightdx91.websitebusiness.ui.CommissionScreen(state, nav) }
             composable("costs") { CostsScreen(state, nav) }
             composable("guide/{id}") { e -> GuideScreen(state, nav, e.arguments?.getString("id") ?: "tankboard") }

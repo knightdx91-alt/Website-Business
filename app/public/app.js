@@ -401,7 +401,7 @@
     if (stale(my)) return;
     if (!document.getElementById("leads")) {
       $app.innerHTML = `<div class="split"><div><div id="start">${startHtml()}</div><div id="pushask"></div><div id="today"></div><div id="tasks"></div><div id="runs"></div></div><div><section>
-        <div class="btns btns--full" style="margin-bottom:12px">${isOwner() ? `<a class="btn btn--primary" href="#/run">🔎 Find new leads</a>` : ""}<a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a><a class="btn" href="#/commission">💰 What I'd earn</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a></div>
+        <div class="btns btns--full" style="margin-bottom:12px">${isOwner() ? `<a class="btn btn--primary" href="#/run">🔎 Find new leads</a>` : ""}<a class="btn" href="#/add">➕ Add a business</a><a class="btn" href="#/route">🗺️ Walk-in route</a><a class="btn" href="#/walkin">🚶 In-person guide</a><a class="btn" href="#/playbook">💬 Plans & answers</a><a class="btn" href="#/plans">📋 Show plans</a><a class="btn" href="#/commission">💰 What I'd earn</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/changelog">📋 What's new</a></div>
         <div class="tabs" role="tablist">${SALES.map(([k, l]) => `<button type="button" data-sales="${k}" class="${filters.sales === k ? "is-on" : ""}">${l}</button>`).join("")}</div>
         <label class="field"><span class="sr-only">Category</span><select id="catfilter"><option value="">All categories</option>${meta.categories
           .map((c) => `<option value="${esc(c.id)}"${filters.category === c.id ? " selected" : ""}>${esc(c.label)}</option>`)
@@ -2296,6 +2296,57 @@ async function viewLead(id, intent) {
     run();
   }
 
+  // What's new: the team change log (src/worker/changelog.ts). A pop-up after each update; the full list at #/changelog.
+  const fmtChangeDate = (d) => new Date(d + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  function changeEntryHtml(e) {
+    return `<article class="change"><h3 style="margin:0 0 2px">${esc(e.title)}</h3>
+      <p class="small muted" style="margin:0 0 6px">${esc(fmtChangeDate(e.date))}${e.android ? ` · Android ${esc(e.android)}` : ""}</p>
+      <ul style="margin:0 0 4px;padding-left:20px">${e.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></article>`;
+  }
+  let whatsNewShown = false;
+  async function maybeWhatsNew() {
+    const w = meta && meta.whatsNew;
+    if (whatsNewShown || !w || (w.seen != null && w.seen >= w.latest)) return;
+    whatsNewShown = true;
+    let data;
+    try { data = await api("/changelog"); } catch (e) { return; }
+    if (!data.unseen || !data.unseen.length) return;
+    const box = document.createElement("div");
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-label", "What's new");
+    box.style.cssText = "position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px";
+    box.innerHTML = `<section class="card" style="max-width:560px;width:100%;max-height:85vh;overflow:auto;margin:0">
+      <h2 style="margin-top:0">📋 What's new</h2>
+      <p class="small muted">What changed in the app since you last looked.</p>
+      ${data.unseen.map(changeEntryHtml).join("<hr>")}
+      <div class="btns"><button class="btn btn--primary" type="button" data-wn-ok>Got it</button><a class="btn" href="#/changelog" data-wn-all>See everything</a></div></section>`;
+    const close = () => { box.remove(); api("/changelog/seen", { method: "POST" }).catch(() => {}); meta.whatsNew.seen = meta.whatsNew.latest; };
+    box.querySelector("[data-wn-ok]").addEventListener("click", close);
+    box.querySelector("[data-wn-all]").addEventListener("click", close);
+    box.addEventListener("click", (ev) => { if (ev.target === box) close(); });
+    document.body.appendChild(box);
+    box.querySelector("[data-wn-ok]").focus();
+  }
+
+  async function viewChangelog() {
+    setNav("settings");
+    const my = renderSeq;
+    $app.innerHTML = `<section class="card"><h2>📋 What's new</h2><p class="muted">Loading…</p></section>`;
+    let data;
+    try { data = await api("/changelog"); } catch (err) { if (stale(my)) return; $app.innerHTML = `<section class="card"><p class="bad">${esc(err.message || NO_CONNECTION)}</p></section>`; return; }
+    if (stale(my)) return;
+    $app.innerHTML = `<p><a href="#/settings">← Settings</a></p><h1>📋 What's new</h1>
+      <p class="muted">Every update to the app, newest first. After an update, the new ones pop up once.</p>
+      <input type="search" id="wnq" placeholder="Search the changes" style="width:100%;margin-bottom:12px">
+      <div id="wnl">${data.entries.map((e) => `<section class="card" data-wn="${esc((e.title + " " + e.items.join(" ")).toLowerCase())}">${changeEntryHtml(e)}</section>`).join("")}</div>`;
+    $app.querySelector("#wnq").addEventListener("input", (ev) => {
+      const q = ev.target.value.trim().toLowerCase();
+      $app.querySelectorAll("[data-wn]").forEach((c) => { c.hidden = !!q && !c.dataset.wn.includes(q); });
+    });
+    if (data.seen == null || data.seen < data.latest) { api("/changelog/seen", { method: "POST" }).catch(() => {}); if (meta && meta.whatsNew) meta.whatsNew.seen = data.latest; }
+  }
+
   async function viewTraining() {
     setNav("home");
     const my = renderSeq;
@@ -3758,7 +3809,7 @@ async function viewLead(id, intent) {
         <p class="small muted">${installPrompt ? "" : "Using the Android app? You're all set. In a browser: open the menu (⋮) and tap “Add to Home screen”."}</p></section>
       <section class="card"><h2>📖 Guides</h2>
         <p class="small muted">How to set up and sell what we offer, with the exact buttons to tap. Prices in the guides come from Settings.</p>
-        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/training">🎓 Training course</a><a class="btn" href="#/commission">💰 Commission calculator</a>${reportBtn()}</div></section>
+        <div class="btns btns--full"><a class="btn" href="#/guide/tankboard">📋 Live inventory: the board, price page & QR tags</a><a class="btn" href="#/guide/pricetags">🏷️ QR price tags (the extra)</a><a class="btn" href="#/guide/display">📺 Tablet display by the tank</a><a class="btn" href="#/guide/costs">💵 What keeps the app running</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/training">🎓 Training course</a><a class="btn" href="#/changelog">📋 What's new</a><a class="btn" href="#/commission">💰 Commission calculator</a>${reportBtn()}</div></section>
       <section class="card"><h2>📬 Flyer mail-out</h2>
         <p class="small muted">Print the flyer, then write each business's 5-digit code in the white box. They type it at undergroundassociates.com/code, see their own sample site, and every phone gets an alert. The mail list is the best open leads with a street address, each with its code (codes stay the same; a coded preview is kept 90 days).</p>
         <div class="btns btns--full"><a class="btn btn--primary" href="/flyers/mailer.pdf" target="_blank" rel="noopener">🖨️ Print the flyer (PDF)</a><a class="btn" href="/api/mailing.csv?limit=50">⬇ Mail list: next 50 (CSV)</a><a class="btn" href="/api/mailing.csv?limit=250&all=1">⬇ Every coded lead (CSV)</a></div></section>
@@ -4111,7 +4162,7 @@ async function viewLead(id, intent) {
     meta = await api("/meta");
     if (stale(my)) return;
     if (!isOwner()) {
-      $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}<section class="card"><h2>Help</h2><div class="btns btns--full"><a class="btn" href="#/commission">💰 What I'd earn</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a>${reportBtn()}</div><p class="small muted">Something didn't work? Report it and the owner sees the screen, the step and the error.</p></section></div>`;
+      $app.innerHTML = `<h1>Settings</h1><div class="grid grid--2">${deviceCard()}<section class="card"><h2>Help</h2><div class="btns btns--full"><a class="btn" href="#/commission">💰 What I'd earn</a><a class="btn" href="#/training">🎓 Training</a><a class="btn" href="#/guide/words">📖 What the words mean</a><a class="btn" href="#/changelog">📋 What's new</a>${reportBtn()}</div><p class="small muted">Something didn't work? Report it and the owner sees the screen, the step and the error.</p></section></div>`;
       return bindDevice();
     }
     const [{ last30Days: u }, { callers }] = await Promise.all([api("/usage"), api("/callers")]);
@@ -4761,6 +4812,7 @@ async function viewLead(id, intent) {
     try {
       if (h === "#/login") return await viewLogin();
       meta = meta || (await api("/meta"));
+      maybeWhatsNew();
       if (!isOwner() && (h === "#/inbox" || h === "#/sales" || h === "#/costs")) return go("#/");
       if ((m = /^#\/lead\/([a-z0-9]+)(?:\/(text|pay|checklist|publish|review|retry|log))?$/.exec(h))) return await viewLead(m[1], m[2]);
       if ((m = /^#\/edit\/([a-z0-9]+)(?:\/([a-z]+))?$/.exec(h))) return await viewEdit(m[1], m[2]);
@@ -4770,6 +4822,7 @@ async function viewLead(id, intent) {
       if (h === "#/playbook") return await viewPlaybook();
       if (h === "#/commission") return await viewCommission();
       if (h === "#/training") return await viewTraining();
+      if (h === "#/changelog") return await viewChangelog();
       if (h === "#/costs") return await viewCosts();
       if ((m = /^#\/guide\/([a-z0-9-]+)$/.exec(h))) return await viewGuide(m[1]);
       if ((m = /^#\/walkin(?:\/([a-z0-9]+))?$/.exec(h))) return await viewWalkin(m[1]);

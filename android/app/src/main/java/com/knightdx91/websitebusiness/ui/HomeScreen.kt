@@ -152,6 +152,7 @@ fun HomeScreen(state: AppState, nav: NavHostController) {
                     OutlinedButton(onClick = { nav.navigate("route") }) { Text("🗺️ Walk-in route") }
                     OutlinedButton(onClick = { nav.navigate("commission") }) { Text("💰 What I'd earn") }
                     OutlinedButton(onClick = { nav.navigate("training") }) { Text("🎓 Training") }
+                    OutlinedButton(onClick = { nav.navigate("changelog") }) { Text("📋 What's new") }
                     OutlinedButton(onClick = { nav.navigate("guide/words") }) { Text("📖 What the words mean") }
                 }
             }

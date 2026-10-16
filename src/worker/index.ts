@@ -1,3 +1,4 @@
+import { CHANGELOG, LATEST_CHANGE, changelogSeenKey, changesSince, unseenChanges } from "./changelog.ts";
 import { relocate } from "./relocate.ts";
 import { stockPhotosOf } from "../generator/scenes.ts";
 import { addEntry, chicagoDay, clockIn, clockOut, clockStatus, deleteEntry, editEntry, EntryInput, remindOpenShifts, setHourly, teamWeek, timesheetCsv } from "./clock.ts";
@@ -1220,6 +1221,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         /** Alert preference: all / mine / important. */
         alertMode: await getAlertMode(env, session.userId),
       },
+      /** What's new: the newest change-log entry and the last one this person saw (null = never). */
+      whatsNew: await (async () => {
+        const raw = await getSetting(env, changelogSeenKey(session.userId));
+        return { latest: LATEST_CHANGE, seen: raw == null ? null : Number(raw) };
+      })(),
       /** The Start-here card for new teammates: three lessons and the practice run; `show` false once done or dismissed. */
       start: {
         show: !startDismissed && startLessons.some((l) => !l.done),
@@ -1415,6 +1421,22 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     await env.DB.prepare("UPDATE problem_reports SET status = ?, done_at = ? WHERE id = ?")
       .bind(done ? "done" : "open", done ? now() : null, problemDone[1]!)
       .run();
+    return json({ ok: true });
+  }
+  // What's new: the team change log (changelog.ts). ?since=<android version> = what an update would bring.
+  if (path === "/changelog" && m === "GET") {
+    const since = url.searchParams.get("since");
+    const raw = await getSetting(env, changelogSeenKey(session.userId));
+    const seen = raw == null ? null : Number(raw);
+    return json({
+      latest: LATEST_CHANGE,
+      seen,
+      entries: since ? changesSince(since) : CHANGELOG,
+      unseen: unseenChanges(seen),
+    });
+  }
+  if (path === "/changelog/seen" && m === "POST") {
+    await setSetting(env, changelogSeenKey(session.userId), String(LATEST_CHANGE));
     return json({ ok: true });
   }
   // "Start here" on Home: hidden once dismissed or finished.

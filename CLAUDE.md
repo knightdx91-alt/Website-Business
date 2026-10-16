@@ -162,6 +162,17 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
       Turnstile switches on once the owner adds the site key (Settings → Website) and the TURNSTILE_SECRET_KEY secret (🛡️ below)
 - [ ] Next ideas: email/text alerts for inbox items, daycare / tattoo / photographer packs (need their own research first)
 
+## 📋 What's new (change log) — every update gets an entry
+
+Owner's rule (Oct 2026): the team sees what changed after every update. **Any change the team can see or use — web, Android,
+the sites we build, the company site — gets an entry at the TOP of `CHANGELOG` in `src/worker/changelog.ts` in the same
+commit**: `n` = previous top + 1, today's date, a short title and plain-language items (what changed, where to find it, what
+to do differently; mark owner-only things). An Android release puts its new versionName in `android` (the test
+`test/worker/changelog.test.ts` fails when build.gradle's versionName has no entry). Pure internal fixes nobody notices can
+skip it. Shown as a pop-up after each update (web `maybeWhatsNew`, Android `WhatsNewDialog` in AppRoot; seen per person in
+settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phone's Update available pop-up ("What's in it",
+`GET /api/changelog?since=<versionName>`), and in full at web `#/changelog` / Android route `changelog` (Home, Settings).
+
 ## Code map
 
 - `src/generator/`: pure TypeScript, runs in Node and Workers. `render.ts#buildSite`

@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import com.knightdx91.websitebusiness.BuildConfig
 import com.knightdx91.websitebusiness.net.Api
 import com.knightdx91.websitebusiness.update.Updater
+import com.knightdx91.websitebusiness.net.ChangeEntry
+import com.knightdx91.websitebusiness.net.changelog
+import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.launch
 
 /**
@@ -35,6 +38,9 @@ fun UpdateDialog(api: Api, update: Updater.Check, onDone: () -> Unit) {
     var progress by remember { mutableStateOf<Float?>(null) }
     var message by remember { mutableStateOf("") }
     val busy = progress != null
+    // What's in it: change-log entries from builds newer than this one.
+    var changes by remember { mutableStateOf<List<ChangeEntry>>(emptyList()) }
+    LaunchedEffect(update.versionName) { changes = runCatching { api.changelog(since = BuildConfig.VERSION_NAME).entries }.getOrDefault(emptyList()) }
     fun mb(b: Long) = "%.1f MB".format(b / 1_048_576.0)
 
     fun install() {
@@ -62,6 +68,10 @@ fun UpdateDialog(api: Api, update: Updater.Check, onDone: () -> Unit) {
         text = {
             Column {
                 Text("Version ${update.versionName} is ready. You have ${BuildConfig.VERSION_NAME}.")
+                if (changes.isNotEmpty()) {
+                    Text("What's in it:", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
+                    ChangeList(changes)
+                }
                 Text("Download takes about a minute, then Android asks you to install it. The app reopens where you left off.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                 progress?.let { p ->
                     if (p < 0f) LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
