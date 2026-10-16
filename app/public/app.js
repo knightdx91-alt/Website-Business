@@ -989,7 +989,7 @@ async function viewLead(id, intent) {
             ${work ? `<a class="btn" href="#/edit/${l.id}">Edit</a>` : ""}
             ${l.salesStatus !== "live" ? `<button class="btn" type="button" data-flyer="${l.id}">Leave-behind flyer (QR)</button>` : ""}
           </div>
-          ${l.salesStatus !== "live" ? `<div style="margin-top:10px">${shareButtonsHtml()}</div>` : ""}
+          ${l.salesStatus !== "live" ? `<div style="margin-top:10px">${shareButtonsHtml(l)}</div>` : ""}
           ${l.salesStatus !== "live" ? `<div class="flyercode" data-mailcode-box style="margin-top:12px">${mailCodeHtml(l)}</div>` : ""}
           ${l.previewOpens ? `<p class="small" style="margin-top:8px">👀 They opened their preview ${l.previewOpens === 1 ? "once" : `${l.previewOpens} times`}, last ${ago(l.previewOpenedAt)}.</p>` : ""}` : ""}
         ${l.liveUrl ? `<p style="margin-top:12px">Live at <a href="${esc(l.liveUrl)}" target="_blank" rel="noopener">${esc(l.liveUrl.replace("https://", ""))}</a></p>` : ""}
@@ -1259,7 +1259,7 @@ async function viewLead(id, intent) {
         draw(!!l.sampleStock);
       }
       if (!box || l.status !== "ready" || l.salesStatus === "live") return;
-      box.innerHTML = shareButtonsHtml();
+      box.innerHTML = shareButtonsHtml(l);
       bindShareButtons(l);
     }).catch(() => {});
     const fw = $app.querySelector("#fw");
@@ -1727,8 +1727,8 @@ async function viewLead(id, intent) {
   }
 
   /* ---------- call guide ---------- */
-  async function shareLink(id) {
-    const { url } = await api(`/leads/${id}/share`, { method: "POST" });
+  async function shareLink(id, lang) {
+    const { url } = await api(`/leads/${id}/share`, { method: "POST", json: lang ? { lang } : undefined });
     return url;
   }
 
@@ -1760,9 +1760,10 @@ async function viewLead(id, intent) {
       <p class="small muted" style="margin:4px 0 0">Write it in the white box on their flyer; they enter it at undergroundassociates.com/code and you get an alert. Log "Left a flyer" so their preview stays up 90 days.${l.mailOpens ? ` Used ${l.mailOpens === 1 ? "once" : `${l.mailOpens} times`}, last ${ago(l.mailOpenedAt)}.` : " Not used yet."}</p>`;
   }
 
-  function shareButtonsHtml() {
-    return `<div class="btns btns--full" data-share><button class="btn" type="button" data-share-sms>💬 Text preview link</button><button class="btn" type="button" data-share-copy>🔗 Copy message + link</button></div>
-      <p class="small muted">Only text the link after they say it's OK. It works for 14 days, no login needed.</p>
+  function shareButtonsHtml(l) {
+    const es = l && l.hasSpanish ? `<div class="btns btns--full"><button class="btn" type="button" data-share-es-sms>🇲🇽 Text Spanish link</button><button class="btn" type="button" data-share-es-copy>🔗 Copy Spanish message</button><button class="btn" type="button" data-share-es-open>Open Spanish version</button></div>` : "";
+    return `<div class="btns btns--full" data-share><button class="btn" type="button" data-share-sms>💬 Text preview link</button><button class="btn" type="button" data-share-copy>🔗 Copy message + link</button></div>${es}
+      <p class="small muted">Only text the link after they say it's OK. It works for 14 days, no login needed.${es ? " The Spanish link opens their site in Spanish." : ""}</p>
       <details class="more"><summary>Follow-up texts</summary><div class="btns btns--full">${FOLLOW_UPS.map((f, i) => `<button class="btn btn--small" type="button" data-follow="${i}">${esc(f.label)}</button>`).join("")}</div>
         <p class="small muted">Each one opens a text with a fresh preview link. Send it yourself; skip it if they asked you to stop.</p></details>`;
   }
@@ -1796,6 +1797,20 @@ async function viewLead(id, intent) {
         location.href = `sms:+1${digits}?body=${encodeURIComponent(FOLLOW_UPS[Number(b.dataset.follow)].text(greeting(), name, url))}`;
       } catch (err) { toast(err.message); } finally { b.disabled = false; }
     }));
+    // Spanish: the link opens /es/ and the text itself is in Spanish.
+    const smsBodyEs = (url) => `¡Hola! Aquí está la vista previa gratis del sitio web que hice para ${name}: ${url}`;
+    const esBtn = (sel, fn) => $app.querySelectorAll(sel).forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await fn(await shareLink(l.id, "es")); } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+    esBtn("[data-share-es-sms]", (url) => { logSent("Text Spanish link"); location.href = `sms:+1${digits}?body=${encodeURIComponent(smsBodyEs(url))}`; });
+    esBtn("[data-share-es-copy]", async (url) => {
+      logSent("Copy Spanish message");
+      const msg = smsBodyEs(url);
+      try { await navigator.clipboard.writeText(msg); toast("Spanish message with the link copied."); }
+      catch (e) { prompt("Copy this message:", msg); }
+    });
+    esBtn("[data-share-es-open]", (url) => { window.open(url, "_blank", "noopener"); });
     $app.querySelectorAll("[data-share-copy]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try {
@@ -1823,7 +1838,7 @@ async function viewLead(id, intent) {
       <div class="btns btns--full" style="margin-bottom:8px">
         <a class="btn btn--primary" href="${telHref(phoneDigits(l))}">📞 Call ${esc(r.phone.display)}</a>
       </div>
-      ${shareButtonsHtml()}
+      ${shareButtonsHtml(l)}
       <p><a class="btn btn--small" href="#/playbook">💬 Plans & answers</a> <a class="btn btn--small" href="#/walkin/${id}">🚶 Going in person?</a></p>
       ${isOwner() && (!s.companyName || !s.monthlyPrice) ? `<div class="card small">Add your company name, your name and your prices in <a href="#/settings">Settings</a> so the guide can use them.</div>` : ""}
       ${l.notes.length ? `<section class="card"><h2>Earlier calls</h2>${l.followUp ? `<p>${followChip(l.followUp)}</p>` : ""}${notesHtml(l, 3)}</section>` : ""}
@@ -3211,7 +3226,7 @@ async function viewLead(id, intent) {
           "Leave the flyer either way.",
           "Set a callback for 2 or 3 days out, then follow up.",
         ])}
-        ${l && l.salesStatus !== "live" ? shareButtonsHtml() : ""}`)}
+        ${l && l.salesStatus !== "live" ? shareButtonsHtml(l) : ""}`)}
 
       <section class="card"><h2>If they say…</h2>
         ${walkinObjections(priceShort, isChurch).map(([q, a]) => `<details class="obj"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}

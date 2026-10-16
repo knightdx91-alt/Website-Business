@@ -589,6 +589,8 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?:
     stockPhotos: record ? stockPhotosOf(record) : [],
     /** Typed in by hand: no Google Maps listing, so no Google import, review link or Google photos. */
     notOnGoogle: isManualPlaceId(l.place_id),
+    /** The site has a Spanish page at /es/ (share buttons offer a Spanish link). */
+    hasSpanish: !!copy?.es,
     existingSite: record?.existingSite
       ? {
           url: record.existingSite.url,
@@ -3752,8 +3754,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     if (action === "/share" && m === "POST") {
       if (lead.status !== "ready")
         throw new HttpError(409, "The preview isn't ready yet");
+      // {lang: "es"} links straight to the Spanish page (/es/), for owners who read Spanish first.
+      const body = (await req.json().catch(() => ({}))) as { lang?: string };
+      const es = body?.lang === "es";
+      if (es && !(lead.copy_json && (JSON.parse(lead.copy_json) as Copy).es))
+        throw new HttpError(409, "There's no Spanish page yet. Edit → Spanish page → Write Spanish page first.");
       const token = await shareToken(env, id);
-      return json({ url: `${url.origin}/s/${token}/`, expiresInDays: 14 });
+      return json({ url: `${url.origin}/s/${token}/${es ? "es/" : ""}`, expiresInDays: 14 });
     }
     if (action === "/pitch" && (m === "GET" || m === "POST")) {
       const settings = await getSettings(env);
@@ -3917,7 +3924,13 @@ async function serveShared(
     const reach = digits.length === 10
       ? ` <span style="white-space:nowrap">Like it? <a href="tel:+1${digits}" style="color:#fca311">Call</a> or <a href="sms:+1${digits}" style="color:#fca311">text</a> ${esc(settings.companyPhone!)}.</span>`
       : "";
-    const banner = `<div role="note" style="position:relative;z-index:60;background:#14213d;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 16px;text-align:center">Free preview made for ${name}${from}. Not live yet; photos and details will be checked with you first.${reach}</div>`;
+    const spanish = rest.startsWith("/es/") || rest === "/es";
+    const reachEs = digits.length === 10
+      ? ` <span style="white-space:nowrap">¿Le gusta? <a href="tel:+1${digits}" style="color:#fca311">Llame</a> o <a href="sms:+1${digits}" style="color:#fca311">envíe un texto</a> al ${esc(settings.companyPhone!)}.</span>`
+      : "";
+    const banner = spanish
+      ? `<div role="note" lang="es" style="position:relative;z-index:60;background:#14213d;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 16px;text-align:center">Vista previa gratis hecha para ${name}${settings.companyName ? ` por ${esc(settings.companyName)}` : ""}. Todavía no está publicada; revisaremos las fotos y los datos con usted primero.${reachEs}</div>`
+      : `<div role="note" style="position:relative;z-index:60;background:#14213d;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 16px;text-align:center">Free preview made for ${name}${from}. Not live yet; photos and details will be checked with you first.${reach}</div>`;
     // Link-preview bots (texts, Facebook) fetch the page but don't run scripts, so only a real visit after a moment counts.
     const beacon = `<script>setTimeout(function(){try{if(sessionStorage.getItem("wbo"))return;sessionStorage.setItem("wbo","1")}catch(e){}if(document.visibilityState!=="hidden"&&navigator.sendBeacon)navigator.sendBeacon("/s/${token}/opened")},3000)</script>`;
     text = text

@@ -67,6 +67,8 @@ data class LeadFull(
     val sampleStock: Boolean = false,
     /** Typed in by hand: no Google Maps listing, so no Google import or review cards. */
     val notOnGoogle: Boolean = false,
+    /** The site has a Spanish page (/es/): the share buttons offer a Spanish link. */
+    val hasSpanish: Boolean = false,
     /** Items on the live price list; >0 = the shop uses the inventory system, so the board card sits up top. */
     val priceListItems: Int = 0,
     /** Finish & publish: every blocker with the Edit card that fixes it (empty = Publish works). */
@@ -131,6 +133,7 @@ data class LeadFull(
                 boardName = j.optString("boardName").ifBlank { "Stock board" },
                 sampleStock = j.optBoolean("sampleStock"),
                 notOnGoogle = j.optBoolean("notOnGoogle"),
+                hasSpanish = j.optBoolean("hasSpanish"),
                 priceListItems = j.optInt("priceListItems", 0),
                 checklist = j.optJSONArray("checklist").objects().map { ChecklistItem(it.optString("text"), it.optString("card"), it.optString("kind")) },
                 existingSiteLine = j.optJSONObject("existingSite")?.let { x ->

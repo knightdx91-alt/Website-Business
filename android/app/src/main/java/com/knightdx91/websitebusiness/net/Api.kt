@@ -171,7 +171,7 @@ class Api(context: Context) {
 
     suspend fun setStatus(id: String, salesStatus: String) = post("/leads/$id/status", JSONObject().put("salesStatus", salesStatus))
 
-    suspend fun shareLink(id: String): String = post("/leads/$id/share").optString("url")
+    suspend fun shareLink(id: String, lang: String? = null): String = post("/leads/$id/share", lang?.let { JSONObject().put("lang", it) }).optString("url")
 
     suspend fun pitch(id: String, generate: Boolean): Pitch? {
         val j = if (generate) post("/leads/$id/pitch") else get("/leads/$id/pitch")

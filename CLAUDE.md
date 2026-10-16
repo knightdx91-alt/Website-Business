@@ -1665,6 +1665,10 @@ secrets (`wrangler secret put`); never into source or `wrangler.toml`.
   `FOCUS_OPTIONS` / `ZOOM_OPTIONS` mirror editform.ts, `stockCardHtml`, `data-eact="delhero"`, `EDIT_CARD_ID` "Stock photos": "stock".
   Android: EditScreen photo kind shows the photo (card `gallery[0]`) + Remove; gallery per-photo fields match any `_<key>` suffix;
   card kind `stock` shows thumbnails with their checkbox.
+- 🇲🇽 Spanish share link (Oct 2026, owner's ask for Reyes pizza; Android 2.74): `POST /api/leads/:id/share {lang:"es"}` returns
+  `/s/<token>/es/` (409 when `copy.es` is missing); `detail().hasSpanish`. The shared page's banner is in Spanish on `/es/` pages
+  (`serveShared`). Web `shareButtonsHtml(l)` adds "🇲🇽 Text Spanish link" / "Copy Spanish message" / "Open Spanish version" (message
+  in Spanish, logged as link_sent); Android LeadScreen has the same three, PreviewScreen "🇲🇽 Text Spanish link" + "Spanish in Chrome".
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

@@ -225,6 +225,21 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
         }
     }
 
+    // Spanish: the link opens their site's /es/ page and the message is in Spanish.
+    fun spanishText(url: String, name: String) = "¡Hola! Aquí está la vista previa gratis del sitio web que hice para $name: $url"
+
+    fun textSpanish(copy: Boolean) {
+        val l = d ?: return
+        act("share") {
+            val url = state.api.shareLink(id, "es")
+            logSent(if (copy) "Copy Spanish message" else "Text Spanish link")
+            if (copy) {
+                context.copyText("Spanish preview link", spanishText(url, l.name))
+                context.toast("Spanish message with the link copied.")
+            } else context.sms(l.lead.phone, spanishText(url, l.name))
+        }
+    }
+
     fun followUp(i: Int) {
         val l = d ?: return
         act("share") {
@@ -573,6 +588,11 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
                                     OutlinedButton(onClick = { textPreview() }, enabled = busy == null) { Text("💬 Text preview link") }
                                     OutlinedButton(onClick = { copyPreview() }, enabled = busy == null) { Text("🔗 Copy message + link") }
+                                    if (detail.hasSpanish) {
+                                        OutlinedButton(onClick = { textSpanish(false) }, enabled = busy == null) { Text("🇲🇽 Text Spanish link") }
+                                        OutlinedButton(onClick = { textSpanish(true) }, enabled = busy == null) { Text("🔗 Copy Spanish message") }
+                                        OutlinedButton(onClick = { act("share") { context.openUrl(state.api.shareLink(id, "es")) } }, enabled = busy == null) { Text("Open Spanish version") }
+                                    }
                                 }
                                 Text("Only text the link after they say it's OK. It works for 14 days, no login needed.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 4.dp))
                                 var moreTexts by remember { mutableStateOf(false) }

@@ -66,25 +66,26 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
     var mobileUa by remember { mutableStateOf("") }
     // Sample stock on the price list (owner): null until the lead is read, or when the site is live.
     var sample by remember { mutableStateOf<Boolean?>(null) }
+    var spanish by remember { mutableStateOf(false) }
     var sampleBusy by remember { mutableStateOf(false) }
     // Our to-do notes ("Add your hours", "Send photos") are hidden on every preview so the owner sees a finished site.
     var notes by remember { mutableStateOf(false) }
     LaunchedEffect(id) {
-        if (state.meta != null) runCatching { state.api.leadFull(id) }.getOrNull()?.let { d -> if (d.lead.salesStatus != "live") sample = d.sampleStock }
+        if (state.meta != null) runCatching { state.api.leadFull(id) }.getOrNull()?.let { d -> if (d.lead.salesStatus != "live") sample = d.sampleStock; spanish = d.hasSpanish }
     }
 
     BackHandler { if (webView?.canGoBack() == true) webView?.goBack() else nav.popBackStack() }
 
-    fun share(copy: Boolean) {
+    fun share(copy: Boolean, es: Boolean = false) {
         scope.launch {
             try {
-                val link = state.api.shareLink(id)
-                runCatching { state.api.logCall(id, "link_sent", if (copy) "Copied the preview link" else "Texted the preview link", null) }
+                val link = state.api.shareLink(id, if (es) "es" else null)
+                runCatching { state.api.logCall(id, "link_sent", (if (copy) "Copied the " else "Texted the ") + (if (es) "Spanish link" else "preview link"), null) }
                 val detail = runCatching { state.api.lead(id) }.getOrNull()
                 val name = detail?.lead?.name ?: "your business"
                 val me = state.meta?.let { m -> if (m.isOwner) m.callerName.ifBlank { m.meName } else m.meName } ?: ""
                 val co = state.meta?.companyName?.ifBlank { null }
-                val msg = "Hi, this is ${me.ifBlank { "me" }}${if (co != null) " with $co" else ""}. Here's the free website preview I made for $name: $link"
+                val msg = if (es) "¡Hola! Aquí está la vista previa gratis del sitio web que hice para $name: $link" else "Hi, this is ${me.ifBlank { "me" }}${if (co != null) " with $co" else ""}. Here's the free website preview I made for $name: $link"
                 if (copy) {
                     (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Preview link", msg))
                     context.toast("Message with the preview link copied")
@@ -105,6 +106,8 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
                 if (state.meta != null) FilterChip(selected = notes, onClick = { notes = !notes; webView?.loadUrl("$url?notes=${if (notes) 1 else 0}") }, label = { Text(if (notes) "📝 Hide notes" else "📝 Show notes") })
                 OutlinedButton(onClick = { share(false) }) { Text("💬 Text link") }
                 OutlinedButton(onClick = { share(true) }) { Text("🔗 Copy") }
+                if (spanish) OutlinedButton(onClick = { share(false, es = true) }) { Text("🇲🇽 Text Spanish link") }
+                if (spanish) OutlinedButton(onClick = { scope.launch { runCatching { state.api.shareLink(id, "es") }.onSuccess { context.openUrl(it) }.onFailure { context.toast("Couldn't make the link") } } }) { Text("Spanish in Chrome") }
                 if (state.meta != null) OutlinedButton(onClick = { nav.navigate("edit/$id") }) { Text("✏️ Edit") }
                 sample?.let { on ->
                     OutlinedButton(enabled = !sampleBusy, onClick = {
