@@ -1778,6 +1778,11 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   after launch → the owner's one-time setups (GA account + Admin API + service account; Cloudflare token DNS/Zone permissions).
   Domain extra price and the Pro plan name come from Settings. Buttons: web Settings guides (owner) + Help (callers), the lead
   page's Finish & publish card; Android Settings → More + the Finish & publish card. When a button it names is renamed, update it.
+- 📘 Printable training handbooks (Oct 2026, owner's ask): `npx tsx scripts/training-pdfs.ts` → `research/training/UA-Marketing-Training.pdf`
+  (9 pages: basics, who we sell to, message + never-say, brand rules with screen/print colors, flyer codes, offers + TCPA, cut-out
+  cards) and `UA-Caller-Training.pdf` (11 pages: basics, prep, phone script, walk-in script + timing, sign-up + payment, 19 objection
+  answers, logging + cadence, cut-out cards, sign-off line). Branded like the flyer (print navy / gold, UA badge, Montserrat /
+  Inter); prices and plan contents are typed in the script from live Settings, so rerun after a price change. Not served by the app.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
