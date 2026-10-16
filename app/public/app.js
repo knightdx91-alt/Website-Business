@@ -4606,6 +4606,11 @@ async function viewLead(id, intent) {
       <div class="btns"><button class="btn btn--primary" type="submit">${t.id ? "Save" : "Add task"}</button>${t.id ? `<button class="btn" type="button" data-cancel>Cancel</button>` : ""}</div>
     </form>`;
   }
+  // Dated tasks go to the Google Calendar of everyone they're for; say who has no email on file (Settings → Team).
+  const calNote = (t) => {
+    const miss = (t && t.noCalendar) || [];
+    return miss.length ? `. Not on ${miss.join(" & ")}'s calendar: add their email in Settings → Team` : "";
+  };
   const taskFormValues = (f) => ({
     title: f.title.value.trim(),
     // A time picked without a date means today (it used to be dropped silently).
@@ -4667,7 +4672,7 @@ async function viewLead(id, intent) {
         f.querySelector("[data-cancel]").addEventListener("click", load);
         f.addEventListener("submit", async (e) => {
           e.preventDefault();
-          try { await api(`/tasks/${t.id}`, { method: "PUT", json: taskFormValues(f) }); toast("Saved"); load(); } catch (err) { toast(err.message); }
+          try { const r = await api(`/tasks/${t.id}`, { method: "PUT", json: taskFormValues(f) }); toast("Saved" + calNote(r.task)); load(); } catch (err) { toast(err.message); }
         });
         f.title.focus();
       }));
@@ -4680,9 +4685,9 @@ async function viewLead(id, intent) {
       const btn = form.querySelector("button[type=submit]");
       btn.disabled = true;
       try {
-        await api("/tasks", { method: "POST", json: { ...v, leadId: state.leadId } });
+        const r = await api("/tasks", { method: "POST", json: { ...v, leadId: state.leadId } });
         form.reset();
-        toast("Task added");
+        toast("Task added" + calNote(r.task));
         if (state.scope !== "open") { state.scope = "open"; $app.querySelectorAll("[data-scope]").forEach((x) => x.classList.toggle("is-on", x.dataset.scope === "open")); }
         load();
       } catch (err) { toast(err.message); } finally { btn.disabled = false; }

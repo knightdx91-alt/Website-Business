@@ -307,7 +307,12 @@ data class Task(
     val createdByName: String?,
     val doneAt: Long?,
     val createdBy: String? = null,
+    /** People it's for whose Google Calendar can't get it (no email on file in Settings → Team). */
+    val noCalendar: List<String> = emptyList(),
 ) {
+    /** ". Not on Chris's calendar: …" for the Added / Saved toast, or "". */
+    fun calNote(): String = if (noCalendar.isEmpty()) "" else ". Not on ${noCalendar.joinToString(" & ")}'s calendar: add their email in Settings → Team"
+
     companion object {
         fun from(j: JSONObject) = Task(
             id = j.optString("id"),
@@ -324,6 +329,7 @@ data class Task(
             createdByName = j.str("createdByName"),
             doneAt = if (j.isNull("doneAt")) null else j.optLong("doneAt"),
             createdBy = j.str("createdBy"),
+            noCalendar = j.optJSONArray("noCalendar")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() } } ?: emptyList(),
         )
     }
 }

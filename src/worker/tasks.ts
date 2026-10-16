@@ -7,8 +7,10 @@ import { notify } from "./notify.ts";
 
 /**
  * Tasks: a shared to-do list for the team (Tasks screen), each optionally tied to a lead and assigned to someone.
- * Calendar: tasks for the owner that have a date are mirrored to the owner's Google Calendar as ordinary email invites
- * (iCalendar METHOD:REQUEST to Settings → calendar email; an update bumps SEQUENCE, finishing or deleting sends CANCEL).
+ * Calendar: a task with a date is mirrored to the Google Calendar of everyone it's for as ordinary email invites
+ * (iCalendar METHOD:REQUEST; the owner at Settings → calendar email, team members at their Settings → Team email; a task
+ * for anyone goes to the owner). An update bumps SEQUENCE, finishing or deleting sends CANCEL, someone taken off gets a
+ * CANCEL and someone added gets the invite (`tasks.cal_to` = who holds it now).
  * That needs no Google login from the app: Google Calendar treats them like any meeting invite.
  */
 
@@ -30,6 +32,7 @@ export interface TaskRow {
   done_by_name: string | null;
   cal_uid: string | null;
   cal_seq: number;
+  cal_to?: string | null;
 }
 
 export interface Task {
@@ -54,6 +57,8 @@ export interface Task {
   doneAt: number | null;
   doneByName: string | null;
   onCalendar: boolean;
+  /** Names of the people it's for whose calendar can't get it (no email on file). */
+  noCalendar?: string[];
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -265,7 +270,7 @@ export async function createTask(
     text: `📝 ${session.name} added a task for ${forWhom}: ${task.title}${task.due ? ` (${when(task.due, task.dueTime)})` : ""}`,
   });
   await syncCalendar(env, row);
-  return task;
+  return withNoCalendar(env, task, row, names);
 }
 
 export async function updateTask(
@@ -328,7 +333,7 @@ export async function updateTask(
     });
   }
   await syncCalendar(env, row, before);
-  return task;
+  return withNoCalendar(env, task, row, names);
 }
 
 export async function deleteTask(
@@ -344,43 +349,106 @@ export async function deleteTask(
       "Only the owner or whoever added it can delete a task",
     );
   await env.DB.prepare("DELETE FROM tasks WHERE id = ?").bind(id).run();
-  if (row.cal_uid) await sendInvite(env, row, "CANCEL", row.cal_seq + 1);
+  if (row.cal_uid) {
+    const s = await getSettings(env);
+    for (const to of heldBy(row, s)) await sendInvite(env, row, "CANCEL", row.cal_seq + 1, to).catch(() => false);
+  }
 }
 
 /* ---------- calendar invites ---------- */
 
-/** Tasks that belong on the owner's calendar: for the owner (or anyone), dated, not done. */
-function wantsCalendar(r: TaskRow): boolean {
-  const who = assigneeIds(r.assignee);
-  return !!r.due && !r.done_at && (!who.length || who.includes("owner"));
+/** Adds the names of the people it's for whose calendar can't get it (no email on file), so the app can say so. */
+async function withNoCalendar(env: Env, task: Task, row: TaskRow, names: Names): Promise<Task> {
+  if (!row.due || row.done_at || !assigneeIds(row.assignee).length) return task;
+  try {
+    const { missing } = await calendarRecipients(env, row.assignee, await getSettings(env), names);
+    return missing.length ? { ...task, noCalendar: missing } : task;
+  } catch {
+    return task;
+  }
 }
 
-/** Sends an invite, an update or a cancellation as the task changes. Never throws. */
+type CalSettings = { calendarEmail?: string | null; directEmail?: string | null };
+const ownerCal = (s: CalSettings) => (s.calendarEmail || s.directEmail || "").trim().toLowerCase();
+const splitTo = (v: string | null | undefined) => (v ? v.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean) : []);
+
+/** Who holds the invite now (older rows: the owner's calendar, the only one invited before). */
+function heldBy(r: TaskRow, s: CalSettings): string[] {
+  if (r.cal_to != null) return splitTo(r.cal_to);
+  const o = ownerCal(s);
+  return r.cal_uid && o ? [o] : [];
+}
+
+/** Calendar addresses of everyone a task is for (anyone = the owner), plus the names that have no email on file. */
+export async function calendarRecipients(
+  env: Env,
+  assignee: string | null,
+  s: CalSettings,
+  names?: Names,
+): Promise<{ emails: string[]; missing: string[] }> {
+  const ids = assigneeIds(assignee);
+  const who = ids.length ? ids : ["owner"];
+  const emails: string[] = [];
+  const missing: string[] = [];
+  const userIds = who.filter((id) => id !== "owner");
+  const users = userIds.length
+    ? (
+        await env.DB.prepare(`SELECT id, name, email, disabled FROM users WHERE id IN (${userIds.map(() => "?").join(",")})`)
+          .bind(...userIds)
+          .all<{ id: string; name: string; email: string | null; disabled: number }>()
+      ).results
+    : [];
+  for (const id of who) {
+    if (id === "owner") {
+      const o = ownerCal(s);
+      if (o) emails.push(o);
+      else if (ids.length) missing.push(names?.get("owner") ?? "Owner");
+      continue;
+    }
+    const u = users.find((x) => x.id === id);
+    if (!u || u.disabled) continue;
+    const e = (u.email ?? "").trim().toLowerCase();
+    if (e) emails.push(e);
+    else missing.push(u.name);
+  }
+  return { emails: [...new Set(emails)], missing };
+}
+
+/** What to send: the invite to new people (and to everyone when the task changed), a cancel to people taken off. */
+export function calendarPlan(held: string[], want: string[], changed: boolean): { request: string[]; cancel: string[] } {
+  return {
+    request: want.filter((e) => changed || !held.includes(e)),
+    cancel: held.filter((e) => !want.includes(e)),
+  };
+}
+
+/** Sends invites, updates and cancellations as the task changes. Never throws. */
 export async function syncCalendar(
   env: Env,
   row: TaskRow,
   before?: TaskRow | null,
 ): Promise<void> {
   try {
-    const want = wantsCalendar(row);
-    if (want) {
-      const changed =
-        !before ||
-        before.title !== row.title ||
-        before.notes !== row.notes ||
-        before.due !== row.due ||
-        before.due_time !== row.due_time ||
-        !row.cal_uid;
-      if (changed || (before && !wantsCalendar(before)))
-        await sendInvite(
-          env,
-          row,
-          "REQUEST",
-          row.cal_uid ? row.cal_seq + 1 : 0,
-        );
-    } else if (row.cal_uid && before && wantsCalendar(before)) {
-      await sendInvite(env, row, "CANCEL", row.cal_seq + 1);
-    }
+    const s = await getSettings(env);
+    const held = heldBy(row, s);
+    const want = row.due && !row.done_at ? (await calendarRecipients(env, row.assignee, s)).emails : [];
+    const changed =
+      !before ||
+      before.title !== row.title ||
+      before.notes !== row.notes ||
+      before.due !== row.due ||
+      before.due_time !== row.due_time ||
+      !row.cal_uid;
+    const plan = calendarPlan(held, want, changed);
+    if (!plan.request.length && !plan.cancel.length) return;
+    if (!s.companyEmail) return;
+    const seq = row.cal_uid ? row.cal_seq + 1 : 0;
+    const now = new Set(held);
+    for (const to of plan.cancel) if (await sendInvite(env, row, "CANCEL", seq, to)) now.delete(to);
+    for (const to of plan.request) if (await sendInvite(env, row, "REQUEST", seq, to)) now.add(to);
+    await env.DB.prepare("UPDATE tasks SET cal_uid = ?, cal_seq = ?, cal_to = ? WHERE id = ?")
+      .bind(row.cal_uid ?? `task-${row.id}@undergroundassociates.com`, seq, [...now].join(",") || null, row.id)
+      .run();
   } catch (err) {
     console.error("calendar sync failed", err);
   }
@@ -391,10 +459,10 @@ async function sendInvite(
   row: TaskRow,
   method: "REQUEST" | "CANCEL",
   seq: number,
-): Promise<void> {
+  to: string,
+): Promise<boolean> {
   const s = await getSettings(env);
-  const to = s.calendarEmail || s.directEmail;
-  if (!to || !s.companyEmail) return;
+  if (!to || !s.companyEmail) return false;
   const uid = row.cal_uid ?? `task-${row.id}@undergroundassociates.com`;
   const lead = row.lead_id
     ? await env.DB.prepare("SELECT name FROM leads WHERE id = ?")
@@ -429,7 +497,7 @@ async function sendInvite(
         : `Task: ${row.title}${row.due ? ` (${when(row.due, row.due_time)})` : ""}`,
     text:
       method === "CANCEL"
-        ? `"${row.title}" is finished or removed, so it's off your calendar.`
+        ? `"${row.title}" is finished, removed or handed to someone else, so it's off your calendar.`
         : `${row.title}${row.notes ? `\n\n${row.notes}` : ""}${lead?.name ? `\n\nAbout: ${lead.name}` : ""}\n\nFrom the Website Business app. Accept the invite to keep it on your calendar.`,
     attachments: [
       {
@@ -439,12 +507,7 @@ async function sendInvite(
       },
     ],
   });
-  if (r.ok)
-    await env.DB.prepare(
-      "UPDATE tasks SET cal_uid = ?, cal_seq = ? WHERE id = ?",
-    )
-      .bind(uid, seq, row.id)
-      .run();
+  return r.ok;
 }
 
 /** Cullman wall-clock date + time → UTC instant (handles daylight saving by checking the zone's own offset). */

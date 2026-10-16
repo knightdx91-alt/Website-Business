@@ -81,10 +81,10 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
             try {
                 // A time without a date means today.
                 val day = due ?: if (dueTime != null) dayFromNow(0) else null
-                state.api.addTask(title.trim(), notes.trim(), day, if (day != null) dueTime else null, assignees.toList(), leadId)
+                val added = state.api.addTask(title.trim(), notes.trim(), day, if (day != null) dueTime else null, assignees.toList(), leadId)
                 title = ""; notes = ""; due = null; dueTime = null; assignees = emptySet()
                 load()
-                context.toast("Added")
+                context.toast("Added" + added.calNote())
             } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't add") } finally { busy = false }
         }
     }
@@ -140,7 +140,7 @@ fun TasksScreen(state: AppState, nav: NavHostController, leadId: String?) {
             onDismiss = { editing = null },
             onSave = { change ->
                 scope.launch {
-                    try { state.api.updateTask(t.id, change); editing = null; context.toast("Saved"); load() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't save") }
+                    try { val saved = state.api.updateTask(t.id, change).optJSONObject("task")?.let { Task.from(it) }; editing = null; context.toast("Saved" + (saved?.calNote() ?: "")); load() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { context.toast(e.message ?: "Couldn't save") }
                 }
             },
             onDelete = {

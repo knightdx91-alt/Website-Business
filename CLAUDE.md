@@ -1709,6 +1709,13 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `prices_dirty` once the setup is complete, so `republishDirty` gives each its property. Owner setup: analytics.google.com → Admin →
   Create account → Account ID into Settings; Google Cloud (the service account's project) → enable "Google Analytics Admin API"; GA
   Admin → Account access management → add the service account email as Administrator.
+- 📅 Tasks on everyone's calendar (Oct 2026, owner's ask; Android 2.80; migration 0026 `tasks.cal_to`): a dated, open task's invite
+  goes to every assignee: the owner at Settings → Calendar email (else direct email), team members at `users.email` (Settings →
+  Team; disabled people skipped); "anyone" = the owner only. `calendarRecipients()` + `calendarPlan(held, want, changed)` in tasks.ts:
+  a change re-sends REQUEST to everyone, someone taken off gets CANCEL, someone added gets REQUEST, done / undated / deleted =
+  CANCEL to all; `cal_to` = who holds it now (NULL on older rows = the owner's address). One email per person (attendee = them,
+  same UID). Create / update return `noCalendar` (names with no email) → the "Task added" / "Saved" toast says to add their email
+  (web `calNote`, Android `Task.calNote()`). `test/worker/tasks.test.ts`.
 - 🌐 Their domain name in Edit (Oct 2026, owner's ask "a place to put their purchased domain name"): Edit card "Their domain name"
   (web section + `EDIT_CARD_ID` `domain`; editform card `domain`, field `customDomain`, so Android's Edit has it with no app build).
   `setLeadDomain(env, lead, domain|null, origin)` + `domainStatus()` in index.ts (shared by `/domain` GET/PUT/DELETE, the web Edit save,

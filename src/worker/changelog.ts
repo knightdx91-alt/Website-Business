@@ -18,6 +18,18 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 49,
+    date: "2026-10-16",
+    android: "2.80",
+    title: "Tasks go on everyone's Google Calendar",
+    items: [
+      "A task with a date now shows up on the Google Calendar of every person it's for, not just the owner's. It arrives as a calendar invite by email: accept it once and it stays on your calendar.",
+      "Changing the task updates it on everyone's calendar. Finishing or deleting it takes it off. Taking someone off the task takes it off their calendar, and adding someone sends it to them.",
+      "A task for \"anyone\" still goes to the owner's calendar.",
+      "It goes to the email in Settings → Team. If someone has no email there, the app tells you when you save the task. Owner: add each person's work email so their calendar gets tasks.",
+    ],
+  },
+  {
     n: 48,
     date: "2026-10-16",
     android: "2.79",

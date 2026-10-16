@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { chicagoToUtc, taskIcs } from "../../src/worker/tasks.ts";
+import { calendarPlan, calendarRecipients, chicagoToUtc, taskIcs } from "../../src/worker/tasks.ts";
 
 test("Cullman times become the right UTC instant in and out of daylight saving", () => {
   assert.equal(chicagoToUtc("2026-10-14", "14:30").toISOString(), "2026-10-14T19:30:00.000Z"); // CDT, UTC-5
@@ -47,4 +47,31 @@ test("a task can be for several people (comma-joined in the assignee column)", a
   assert.deepEqual(assigneeIds("u1"), ["u1"]);
   assert.deepEqual(assigneeIds(null), []);
   assert.deepEqual(assigneeIds(""), []);
+});
+
+test("task invites go to everyone it's for; taken off = cancel, added = invite, changed = update all", async () => {
+  const users = [
+    { id: "u1", name: "Chris", email: "Chris@UndergroundAssociates.com", disabled: 0 },
+    { id: "u2", name: "Brenda", email: null, disabled: 0 },
+    { id: "u3", name: "Gone", email: "gone@x.com", disabled: 1 },
+  ];
+  const env = {
+    DB: {
+      prepare: () => ({
+        bind: (...ids: string[]) => ({ all: async () => ({ results: users.filter((u) => ids.includes(u.id)) }) }),
+      }),
+    },
+  } as never;
+  const s = { calendarEmail: "post@undergroundassociates.com" };
+  assert.deepEqual(await calendarRecipients(env, null, s), { emails: ["post@undergroundassociates.com"], missing: [] }, "anyone = owner");
+  assert.deepEqual(await calendarRecipients(env, "owner,u1,u2,u3", s), {
+    emails: ["post@undergroundassociates.com", "chris@undergroundassociates.com"],
+    missing: ["Brenda"],
+  });
+  assert.deepEqual(await calendarRecipients(env, "owner", {}), { emails: [], missing: ["Owner"] });
+
+  assert.deepEqual(calendarPlan([], ["a", "b"], true), { request: ["a", "b"], cancel: [] });
+  assert.deepEqual(calendarPlan(["a", "b"], ["b", "c"], false), { request: ["c"], cancel: ["a"] });
+  assert.deepEqual(calendarPlan(["a", "b"], ["a", "b"], true), { request: ["a", "b"], cancel: [] });
+  assert.deepEqual(calendarPlan(["a"], [], false), { request: [], cancel: ["a"] }, "done or undated = cancel");
 });
