@@ -23,7 +23,8 @@ export const CHANGELOG: ChangeEntry[] = [
     title: "Tasks now go straight onto your Google Calendar",
     items: [
       "A task with a date goes straight onto the calendar of everyone it's for, the moment it's saved. Nothing to accept.",
-      "You also get a short email, \"📅 On your calendar: …\", so your phone lets you know it's there. You get another if the date or time changes. The person who adds the task doesn't get one.",
+      "You also get a short email, \"📅 On your calendar: …\", and a phone notification from the app. You get both again if the date or time changes, or when you're added to a task later. The person who makes the change doesn't get them.",
+      "Task notifications reach you even if your alerts are set to \"My leads\" or \"Important only\".",
       "Timed tasks remind you 30 minutes before. Finishing or deleting a task takes it off everyone's calendar.",
     ],
   },

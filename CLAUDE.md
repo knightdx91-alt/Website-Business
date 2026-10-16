@@ -1728,6 +1728,10 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   sound in Google Calendar, so `sendNotice()` emails "📅 On your calendar: <task> (<when>)" to each person newly written (and
   "Moved" when date / time change), never to the person who saved it (`syncCalendar(…, by)` from create / update; the cron passes
   none). `upgradeCalendars()` (minute cron, every third minute, 5 tasks) moves emailed / missing invites into calendars.
+  Phone notification too (owner's rule "email and a phone notification"; migration 0027 `events.for_ids`): `notify({forIds})`
+  marks who an alert is for; `prefFilter` always lets those through whatever the alert mode and `pushAll` pushes to them past
+  `wantsPush`. Tasks set it on create (assignees minus the creator) and on update for people newly added ("put X on a task")
+  or when the day / time moves ("📅 moved a task to …").
 - 🌐 Their domain name in Edit (Oct 2026, owner's ask "a place to put their purchased domain name"): Edit card "Their domain name"
   (web section + `EDIT_CARD_ID` `domain`; editform card `domain`, field `customDomain`, so Android's Edit has it with no app build).
   `setLeadDomain(env, lead, domain|null, origin)` + `domainStatus()` in index.ts (shared by `/domain` GET/PUT/DELETE, the web Edit save,

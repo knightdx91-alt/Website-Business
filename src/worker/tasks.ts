@@ -269,6 +269,8 @@ export async function createTask(
     actor: session,
     leadId: task.leadId,
     text: `📝 ${session.name} added a task for ${forWhom}: ${task.title}${task.due ? ` (${when(task.due, task.dueTime)})` : ""}`,
+    // Everyone it's for gets the phone notification even if their alerts are set to "my leads" or "important only".
+    forIds: task.assignees.filter((id) => id !== session.userId),
   });
   await syncCalendar(env, row, null, session);
   return withNoCalendar(env, task, row, names);
@@ -325,6 +327,30 @@ export async function updateTask(
     .run();
   const row = (await getTask(env, id))!;
   const task = toTask(row, names);
+  // Someone newly put on the task, or the day / time moved: tell the people it's for.
+  if (!row.done_at) {
+    const was = assigneeIds(before.assignee);
+    const added = task.assignees.filter((id) => !was.includes(id) && id !== session.userId);
+    const moved = before.due !== row.due || before.due_time !== row.due_time;
+    const movedFor = moved ? task.assignees.filter((id) => was.includes(id) && id !== session.userId) : [];
+    const whenText = row.due ? ` (${when(row.due, row.due_time)})` : "";
+    if (added.length)
+      await notify(env, {
+        kind: "task",
+        actor: session,
+        leadId: task.leadId,
+        text: `📝 ${session.name} put ${added.map((id) => names.get(id) ?? "someone").join(" & ")} on a task: ${task.title}${whenText}`,
+        forIds: added,
+      });
+    if (movedFor.length)
+      await notify(env, {
+        kind: "task",
+        actor: session,
+        leadId: task.leadId,
+        text: `📅 ${session.name} moved a task${row.due ? ` to ${when(row.due, row.due_time)}` : " (no date now)"}: ${task.title}`,
+        forIds: movedFor,
+      });
+  }
   if (patch.done === true && !before.done_at) {
     await notify(env, {
       kind: "task",

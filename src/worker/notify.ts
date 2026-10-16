@@ -57,6 +57,8 @@ export interface EventInput {
   /** Who did it; null for customers (sign-ups, website forms). */
   actor?: Pick<Session, "userId" | "name"> | null;
   actorName?: string;
+  /** People this is for (task assignees): they always see it and get the phone notification, whatever their alert mode. */
+  forIds?: string[];
 }
 
 interface EventRow {
@@ -73,7 +75,7 @@ interface EventRow {
 export async function notify(env: Env, e: EventInput): Promise<void> {
   try {
     await env.DB.prepare(
-      "INSERT INTO events (id, created_at, actor_id, actor_name, kind, lead_id, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO events (id, created_at, actor_id, actor_name, kind, lead_id, text, for_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
       .bind(
         newId(),
@@ -83,9 +85,10 @@ export async function notify(env: Env, e: EventInput): Promise<void> {
         e.kind,
         e.leadId ?? null,
         e.text.slice(0, 500),
+        e.forIds?.length ? e.forIds.join(",") : null,
       )
       .run();
-    await pushAll(env, e.actor?.userId ?? null, e.kind, e.leadId ?? null);
+    await pushAll(env, e.actor?.userId ?? null, e.kind, e.leadId ?? null, e.forIds ?? []);
     // Android phones: an instant "something's new" ping; each phone fetches its own filtered list.
     await fcmSend(env, { kind: "alerts" });
   } catch (err) {
@@ -142,7 +145,12 @@ async function userName(env: Env, userId: string): Promise<string> {
 async function prefFilter(env: Env, userId: string): Promise<{ sql: string; binds: unknown[] }> {
   const mode = await getAlertMode(env, userId);
   if (mode === "all") return { sql: "", binds: [] };
-  return modeFilter(mode, mode === "mine" ? await userName(env, userId) : "");
+  const f = modeFilter(mode, mode === "mine" ? await userName(env, userId) : "");
+  // Anything addressed to this person (a task for them) shows whatever the mode.
+  return {
+    sql: `AND (instr(',' || coalesce(e.for_ids, '') || ',', ?) > 0 OR (1 ${f.sql}))`,
+    binds: [`,${userId},`, ...f.binds],
+  };
 }
 
 export async function listEvents(
@@ -396,11 +404,13 @@ async function pushAll(
   exceptUserId: string | null,
   kind: EventKind,
   leadId: string | null,
+  forIds: string[] = [],
 ): Promise<void> {
   if (!env.VAPID_PRIVATE_JWK) return;
-  let who = (await recipients(env, kind)).filter((id) => id !== exceptUserId);
-  if (!who.length) return;
-  who = await wantsPush(env, who, kind, leadId);
+  const all = (await recipients(env, kind)).filter((id) => id !== exceptUserId);
+  if (!all.length) return;
+  const wanted = await wantsPush(env, all.filter((id) => !forIds.includes(id)), kind, leadId);
+  let who = [...wanted, ...all.filter((id) => forIds.includes(id))];
   if (!who.length) return;
   const subs = await env.DB.prepare(
     `SELECT endpoint FROM push_subs WHERE user_id IN (${who.map(() => "?").join(",")})`,
