@@ -241,7 +241,7 @@ import { extraTerms } from "./contract.ts";
 import { appContent } from "./content.ts";
 import { plansOptions } from "./plan-options.ts";
 import { mailReady, maskEmail, sendEmailDetailed } from "./mail.ts";
-import { createTask, deleteTask, listTasks, updateTask } from "./tasks.ts";
+import { createTask, deleteTask, listTasks, updateTask, upgradeCalendars } from "./tasks.ts";
 import { translateToSpanish } from "../copy/spanish.ts";
 import {
   chooseLook,
@@ -4493,6 +4493,8 @@ async function handleScheduled(
     await queueGaBackfill(env).catch((e) => console.error("ga backfill", e));
     // Client domains waiting on their DNS record: switch the site over once Cloudflare says it works.
     await checkDomains(env).catch((e) => console.error("domain check", e));
+    // Tasks still on someone's calendar as an emailed invite move straight into it once Google allows it (gcal.ts).
+    if (new Date().getUTCMinutes() % 3 === 0) await upgradeCalendars(env).catch((e) => console.error("calendar upgrade", e));
     await republishDirty(env);
     await requeueStuck(env);
     await queueRelive(env);

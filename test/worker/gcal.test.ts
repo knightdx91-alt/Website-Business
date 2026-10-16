@@ -24,11 +24,11 @@ test("Calendar event bodies: timed with a 30-minute reminder, all-day as free ti
 test("only company addresses are reached directly; the JWT acts as that person", async () => {
   assert.ok(onDomain("Chris@UndergroundAssociates.com", "undergroundassociates.com"));
   assert.ok(!onDomain("chris@gmail.com", "undergroundassociates.com"));
-  const { privateKey } = await crypto.subtle.generateKey(
+  const { privateKey } = (await crypto.subtle.generateKey(
     { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
     true,
     ["sign", "verify"],
-  );
+  )) as CryptoKeyPair;
   const der = Buffer.from(await crypto.subtle.exportKey("pkcs8", privateKey)).toString("base64");
   const sa = { client_email: "sa@p.iam.gserviceaccount.com", project_id: "p", private_key: `-----BEGIN PRIVATE KEY-----\n${der}\n-----END PRIVATE KEY-----` };
   const jwt = await fcmJwt(sa, 1000, "https://www.googleapis.com/auth/calendar.events", "chris@undergroundassociates.com");

@@ -662,3 +662,31 @@ export function taskIcs(o: {
   ];
   return lines.map(fold).join("\r\n") + "\r\n";
 }
+
+/**
+ * Minute cron (every third minute): open dated tasks whose people hold an emailed invite (or none yet) get another try at
+ * going straight into their calendars, so finishing the Google setup needs no task edits. Five tasks a run.
+ */
+export async function upgradeCalendars(env: Env): Promise<number> {
+  const { gaServiceAccount } = await import("./analytics.ts");
+  if (!gaServiceAccount(env)) return 0;
+  const s = await getSettings(env);
+  const domain = (s.googleDomain || "undergroundassociates.com").toLowerCase();
+  const today = new Date(Date.now() - 6 * 3600_000).toISOString().slice(0, 10);
+  const rows = await env.DB.prepare(
+    `${SELECT} WHERE t.done_at IS NULL AND t.due IS NOT NULL AND t.due >= ? ORDER BY t.due LIMIT 50`,
+  )
+    .bind(today)
+    .all<TaskRow & { lead_name: string | null }>();
+  let n = 0;
+  for (const row of rows.results) {
+    if (n >= 5) break;
+    const held = heldBy(row, s);
+    const want = (await calendarRecipients(env, row.assignee, s)).emails.filter((e) => onDomain(e, domain));
+    if (!want.some((e) => !held.includes(`g:${e}`))) continue;
+    n++;
+    // Same row as "before": nothing changed, so only people not yet in their calendar are written.
+    await syncCalendar(env, row, row);
+  }
+  return n;
+}
