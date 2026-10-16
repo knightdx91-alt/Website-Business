@@ -13,6 +13,7 @@ import { financeVariant } from "../generator/packs/finance.ts";
 import { pickDesign } from "../generator/design.ts";
 import type { DnaHints } from "../generator/dna.ts";
 import { buildSite } from "../generator/render.ts";
+import { syncSpanish } from "./spanish-sync.ts";
 import type { BusinessRecord, CategoryId, Copy, DesignNotes } from "../generator/types.ts";
 import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { groupById, MARKET } from "../places/queries.ts";
@@ -440,15 +441,19 @@ export async function renderPreview(
   const place = lead.place_json
     ? (JSON.parse(lead.place_json) as Place)
     : undefined;
-  const out = await buildSite({
-    record,
-    copy,
-    site: { slug: lead.id, look },
-    mode: "preview",
-    basePath: `/p/${lead.id}`,
-    reviewTexts: place ? reviewTexts(place) : [],
-    liveData: `/l/${lead.id}/prices.json`,
-  });
+  const build = () =>
+    buildSite({
+      record,
+      copy,
+      site: { slug: lead.id, look },
+      mode: "preview",
+      basePath: `/p/${lead.id}`,
+      reviewTexts: place ? reviewTexts(place) : [],
+      liveData: `/l/${lead.id}/prices.json`,
+    });
+  let out = await build();
+  // Sites with a Spanish page: any line without Spanish yet (new section, edited text, menu change) is translated, then built again.
+  if (await syncSpanish(env, record, copy, out.files)) out = await build();
   await Promise.all(
     [...out.files].map(([path, content]) =>
       env.BUCKET.put(`previews/${lead.id}/${path}`, content, {

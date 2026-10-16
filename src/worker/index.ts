@@ -3537,7 +3537,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           { record, copy, model: settings.copyModel },
         );
         await chargeAi(env, settings.copyModel, usage);
-        copy.es = es;
+        // strings: {} = translate every line of every page afresh (renderPreview → syncSpanish fills it).
+        copy.es = { ...es, strings: {} };
       }
       await renderPreview(env, lead, record, copy, lead.look ?? "");
       await siteUpdated(env, session, lead, [

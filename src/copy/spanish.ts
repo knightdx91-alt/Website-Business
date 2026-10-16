@@ -81,3 +81,62 @@ export async function translateToSpanish(
     usage,
   };
 }
+
+const StringsSchema = z.object({
+  items: z.array(z.object({ i: z.number().int(), es: z.string() })).describe("One entry per English line, same i"),
+});
+
+/** Strings per request: big menus go in several calls so no answer runs out of room. */
+const BATCH = 120;
+
+/**
+ * Full-site Spanish: translates every visible line of the built site (headings, menu items, reviews, FAQ, buttons, footer…)
+ * into Spanish. Returns English → Spanish; lines the model skipped are left out (they stay English until the next try).
+ */
+export async function translateStrings(
+  client: Anthropic,
+  input: { record: BusinessRecord; lines: string[]; model?: string },
+): Promise<{ strings: Record<string, string>; usage: { input: number; output: number } }> {
+  const r = input.record;
+  const system = `You translate the text of a small local business website in ${r.address.city}, ${r.address.state} into natural, friendly Spanish for local Spanish-speaking customers (Mexican and Central American Spanish, "usted" form). You get numbered lines; each is one piece of text from the page (a heading, a button, a menu item, a sentence, sometimes a fragment of a sentence that continues around a link).
+- Translate meaning, not word for word. Keep each line about as short as the English; buttons and menu labels stay short.
+- Keep the business name (${r.name}), people's names, street and town names, brand names, prices, phone numbers, times and dish or product names that are names (like "Margherita", "Supreme") exactly as written; translate plain descriptions ("Cheese pizza" → "Pizza de queso").
+- Keep the punctuation and capitalization style of each line, and a fragment stays a fragment.
+- Never add facts, prices, promises or claims that aren't in the English.
+- Return one entry per line with the same i.${
+    r.category === "finance"
+      ? `\n- This is a tax, accounting, insurance or financial office. Never use "notario" or "notario público" (say "servicio de notaría" for notary), never mention immigration or legal services, and never add refund, rate, savings or credential claims.`
+      : ""
+  }`;
+  const strings: Record<string, string> = {};
+  const usage = { input: 0, output: 0 };
+  const batches: string[][] = [];
+  for (let start = 0; start < input.lines.length; start += BATCH) batches.push(input.lines.slice(start, start + BATCH));
+  // A few at a time, so a long menu doesn't take minutes.
+  for (let g = 0; g < batches.length; g += 4) {
+    await Promise.all(
+      batches.slice(g, g + 4).map(async (lines) => {
+        const { data, usage: u } = await ask(
+          client,
+          input.model ?? "claude-sonnet-5-5",
+          system,
+          `<lines>\n${JSON.stringify(lines.map((en, i) => ({ i, en })), null, 1)}\n</lines>\n\nTranslate every line into Spanish.`,
+          StringsSchema,
+          Math.min(16000, 400 + lines.reduce((n, l) => n + Math.ceil(l.length / 2) + 20, 0)),
+        );
+        usage.input += u.input;
+        usage.output += u.output;
+        for (const it of data.items) {
+          const en = lines[it.i];
+          const es = it.es.trim();
+          if (en && es) strings[en] = es;
+        }
+      }),
+    );
+  }
+  if (r.category === "finance") {
+    const bad = /\bnotario|inmigraci|abogad|reembolso (m[aá]ximo|garantizado|r[aá]pido)|garantiza|m[aá]s barat/i;
+    for (const [en, es] of Object.entries(strings)) if (bad.test(es)) delete strings[en];
+  }
+  return { strings, usage };
+}

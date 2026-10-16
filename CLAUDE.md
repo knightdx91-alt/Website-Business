@@ -1680,6 +1680,17 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `/s/<token>/es/` (409 when `copy.es` is missing); `detail().hasSpanish`. The shared page's banner is in Spanish on `/es/` pages
   (`serveShared`). Web `shareButtonsHtml(l)` adds "🇲🇽 Text Spanish link" / "Copy Spanish message" / "Open Spanish version" (message
   in Spanish, logged as link_sent); Android LeadScreen has the same three, PreviewScreen "🇲🇽 Text Spanish link" + "Spanish in Chrome".
+- 🇪🇸 Full-site Spanish (Oct 2026, owner's report on Reyes pizza: the /es/ page was a summary without the menu, reviews, FAQ or
+  photo): `copy.es.strings` (English line → Spanish) makes `buildSite` copy EVERY page under /es/ (`spanishDoc` in
+  `src/generator/translate.ts`: text nodes + alt/title/aria-label/placeholder/data-cap + meta description swapped, lang="es", links
+  between site pages kept in /es/, the Español link becomes "English" back to the same page, canonical/og:url → /es/). Lines come
+  from the built English pages (`textsOf` / `siteTexts`; to-do notes, scripts, phones, times, prices skipped) and are translated by
+  `translateStrings` (src/copy/spanish.ts, Sonnet 5.5, batches of 120, 4 at a time). `syncSpanish` (src/worker/spanish-sync.ts) runs
+  in `renderPreview` and `buildForPublish`: any line without Spanish yet is translated and the site built again, so edits, new
+  sections and menu changes never leave English behind (old lines are pruned once 300+ pile up). "Write Spanish page" resets
+  `strings` to {} (fresh translation). The page script says its own lines in Spanish on lang="es" pages (`L()` in client-script.ts:
+  open now, today's hours, next service, photo buttons). Without `strings` the old summary page (`spanishPage`) still renders.
+  `test/translate.test.ts` builds every example with a fake map and checks each /es/ page has the same sections and no English left.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

@@ -11,6 +11,7 @@ import { packFor } from "./packs/index.ts";
 import type { CategoryPack, PageSpec } from "./packs/types.ts";
 import { businessNode, faqNode, graph, originFor, webPageNode, websiteNode } from "./schema.ts";
 import { spanishNav, spanishPage } from "./spanish.ts";
+import { spanishDoc } from "./translate.ts";
 import { resolveTheme } from "./themes.ts";
 import { scenesFor, scenesUsed } from "./scenes.ts";
 import type { BuildMode, BusinessRecord, Copy, Site } from "./types.ts";
@@ -193,7 +194,8 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   });
   pages.push({ path: "/", html: home });
 
-  const spanish = spanishPage(ctx);
+  const esStrings = ctx.copy.es?.strings && Object.keys(ctx.copy.es.strings).length ? ctx.copy.es.strings : null;
+  const spanish = esStrings ? null : spanishPage(ctx);
   if (spanish) {
     pages.push({
       path: "/es/",
@@ -244,7 +246,11 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     jsonLd: graph(webPageNode(ctx, "/404.html", "Page not found")),
   });
 
-  for (const p of pages) files.set(p.path === "/" ? "index.html" : `${p.path.replace(/^\//, "")}index.html`, p.html);
+  // Full-site Spanish: every page again under /es/, text swapped from copy.es.strings (not linted: it's the same page).
+  const esPages = esStrings
+    ? pages.map((p) => ({ path: `/es${p.path}`, noindex: p.noindex, html: spanishDoc(p.html, { path: p.path, pagePaths: pages.map((x) => x.path), origin: originFor(ctx), map: esStrings }) }))
+    : [];
+  for (const p of [...pages, ...esPages]) files.set(p.path === "/" ? "index.html" : `${p.path.replace(/^\//, "")}index.html`, p.html);
   files.set("404.html", notFound);
 
   if (input.loadScene) {
@@ -267,8 +273,8 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     files.set("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`);
     files.set(
       "sitemap.xml",
-      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pages
-        .filter((p) => p.path !== "/thanks/" && !p.noindex)
+      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[...pages, ...esPages]
+        .filter((p) => !p.path.endsWith("/thanks/") && !p.noindex)
         .map((p) => `<url><loc>${origin}${p.path}</loc></url>`)
         .join("\n")}\n</urlset>\n`,
     );

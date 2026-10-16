@@ -59,6 +59,20 @@ function nowIn(tz) {
 export const CLIENT_SCRIPT = `(function () {
 "use strict";
 var d = document, root = d.documentElement;
+/* Spanish pages (/es/, html lang="es"): the few lines this script writes itself (open now, today's hours, next service,
+   photo buttons) are said in Spanish too. Everything else on the page was translated when it was built. */
+var ES = root.lang === "es";
+var ES_DAYS = { Sun: "dom", Mon: "lun", Tue: "mar", Wed: "mié", Thu: "jue", Fri: "vie", Sat: "sáb", Sunday: "domingo", Monday: "lunes", Tuesday: "martes", Wednesday: "miércoles", Thursday: "jueves", Friday: "viernes", Saturday: "sábado" };
+function L(s) {
+  if (!ES || !s) return s;
+  return s
+    .replace(/Open 24 hours/, "Abierto las 24 horas").replace(/Open all day today/, "Abierto todo el día hoy").replace(/Open all day/, "Abierto todo el día")
+    .replace(/Open now · closes /, "Abierto ahora · cierra ").replace(/Closed · opens tomorrow /, "Cerrado · abre mañana ").replace(/Closed · opens /, "Cerrado · abre el ")
+    .replace(/Closed today/, "Cerrado hoy").replace(/^Closed$/, "Cerrado").replace(/^Today /, "Hoy ").replace(/^Next: /, "Próximo: ")
+    .replace(/\\b(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sun|Mon|Tue|Wed|Thu|Fri|Sat)\\b/g, function (m) { return ES_DAYS[m]; })
+    .replace(/ AM\\b/g, " a. m.").replace(/ PM\\b/g, " p. m.").replace(/\\bnoon\\b/g, "mediodía").replace(/\\bmidnight\\b/g, "medianoche")
+    .replace(/^Photo (\\d+) of (\\d+)$/, "Foto $1 de $2").replace(/^Photo$/, "Foto").replace(/^Close$/, "Cerrar").replace(/^Previous photo$/, "Foto anterior").replace(/^Next photo$/, "Foto siguiente");
+}
 /* Previews: the team's to-do notes ("Add your hours", "Send photos") stay hidden, so the owner sees a finished-looking site.
    ?notes=1 (the app's "Show notes" switch) turns them on for this tab; ?notes=0 turns them off again. A section left with
    nothing but its heading once its notes are hidden is hidden too. Published sites carry no notes at all. */
@@ -125,12 +139,12 @@ if (hd) {
     var data = JSON.parse(hd.textContent), now = nowIn(data.tz), st = openStatus(data.hours, now);
     var els = d.querySelectorAll("[data-open-status]");
     for (var i = 0; i < els.length; i++) {
-      els[i].textContent = st.text;
+      els[i].textContent = L(st.text);
       els[i].classList.add(st.open ? "is-open" : "is-closed");
       els[i].hidden = false;
     }
     var th = d.querySelectorAll("[data-today-hours]");
-    for (var t = 0; t < th.length; t++) th[t].textContent = todayText(data.hours, now);
+    for (var t = 0; t < th.length; t++) th[t].textContent = L(todayText(data.hours, now));
     var rows = d.querySelectorAll("[data-day='" + now.day + "']");
     for (var j = 0; j < rows.length; j++) rows[j].classList.add("is-today");
   } catch (err) {}
@@ -186,7 +200,7 @@ if (ns) {
     }
     if (best) {
       var mm = best.row.m, hh = Math.floor(mm / 60), mi = mm % 60, pad = mi < 10 ? "0" + mi : "" + mi;
-      ns.textContent = "Next: " + ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][best.row.d] + " " + fmtTime((hh < 10 ? "0" + hh : hh) + ":" + pad);
+      ns.textContent = L("Next: " + ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][best.row.d] + " " + fmtTime((hh < 10 ? "0" + hh : hh) + ":" + pad));
       ns.hidden = false;
     }
   } catch (err) {}
@@ -268,7 +282,7 @@ for (var ci = 0; ci < cs.length; ci++) (function (c) {
   dots.className = "carousel__dots";
   for (var di = 0; di < items.length; di++) (function (i) {
     var bt = d.createElement("button");
-    bt.type = "button"; bt.setAttribute("aria-label", "Photo " + (i + 1) + " of " + items.length);
+    bt.type = "button"; bt.setAttribute("aria-label", L("Photo " + (i + 1) + " of " + items.length));
     bt.addEventListener("click", function () { tr.scrollTo({ left: items[i].offsetLeft - tr.offsetLeft, behavior: "smooth" }); });
     dots.appendChild(bt);
   })(di);
@@ -289,8 +303,8 @@ var zs = d.querySelectorAll("[data-zoom]");
 if (zs.length) {
   var lb = d.createElement("div");
   lb.className = "lightbox"; lb.hidden = true;
-  lb.setAttribute("role", "dialog"); lb.setAttribute("aria-modal", "true"); lb.setAttribute("aria-label", "Photo");
-  lb.innerHTML = '<button type="button" class="lightbox__close" aria-label="Close">×</button><button type="button" class="lightbox__nav lightbox__nav--prev" aria-label="Previous photo">‹</button><figure><img alt=""><figcaption></figcaption></figure><button type="button" class="lightbox__nav lightbox__nav--next" aria-label="Next photo">›</button>';
+  lb.setAttribute("role", "dialog"); lb.setAttribute("aria-modal", "true"); lb.setAttribute("aria-label", L("Photo"));
+  lb.innerHTML = '<button type="button" class="lightbox__close" aria-label="' + L("Close") + '">×</button><button type="button" class="lightbox__nav lightbox__nav--prev" aria-label="' + L("Previous photo") + '">‹</button><figure><img alt=""><figcaption></figcaption></figure><button type="button" class="lightbox__nav lightbox__nav--next" aria-label="' + L("Next photo") + '">›</button>';
   d.body.appendChild(lb);
   if (zs.length < 2) { var nv = lb.querySelectorAll(".lightbox__nav"); for (var ni = 0; ni < nv.length; ni++) nv[ni].hidden = true; }
   var lbImg = lb.querySelector("img"), lbCap = lb.querySelector("figcaption"), lbCur = 0, lbBack = null, lbX = null;

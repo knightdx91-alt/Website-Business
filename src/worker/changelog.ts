@@ -18,6 +18,17 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 43,
+    date: "2026-10-16",
+    title: "Spanish sites translate the whole site",
+    items: [
+      "The Spanish version used to be a short summary page that left out the menu, reviews, FAQ and photos. Now every page and every section is translated: the menu, price list, reviews, FAQ, hours, buttons and footer.",
+      "Links on a Spanish page stay in Spanish (the Menú link opens the Spanish menu), and the English link goes back to the same page in English.",
+      "When the site changes (new menu items, edits, new sections), the new lines are translated automatically on the next save.",
+      "Sites that already had a Spanish page were redone this way.",
+    ],
+  },
+  {
     n: 42,
     date: "2026-10-16",
     android: "2.75",

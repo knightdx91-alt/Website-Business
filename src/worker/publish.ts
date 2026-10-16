@@ -1,3 +1,4 @@
+import { syncSpanish } from "./spanish-sync.ts";
 import { zipSync } from "fflate";
 import { lockDesign } from "./exclusive.ts";
 import { slugify } from "../generator/html.ts";
@@ -55,7 +56,7 @@ async function buildForPublish(
 ) {
   const { record, copy } = parse(lead);
   try {
-    const out = await buildSite({
+    const build = async () => buildSite({
       record,
       copy,
       site: {
@@ -84,6 +85,12 @@ async function buildForPublish(
         changeUrl: `${COMPANY_ORIGIN}/change?b=${lead.id}`,
       },
     });
+    let out = await build();
+    // Lines only a live site has (the footer credit) get their Spanish too; the copy is saved so previews keep it.
+    if (await syncSpanish(env, record, copy, out.files)) {
+      out = await build();
+      await env.DB.prepare("UPDATE leads SET copy_json = ? WHERE id = ?").bind(JSON.stringify(copy), lead.id).run();
+    }
     for (const [k, v] of await ownerFiles(env, lead.id)) out.files.set(k, v);
     return out;
   } catch (err) {
