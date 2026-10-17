@@ -18,6 +18,17 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 60,
+    date: "2026-10-17",
+    android: "2.83",
+    title: "Slide the photo and the words into place",
+    items: [
+      "Preview → “↕ Adjust the top photo”: three sliders (Words position, Photo position, Shade on the photo). The preview moves while you drag, so you can line the words up with the photo exactly. Tap Save to keep it, Undo to go back, As designed to start over.",
+      "The same three sliders are in Edit → Photo. They replace the Higher / Lower / Much lower steps; anything you set with the steps carries over.",
+      "Phone app: update to 2.83 for the sliders.",
+    ],
+  },
+  {
     n: 59,
     date: "2026-10-17",
     title: "Move the words and the photo separately",

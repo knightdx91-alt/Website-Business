@@ -1834,3 +1834,12 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `HERO_SHIFT_OPTIONS`, `HERO_SHADE_OPTIONS` in editform.ts + app.js), `<html data-hmove / data-hshift / data-hshade>`, rules in css.ts
   (`html[data-…] .hero.hero--photo …`, specific enough to beat dna-css). Moving the words alone grows the opening and the photo with
   it, hence the separate photo shift. Only applies to openings with the photo behind the words (`.hero--photo`).
+- 🎚️ Fine photo / words positions (Oct 2026, owner's ask: the three steps weren't fine enough; Android 2.83): `record.heroAdjust`
+  {move px −60…400, shift % −40…80, shade % 10…100} (`src/generator/hero-adjust.ts`: `HERO_ADJUST_RANGE`, `heroAdjustOf()` reads the
+  older `heroMove / heroShift / heroShade` steps as numbers, `heroAdjustAttrs()` → `<html data-hadj [data-hshift="down"]
+  [data-hshade="1"] style="--hmove;--hshift;--hshade">`). css.ts: words = first child's margin-top (down) / `translate` on
+  `.hero__in` (up), photo = `translate` on the img (the zoom-on-phones `transform` stays separate), mask on a photo moved down,
+  scrim opacity + heroBg glow. Saving sliders clears the old steps. Editors: editform field type **range** (min / max / step /
+  unit; Android `FieldView` → Slider), web `heroAdjustFields` / `heroAdjustValues` (only moved sliders are sent). Live: web Preview
+  "↕ Adjust the top photo" (`bindAdjust` sets the variables on the iframe's `<html>` while dragging, Save = `PUT /edits
+  {record:{heroAdjust}}`), Android `PreviewScreen` panel (`evaluateJavascript`, re-applied on page load). `detail().heroAdjust`.

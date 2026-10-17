@@ -1285,7 +1285,8 @@ async function viewLead(id, intent) {
     $app.innerHTML = `<p><a href="#/lead/${id}">← Details</a></p>
       <div class="row" style="margin-bottom:10px"><div class="tabs" style="margin:0">
         <button type="button" data-mode="phone">Phone view</button><button type="button" data-mode="desktop">Desktop view</button></div>
-        <a class="btn btn--small" href="#/full/${id}" style="flex:none">Full screen</a><button class="btn btn--small btn--line" type="button" id="notesbtn" style="flex:none" title="Our to-do notes (missing hours, photos…). The business owner never sees them.">📝 Show notes</button><span id="previewsample" style="flex:none"></span></div>
+        <a class="btn btn--small" href="#/full/${id}" style="flex:none">Full screen</a><button class="btn btn--small btn--line" type="button" id="notesbtn" style="flex:none" title="Our to-do notes (missing hours, photos…). The business owner never sees them.">📝 Show notes</button><span id="previewsample" style="flex:none"></span><span id="adjbtnbox" style="flex:none"></span></div>
+      <div id="adjpanel" class="card" hidden style="margin-bottom:10px"></div>
       <div class="frame-wrap" id="fw"><iframe id="pf" title="Site preview" src="/p/${id}/"></iframe></div>
       <div id="previewshare" style="margin-top:12px"></div>`;
     const my = renderSeq;
@@ -1317,10 +1318,58 @@ async function viewLead(id, intent) {
         };
         draw(!!l.sampleStock);
       }
+      if (l.heroAdjust && l.status === "ready") bindAdjust(l.heroAdjust);
       if (!box || l.status !== "ready" || l.salesStatus === "live") return;
       box.innerHTML = shareButtonsHtml(l);
       bindShareButtons(l);
     }).catch(() => {});
+    // ↕ Adjust the top photo: sliders that move the words / photo / tint in the frame as you drag, then Save.
+    function bindAdjust(start) {
+      const btnBox = document.getElementById("adjbtnbox");
+      const panel = document.getElementById("adjpanel");
+      if (!btnBox || !panel) return;
+      btnBox.innerHTML = `<button class="btn btn--small btn--line" type="button">↕ Adjust the top photo</button>`;
+      let saved = { ...start };
+      const draw = (a) => {
+        panel.innerHTML = `<p class="small muted" style="margin-top:0">Drag and watch the preview. Words and photo move separately; Shade lightens the tint over the photo.</p>${heroAdjustFields(a, "pv_")}
+          <div class="btns"><button class="btn btn--small btn--good" type="button" data-adj="save">Save</button><button class="btn btn--small btn--line" type="button" data-adj="reset">Back to how it was</button><button class="btn btn--small btn--line" type="button" data-adj="design">As designed</button></div>`;
+      };
+      const read = () => ({ move: Number(panel.querySelector('[name="pv_move"]').value), shift: Number(panel.querySelector('[name="pv_shift"]').value), shade: Number(panel.querySelector('[name="pv_shade"]').value) });
+      const apply = (a) => {
+        const d = frame.contentDocument;
+        if (!d || !d.documentElement) return;
+        const h = d.documentElement;
+        h.setAttribute("data-hadj", "");
+        h.style.setProperty("--hmove", a.move + "px");
+        h.style.setProperty("--hshift", a.shift + "%");
+        h.style.setProperty("--hshade", String(a.shade / 100));
+        if (a.shift > 0) h.setAttribute("data-hshift", "down"); else h.removeAttribute("data-hshift");
+        if (a.shade < 100) h.setAttribute("data-hshade", "1"); else h.removeAttribute("data-hshade");
+      };
+      btnBox.firstChild.addEventListener("click", () => {
+        panel.hidden = !panel.hidden;
+        if (!panel.hidden) { draw(saved); try { frame.contentWindow.scrollTo(0, 0); } catch (e) { /* not loaded yet */ } }
+      });
+      panel.addEventListener("input", () => apply(read()));
+      panel.addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-adj]");
+        if (!b) return;
+        if (b.dataset.adj === "reset" || b.dataset.adj === "design") {
+          const a = b.dataset.adj === "reset" ? saved : { move: 0, shift: 0, shade: 100 };
+          draw(a); apply(a); return;
+        }
+        b.disabled = true; b.textContent = "Saving…";
+        try {
+          const a = read();
+          await api(`/leads/${id}/edits`, { method: "PUT", json: { record: { heroAdjust: a } } });
+          saved = a;
+          toast("Saved. The preview is rebuilding with this position.");
+        } catch (err) { toast(err.message); }
+        b.disabled = false; b.textContent = "Save";
+      });
+      // A reload of the frame (notes on/off, sample items) keeps what's on the sliders.
+      frame.addEventListener("load", () => { if (!panel.hidden) apply(read()); });
+    }
     const fw = $app.querySelector("#fw");
     const frame = $app.querySelector("#pf");
     const layout = () => {
@@ -1366,9 +1415,31 @@ async function viewLead(id, intent) {
   const ZOOM_OPTIONS = [["", "No zoom"], ["1.25", "A little (125%)"], ["1.5", "More (150%)"], ["1.75", "A lot (175%)"], ["2", "The most (200%)"]];
   const optsWith = (opts, cur) => (cur && !opts.some(([v]) => v === cur) ? opts.concat([[cur, `As set (${cur})`]]) : opts).map(([v, t]) => `<option value="${esc(v)}"${v === (cur || "") ? " selected" : ""}>${esc(t)}</option>`).join("");
   const HERO_TEXT_OPTIONS = [["", "No, keep them on the photo"], ["bottom", "Bottom of the photo"], ["below", "Under the photo"]];
-  const HERO_MOVE_OPTIONS = [["", "As designed"], ["up", "Higher"], ["down", "Lower"], ["down2", "Much lower"]];
-  const HERO_SHIFT_OPTIONS = [["", "As is"], ["up", "Higher"], ["down", "Lower"], ["down2", "Much lower"]];
-  const HERO_SHADE_OPTIONS = [["", "As designed"], ["lighter", "Lighter"], ["lightest", "Much lighter"]];
+  // Mirrors src/generator/hero-adjust.ts: the opening's words / photo / tint sliders.
+  const HERO_ADJ = { move: { min: -60, max: 400, step: 2, unit: "px", label: "Words position", hint: "left = higher, right = lower" }, shift: { min: -40, max: 80, step: 1, unit: "%", label: "Photo position", hint: "left = higher, right = lower" }, shade: { min: 10, max: 100, step: 5, unit: "%", label: "Shade on the photo", hint: "left = lighter" } };
+  function heroAdjustOf(r) {
+    const a = r.heroAdjust || {};
+    const legacy = { move: { up: -30, down: 140, down2: 260 }[r.heroMove] || 0, shift: { up: -18, down: 22, down2: 42 }[r.heroShift] || 0, shade: { lighter: 60, lightest: 30 }[r.heroShade] || 100 };
+    return { move: a.move ?? legacy.move, shift: a.shift ?? legacy.shift, shade: a.shade ?? legacy.shade };
+  }
+  function heroAdjustFields(a, prefix = "heroAdj_") {
+    return Object.entries(HERO_ADJ).map(([k, o]) => `<label class="field">${o.label} <span class="hint">${o.hint} · <output data-out="${prefix + k}">${a[k]}${o.unit}</output></span><input type="range" name="${prefix + k}" min="${o.min}" max="${o.max}" step="${o.step}" value="${a[k]}" data-initial="${a[k]}" data-unit="${o.unit}"></label>`).join("");
+  }
+  // Keeps each slider's number in step while dragging.
+  document.addEventListener("input", (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement) || t.type !== "range" || !t.dataset.unit) return;
+    const out = t.closest("label") && t.closest("label").querySelector(`[data-out="${t.name}"]`);
+    if (out) out.textContent = t.value + t.dataset.unit;
+  });
+  function heroAdjustValues(root, prefix = "heroAdj_") {
+    const out = {};
+    for (const k of Object.keys(HERO_ADJ)) {
+      const el = root.querySelector(`[name="${prefix + k}"]`);
+      if (el && el.value !== el.dataset.initial) out[k] = Number(el.value);
+    }
+    return Object.keys(out).length ? out : undefined;
+  }
   function photoCardHtml(r, id) {
     const h = r.media.hero;
     return `<section class="card" id="card-photo"><h2>Photo</h2>
@@ -1377,9 +1448,8 @@ async function viewLead(id, intent) {
         ${h ? `<label class="field">Keep in view <span class="hint">when the photo is cropped</span><select name="heroFocus">${optsWith(FOCUS_OPTIONS, h.focus || "")}</select></label>
         <label class="field">Zoom in on phones <span class="hint">so a sign or detail is big enough to read</span><select name="heroZoom">${optsWith(ZOOM_OPTIONS, h.zoomPhone ? String(h.zoomPhone) : "")}</select></label>
         ${h.source !== "google" ? `<button class="linkbtn" type="button" data-eact="delhero">Remove main photo</button>` : ""}` : ""}
-        <label class="field">Words position <span class="hint">move the name and text up or down on the photo</span><select name="heroMove">${optsWith(HERO_MOVE_OPTIONS, r.heroMove || "")}</select></label>
-        <label class="field">Photo position <span class="hint">slide the picture up or down behind the words</span><select name="heroShift">${optsWith(HERO_SHIFT_OPTIONS, r.heroShift || "")}</select></label>
-        <label class="field">Shade on the photo <span class="hint">the dark tint under the words</span><select name="heroShade">${optsWith(HERO_SHADE_OPTIONS, r.heroShade || "")}</select></label>
+        ${heroAdjustFields(heroAdjustOf(r))}
+        ${id ? `<p class="small"><a href="#/preview/${id}">↕ Adjust it live on the preview</a> (the photo and words move while you drag)</p>` : ""}
         <label class="field">Or take the words off the photo <span class="hint">“Bottom of the photo” keeps the top of the photo clear, “Under the photo” shows the photo with nothing on it</span><select name="heroText">${optsWith(HERO_TEXT_OPTIONS, r.heroText || "")}</select></label>
         <label class="field">Main photo<input type="file" id="photo" accept="image/*"></label>
         <label class="field">Describe the photo<input id="photoAlt" placeholder="e.g. Freshly mowed front lawn in Cullman"></label>
@@ -1790,9 +1860,7 @@ async function viewLead(id, intent) {
           heroFocus: f.elements.heroFocus ? f.elements.heroFocus.value : undefined,
           heroZoom: f.elements.heroZoom ? (f.elements.heroZoom.value ? Number(f.elements.heroZoom.value) : null) : undefined,
           heroText: f.elements.heroText ? f.elements.heroText.value : undefined,
-          heroMove: f.elements.heroMove ? f.elements.heroMove.value : undefined,
-          heroShade: f.elements.heroShade ? f.elements.heroShade.value : undefined,
-          heroShift: f.elements.heroShift ? f.elements.heroShift.value : undefined,
+          heroAdjust: heroAdjustValues(f),
           photoPicks: pickValues(f),
           hiddenScenes: f.querySelector('[name^="noscene_"]') ? [...f.querySelectorAll('[name^="noscene_"]')].filter((x) => x.checked).map((x) => x.name.slice(8) + ".jpg") : undefined,
           menuText: isR ? f.elements.menuText.value : undefined,

@@ -147,15 +147,24 @@ test("words on the main photo: bottom of the photo (cover) or under it (card), o
   assert.equal(off.heroText, undefined);
 });
 
-test("words position, photo position and shade: saved and on the page", async () => {
+test("words position, photo position and shade: sliders saved, older steps still read, on the page", async () => {
+  const { heroAdjustOf } = await import("../../src/generator/hero-adjust.ts");
   const r0 = salonWithPhotos();
   const f = fields(r0);
-  for (const n of ["heroMove", "heroShift", "heroShade"]) assert.ok(f.some((x) => x.card === "photo" && x.name === n), n);
-  const { edits } = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { heroMove: "down", heroShift: "down2", heroShade: "lighter" });
+  for (const n of ["heroMoveN", "heroShiftN", "heroShadeN"]) assert.ok(f.some((x) => x.card === "photo" && x.name === n && x.type === "range"), n);
+  // Untouched sliders send nothing.
+  assert.equal((editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { heroMoveN: "0", heroShiftN: "0", heroShadeN: "100" }).edits as { record: { heroAdjust?: unknown } }).record.heroAdjust, undefined);
+  const { edits } = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { heroMoveN: "48", heroShiftN: "17", heroShadeN: "65" });
   const { record } = applyEdits(r0, sampleCopy(), edits as never);
-  assert.deepEqual([record.heroMove, record.heroShift, record.heroShade], ["down", "down2", "lighter"]);
+  assert.deepEqual(record.heroAdjust, { move: 48, shift: 17, shade: 65 });
   const html = String((await buildSite({ record, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
-  assert.match(html, /<html[^>]*data-hmove="down" data-hshade="lighter" data-hshift="down2"/);
-  const off = applyEdits(record, sampleCopy(), { record: { heroMove: "", heroShift: "", heroShade: "" } } as never).record;
-  assert.deepEqual([off.heroMove, off.heroShift, off.heroShade], [undefined, undefined, undefined]);
+  assert.match(html, /<html[^>]*data-hadj data-hshift="down" data-hshade="1" style="--hmove:48px;--hshift:17%;--hshade:0.65"/);
+  // The older three steps are read as numbers, and the sliders replace them.
+  assert.deepEqual(heroAdjustOf({ heroMove: "down", heroShift: "up", heroShade: "lighter" }), { move: 140, shift: -18, shade: 60 });
+  const moved = applyEdits({ ...r0, heroMove: "down", heroShade: "lighter" }, sampleCopy(), { record: { heroAdjust: { shift: 10 } } } as never).record;
+  assert.deepEqual([moved.heroMove, moved.heroShade, moved.heroAdjust], [undefined, undefined, { move: 140, shift: 10, shade: 60 }]);
+  const back = applyEdits(record, sampleCopy(), { record: { heroAdjust: { move: 0, shift: 0, shade: 100 } } } as never).record;
+  assert.equal(back.heroAdjust, undefined);
+  const plain = String((await buildSite({ record: back, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
+  assert.ok(!plain.includes("data-hadj"));
 });

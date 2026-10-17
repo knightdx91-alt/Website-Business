@@ -597,6 +597,10 @@ export interface BusinessRecord {
   heroShade?: "lighter" | "lightest";
   /** The main photo slid up or down behind the words (Edit → Photo → Photo position), past where cropping alone can move it. */
   heroShift?: "up" | "down" | "down2";
+  /** Fine positions from the sliders (Edit → Photo, Preview → Adjust the top photo); win over the three steps above.
+   *  move: px the words go down (negative = up, to -60), shift: % of the photo's height it slides (negative = up),
+   *  shade: the tint's strength in % (100 = as designed). */
+  heroAdjust?: { move?: number; shift?: number; shade?: number };
   /** Grouped service menus: a line under each group heading ("Color" → "Any lightening adds Olaplex, $40"). */
   serviceNotes?: Record<string, string>;
   timezone: string;

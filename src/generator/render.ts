@@ -5,6 +5,7 @@ import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
 import { html, jsonForScript, raw, type Raw } from "./html.ts";
 import { dnaAttrs, settleDna } from "./dna.ts";
+import { heroAdjustAttrs, heroAdjustOf } from "./hero-adjust.ts";
 import { addLife, footerEdge } from "./life.ts";
 import { lintSite, type LintResult } from "./lint.ts";
 import { packFor } from "./packs/index.ts";
@@ -73,7 +74,7 @@ function doc(ctx: Ctx, pack: CategoryPack, o: DocOpts): string {
   // Link previews (texts, Facebook) get the hero photo when it's one we may show; Google photos stay out of the HTML.
   const heroImg = ctx.r.media.hero;
   const ogImage = heroImg && heroImg.source !== "google" ? new URL(heroImg.src, origin).toString() : undefined;
-  return `<!doctype html>${html`<html lang="${o.lang ?? "en"}" class="no-js"${raw(dnaAttrs(ctx.theme.dna))}${raw(ctx.r.heroText ? ` data-htext="${ctx.r.heroText}"` : "")}${raw(ctx.r.heroMove ? ` data-hmove="${ctx.r.heroMove}"` : "")}${raw(ctx.r.heroShade ? ` data-hshade="${ctx.r.heroShade}"` : "")}${raw(ctx.r.heroShift ? ` data-hshift="${ctx.r.heroShift}"` : "")}><head>
+  return `<!doctype html>${html`<html lang="${o.lang ?? "en"}" class="no-js"${raw(dnaAttrs(ctx.theme.dna))}${raw(ctx.r.heroText ? ` data-htext="${ctx.r.heroText}"` : "")}${raw(heroAdjustAttrs(heroAdjustOf(ctx.r)))}><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${o.title}</title>

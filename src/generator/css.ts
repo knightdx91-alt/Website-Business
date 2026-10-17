@@ -351,18 +351,14 @@ html.notes .todo strong{display:block;margin-bottom:.25em}
 .pair__cap{margin:8px 0 0;font-weight:600}
 .gallery figure{margin:0}.gallery figcaption{font-size:.92rem;color:var(--muted);margin-top:6px}
 .gallery--more{margin-top:28px}
-/* Edit → Photo: move the words over the photo up or down, and lighten the tint (a glow in the opening's own color keeps the words readable). */
-html[data-hmove="up"] .hero.hero--photo .hero__in{padding-top:16px;justify-content:flex-start}
-html[data-hmove="down"] .hero.hero--photo .hero__in{padding-top:clamp(120px,30vw,240px)}
-html[data-hmove="down2"] .hero.hero--photo .hero__in{padding-top:clamp(200px,58vw,420px)}
-@media (min-width:900px){html[data-hmove="up"] .hero.hero--photo .hero__in{padding-top:40px}html[data-hmove="down"] .hero.hero--photo .hero__in{padding-top:220px}html[data-hmove="down2"] .hero.hero--photo .hero__in{padding-top:340px}}
-html[data-hshift] .hero.hero--photo .hero__media{overflow:hidden;background:${c.heroBg}}
-html[data-hshift="up"] .hero.hero--photo .hero__media img{transform:translateY(-18%) scale(1.02)}
-html[data-hshift="down"] .hero.hero--photo .hero__media img{transform:translateY(22%)}
-html[data-hshift="down2"] .hero.hero--photo .hero__media img{transform:translateY(42%)}
-html[data-hshift^="down"] .hero.hero--photo .hero__media img{-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%);mask-image:linear-gradient(180deg,transparent 0,#000 14%)}
-html[data-hshade="lighter"] .hero.hero--photo .hero__media::after{opacity:.6}
-html[data-hshade="lightest"] .hero.hero--photo .hero__media::after{opacity:.3}
+/* Edit → Photo / Preview → Adjust the top photo: the words and the photo move separately (CSS variables on <html>, set at build
+   and live by the preview's sliders), and the tint can be lightened (a glow in the opening's own color keeps the words readable). */
+html[data-hadj] .hero.hero--photo .hero__in>:first-child{margin-top:max(0px,var(--hmove,0px))}
+html[data-hadj] .hero.hero--photo .hero__in{translate:0 min(0px,var(--hmove,0px))}
+html[data-hadj] .hero.hero--photo .hero__media{overflow:hidden;background:${c.heroBg}}
+html[data-hadj] .hero.hero--photo .hero__media img{translate:0 var(--hshift,0%)}
+html[data-hshift="down"] .hero.hero--photo .hero__media img{-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%);mask-image:linear-gradient(180deg,transparent 0,#000 14%)}
+html[data-hadj] .hero.hero--photo .hero__media::after{opacity:var(--hshade,1)}
 html[data-hshade] .hero.hero--photo .hero__in{text-shadow:0 1px 2px ${withAlpha(c.heroBg, 0.9)},0 0 18px ${withAlpha(c.heroBg, 0.75)}}
 html[data-hshade] .hero.hero--photo .hero__in .btn,html[data-hshade] .hero.hero--photo .hero__in .status{text-shadow:none}
 @media (max-width:899px){.hero img[data-zoom-phone]{transform:scale(var(--zoom))}.hero .ph:has(img[data-zoom-phone]),.hero__media:has(img[data-zoom-phone]){overflow:hidden}html[data-hero="card"] .hero:has(img[data-zoom-phone]) .hero__in{margin-top:-16px}}

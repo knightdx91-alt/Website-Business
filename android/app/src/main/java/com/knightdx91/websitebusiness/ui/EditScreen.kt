@@ -86,6 +86,11 @@ data class EditField(
     val options: List<Pair<String, String>>,
     val rows: Int,
     val text: String?,
+    /** range fields: the slider's limits and the unit shown after the number. */
+    val min: Float = 0f,
+    val max: Float = 100f,
+    val step: Float = 1f,
+    val unit: String = "",
 ) {
     companion object {
         fun from(j: JSONObject) = EditField(
@@ -98,6 +103,10 @@ data class EditField(
             options = j.optJSONArray("options").objects().map { it.optString("value") to it.optString("label") },
             rows = j.optInt("rows", 3),
             text = j.str("text"),
+            min = j.optDouble("min", 0.0).toFloat(),
+            max = j.optDouble("max", 100.0).toFloat(),
+            step = j.optDouble("step", 1.0).toFloat(),
+            unit = j.optString("unit", ""),
         )
     }
 }
@@ -353,6 +362,12 @@ private fun FieldView(f: EditField, values: MutableMap<String, Any>, onChange: (
                 Checkbox(checked = checked, onCheckedChange = { values[name!!] = it; onChange() })
                 Text(f.label ?: "", modifier = Modifier.weight(1f))
             }
+        }
+        "range" -> {
+            val v = values[name]?.toString()?.toFloatOrNull() ?: 0f
+            Text("${f.label ?: ""}: ${v.toInt()}${f.unit}", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+            val steps = if (f.step > 0) ((f.max - f.min) / f.step).toInt() - 1 else 0
+            androidx.compose.material3.Slider(value = v.coerceIn(f.min, f.max), onValueChange = { values[name!!] = it.toInt().toString(); onChange() }, valueRange = f.min..f.max, steps = steps.coerceIn(0, 200))
         }
         "select" -> {
             val current = values[name]?.toString() ?: ""

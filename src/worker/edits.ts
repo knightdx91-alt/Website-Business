@@ -1,3 +1,4 @@
+import { heroAdjustOf } from "../generator/hero-adjust.ts";
 import { sceneImage } from "../generator/scenes.ts";
 import { parseDesign } from "../generator/themes.ts";
 import { z } from "zod";
@@ -578,6 +579,7 @@ export const EditsSchema = z.object({
       heroMove: z.enum(["", "up", "down", "down2"]).optional(),
       heroShade: z.enum(["", "lighter", "lightest"]).optional(),
       heroShift: z.enum(["", "up", "down", "down2"]).optional(),
+      heroAdjust: z.object({ move: z.number().min(-60).max(400), shift: z.number().min(-40).max(80), shade: z.number().min(10).max(100) }).partial().optional(),
       /** Stock photos turned off for this site (file names); the list replaces the old one. */
       hiddenScenes: z.array(z.string().regex(/^[\w.-]{1,120}\.jpg$/)).max(100).optional(),
       /** The photo pickers: "" = automatic, "s:<stock file>", "g:<gallery photo key>" (main photo: becomes their main photo). */
@@ -1289,6 +1291,12 @@ export function applyEdits(
   if (e.heroMove !== undefined) r.heroMove = e.heroMove || undefined;
   if (e.heroShade !== undefined) r.heroShade = e.heroShade || undefined;
   if (e.heroShift !== undefined) r.heroShift = e.heroShift || undefined;
+  if (e.heroAdjust) {
+    // The sliders replace the older three-step settings.
+    const a = { ...heroAdjustOf(r), ...e.heroAdjust };
+    r.heroMove = r.heroShift = r.heroShade = undefined;
+    r.heroAdjust = a.move || a.shift || a.shade !== 100 ? { move: Math.round(a.move), shift: Math.round(a.shift), shade: Math.round(a.shade) } : undefined;
+  }
   if (e.hiddenScenes !== undefined) r.hiddenScenes = e.hiddenScenes.length ? [...new Set(e.hiddenScenes)] : undefined;
   if (e.address) {
     const a = e.address;

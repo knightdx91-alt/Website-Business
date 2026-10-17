@@ -2,6 +2,7 @@ import type { BusinessRecord } from "../generator/types.ts";
 import { AUTO_VARIANT_LABELS } from "../generator/packs/auto.ts";
 import { scanningOn } from "../generator/pricelist.ts";
 import { menuToText } from "../generator/menu.ts";
+import { HERO_ADJUST_RANGE, heroAdjustOf } from "../generator/hero-adjust.ts";
 import { photoPickChoices, photoPickValues, sceneLibrary, stockPhotosOf } from "../generator/scenes.ts";
 /**
  * The site editor as data (Oct 2026): one description of every Edit card and field, built from a lead's detail, and the
@@ -24,7 +25,9 @@ export type FieldType =
   | "date"
   | "heading"
   | "note"
-  | "hidden";
+  | "hidden"
+  /** A slider (min / max / step, value as a number string); `unit` is shown after the number. */
+  | "range";
 
 export interface Field {
   type: FieldType;
@@ -37,6 +40,9 @@ export interface Field {
   rows?: number;
   required?: boolean;
   max?: number;
+  min?: number;
+  step?: number;
+  unit?: string;
   /** heading / note text */
   text?: string;
 }
@@ -271,6 +277,16 @@ const sel = (
   ...o,
 });
 const h3 = (text: string): Field => ({ type: "heading", text });
+const range = (name: string, label: string, value: number, r: { min: number; max: number; step: number }, unit: string): Field => ({
+  type: "range",
+  name,
+  label,
+  value: String(value),
+  min: r.min,
+  max: r.max,
+  step: r.step,
+  unit,
+});
 const AUTO_KIND_OPTIONS = Object.entries(AUTO_VARIANT_LABELS) as Array<[string, string]>;
 /** The site templates, worded as on Add a business (web `PACKS`). */
 export const KIND_OPTIONS: Array<[string, string]> = [
@@ -502,6 +518,7 @@ export function editForm(l: EditDetail): EditForm {
   ]);
 
   const hero = r.media?.hero;
+  const adj = heroAdjustOf(r as BusinessRecord);
   card(
     "photo",
     "Photo",
@@ -519,9 +536,10 @@ export function editForm(l: EditDetail): EditForm {
             sel("heroZoom", "Zoom in on phones (so a sign or detail is big enough to read)", hero.zoomPhone ? String(hero.zoomPhone) : "", withCurrent(ZOOM_OPTIONS, hero.zoomPhone ? String(hero.zoomPhone) : "")),
           ]
         : []),
-      sel("heroMove", "Words position (move the name and text up or down on the photo)", r.heroMove || "", HERO_MOVE_OPTIONS),
-      sel("heroShift", "Photo position (slide the picture up or down behind the words)", r.heroShift || "", HERO_SHIFT_OPTIONS),
-      sel("heroShade", "Shade on the photo (the dark tint under the words)", r.heroShade || "", HERO_SHADE_OPTIONS),
+      note("Drag to move the words and the photo separately. Tip: Preview → ↕ Adjust the top photo moves them live while you drag."),
+      range("heroMoveN", "Words position (left = higher, right = lower)", adj.move, HERO_ADJUST_RANGE.move, "px"),
+      range("heroShiftN", "Photo position (left = higher, right = lower)", adj.shift, HERO_ADJUST_RANGE.shift, "%"),
+      range("heroShadeN", "Shade on the photo (left = lighter)", adj.shade, HERO_ADJUST_RANGE.shade, "%"),
       sel("heroText", "Or take the words off the photo", r.heroText || "", HERO_TEXT_OPTIONS),
     ],
     {
@@ -3154,6 +3172,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
     heroMove: has("heroMove") ? ((v("heroMove") || "") as "" | "up" | "down" | "down2") : undefined,
     heroShade: has("heroShade") ? ((v("heroShade") || "") as "" | "lighter" | "lightest") : undefined,
     heroShift: has("heroShift") ? ((v("heroShift") || "") as "" | "up" | "down" | "down2") : undefined,
+    heroAdjust: has("heroMoveN") || has("heroShiftN") || has("heroShadeN") ? adjustEdits(r as BusinessRecord, values) : undefined,
     photoPicks: pickEdits(r as BusinessRecord, values),
     hiddenScenes: Object.keys(values).some((k) => k.startsWith("noscene_"))
       ? Object.keys(values)
@@ -3247,25 +3266,19 @@ export function photoPlace(p: { whatsNew?: boolean; band?: boolean; hidden?: boo
 }
 
 /** Edit → Photo → "Words on the main photo" (mirrored in app.js). */
-export const HERO_MOVE_OPTIONS: Array<[string, string]> = [
-  ["", "As designed"],
-  ["up", "Higher"],
-  ["down", "Lower"],
-  ["down2", "Much lower"],
-];
-export const HERO_SHIFT_OPTIONS: Array<[string, string]> = [
-  ["", "As is"],
-  ["up", "Higher"],
-  ["down", "Lower"],
-  ["down2", "Much lower"],
-];
-export const HERO_SHADE_OPTIONS: Array<[string, string]> = [
-  ["", "As designed"],
-  ["lighter", "Lighter"],
-  ["lightest", "Much lighter"],
-];
 export const HERO_TEXT_OPTIONS: Array<[string, string]> = [
   ["", "No, keep them on the photo"],
   ["bottom", "Bottom of the photo"],
   ["below", "Under the photo"],
 ];
+
+/** The photo sliders: only the ones that moved go in the save (so an untouched form doesn't turn the old steps into numbers). */
+function adjustEdits(r: BusinessRecord, values: Record<string, unknown>): { move?: number; shift?: number; shade?: number } | undefined {
+  const now = heroAdjustOf(r);
+  const out: { move?: number; shift?: number; shade?: number } = {};
+  for (const [k, f] of [["move", "heroMoveN"], ["shift", "heroShiftN"], ["shade", "heroShadeN"]] as const) {
+    const n = Number(values[f]);
+    if (values[f] !== undefined && values[f] !== "" && Number.isFinite(n) && Math.round(n) !== now[k]) out[k] = Math.round(n);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
