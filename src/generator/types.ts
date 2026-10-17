@@ -583,6 +583,9 @@ export interface BusinessRecord {
   addressEdited?: boolean;
   /** Stock photos (file names under /assets/scene/) the owner turned off for this site; the next best ones take their place. */
   hiddenScenes?: string[];
+  /** Stock photos the owner picked by hand (file names under /assets/scene/): the main photo when they have none of their own, and the
+   *  wide photo between sections / behind the closing call. Their own photo for the strip is `Image.band` on a gallery photo. */
+  photoPicks?: { hero?: string; strip?: string };
   /** Grouped service menus: a line under each group heading ("Color" → "Any lightening adds Olaplex, $40"). */
   serviceNotes?: Record<string, string>;
   timezone: string;

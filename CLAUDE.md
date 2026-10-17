@@ -1804,3 +1804,12 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   editform `gband_<key>` so Android shows it with no build, edits `galleryMeta[src].band`). render.ts puts band photos first in
   `ctx.photos`; `addLife` lets a band photo show even when it's elsewhere on the page and turns the strip on (`band`) when the
   design's `pics` is none. The Stock photos card points at it. `test/worker/photo-controls.test.ts`.
+- 🔁 Swap any stock photo (Oct 2026, owner's rule: "swap out any stock photo on any website, app wide"; Android 2.82): stock photos
+  show in two slots, the main photo (when there's no owner photo) and the strip / closing-call backdrop. Edit → Stock photos (every
+  category) has two pickers, `pick_hero` and `pick_strip` (values "" automatic / `s:<scene file>` / `g:<gallery key>`), choices from
+  `photoPickChoices(r)` in scenes.ts (their gallery photos, then `sceneLibrary(r)` = the trade's scenes + general, best fits first;
+  `detail().photoPicks`, editform card `picks`). `applyPhotoPicks()` in edits.ts (after the gallery ticks): hero `g:` copies that photo
+  into `media.hero`, `s:` → `record.photoPicks.hero`; strip `g:` → that photo's `Image.band` (others cleared), `s:` →
+  `photoPicks.strip`. Only changed pickers are sent (web `pickValues` with `data-initial`, editform `pickEdits`). render.ts: a hero
+  pick wins over a Google hero / the automatic scene, never over the owner's own; a strip pick goes into `ctx.photos` as a band photo
+  (shows + turns the strip on). Web `pickGridHtml` radio tiles (`.picktile`), Android `PhotoPickRow` in EditScreen.

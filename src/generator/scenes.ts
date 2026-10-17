@@ -248,6 +248,39 @@ export function stockPhotosOf(r: BusinessRecord): Array<{ file: string; src: str
   return [...used, ...off];
 }
 
+/** One library photo as an Image (undefined for a file that isn't in the library). */
+export function sceneImage(file: string | undefined): Image | undefined {
+  const s = file ? SCENES.find((x) => x.file === file) : undefined;
+  return s ? { src: `/assets/scene/${s.file}`, alt: s.alt, source: "stock", width: s.w, height: s.h } : undefined;
+}
+
+/** For the photo pickers: every library photo of this business's trade (plus the general ones), best fits first. */
+export function sceneLibrary(r: Pick<BusinessRecord, "category" | "variant" | "typeLabel" | "name">): Array<{ file: string; src: string; alt: string }> {
+  const words = `${r.variant ?? ""} ${r.typeLabel ?? ""} ${r.name}`.toLowerCase();
+  const fits = (s: Scene) => (s.fits ?? []).some((f) => words.includes(f));
+  const pool = SCENES.filter((s) => s.cats.includes(r.category) || s.cats.includes("general"));
+  const rank = (s: Scene) => (fits(s) ? 0 : s.cats.includes(r.category) ? (s.fits?.length ? 2 : 1) : 3);
+  return [...pool].sort((a, b) => rank(a) - rank(b)).map((s) => ({ file: s.file, src: `/assets/scene/${s.file}`, alt: s.alt }));
+}
+
+/** The pickers' current values: "" (automatic), "s:<stock file>" or "g:<gallery photo key>". */
+export function photoPickValues(r: BusinessRecord): { hero: string; strip: string } {
+  const band = r.media.gallery.find((g) => g.band);
+  const key = (src: string) => (src.split("/").pop() ?? src).split(".")[0]!;
+  return {
+    hero: r.photoPicks?.hero && sceneImage(r.photoPicks.hero) ? `s:${r.photoPicks.hero}` : "",
+    strip: band ? `g:${key(band.src)}` : r.photoPicks?.strip && sceneImage(r.photoPicks.strip) ? `s:${r.photoPicks.strip}` : "",
+  };
+}
+
+/** Everything the photo pickers offer: their own gallery photos first, then the trade's stock photos. */
+export function photoPickChoices(r: BusinessRecord): { hero: string; strip: string; ownHero: boolean; options: Array<{ value: string; src: string; alt: string }> } {
+  const key = (src: string) => (src.split("/").pop() ?? src).split(".")[0]!;
+  const own = r.media.gallery.filter((g) => g.source !== "google").map((g) => ({ value: `g:${key(g.src)}`, src: g.src, alt: `Their photo: ${g.caption || g.alt || key(g.src)}` }));
+  const stock = sceneLibrary(r).map((s) => ({ value: `s:${s.file}`, src: s.src, alt: `Stock: ${s.alt}` }));
+  return { ...photoPickValues(r), ownHero: !!r.media.hero && r.media.hero.source !== "google", options: [...own, ...stock] };
+}
+
 export function hasScenes(r: Pick<BusinessRecord, "category" | "variant" | "typeLabel" | "name">): boolean {
   return scenesFor(r, "", 1).length > 0;
 }

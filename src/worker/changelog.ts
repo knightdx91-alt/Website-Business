@@ -18,6 +18,18 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 55,
+    date: "2026-10-17",
+    android: "2.82",
+    title: "Swap any stock photo on any website",
+    items: [
+      "Edit → Stock photos now has two photo pickers on every website: Main photo (top of the page) and Big photo between sections (also used behind the closing call).",
+      "Tap any picture in the row: another stock photo for their trade, or one of their own photos (add theirs in Photo gallery first). Then Save. Automatic puts it back to our pick.",
+      "Picking a photo for the between-sections spot also turns that strip on if the design didn't have one. To remove the strip, go to Edit → Design → Page structure and set More photos to “Opening only”.",
+      "Phone app: update to 2.82 to see the pictures in the pickers.",
+    ],
+  },
+  {
     n: 54,
     date: "2026-10-17",
     title: "Pick the big photo between sections",

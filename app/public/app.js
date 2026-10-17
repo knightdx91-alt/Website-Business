@@ -1378,12 +1378,34 @@ async function viewLead(id, intent) {
         <button class="btn btn--small" type="button" data-eact="upload">Upload photo</button>
       </section>`;
   }
+  // A row of pictures to pick from (radio tiles); data-initial lets the save send only pickers that changed.
+  function pickGridHtml(id, name, label, cur, opts, autoLabel) {
+    const tile = (v, inner, title) => `<label class="picktile" title="${esc(title)}"><input type="radio" name="${name}" value="${esc(v)}"${cur === v ? " checked" : ""}>${inner}</label>`;
+    return `<fieldset class="pickgrid" data-initial="${esc(cur)}"><legend>${esc(label)}</legend><div class="pickgrid__row">
+      ${tile("", `<span class="picktile__auto">${esc(autoLabel)}</span>`, autoLabel)}
+      ${opts.map((o) => tile(o.value, `<img src="/p/${id}${esc(o.src)}" alt="${esc(o.alt)}" loading="lazy"><small>${o.value.startsWith("g:") ? "Their photo" : "Stock"}</small>`, o.alt)).join("")}
+    </div></fieldset>`;
+  }
+  function pickValues(f) {
+    const out = {};
+    for (const slot of ["hero", "strip"]) {
+      const els = [...f.querySelectorAll(`[name="pick_${slot}"]`)];
+      if (!els.length) continue;
+      const v = (els.find((x) => x.checked) || { value: "" }).value;
+      if (v !== els[0].closest("[data-initial]").dataset.initial) out[slot] = v;
+    }
+    return Object.keys(out).length ? out : undefined;
+  }
   function stockCardHtml(id, l) {
     const list = l.stockPhotos || [];
-    if (!list.length) return `<section class="card" id="card-stock" hidden></section>`;
+    const pk = l.photoPicks;
+    if (!list.length && !(pk && pk.options.length)) return `<section class="card" id="card-stock" hidden></section>`;
     return `<section class="card" id="card-stock"><h2>Stock photos</h2>
-        <p class="small muted">Pictures from our free photo library that fill in where the business has no photo of its own (the main photo, a wide photo strip, the closing section). Tick one off and the next best one takes its place. Their own photos always come first: to put one of theirs in the wide strip, tick “Use as the big photo between sections” under it in Photo gallery.</p>
-        <ul class="thumbs" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">${list.map((s) => `<li><img src="/p/${id}${esc(s.src)}" alt="${esc(s.alt)}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px${s.hidden ? ";opacity:.4" : ""}"><label class="check small"><input type="checkbox" name="noscene_${esc(s.file.replace(/\.jpg$/, ""))}"${s.hidden ? " checked" : ""}> Don't use this one</label></li>`).join("")}</ul>
+        <p class="small muted">Pictures from our free photo library fill in wherever the business has no photo of its own. Swap any of them here: tap another stock photo, or one of their own photos (add theirs in Photo gallery first), then Save.</p>
+        ${pk ? (pk.ownHero ? `<p class="small"><strong>Main photo:</strong> their own photo is the main photo (change it in Photo).</p>` : pickGridHtml(id, "pick_hero", "Main photo (top of the page)", pk.hero, pk.options, "Automatic: the best stock photo for their trade")) : ""}
+        ${pk ? pickGridHtml(id, "pick_strip", "Big photo between sections (and behind the closing call)", pk.strip, pk.options, "Automatic: the design decides") : ""}
+        ${list.length ? `<p class="small muted" style="margin-top:12px">The stock photos this site uses on its own. Tick one off and the next best one takes its place.</p>
+        <ul class="thumbs" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">${list.map((s) => `<li><img src="/p/${id}${esc(s.src)}" alt="${esc(s.alt)}" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px${s.hidden ? ";opacity:.4" : ""}"><label class="check small"><input type="checkbox" name="noscene_${esc(s.file.replace(/\.jpg$/, ""))}"${s.hidden ? " checked" : ""}> Don't use this one</label></li>`).join("")}</ul>` : ""}
       </section>`;
   }
   function galleryCardHtml(id, r) {
@@ -1759,6 +1781,7 @@ async function viewLead(id, intent) {
           address: val("addrCity") ? { street: val("addrStreet"), city: val("addrCity"), zip: val("addrZip") } : undefined,
           heroFocus: f.elements.heroFocus ? f.elements.heroFocus.value : undefined,
           heroZoom: f.elements.heroZoom ? (f.elements.heroZoom.value ? Number(f.elements.heroZoom.value) : null) : undefined,
+          photoPicks: pickValues(f),
           hiddenScenes: f.querySelector('[name^="noscene_"]') ? [...f.querySelectorAll('[name^="noscene_"]')].filter((x) => x.checked).map((x) => x.name.slice(8) + ".jpg") : undefined,
           menuText: isR ? f.elements.menuText.value : undefined,
           confirmed,

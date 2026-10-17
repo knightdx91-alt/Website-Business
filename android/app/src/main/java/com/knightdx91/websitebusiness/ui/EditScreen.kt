@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -102,7 +104,7 @@ data class EditField(
 
 data class GalleryItem(val key: String, val src: String, val alt: String)
 
-data class EditCard(val id: String, val title: String, val kind: String?, val hero: String?, val gallery: List<GalleryItem>, val hasSpanish: Boolean, val collapsed: Boolean, val fields: List<EditField>) {
+data class EditCard(val id: String, val title: String, val kind: String?, val hero: String?, val gallery: List<GalleryItem>, val hasSpanish: Boolean, val collapsed: Boolean, val fields: List<EditField>, val picks: List<GalleryItem> = emptyList()) {
     companion object {
         fun from(j: JSONObject) = EditCard(
             id = j.optString("id"),
@@ -113,6 +115,8 @@ data class EditCard(val id: String, val title: String, val kind: String?, val he
             hasSpanish = j.optBoolean("hasSpanish"),
             collapsed = j.optBoolean("collapsed"),
             fields = j.optJSONArray("fields").objects().map { EditField.from(it) },
+            // Stock photos card: a picture for each photo-picker choice (key = the option's value).
+            picks = j.optJSONArray("picks").objects().map { GalleryItem(it.optString("value"), it.optString("src"), it.optString("alt")) },
         )
     }
 }
@@ -296,7 +300,9 @@ fun EditScreen(state: AppState, nav: NavHostController, id: String, jumpTo: Stri
                                     OutlinedButton(onClick = { galleryPicker.launch("image/*") }, enabled = busy == null, modifier = Modifier.padding(top = 6.dp)) { Text("Add photos") }
                                 }
                                 "stock" -> {
-                                    card.fields.filter { it.type == "note" }.forEach { FieldView(it, values) {} }
+                                    card.fields.filter { it.type == "note" || it.name?.startsWith("pick_") == true }.forEach { f ->
+                                        if (f.name?.startsWith("pick_") == true) PhotoPickRow(f, card.picks, values, state.api, id) { dirty = true } else FieldView(f, values) {}
+                                    }
                                     card.gallery.forEach { g ->
                                         Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                                             AuthImage(state.api, "/p/$id${g.src}", Modifier.size(width = 120.dp, height = 90.dp), maxPx = 300)
@@ -388,6 +394,36 @@ private fun FieldView(f: EditField, values: MutableMap<String, Any>, onChange: (
                 keyboardOptions = KeyboardOptions(keyboardType = kb),
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             )
+        }
+    }
+}
+
+
+/** Edit → Stock photos: one picker as a sideways row of pictures (Automatic first); the tapped one is outlined. */
+@Composable
+private fun PhotoPickRow(f: EditField, picks: List<GalleryItem>, values: MutableMap<String, Any>, api: com.knightdx91.websitebusiness.net.Api, leadId: String, onChange: () -> Unit) {
+    val name = f.name ?: return
+    val current = values[name]?.toString() ?: ""
+    val byValue = picks.associateBy { it.key }
+    Text(f.label ?: "", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(f.options.size) { i ->
+            val (v, label) = f.options[i]
+            val on = v == current
+            val shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+            Column(
+                Modifier.width(120.dp)
+                    .border(if (on) 3.dp else 1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
+                    .clip(shape)
+                    .clickable { values[name] = v; onChange() }
+                    .padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                val pic = byValue[v]
+                if (pic != null) AuthImage(api, "/p/$leadId${pic.src}", Modifier.fillMaxWidth().height(80.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)), maxPx = 300)
+                else Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { Text("Automatic", style = MaterialTheme.typography.labelMedium) }
+                Text(if (pic == null) label.substringAfter(": ", label) else if (v.startsWith("g:")) "Their photo" else "Stock", style = MaterialTheme.typography.labelSmall, maxLines = 2, modifier = Modifier.padding(top = 2.dp))
+            }
         }
     }
 }

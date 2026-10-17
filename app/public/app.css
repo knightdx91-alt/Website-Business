@@ -302,3 +302,14 @@ body.showing .top { display: none; }
 .chipbox { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--chip); font-size: .9rem; font-weight: 600; cursor: pointer; }
 .chipbox input { margin: 0; }
 .chipbox:has(input:checked) { outline: 2px solid var(--accent, currentColor); }
+
+/* Edit → Stock photos: pick a picture (radio tiles in a sideways row). */
+.pickgrid { border: 0; padding: 0; margin: 10px 0 0; min-width: 0; }
+.pickgrid legend { font-weight: 700; margin-bottom: 6px; }
+.pickgrid__row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.picktile { flex: 0 0 128px; scroll-snap-align: start; position: relative; border: 2px solid transparent; border-radius: 10px; padding: 2px; cursor: pointer; text-align: center; font-size: .78rem; }
+.picktile input { position: absolute; opacity: 0; pointer-events: none; }
+.picktile img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 8px; display: block; }
+.picktile__auto { display: flex; align-items: center; justify-content: center; aspect-ratio: 4/3; border-radius: 8px; background: var(--card-2, rgba(127,127,127,.12)); padding: 6px; line-height: 1.25; }
+.picktile:has(input:checked) { border-color: var(--accent, #fca311); }
+.picktile:has(input:focus-visible) { outline: 2px solid var(--accent, #fca311); outline-offset: 2px; }

@@ -13,7 +13,7 @@ import { businessNode, faqNode, graph, originFor, webPageNode, websiteNode } fro
 import { spanishNav, spanishPage } from "./spanish.ts";
 import { spanishDoc } from "./translate.ts";
 import { resolveTheme } from "./themes.ts";
-import { scenesFor, scenesUsed } from "./scenes.ts";
+import { sceneImage, scenesFor, scenesUsed } from "./scenes.ts";
 import type { BuildMode, BusinessRecord, Copy, Site } from "./types.ts";
 
 export interface BuildInput {
@@ -158,12 +158,22 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   // No photo that may show here (none at all, or Google's on a live site): a trade scene opens the page instead.
   const scenes = scenesFor(input.record, input.record.placeId || input.record.name);
   const own = input.record.media.hero;
-  const heroOk = !!own && (input.mode === "preview" || own.source !== "google");
-  const record: BusinessRecord = !heroOk && scenes[0] ? { ...input.record, media: { ...input.record.media, hero: scenes[0] } } : input.record;
+  const picks = input.record.photoPicks ?? {};
+  const heroPick = own && own.source !== "google" ? undefined : sceneImage(picks.hero);
+  const heroOk = !!own && (input.mode === "preview" || own.source !== "google") && !heroPick;
+  const heroScene = heroPick ?? scenes[0];
+  const record: BusinessRecord = !heroOk && heroScene ? { ...input.record, media: { ...input.record.media, hero: heroScene } } : input.record;
   const heroSrc = record.media.hero?.src;
   const galleryPhotos = record.media.gallery.filter((g) => g.source !== "google" || input.mode === "preview");
   // Photos the owner picked for the wide strip go first, ahead of their other photos and the stock ones.
-  const photos = [...galleryPhotos.filter((g) => g.band), ...galleryPhotos.filter((g) => !g.band), ...scenes].filter((p) => p.src !== heroSrc);
+  // A stock photo picked for the strip counts as picked (it shows and turns the strip on), unless one of their own is picked.
+  const stripPick = galleryPhotos.some((g) => g.band) ? undefined : sceneImage(picks.strip);
+  const photos = [
+    ...galleryPhotos.filter((g) => g.band),
+    ...(stripPick ? [{ ...stripPick, band: true }] : []),
+    ...galleryPhotos.filter((g) => !g.band),
+    ...scenes.filter((s) => s.src !== stripPick?.src),
+  ].filter((p) => p.src !== heroSrc);
   const ctx: Ctx = {
     r: record,
     copy: input.copy,

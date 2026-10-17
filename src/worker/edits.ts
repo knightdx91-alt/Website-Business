@@ -1,3 +1,4 @@
+import { sceneImage } from "../generator/scenes.ts";
 import { parseDesign } from "../generator/themes.ts";
 import { z } from "zod";
 import { menuToText, parseMenuText } from "../generator/menu.ts";
@@ -574,6 +575,11 @@ export const EditsSchema = z.object({
       heroZoom: z.number().min(1).max(3).nullable().optional(),
       /** Stock photos turned off for this site (file names); the list replaces the old one. */
       hiddenScenes: z.array(z.string().regex(/^[\w.-]{1,120}\.jpg$/)).max(100).optional(),
+      /** The photo pickers: "" = automatic, "s:<stock file>", "g:<gallery photo key>" (main photo: becomes their main photo). */
+      photoPicks: z
+        .object({ hero: z.string().regex(/^(|s:[\w.-]{1,120}\.jpg|g:[\w.-]{1,120})$/), strip: z.string().regex(/^(|s:[\w.-]{1,120}\.jpg|g:[\w.-]{1,120})$/) })
+        .partial()
+        .optional(),
       /** A new street address (the business moved, or Google has it wrong). */
       address: z
         .object({
@@ -1375,6 +1381,7 @@ export function applyEdits(
   }
   if (e.confirmed) r.confirmed = e.confirmed as ConfirmableField[];
   applyTlcEdits(r, e);
+  if (e.photoPicks) applyPhotoPicks(r, e.photoPicks);
 
   const ce = edits.copy ?? {};
   if (ce.heroTagline !== undefined) c.heroTagline = ce.heroTagline;
@@ -1409,6 +1416,28 @@ export function applyEdits(
 }
 
 /** Trades, lawn and cleaning modules (Oct 2026): plans, guarantee, offers, photo captions/pairs, and the per-category details. */
+/** The Stock photos card's pickers. Runs after the gallery's own ticks, so a pick made here wins. */
+export function applyPhotoPicks(r: BusinessRecord, p: { hero?: string; strip?: string }): void {
+  const key = (src: string) => (src.split("/").pop() ?? src).split(".")[0];
+  const picks = { ...(r.photoPicks ?? {}) };
+  if (p.hero !== undefined) {
+    if (p.hero.startsWith("g:")) {
+      // One of their own photos becomes the main photo (it stays in the gallery too).
+      const g = r.media.gallery.find((x) => key(x.src) === p.hero!.slice(2));
+      if (g) r.media.hero = { src: g.src, alt: g.alt, source: g.source, width: g.width, height: g.height, ...(g.focus ? { focus: g.focus } : {}) };
+      delete picks.hero;
+    } else if (p.hero.startsWith("s:") && sceneImage(p.hero.slice(2))) picks.hero = p.hero.slice(2);
+    else delete picks.hero;
+  }
+  if (p.strip !== undefined) {
+    const own = p.strip.startsWith("g:") ? p.strip.slice(2) : "";
+    for (const g of r.media.gallery) g.band = own && key(g.src) === own ? true : undefined;
+    if (p.strip.startsWith("s:") && sceneImage(p.strip.slice(2))) picks.strip = p.strip.slice(2);
+    else delete picks.strip;
+  }
+  r.photoPicks = picks.hero || picks.strip ? picks : undefined;
+}
+
 function applyTlcEdits(
   r: BusinessRecord,
   e: NonNullable<Edits["record"]>,

@@ -2,7 +2,7 @@ import type { BusinessRecord } from "../generator/types.ts";
 import { AUTO_VARIANT_LABELS } from "../generator/packs/auto.ts";
 import { scanningOn } from "../generator/pricelist.ts";
 import { menuToText } from "../generator/menu.ts";
-import { stockPhotosOf } from "../generator/scenes.ts";
+import { photoPickChoices, photoPickValues, sceneLibrary, stockPhotosOf } from "../generator/scenes.ts";
 /**
  * The site editor as data (Oct 2026): one description of every Edit card and field, built from a lead's detail, and the
  * reverse mapping from typed values back to the `PUT /edits` payload. The Android app renders the cards natively from
@@ -64,6 +64,8 @@ export interface Card {
   hasSpanish?: boolean;
   /** Cards that start folded on the phone (long optional lists). */
   collapsed?: boolean;
+  /** stock: a picture for every choice of the photo pickers (`pick_hero` / `pick_strip`), by option value. */
+  picks?: Array<{ value: string; src: string; alt: string }>;
 }
 
 export interface EditForm {
@@ -581,22 +583,32 @@ export function editForm(l: EditDetail): EditForm {
   );
 
   const stock = stockPhotosOf(r as BusinessRecord);
-  if (stock.length)
+  const library = sceneLibrary(r as BusinessRecord);
+  if (stock.length || library.length) {
+    const { hero, strip, ownHero, options } = photoPickChoices(r as BusinessRecord);
+    const opts = (auto: string, list: Array<{ value: string; alt: string }>): Array<[string, string]> => [["", auto], ...list.map((o): [string, string] => [o.value, o.alt])];
     card(
       "stock",
       "Stock photos",
       [
         note(
-          "Pictures from our free photo library that fill in where the business has no photo of its own (the main photo, a wide photo strip, the closing section). Tick one off and the next best one takes its place. Their own photos always come first: upload them in Photo and Photo gallery. To put one of their photos in the wide strip instead, tick “Use as the big photo between sections” under it in Photo gallery.",
+          "Pictures from our free photo library fill in wherever the business has no photo of its own. Swap any of them here: pick another stock photo, or one of their own photos (add theirs in Photo gallery first).",
         ),
+        ...(ownHero
+          ? [note("Main photo: their own photo is the main photo (change it in Photo).")]
+          : [sel("pick_hero", "Main photo (top of the page)", hero, opts("Automatic: the best stock photo for their trade", options))]),
+        sel("pick_strip", "Big photo between sections (and behind the closing call)", strip, opts("Automatic: the design decides", options)),
+        ...(stock.length ? [note("The stock photos this site uses on its own. Tick one off and the next best one takes its place.")] : []),
         ...stock.map((s) => cb(`noscene_${sceneKey(s.file)}`, "Don't use this one", s.hidden)),
       ],
       {
         kind: "stock",
         gallery: stock.map((s) => ({ key: sceneKey(s.file), src: s.src, alt: s.alt, caption: "", town: "", pairWith: "" })),
+        picks: options,
         collapsed: true,
       },
     );
+  }
 
   card(
     "es",
@@ -3130,6 +3142,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
     services: hasServices && has("services") ? lines("services") : undefined,
     heroFocus: has("heroFocus") ? v("heroFocus") || "" : undefined,
     heroZoom: has("heroZoom") ? (v("heroZoom") ? Number(v("heroZoom")) : null) : undefined,
+    photoPicks: pickEdits(r as BusinessRecord, values),
     hiddenScenes: Object.keys(values).some((k) => k.startsWith("noscene_"))
       ? Object.keys(values)
           .filter((k) => k.startsWith("noscene_") && on(k))
@@ -3196,4 +3209,16 @@ export function dnaCode(
     if (i) any = true;
   }
   return any ? "~" + code : "";
+}
+
+/** Only the pickers that changed go in the save, so a gallery tick saved at the same time isn't undone. */
+function pickEdits(r: BusinessRecord, values: Record<string, unknown>): { hero?: string; strip?: string } | undefined {
+  if (!r.media) return undefined;
+  const now = photoPickValues(r);
+  const out: { hero?: string; strip?: string } = {};
+  for (const slot of ["hero", "strip"] as const) {
+    const v = values[`pick_${slot}`];
+    if (typeof v === "string" && v !== now[slot]) out[slot] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
 }

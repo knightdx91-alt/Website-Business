@@ -3,7 +3,7 @@ import { bareDomain, buyUrl, domainAvailable, DOMAIN_RE, suggestDomains, ourZone
 import { gaLastError, gaServiceAccount, gaState, grantViewer, queueGaBackfill, reportsUrl } from "./analytics.ts";
 import { CHANGELOG, LATEST_CHANGE, changelogSeenKey, changesSince, unseenChanges } from "./changelog.ts";
 import { relocate } from "./relocate.ts";
-import { stockPhotosOf } from "../generator/scenes.ts";
+import { photoPickChoices, stockPhotosOf } from "../generator/scenes.ts";
 import { addEntry, chicagoDay, clockIn, clockOut, clockStatus, deleteEntry, editEntry, EntryInput, remindOpenShifts, setHourly, teamWeek, timesheetCsv } from "./clock.ts";
 import { AI_KEY_RE, aiKeyStatus, clearAiKey, saveAiKey, testAiKey, withAiKey } from "./ai-key.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
@@ -701,6 +701,8 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?:
     siteImport: record?.siteImport ?? null,
     googleImportedAt: record?.googleImportedAt ?? null,
     stockPhotos: record ? stockPhotosOf(record) : [],
+    /** Edit → Stock photos pickers: current choice per slot and every photo they can pick. */
+    photoPicks: record ? photoPickChoices(record) : null,
     /** Typed in by hand: no Google Maps listing, so no Google import, review link or Google photos. */
     notOnGoogle: isManualPlaceId(l.place_id),
     /** The site has a Spanish page at /es/ (share buttons offer a Spanish link). */

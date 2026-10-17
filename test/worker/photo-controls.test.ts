@@ -4,7 +4,7 @@ import { buildSite } from "../../src/generator/render.ts";
 import { stockPhotosOf } from "../../src/generator/scenes.ts";
 import { applyEdits } from "../../src/worker/edits.ts";
 import { editForm, editsFromForm } from "../../src/worker/editform.ts";
-import { categoryRecord, sampleCopy } from "../fixtures.ts";
+import { categoryRecord, restaurantRecord, sampleCopy } from "../fixtures.ts";
 
 const DETAIL = { menuText: "", looks: [], layouts: [], dnaOrder: [], dna: null, layout: "classic", lookBase: "" };
 const fields = (r: ReturnType<typeof categoryRecord>) =>
@@ -73,4 +73,39 @@ test("a gallery photo picked for the wide strip replaces the stock photo there, 
   }
   const plain = String((await buildSite({ record: r0, copy: sampleCopy(), site: { slug: "s", look: look("z0") }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
   assert.ok(!plain.includes('class="pband'));
+});
+
+test("photo pickers: swap the main photo and the strip for any stock photo or one of their own, in every category", async () => {
+  const { photoPickChoices, sceneLibrary } = await import("../../src/generator/scenes.ts");
+  for (const cat of ["restaurant", "contractor", "salon", "auto", "landscaping", "cleaning", "retail", "print", "finance", "church", "general"] as const) {
+    const r0 = cat === "restaurant" ? restaurantRecord() : categoryRecord(cat);
+    r0.media.hero = undefined;
+    const lib = sceneLibrary(r0);
+    assert.ok(lib.length >= 4, `${cat} has a library`);
+    const f = fields(r0);
+    assert.ok(f.some((x) => x.card === "stock" && x.name === "pick_hero"), `${cat} main photo picker`);
+    assert.ok(f.some((x) => x.card === "stock" && x.name === "pick_strip"), `${cat} strip picker`);
+    const last = lib[lib.length - 1]!.file;
+    const built = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { pick_hero: `s:${last}`, pick_strip: `s:${lib[0]!.file}` });
+    const { record: r } = applyEdits(r0, sampleCopy(), built.edits as never);
+    assert.deepEqual(r.photoPicks, { hero: last, strip: lib[0]!.file });
+    assert.equal(photoPickChoices(r).hero, `s:${last}`);
+    const html = String((await buildSite({ record: r, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
+    assert.ok(html.includes(`/assets/scene/${last}`), `${cat} hero is the picked stock photo`);
+    if (lib[0]!.file !== last) assert.ok(html.includes(`/assets/scene/${lib[0]!.file}`), `${cat} strip shows the picked stock photo`);
+    // Back to automatic.
+    const auto = applyEdits(r, sampleCopy(), { record: { photoPicks: { hero: "", strip: "" } } } as never).record;
+    assert.equal(auto.photoPicks, undefined);
+  }
+  // One of their own photos as the main photo, and as the strip (which clears a stock pick).
+  const r1 = salonWithPhotos();
+  r1.media.hero = undefined;
+  const a = applyEdits(r1, sampleCopy(), { record: { photoPicks: { hero: "g:g1", strip: "g:g1" } } } as never).record;
+  assert.equal(a.media.hero!.src, "/assets/owner/g1.jpg");
+  assert.equal(a.media.gallery[0]!.band, true);
+  // Saving the form without touching the pickers leaves a gallery tick alone.
+  const r2 = salonWithPhotos();
+  const untouched = editsFromForm({ record: r2, copy: sampleCopy(), ...DETAIL } as never, { gcap_g1: "", gband_g1: true, pick_strip: "" });
+  const b = applyEdits(r2, sampleCopy(), untouched.edits as never).record;
+  assert.equal(b.media.gallery[0]!.band, true);
 });
