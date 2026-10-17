@@ -161,10 +161,9 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   const heroOk = !!own && (input.mode === "preview" || own.source !== "google");
   const record: BusinessRecord = !heroOk && scenes[0] ? { ...input.record, media: { ...input.record.media, hero: scenes[0] } } : input.record;
   const heroSrc = record.media.hero?.src;
-  const photos = [
-    ...record.media.gallery.filter((g) => g.source !== "google" || input.mode === "preview"),
-    ...scenes,
-  ].filter((p) => p.src !== heroSrc);
+  const galleryPhotos = record.media.gallery.filter((g) => g.source !== "google" || input.mode === "preview");
+  // Photos the owner picked for the wide strip go first, ahead of their other photos and the stock ones.
+  const photos = [...galleryPhotos.filter((g) => g.band), ...galleryPhotos.filter((g) => !g.band), ...scenes].filter((p) => p.src !== heroSrc);
   const ctx: Ctx = {
     r: record,
     copy: input.copy,

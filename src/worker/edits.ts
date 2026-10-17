@@ -672,6 +672,7 @@ export const EditsSchema = z.object({
               town: z.string().trim().max(40),
               pairWith: z.string().trim().max(80),
               whatsNew: z.boolean(),
+              band: z.boolean(),
               focus: z.string().trim().regex(/^(\d{1,3}% \d{1,3}%)?$/),
             })
             .partial(),
@@ -1456,6 +1457,7 @@ function applyTlcEdits(
       if (m.caption !== undefined) p.caption = clear(m.caption);
       if (m.town !== undefined) p.town = clear(m.town);
       if (m.whatsNew !== undefined) p.whatsNew = m.whatsNew || undefined;
+      if (m.band !== undefined) p.band = m.band || undefined;
       if (m.focus !== undefined) p.focus = m.focus || undefined;
       // A pair only points at another photo that is on the record (and not at itself).
       if (m.pairWith !== undefined) {

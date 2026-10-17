@@ -544,6 +544,7 @@ export function editForm(l: EditDetail): EditForm {
     );
     galleryFields.push(sel(`gfocus_${key}`, "Keep in view", p.focus || "", withCurrent(FOCUS_OPTIONS, p.focus || "")));
     galleryFields.push(cb(`gnew_${key}`, "Show in “What's new” (photo row: swipe or arrows, tap to see it big)", p.whatsNew));
+    galleryFields.push(cb(`gband_${key}`, "Use as the big photo between sections (and behind the closing call)", p.band));
     galleryFields.push(
       sel(`gpair_${key}`, "Before/after", p.pairWith || "", [
         ["", "Not a “before” photo"],
@@ -586,7 +587,7 @@ export function editForm(l: EditDetail): EditForm {
       "Stock photos",
       [
         note(
-          "Pictures from our free photo library that fill in where the business has no photo of its own (the main photo, a wide photo strip, the closing section). Tick one off and the next best one takes its place. Their own photos always come first: upload them in Photo and Photo gallery.",
+          "Pictures from our free photo library that fill in where the business has no photo of its own (the main photo, a wide photo strip, the closing section). Tick one off and the next best one takes its place. Their own photos always come first: upload them in Photo and Photo gallery. To put one of their photos in the wide strip instead, tick “Use as the big photo between sections” under it in Photo gallery.",
         ),
         ...stock.map((s) => cb(`noscene_${sceneKey(s.file)}`, "Don't use this one", s.hidden)),
       ],
@@ -2545,6 +2546,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
       town: v("gtown_" + key) || "",
       pairWith: v("gpair_" + key) || "",
       ...(has("gnew_" + key) ? { whatsNew: !!on("gnew_" + key) } : {}),
+      ...(has("gband_" + key) ? { band: !!on("gband_" + key) } : {}),
       ...(has("gfocus_" + key) ? { focus: v("gfocus_" + key) || "" } : {}),
     };
   }

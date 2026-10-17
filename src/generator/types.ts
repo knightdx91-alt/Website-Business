@@ -51,6 +51,8 @@ export interface Image {
   zoomPhone?: number;
   /** Shops: show this photo in the "What's new" carousel (tap to see it big) instead of the Photos grid. */
   whatsNew?: boolean;
+  /** The owner picked this one for the wide photo between sections (and the closing call's backdrop), in place of a stock photo. */
+  band?: boolean;
 }
 
 export type PriceMode = "none" | "exact" | "from" | "range" | "quote";

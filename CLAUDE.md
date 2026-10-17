@@ -1799,3 +1799,8 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   access team members have role "owner", so texts / flyers / call guides that checked the role used Settings → Your name ("Post");
   the worker's `senderOf(session, settings)` and Android `Meta.senderName` use the owner's name only for the owner's own login
   (`userId` / `meId` "owner"), everyone else their login name (web `senderName()` already did).
+- 🖼️ Owner's pick for the photo strip (Oct 2026, owner's ask: the stock hangers photo in Thrift & More's strip couldn't be replaced):
+  `Image.band` = Edit → Photo gallery → "Use as the big photo between sections (and behind the closing call)" (web `gband_<key>`,
+  editform `gband_<key>` so Android shows it with no build, edits `galleryMeta[src].band`). render.ts puts band photos first in
+  `ctx.photos`; `addLife` lets a band photo show even when it's elsewhere on the page and turns the strip on (`band`) when the
+  design's `pics` is none. The Stock photos card points at it. `test/worker/photo-controls.test.ts`.

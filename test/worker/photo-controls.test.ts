@@ -58,3 +58,19 @@ test("stock photos: listed in Edit, a ticked one is replaced by the next, and ca
   const back = applyEdits(r, sampleCopy(), { record: { hiddenScenes: [] } } as never).record;
   assert.equal(back.hiddenScenes, undefined);
 });
+
+test("a gallery photo picked for the wide strip replaces the stock photo there, even on a design without a strip", async () => {
+  const r0 = salonWithPhotos();
+  assert.ok(fields(r0).some((x) => x.card === "gallery" && x.name === "gband_g1"));
+  const built = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { gcap_g1: "", gband_g1: true });
+  const { record: r } = applyEdits(r0, sampleCopy(), built.edits as never);
+  assert.equal(r.media.gallery[0]!.band, true);
+  const look = (z: string) => `salon.blush_hour~circle~h5n2b3s4v4c0f1a1p0t0r0k1d2o0m0q0g0e0u0w0x3y4${z}`;
+  for (const z of ["z0", "z1"]) {
+    const html = String((await buildSite({ record: r, copy: sampleCopy(), site: { slug: "s", look: look(z) }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
+    const band = html.match(/<div class="pband[^"]*"[^>]*>(.*?)<\/div>/)?.[1] ?? "";
+    assert.match(band, /src="\/assets\/owner\/g1\.jpg"/, `strip on ${z}`);
+  }
+  const plain = String((await buildSite({ record: r0, copy: sampleCopy(), site: { slug: "s", look: look("z0") }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
+  assert.ok(!plain.includes('class="pband'));
+});

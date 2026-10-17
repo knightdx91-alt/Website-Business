@@ -115,7 +115,10 @@ export function addLife(ctx: Ctx, body: string): string {
   const edge = dna.edge && dna.edge !== "straight";
   const decor = dna.decor && dna.decor !== "none" ? dna.decor : null;
   // Never a photo the page already shows (a What's new or gallery photo would appear twice, once huge).
-  const pics = dna.pics && dna.pics !== "none" ? (ctx.photos ?? []).filter((p) => !body.includes(`src="${esc(p.src)}"`) && !body.includes(`src="${p.src}"`)) : [];
+  // A photo the owner picked for the strip shows even if it's elsewhere on the page, and turns the strip on when the design had none.
+  const picked = (ctx.photos ?? []).filter((p) => p.band);
+  const mode = dna.pics && dna.pics !== "none" ? dna.pics : picked.length ? "band" : "none";
+  const pics = mode !== "none" ? (ctx.photos ?? []).filter((p) => p.band || (!body.includes(`src="${esc(p.src)}"`) && !body.includes(`src="${p.src}"`))) : [];
   if (!edge && !decor && !pics.length) return body;
   const icons = tradeIcons(ctx.r);
   let n = 0;
@@ -128,14 +131,14 @@ export function addLife(ctx: Ctx, body: string): string {
   let out = body
     .replace(/<section class="hero [^"]*"[^>]*>/, (m) => m + dec("hero") + seal)
     .replace(/<section class="section section--band"[^>]*>/g, (m) => m + top + bottom + dec("band"));
-  const ctaPhoto = dna.pics === "cta" ? pics[0] : undefined;
+  const ctaPhoto = mode === "cta" ? pics[0] : undefined;
   out = out.replace(/<section class="cta([ "])([^>]*)>/g, (_m, sep: string, rest: string) =>
     ctaPhoto
       ? `<section class="cta cta--photo${sep === '"' ? '"' : " "}${rest}>${top}<div class="cta__ph"><img src="${esc(ctaPhoto.src)}" alt="" loading="lazy" decoding="async"></div>`
       : `<section class="cta${sep}${rest}>${top}${dec("cta")}`,
   );
   // The photo band: one wide photo (two side by side on wide screens) between the middle sections of the home page.
-  if (dna.pics === "band" && pics.length && out.includes('id="hero-title"')) {
+  if (mode === "band" && pics.length && out.includes('id="hero-title"')) {
     const two = pics.slice(0, 2);
     const band = `<div class="pband${two.length > 1 ? " pband--2" : ""}" aria-hidden="true">${two.map((p) => `<img src="${esc(p.src)}" alt="" loading="lazy" decoding="async">`).join("")}</div>`;
     const at = out.search(/<section class="section[^"]*" id="(reviews|about|visit|faq)"/);

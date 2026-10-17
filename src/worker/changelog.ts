@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 54,
+    date: "2026-10-17",
+    title: "Pick the big photo between sections",
+    items: [
+      "Some designs show a wide photo partway down the home page or behind the closing call. Until now it was always a stock photo.",
+      "To use one of their own photos there: Edit → Photo gallery → tick “Use as the big photo between sections” under the photo, then Save. It works even if that photo is also in What's new. Works the same in the phone app; no update needed.",
+      "To drop the strip altogether, go to Edit → Design → Page structure and set More photos to “Opening only”.",
+    ],
+  },
+  {
     n: 53,
     date: "2026-10-17",
     android: "2.81",
