@@ -1783,10 +1783,19 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   cards) and `UA-Caller-Training.pdf` (11 pages: basics, prep, phone script, walk-in script + timing, sign-up + payment, 19 objection
   answers, logging + cadence, cut-out cards, sign-off line). Branded like the flyer (print navy / gold, UA badge, Montserrat /
   Inter); prices and plan contents are typed in the script from live Settings, so rerun after a price change. Not served by the app.
-  Third: `UA-HR-Accounting-Handbook.pdf` (12 pages: hiring checklist, forms + where to get them, I-9 / E-Verify (Alabama requires it),
-  employee vs contractor, time clock → payroll, commission rules from Settings, money in (Stripe fees, failed payments, refunds,
+  Third: `UA-HR-Accounting-Handbook.pdf` (14 pages: hiring checklist, forms + where to get them, I-9 / E-Verify (Alabama requires it),
+  employee vs contractor, time clock → payroll, time off and leave (a starting vacation / holiday / sick policy for the owner to set,
+  FMLA only from 50 employees with our own 6-week unpaid leave until then, Alabama jury duty pay, USERRA, voting, PUMP Act, workers'
+  comp from 5 employees; the app does not track paid time off), commission rules from Settings, money in (Stripe fees, failed payments, refunds,
   referral credits), money out + record keeping, owner pay (no commission; draws from profit, a Plus sale worked through, quarterly taxes, S-corp), cut-out cards). Not legal or tax advice; says so on its how-to page.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages
   project afterwards.
+- 📬 Mailed a flyer + texts in the sender's name (Oct 2026, Android 2.81): call-log outcome `mailed` ("📬 Mailed a flyer"; OUTCOMES in
+  index.ts, `OUTCOME_LABEL` in app.js + Format.kt) and an "📬 I mailed it" button under the flyer code (web `bindMailed`, Android
+  LeadScreen): assigns a code if missing, `markHandedOut` (keeps the preview for the code), books a callback 5 days out unless one is
+  sooner, does not count as contact (no `last_contact`, not in CALL_OUTCOMES / CONTACT_OUTCOMES), no status change. Sender fix: full
+  access team members have role "owner", so texts / flyers / call guides that checked the role used Settings → Your name ("Post");
+  the worker's `senderOf(session, settings)` and Android `Meta.senderName` use the owner's name only for the owner's own login
+  (`userId` / `meId` "owner"), everyone else their login name (web `senderName()` already did).

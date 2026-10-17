@@ -615,7 +615,15 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                                     Text("For the mail-out / leave-behind flyer: write the code in the white box. They type it at undergroundassociates.com/code to see this preview, and you get an alert.", style = MaterialTheme.typography.bodySmall, color = muted)
                                 } else {
                                     Text("📬 Flyer code: $flyerCode", style = MaterialTheme.typography.titleLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold), modifier = Modifier.padding(top = 10.dp))
-                                    Text("Write it in the white box on their flyer; they enter it at undergroundassociates.com/code and you get an alert. Log \"Left a flyer\" so their preview stays up 90 days." + (if (l.mailOpens > 0) " Used ${if (l.mailOpens == 1) "once" else "${l.mailOpens} times"}, last ${ago(l.mailOpenedAt)}." else " Not used yet."), style = MaterialTheme.typography.bodySmall, color = muted)
+                                    Text("Write it in the white box on their flyer; they enter it at undergroundassociates.com/code and you get an alert. Log \"Left a flyer\" or \"Mailed a flyer\" so their preview stays up 90 days." + (if (l.mailOpens > 0) " Used ${if (l.mailOpens == 1) "once" else "${l.mailOpens} times"}, last ${ago(l.mailOpenedAt)}." else " Not used yet."), style = MaterialTheme.typography.bodySmall, color = muted)
+                                    OutlinedButton(onClick = {
+                                        act("mailed") {
+                                            val r = state.api.logCall(id, "mailed", "", null)
+                                            val f = r.optString("followUp").takeIf { !r.isNull("followUp") && it.isNotBlank() }
+                                            context.toast("Logged: flyer mailed." + (f?.let { " Callback set for ${niceDay(it)}." } ?: ""))
+                                            load()
+                                        }
+                                    }, enabled = busy == null, modifier = Modifier.padding(top = 6.dp)) { Text(if (busy == "mailed") "Saving…" else "📬 I mailed it") }
                                 }
                             }
                             if (l.previewOpens > 0) Text("👀 They opened their preview ${if (l.previewOpens == 1) "once" else "${l.previewOpens} times"}, last ${ago(l.previewOpenedAt)}.", style = MaterialTheme.typography.bodySmall, color = Good, modifier = Modifier.padding(top = 8.dp))

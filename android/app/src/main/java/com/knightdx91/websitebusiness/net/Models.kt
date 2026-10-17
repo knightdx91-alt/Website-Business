@@ -51,6 +51,8 @@ data class Meta(
     val start: StartInfo? = null,
 ) {
     val isOwner get() = meRole == "owner"
+    /** Who texts are from: the owner's own login uses Settings → Your name; everyone else (full access too) their login name. */
+    val senderName get() = if (meId.isEmpty() || meId == "owner") callerName.ifBlank { meName } else meName
 
     companion object {
         fun from(j: JSONObject): Meta {

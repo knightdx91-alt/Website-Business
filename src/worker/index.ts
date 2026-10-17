@@ -439,7 +439,7 @@ interface NoteRow {
 }
 
 // link_sent: a preview link was texted or copied (counts as contact, nothing else). reached: someone answered (no status change).
-/** Phone outcomes (no_answer, reached), in-person outcomes (not_in = owner wasn't there, visited = talked in person, flyer = left the preview flyer) and the shared ones. */
+/** Phone outcomes (no_answer, reached), in-person outcomes (not_in = owner wasn't there, visited = talked in person, flyer = left the preview flyer), mailed (the flyer went out in the mail) and the shared ones. */
 const OUTCOMES = [
   "note",
   "no_answer",
@@ -447,6 +447,7 @@ const OUTCOMES = [
   "not_in",
   "visited",
   "flyer",
+  "mailed",
   "link_sent",
   "callback",
   "shown",
@@ -496,6 +497,12 @@ async function notesFor(env: Env, leadId: string) {
 }
 
 /** Call guides name the caller; swap the cached name for whoever is opening it instead of paying for a rewrite. */
+/** The name on texts, flyers and the call guide: the owner's name from Settings for the owner's own login, everyone
+ *  else (full access included) their own login name. */
+function senderOf(session: { userId: string; name: string }, s: { callerName?: string }): string | undefined {
+  return session.userId === "owner" ? s.callerName || session.name : session.name;
+}
+
 function pitchFor(raw: string, callerName: string | undefined): unknown {
   const { _caller, ...pitch } = JSON.parse(raw) as { _caller?: string };
   if (!_caller || !callerName || _caller === callerName) return pitch;
@@ -2737,7 +2744,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           previewUrl: `${url.origin}/s/${token}/`,
           company: settings.companyName,
           phone: settings.companyPhone,
-          caller: isOwner ? settings.callerName : session.name,
+          caller: senderOf(session, settings),
           days,
         }),
         `flyer-${id}.pdf`,
@@ -2754,7 +2761,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         previewUrl: `${url.origin}/s/${token}/`,
         company: settings.companyName,
         phone: settings.companyPhone,
-        caller: isOwner ? settings.callerName : session.name,
+        caller: senderOf(session, settings),
         days,
       });
     }
@@ -3080,12 +3087,16 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       if (input.outcome === "callback" && !input.followUp)
         throw new HttpError(400, "Pick a day to call back");
       // Left a flyer: its code went out, so the preview is kept for it.
-      if (input.outcome === "flyer") await markHandedOut(env, lead.id);
+      if (input.outcome === "flyer" || input.outcome === "mailed") {
+        if (!lead.mail_code) await assignMailCode(env, lead.id);
+        await markHandedOut(env, lead.id);
+      }
       if (input.followUp && input.followUp < localDate())
         throw new HttpError(400, "Pick today or a later day");
       const fields: Partial<LeadRow> = {};
       let nextStep: ReturnType<typeof nextCadenceStep> = null;
-      if (input.outcome !== "note") fields.last_contact = now();
+      // Mailing a flyer isn't talking to them, so it doesn't count as contact.
+      if (input.outcome !== "note" && input.outcome !== "mailed") fields.last_contact = now();
       const status =
         OUTCOME_STATUS[input.outcome] ??
         (input.outcome === "callback" && lead.sales_status === "new"
@@ -3133,6 +3144,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         not_in: `stopped by ${lead.name}: the owner wasn't in`,
         visited: `talked to ${lead.name} in person`,
         flyer: `left a flyer at ${lead.name}`,
+        mailed: `mailed ${lead.name} a flyer${lead.mail_code ? ` (code ${lead.mail_code})` : ""}`,
         link_sent: `sent ${lead.name} their preview link`,
         callback:
           `called ${lead.name}: call back ${fields.follow_up ?? ""}`.trim(),
@@ -3914,7 +3926,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     }
     if (action === "/pitch" && (m === "GET" || m === "POST")) {
       const settings = await getSettings(env);
-      const callerName = isOwner ? settings.callerName : session.name;
+      const callerName = senderOf(session, settings);
       if (m === "GET" && lead.pitch_json)
         return json({ pitch: pitchFor(lead.pitch_json, callerName) });
       if (!lead.record_json || !lead.lint_json)

@@ -87,5 +87,5 @@ fun categoryLabel(id: String) = CATEGORY_LABEL[id] ?: id.replaceFirstChar { it.u
 val SALES_LABEL = mapOf("new" to "New", "shown" to "Shown", "sold" to "Sold", "live" to "Live", "not_interested" to "Not interested")
 
 val OUTCOME_LABEL = linkedMapOf(
-    "no_answer" to "No answer", "reached" to "Reached", "not_in" to "Owner not in", "visited" to "Talked in person", "flyer" to "Left a flyer", "shown" to "Showed them", "callback" to "Call back", "sold" to "Sold 🎉", "not_interested" to "Not interested", "note" to "Just a note",
+    "no_answer" to "No answer", "reached" to "Reached", "not_in" to "Owner not in", "visited" to "Talked in person", "flyer" to "Left a flyer", "mailed" to "Mailed a flyer", "shown" to "Showed them", "callback" to "Call back", "sold" to "Sold 🎉", "not_interested" to "Not interested", "note" to "Just a note",
 )

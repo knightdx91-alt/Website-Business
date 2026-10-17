@@ -33,7 +33,7 @@
   const groupLabel = (id) => ((meta && meta.categories.find((c) => c.id === id)) || {}).label || CATEGORY_LABEL[id] || id;
   const GOOGLE_PER_SEARCH = 0.064; // up to 2 pages of Text Search per search phrase
   const SALES = [["new", "New"], ["callbacks", "Callbacks"], ["activity", "Activity"], ["shown", "Shown"], ["sold", "Sold"], ["live", "Live"], ["not_interested", "Not interested"], ["", "All"]];
-  const OUTCOME_LABEL = { no_answer: "📵 No answer", reached: "📞 Reached", not_in: "🚪 Owner not in", visited: "🚶 Talked in person", flyer: "📄 Left a flyer", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested", link_sent: "📲 Preview link texted", signup_sent: "📝 Sent sign-up link", signed: "✍️ Signed up" };
+  const OUTCOME_LABEL = { no_answer: "📵 No answer", reached: "📞 Reached", not_in: "🚪 Owner not in", visited: "🚶 Talked in person", flyer: "📄 Left a flyer", mailed: "📬 Mailed a flyer", callback: "📅 Call back", shown: "👍 Interested", sold: "🎉 Sold", not_interested: "✋ Not interested", link_sent: "📲 Preview link texted", signup_sent: "📝 Sent sign-up link", signed: "✍️ Signed up" };
   const LOST_REASONS = [["price", "Price"], ["has_someone", "Has someone"], ["no_need", "No need"], ["timing", "Timing"], ["other", "Other"]];
   const NO_CONNECTION = "No connection. Check your signal and try again.";
   const money = (n) => "$" + (Number.isInteger(n) ? n : Number(n).toFixed(2));
@@ -585,6 +585,7 @@
         <button class="btn" type="button" data-out="not_in">🚪 Owner not in</button>
         <button class="btn" type="button" data-out="visited">🚶 Talked in person</button>
         <button class="btn" type="button" data-out="flyer">📄 Left a flyer</button>
+        <button class="btn" type="button" data-out="mailed">📬 Mailed a flyer</button>
         <button class="btn" type="button" data-out="shown">👍 Interested (shown)</button>
         <button class="btn" type="button" data-out="callback">📅 Call back</button>
         <button class="btn btn--good" type="button" data-out="sold">🎉 Sold</button>
@@ -593,7 +594,7 @@
       <div id="lostwhy" hidden style="margin-top:10px"><p style="margin:0 0 6px"><strong>Why not?</strong> <span class="small muted">Tap one to save.</span></p>
         <div class="chips">${LOST_REASONS.map(([k, t]) => `<button type="button" class="pick" data-why="${k}">${t}</button>`).join("")}<button type="button" class="linkbtn" data-why-cancel>Cancel</button></div></div>
       <p style="margin:10px 0 0"><button class="linkbtn" type="button" data-out="note">Just save a note</button></p>
-      <p class="small muted" style="margin-top:6px">No answer and Owner not in schedule a callback for tomorrow unless you pick a day. Left a flyer marks them Shown (the flyer has their preview on it). Sold and Not interested clear the callback. If they ask not to be called again, tap Not interested.</p></section>`;
+      <p class="small muted" style="margin-top:6px">No answer and Owner not in schedule a callback for tomorrow unless you pick a day. Left a flyer marks them Shown (the flyer has their preview on it). Mailed a flyer keeps their preview up for the flyer code and books a call 5 days out. Sold and Not interested clear the callback. If they ask not to be called again, tap Not interested.</p></section>`;
   }
 
   function bindLog(l, after) {
@@ -1252,9 +1253,10 @@ async function viewLead(id, intent) {
       try {
         const r = await api(`/leads/${b.dataset.mailcode}/mailcode`, { method: "POST" });
         const box = b.closest("[data-mailcode-box]");
-        if (box) box.innerHTML = mailCodeHtml({ mailCode: r.code, mailOpens: 0 });
+        if (box) { box.innerHTML = mailCodeHtml({ id: b.dataset.mailcode, mailCode: r.code, mailOpens: 0 }); bindMailed(box, reload); }
       } catch (err) { toast(err.message); b.disabled = false; }
     }));
+    bindMailed($app, reload);
     $app.querySelectorAll("[data-flyer]").forEach((b) => b.addEventListener("click", async () => {
       const id = b.dataset.flyer;
       const w = window.open("", "_blank");
@@ -1824,7 +1826,20 @@ async function viewLead(id, intent) {
     if (!l.mailCode) return `<button class="btn" type="button" data-mailcode="${esc(l.id)}">📬 Get flyer code</button>
       <p class="small muted">For the mail-out / leave-behind flyer: write the code in the white box. They type it at undergroundassociates.com/code to see this preview, and you get an alert.</p>`;
     return `<p style="margin:0">📬 Flyer code: <strong style="font:800 1.6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.15em">${esc(l.mailCode)}</strong></p>
-      <p class="small muted" style="margin:4px 0 0">Write it in the white box on their flyer; they enter it at undergroundassociates.com/code and you get an alert. Log "Left a flyer" so their preview stays up 90 days.${l.mailOpens ? ` Used ${l.mailOpens === 1 ? "once" : `${l.mailOpens} times`}, last ${ago(l.mailOpenedAt)}.` : " Not used yet."}</p>`;
+      <p class="small muted" style="margin:4px 0 0">Write it in the white box on their flyer; they enter it at undergroundassociates.com/code and you get an alert. Tap "I mailed it" (or log "Left a flyer") so their preview stays up 90 days.${l.mailOpens ? ` Used ${l.mailOpens === 1 ? "once" : `${l.mailOpens} times`}, last ${ago(l.mailOpenedAt)}.` : " Not used yet."}</p>
+      ${l.id ? `<div class="btns" style="margin-top:6px"><button class="btn btn--small" type="button" data-mailed="${esc(l.id)}">📬 I mailed it</button></div>` : ""}`;
+  }
+
+  // "I mailed it": logs Mailed a flyer (keeps the preview up for the code, books a call 5 days out).
+  function bindMailed(root, after) {
+    root.querySelectorAll("[data-mailed]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        const r = await api(`/leads/${b.dataset.mailed}/log`, { method: "POST", json: { outcome: "mailed", note: "" } });
+        toast(`Logged: flyer mailed.${r.followUp ? ` Callback set for ${dayLabel(r.followUp)}.` : ""}`);
+        if (after) after();
+      } catch (err) { toast(err.message); b.disabled = false; }
+    }));
   }
 
   function shareButtonsHtml(l) {

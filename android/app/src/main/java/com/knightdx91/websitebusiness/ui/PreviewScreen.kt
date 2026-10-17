@@ -83,7 +83,7 @@ fun PreviewScreen(state: AppState, nav: NavHostController, id: String, path: Str
                 runCatching { state.api.logCall(id, "link_sent", (if (copy) "Copied the " else "Texted the ") + (if (es) "Spanish link" else "preview link"), null) }
                 val detail = runCatching { state.api.lead(id) }.getOrNull()
                 val name = detail?.lead?.name ?: "your business"
-                val me = state.meta?.let { m -> if (m.isOwner) m.callerName.ifBlank { m.meName } else m.meName } ?: ""
+                val me = state.meta?.let { m -> m.senderName } ?: ""
                 val co = state.meta?.companyName?.ifBlank { null }
                 val msg = if (es) "¡Hola! Aquí está la vista previa gratis del sitio web que hice para $name: $link" else "Hi, this is ${me.ifBlank { "me" }}${if (co != null) " with $co" else ""}. Here's the free website preview I made for $name: $link"
                 if (copy) {

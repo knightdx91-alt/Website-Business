@@ -33,7 +33,7 @@ import com.knightdx91.websitebusiness.net.Meta
 
 /** "Hi, this is Fox with Underground Associates." (the owner uses the caller name from Settings; team members their own). */
 fun greetingFor(meta: Meta?): String {
-    val me = if (meta != null && meta.isOwner) meta.callerName.ifBlank { meta.meName } else (meta?.meName ?: "")
+    val me = meta?.senderName ?: ""
     val co = meta?.companyName?.ifBlank { null }
     return "Hi, this is ${me.ifBlank { "me" }}${if (co != null) " with $co" else ""}."
 }

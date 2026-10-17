@@ -133,7 +133,7 @@ fun GbpScreen(state: AppState, nav: NavHostController, leadId: String) {
 
     /** "Hi, this is Fox with Underground Associates." */
     fun greeting(): String {
-        val me = if (isOwner) (meta?.callerName?.ifBlank { null } ?: meta?.meName ?: "") else (meta?.meName ?: "")
+        val me = meta?.senderName ?: ""
         val co = meta?.companyName?.ifBlank { null }
         return "Hi, this is ${me.ifBlank { "me" }}${if (co != null) " with $co" else ""}."
     }

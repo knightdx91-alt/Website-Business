@@ -605,7 +605,7 @@ const hr = `${cover(
   "HR &amp; accounting handbook",
   "Hiring, pay and the money, done right.",
   "How we hire, verify and pay the team, how commission works, and how money comes in and goes out of Underground Associates.",
-  ["Hiring checklist", "Forms and where to get them", "I-9 and E-Verify", "Employee or contractor", "Time clock and payroll", "Commission", "Money coming in", "Money going out and records", "Owner pay"],
+  ["Hiring checklist", "Forms and where to get them", "I-9 and E-Verify", "Employee or contractor", "Time clock and payroll", "Time off and leave", "Commission", "Money coming in", "Money going out and records", "Owner pay"],
 )}
 <section class="chap" style="page-break-before:auto"><div class="chap-head"><div class="num">i</div><div><h2>How to use this handbook</h2><p>For the owner and whoever handles hiring, payroll and the books</p></div></div>
 <div class="toc">
@@ -614,11 +614,12 @@ const hr = `${cover(
 <div><span>3</span>I-9 and E-Verify<em>required for every hire in Alabama</em></div>
 <div><span>4</span>Employee or contractor<em>how to tell, and why it matters</em></div>
 <div><span>5</span>Time clock and payroll<em>from shifts to paychecks</em></div>
-<div><span>6</span>Commission<em>how the team is paid on sales</em></div>
-<div><span>7</span>Money coming in<em>plans, payments, refunds, late fees</em></div>
-<div><span>8</span>Money going out and records<em>costs, what to keep and for how long</em></div>
-<div><span>9</span>Owner pay<em>draws, taxes, what a sale leaves</em></div>
-<div><span>10</span>Cut-out cards<em>for your desk</em></div>
+<div><span>6</span>Time off and leave<em>vacation, holidays, sick days, FMLA</em></div>
+<div><span>7</span>Commission<em>how the team is paid on sales</em></div>
+<div><span>8</span>Money coming in<em>plans, payments, refunds, late fees</em></div>
+<div><span>9</span>Money going out and records<em>costs, what to keep and for how long</em></div>
+<div><span>10</span>Owner pay<em>draws, taxes, what a sale leaves</em></div>
+<div><span>11</span>Cut-out cards<em>for your desk</em></div>
 </div>
 ${note("Not legal or tax advice", "This handbook explains how we work and points to the official sources. Rules change. Confirm anything important with our accountant, the IRS, USCIS or the Alabama Department of Labor before relying on it.", true)}
 </section>
@@ -722,13 +723,65 @@ ${ul([
 <li><b>Check every person's week</b>Look for missed clock-outs and shifts that look wrong.</li>
 <li><b>Fix a shift if needed</b>Tap the shift to change the date or times, or use Add a missed shift. The app records who made the change.</li>
 <li><b>Download the CSV</b>The payroll file has each person's hours and pay for the week.</li>
-<li><b>Add commission</b>From the Sales screen (chapter 6) for the pay period.</li>
+<li><b>Add commission and paid time off</b>Commission from the Sales screen (chapter 7); paid vacation, holiday and sick hours from the time-off log (chapter 6) for the pay period.</li>
 <li><b>Pay through payroll</b>Hand the file to whoever runs payroll, or enter it in the payroll service. Payroll handles withholding and tax filings.</li>
 </ol>
 ${note("Overtime", "Hourly employees who work more than 40 hours in a week are owed overtime under federal law. Check the weekly totals before paying.")}`,
 )}
 ${chap(
   6,
+  "Time off and leave",
+  "What the law requires of a company our size, and our own policy",
+  `<p class="lead">No federal or Alabama law makes a private employer give paid vacation, paid holidays or paid sick days. What we offer is our choice, so it has to be <b>written down and applied the same way to everyone</b>. Once it's written, we must follow it, including what happens to unused days when someone leaves.</p>
+<h3>Our time-off policy</h3>
+${note("Starting policy: the owner sets the final numbers", "The numbers below are a common starting point for a small Alabama business. Change them before giving this page to anyone, then have every employee sign a copy.")}
+${table(
+  ["", "Full-time (30+ hours a week)", "Part-time hourly", "Commission-only / contractors"],
+  [
+    ["Paid vacation", "5 days after 90 days; 10 days a year after the first anniversary, earned a little each pay period", "Unpaid time off, by request", "None (they set their own schedule)"],
+    ["Paid holidays", "New Year's Day, Memorial Day, July 4, Labor Day, Thanksgiving + the day after, Christmas Day", "Office closed; unpaid", "None"],
+    ["Paid sick days", "3 days a year, for themselves or to care for family; no doctor's note for 1–2 days", "Unpaid, no penalty", "None"],
+    ["Carry over", "Up to 5 unused vacation days into next year", "", ""],
+    ["When they leave", "Unused vacation is <b>not</b> paid out (Alabama doesn't require it, so this must be in writing)", "", ""],
+  ],
+)}
+<h3>Asking for time off</h3>
+<ol class="script">
+<li><b>Ask early</b>At least 2 weeks ahead for vacation, by text or email to the owner. Sick days: text before the shift starts.</li>
+<li><b>Owner approves</b>Approve or decline in writing (a text is fine). Busy weeks can be declined; try to be first come, first served.</li>
+<li><b>Put it on the calendar</b>Add a Task in the app for the days off, assigned to everyone, so it shows on the team's Google Calendar.</li>
+<li><b>Record it for payroll</b>The time clock only tracks hours worked, so keep a simple time-off log (name, date, hours, vacation / holiday / sick). Add paid hours to that week's payroll as a separate line.</li>
+</ol>
+<h3>FMLA (Family and Medical Leave Act)</h3>
+${table(
+  ["Who it covers", "What it gives"],
+  [
+    ["Employers with <b>50 or more employees</b> within 75 miles, for 20+ weeks this year or last", "Up to 12 weeks of <b>unpaid</b>, job-protected leave a year, with health insurance kept going"],
+    ["Employees who have worked here <b>12 months</b> and <b>1,250 hours</b> in the last year", "For their own serious health condition, a new child (birth, adoption, foster), caring for a seriously ill spouse, child or parent, or certain military family needs"],
+  ],
+)}
+<p><b>FMLA does not apply to us until we have 50 employees.</b> Alabama has no state family-leave law for private employers. Until then we use our own policy:</p>
+${ul([
+  "<b>Our family and medical leave (starting policy):</b> after 6 months, a full-time employee can take up to <b>6 weeks unpaid</b> for a new child, their own serious illness or injury, or caring for a seriously ill spouse, child or parent, and come back to the same job or one like it at the same pay.",
+  "They can use any paid vacation and sick days first.",
+  "Ask for a doctor's note or birth or adoption paperwork for anything over a week. Keep it in a locked file, apart from the personnel file.",
+  "Treat every request the same way, and write down what was agreed.",
+])}
+<h3>Leave the law requires of every employer (even small ones)</h3>
+${table(
+  ["Leave", "What we must do"],
+  [
+    ["Jury duty (Alabama)", "Give the time off and keep paying a <b>full-time</b> employee their usual wages while they serve. Never penalize anyone for being called."],
+    ["Military service (USERRA)", "Unpaid leave for service, and their job back when they return (up to 5 years in total)."],
+    ["Voting (Alabama)", "Up to 1 hour unpaid to vote if the polls aren't open 2 hours before or after their shift. They must ask ahead."],
+    ["Nursing mothers (PUMP Act)", "Reasonable break time and a private place that isn't a bathroom to pump, for a year after the birth."],
+    ["Workplace injury", "Alabama requires workers' compensation insurance once we have <b>5 or more employees</b>. Get a policy before the fifth hire."],
+  ],
+)}
+${note("Laws that start at 15 employees", "From 15 employees, the ADA, the Pregnant Workers Fairness Act and Title VII also apply. They can require leave or schedule changes as a reasonable accommodation. Talk to the accountant or an employment lawyer before we reach 15.")}`,
+)}
+${chap(
+  7,
   "Commission",
   "Set in Settings → Commission; the app does the math",
   `${table(
@@ -757,7 +810,7 @@ ${ul([
 ])}`,
 )}
 ${chap(
-  7,
+  8,
   "Money coming in",
   "How clients pay us, and what happens when something goes wrong",
   `${table(
@@ -793,7 +846,7 @@ ${ul([
 ])}`,
 )}
 ${chap(
-  8,
+  9,
   "Money going out and records",
   "Know what we pay for, and keep what the law requires",
   `<h3>Costs &amp; usage</h3>
@@ -820,7 +873,7 @@ ${table(
 ${note("Backups", "The app makes a weekly backup automatically, and the owner can download one any time from Settings → Team. Card and bank numbers are never stored by us; Stripe holds them.")}`,
 )}
 ${chap(
-  9,
+  10,
   "Owner pay",
   "The owner isn't paid commission; the owner is paid from profit",
   `<p class="lead">The owner's own sales earn no commission (Settings → Commission, "owner earns" off). That money stays in the company. Whatever the company has left after its bills and the team's pay is the profit, and the profit is the owner's. The owner takes it out as an <b>owner's draw</b>: a transfer from the business account to their personal account.</p>
@@ -838,7 +891,7 @@ ${table(
 <p>Running costs (Cloudflare, Google Workspace, Claude, domains, hourly pay) come out of what's left. Settings → <b>Costs &amp; usage</b> shows them month by month. <b>What I'd earn</b> in the app shows the company's side of any plan, way to pay and extras.</p>
 <h3>Taking a draw</h3>
 <ol class="script">
-<li><b>Close the month first</b>Do the monthly close (chapter 8) so you know the real profit.</li>
+<li><b>Close the month first</b>Do the monthly close (chapter 9) so you know the real profit.</li>
 <li><b>Leave a cushion</b>Keep at least one month of running costs and next month's commission in the business account.</li>
 <li><b>Set aside taxes</b>Move about 25–30% of the profit to a separate tax savings account before drawing (see below).</li>
 <li><b>Draw the rest, or part of it</b>Transfer from the business account to your personal account and label it "Owner's draw" in the books. A draw is not payroll and nothing is withheld.</li>
@@ -854,16 +907,17 @@ ${ul([
 ${note("Keep money separate", "Pay personal bills from your personal account, never straight from the business account or card. Clean separation keeps the LLC's protection and makes taxes simple.", true)}`,
 )}
 ${chap(
-  10,
+  11,
   "Cut-out cards",
   "Cut along the dashed lines and keep them at your desk",
   `<div class="cards">
 ${card("New hire checklist", `<ol style="font-size:8.8pt;margin-left:.18in">${["Offer accepted in writing", "I-9 Section 1 by day one", "I-9 Section 2 within 3 business days", "E-Verify within 3 business days", "W-4 and A-4 to payroll", "Alabama new-hire report within 7 days", "Add to app: email + hourly pay", "Handbook + sign-off + Training"].map((x) => `<li>${x}</li>`).join("")}</ol>`)}
 ${card("Payday checklist", `<ol style="font-size:8.8pt;margin-left:.18in">${["Open Timesheets (Mon to Sun)", "Fix missed clock-outs", "Check for overtime (over 40 hours)", "Download the CSV", "Add commission from Sales", "Send to payroll"].map((x) => `<li>${x}</li>`).join("")}</ol>`)}
 ${card("Commission at a glance", table(["Sale", "Earns"], [["New plan", "1 month up front"], ["Later payments", "10% for 24 months"], ["Setup fee", "20%"], ["One-time extras", "20%"], ["Split (30 days)", "Opener 40% of bonus"], ["Refund in 60 days", "Taken back"], ["Owner's own sales", "No commission"]]))}
+${card("Time off at a glance", table(["What", "Rule"], [["Vacation", "Ask 2 weeks ahead"], ["Sick day", "Text before your shift"], ["Calendar", "Add a Task for the days off"], ["Payroll", "Log paid hours separately"], ["FMLA", "Not until 50 employees"], ["Jury duty", "Full-time keep their pay"]]))}
 ${card("Where to get forms", table(["Form", "Site"], [["I-9", "uscis.gov/i-9"], ["E-Verify", "e-verify.gov"], ["W-4", "irs.gov/w4"], ["A-4", "revenue.alabama.gov"], ["New hire", "labor.alabama.gov/NewHire"], ["W-9", "irs.gov/w9"]]))}
-${card("Keep records", table(["Record", "How long"], [["I-9", "3 yrs after hire / 1 yr after leaving (later)"], ["Payroll and taxes", "4+ years"], ["Timesheets", "3+ years"], ["Contractor W-9", "4+ years"]]), true)}
-</div><p class="scissors">- - - - - cut here - - - - -</p>`,
+${card("Keep records", table(["Record", "How long"], [["I-9", "3 yrs after hire / 1 yr after leaving (later)"], ["Payroll and taxes", "4+ years"], ["Timesheets", "3+ years"], ["Contractor W-9", "4+ years"]]))}
+</div>`,
   true,
 )}`;
 

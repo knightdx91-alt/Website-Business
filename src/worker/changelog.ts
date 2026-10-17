@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 53,
+    date: "2026-10-17",
+    android: "2.81",
+    title: "Mailed-flyer button, and texts in your own name",
+    items: [
+      "New on every lead: 📬 I mailed it, under the flyer code. Tap it after a flyer goes in the mail. It keeps their preview up for the code and books a call 5 days out, when the flyer should have arrived. 📬 Mailed a flyer is also in Log a call or visit.",
+      "Fixed: preview texts, flyers and call guides sent by team members with full access started with the owner's name. They now use the name of whoever is signed in.",
+    ],
+  },
+  {
     n: 52,
     date: "2026-10-16",
     title: "Tasks show in the Google Tasks app",
