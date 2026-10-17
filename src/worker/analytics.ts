@@ -15,7 +15,8 @@ import { fcmJwt, type ServiceAccount } from "./fcm.ts";
  * and shown in Settings, and the site goes live without the tag.
  */
 
-const SCOPE = "https://www.googleapis.com/auth/analytics.edit";
+// edit = make properties and streams; manage.users = "Give the owner access" (access bindings refuse a token without it).
+const SCOPE = "https://www.googleapis.com/auth/analytics.edit https://www.googleapis.com/auth/analytics.manage.users";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const ADMIN = "https://analyticsadmin.googleapis.com";
 export const GA_ERROR_KEY = "ga_last_error";
