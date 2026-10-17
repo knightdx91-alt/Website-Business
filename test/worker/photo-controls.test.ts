@@ -131,3 +131,18 @@ test("where a gallery photo shows: one place each, and nowhere when hidden", asy
   assert.equal(count(hidden, "g1.jpg"), 0);
   assert.equal(count(hidden, "g2.jpg"), 1);
 });
+
+test("words on the main photo: bottom of the photo (cover) or under it (card), on any design", async () => {
+  const r0 = salonWithPhotos();
+  assert.ok(fields(r0).some((x) => x.card === "photo" && x.name === "heroText"));
+  const look = "salon.blush_hour~circle~h0n2b3s4v4c0f1a1p0t0r0k1d2o0m0q0g0e0u0w0x3y4z0";
+  for (const [v, hero] of [["bottom", "cover"], ["below", "card"]] as const) {
+    const { edits } = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { heroText: v });
+    const { record } = applyEdits(r0, sampleCopy(), edits as never);
+    assert.equal(record.heroText, v);
+    const html = String((await buildSite({ record, copy: sampleCopy(), site: { slug: "s", look }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
+    assert.match(html, new RegExp(`<html[^>]*data-hero="${hero}"`));
+  }
+  const off = applyEdits({ ...r0, heroText: "below" }, sampleCopy(), { record: { heroText: "" } } as never).record;
+  assert.equal(off.heroText, undefined);
+});

@@ -4,7 +4,7 @@ import { actionBar, announcements, footer, gallery, header, hiring, sectionHead,
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
 import { html, jsonForScript, raw, type Raw } from "./html.ts";
-import { dnaAttrs } from "./dna.ts";
+import { dnaAttrs, settleDna } from "./dna.ts";
 import { addLife, footerEdge } from "./life.ts";
 import { lintSite, type LintResult } from "./lint.ts";
 import { packFor } from "./packs/index.ts";
@@ -73,7 +73,7 @@ function doc(ctx: Ctx, pack: CategoryPack, o: DocOpts): string {
   // Link previews (texts, Facebook) get the hero photo when it's one we may show; Google photos stay out of the HTML.
   const heroImg = ctx.r.media.hero;
   const ogImage = heroImg && heroImg.source !== "google" ? new URL(heroImg.src, origin).toString() : undefined;
-  return `<!doctype html>${html`<html lang="${o.lang ?? "en"}" class="no-js"${raw(dnaAttrs(ctx.theme.dna))}><head>
+  return `<!doctype html>${html`<html lang="${o.lang ?? "en"}" class="no-js"${raw(dnaAttrs(ctx.theme.dna))}${raw(ctx.r.heroText ? ` data-htext="${ctx.r.heroText}"` : "")}><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${o.title}</title>
@@ -154,7 +154,10 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   // Every business can run a live price list (generator/pricelist.ts): the page and its nav link ride on top of the pack.
   const pack: CategoryPack = { ...basePack, nav: (c) => [...priceListNav(c), ...basePack.nav(c)], pages: (c) => [...basePack.pages(c), ...[pricesPage(c)].filter((p): p is PageSpec => !!p)] };
   const look = input.site.look || pack.defaultLook(input.record);
-  const theme = resolveTheme(look);
+  const designed = resolveTheme(look);
+  // Edit → Photo → "Words on the main photo" moves the name off a photo that carries its own sign.
+  const place = input.record.heroText;
+  const theme = place ? { ...designed, dna: settleDna({ ...designed.dna, hero: place === "below" ? "card" : "cover" }) } : designed;
   // No photo that may show here (none at all, or Google's on a live site): a trade scene opens the page instead.
   const scenes = scenesFor(input.record, input.record.placeId || input.record.name);
   const own = input.record.media.hero;

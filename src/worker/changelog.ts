@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 57,
+    date: "2026-10-17",
+    title: "Move the words off a sign in the main photo",
+    items: [
+      "Edit → Photo → “Words on the main photo”: when the business name covers a sign or lettering in their photo, pick “Under the photo” (the photo shows clear with nothing on it, the name sits on a card below) or “Bottom of the photo” (the top half of the photo stays clear and the words sit at the bottom). Then Save.",
+      "“As designed” puts it back. Works on every website and in the phone app, no update needed. Keep in view and Zoom in on phones still move the photo itself.",
+    ],
+  },
+  {
     n: 56,
     date: "2026-10-17",
     title: "Pick where each photo shows",

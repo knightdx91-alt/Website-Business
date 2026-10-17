@@ -588,6 +588,9 @@ export interface BusinessRecord {
   /** Stock photos the owner picked by hand (file names under /assets/scene/): the main photo when they have none of their own, and the
    *  wide photo between sections / behind the closing call. Their own photo for the strip is `Image.band` on a gallery photo. */
   photoPicks?: { hero?: string; strip?: string };
+  /** Where the opening's words sit when the main photo has its own sign or lettering: at the bottom of the photo (cover
+   *  opening, the top of the photo shows clear) or under the photo (card opening, nothing on the photo). Unset = the design's. */
+  heroText?: "bottom" | "below";
   /** Grouped service menus: a line under each group heading ("Color" → "Any lightening adds Olaplex, $40"). */
   serviceNotes?: Record<string, string>;
   timezone: string;

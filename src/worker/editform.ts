@@ -519,6 +519,7 @@ export function editForm(l: EditDetail): EditForm {
             sel("heroZoom", "Zoom in on phones (so a sign or detail is big enough to read)", hero.zoomPhone ? String(hero.zoomPhone) : "", withCurrent(ZOOM_OPTIONS, hero.zoomPhone ? String(hero.zoomPhone) : "")),
           ]
         : []),
+      sel("heroText", "Words on the main photo (when they cover a sign in the photo)", r.heroText || "", HERO_TEXT_OPTIONS),
     ],
     {
       kind: "photo",
@@ -3146,6 +3147,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
     services: hasServices && has("services") ? lines("services") : undefined,
     heroFocus: has("heroFocus") ? v("heroFocus") || "" : undefined,
     heroZoom: has("heroZoom") ? (v("heroZoom") ? Number(v("heroZoom")) : null) : undefined,
+    heroText: has("heroText") ? ((v("heroText") || "") as "" | "bottom" | "below") : undefined,
     photoPicks: pickEdits(r as BusinessRecord, values),
     hiddenScenes: Object.keys(values).some((k) => k.startsWith("noscene_"))
       ? Object.keys(values)
@@ -3237,3 +3239,10 @@ export const PHOTO_PLACES: Array<[string, string]> = [
 export function photoPlace(p: { whatsNew?: boolean; band?: boolean; hidden?: boolean }): string {
   return p.hidden ? "hidden" : p.band ? "strip" : p.whatsNew ? "new" : "grid";
 }
+
+/** Edit → Photo → "Words on the main photo" (mirrored in app.js). */
+export const HERO_TEXT_OPTIONS: Array<[string, string]> = [
+  ["", "As designed"],
+  ["bottom", "Bottom of the photo"],
+  ["below", "Under the photo"],
+];

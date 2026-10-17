@@ -174,6 +174,9 @@ html[data-hero="card"] .hero__card .status{background:var(--band)}
 html[data-hero="card"] .hero__card .btn--ghost{color:var(--text)}
 html[data-hero="card"] .hero__credit{position:static;text-align:right;color:var(--muted);padding:0 20px 8px;font-size:.72rem}
 @media (min-width:900px){html[data-hero="card"] .hero__in{margin-top:-128px;padding-bottom:56px}html[data-hero="card"] .hero__card{padding:44px 48px}}
+html[data-htext="below"][data-hero="card"] .hero__in{margin-top:-12px}
+@media (min-width:900px){html[data-htext="below"][data-hero="card"] .hero__in{margin-top:-24px}}
+@media (max-width:899px){html[data-htext="bottom"][data-hero="cover"] .hero--photo .hero__in{padding-top:min(52vh,460px)}html[data-htext="bottom"][data-hero="cover"] .hero--photo .hero__media::after{background:linear-gradient(180deg,transparent 0%,transparent 26%,${withAlpha(c.heroBg, 0.7)} 36%,${withAlpha(c.heroBg, 0.94)} 44%,${withAlpha(c.heroBg, 0.98)} 100%)}}
 /* opening: the business name huge */
 html[data-hero="billboard"] .hero__in{padding:32px 20px 40px}
 html[data-hero="billboard"] .hero h1{font-size:clamp(2.2rem,min(14vw,calc((100vw - 40px) / var(--h1-ch,8) / var(--h1-adv,.72))),9.5rem);line-height:.9;letter-spacing:-.03em;text-transform:uppercase;margin:0 0 .25em;overflow-wrap:normal;max-width:none}
