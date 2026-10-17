@@ -544,12 +544,14 @@ export function healthItems(h: HealthInput): HealthItem[] {
           {
             id: "analytics",
             label: "Google Analytics on client sites",
-            state: (h.analytics.state === "on" && !h.analytics.lastError ? "ok" : "warn") as HealthItem["state"],
+            state: (h.analytics.state === "on" && !h.analytics.lastError && h.analytics.sites > 0 ? "ok" : "warn") as HealthItem["state"],
             detail:
               h.analytics.state === "on"
                 ? h.analytics.lastError
-                  ? `Connected, but the last setup failed: ${h.analytics.lastError}`
-                  : `Every published site gets its own Google Analytics property (${h.analytics.sites} so far).`
+                  ? `Connected, but the last setup failed: ${h.analytics.lastError}. Check: (a) Google Cloud (the project of ${h.analytics.serviceEmail ?? "the service account"}) has "Google Analytics Admin API" switched on; (b) Google Analytics → Admin → Account access management lists ${h.analytics.serviceEmail ?? "the service account's email"} as Administrator.`
+                  : h.analytics.sites > 0
+                    ? `Every published site gets its own Google Analytics property (${h.analytics.sites} so far).`
+                    : `Account saved; no site has been set up yet. Before the first publish: (2) In Google Cloud (the project of ${h.analytics.serviceEmail ?? "the service account"}), switch on "Google Analytics Admin API". (3) Google Analytics → Admin → Account access management → add ${h.analytics.serviceEmail ?? "the service account's email"} as Administrator. This turns green after the first site gets its property.`
                 : `Not set up yet. (1) analytics.google.com → Admin → Create account "Underground Associates Clients"; copy its Account ID into Settings → Website → "Google Analytics account for client sites". (2) In Google Cloud (the project of ${h.analytics.serviceEmail ?? "the service account"}), switch on "Google Analytics Admin API". (3) Google Analytics → Admin → Account access management → add ${h.analytics.serviceEmail ?? "the service account's email"} as Administrator.${h.analytics.state === "account" ? " Step 1 is the one missing." : h.analytics.state === "secret" ? " The Worker has no service account (GA_SERVICE_ACCOUNT or FCM_SERVICE_ACCOUNT)." : ""}`,
             section: "Website",
           },
