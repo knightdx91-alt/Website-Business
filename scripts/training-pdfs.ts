@@ -2,7 +2,7 @@
  * Printable training handbooks (Oct 2026, owner's ask): one PDF for the marketing team, one for callers (phone + in person),
  * on brand: the UA badge, print navy / gold (the screen navy prints gray, see mailer-flyer.ts), Montserrat / Inter.
  *   npx tsx scripts/training-pdfs.ts [--out research/training] [--phone 256-636-5886] [--png <dir>]
- * Writes <out>/UA-Marketing-Training.pdf and <out>/UA-Caller-Training.pdf. Prices and plan contents mirror live Settings
+ * Writes <out>/UA-Marketing-Training.pdf, <out>/UA-Caller-Training.pdf and <out>/UA-HR-Accounting-Handbook.pdf. Prices and plan contents mirror live Settings
  * (Oct 2026); rerun after a price change. Not served by the app: hand the files to the team.
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -598,6 +598,240 @@ ${card("Log every call", table(["Phone", "In person", "Result"], [["No answer", 
   true,
 )}`;
 
+
+// ---- HR & accounting handbook ----
+
+const hr = `${cover(
+  "HR &amp; accounting handbook",
+  "Hiring, pay and the money, done right.",
+  "How we hire, verify and pay the team, how commission works, and how money comes in and goes out of Underground Associates.",
+  ["Hiring checklist", "Forms and where to get them", "I-9 and E-Verify", "Employee or contractor", "Time clock and payroll", "Commission", "Money coming in", "Money going out and records"],
+)}
+<section class="chap" style="page-break-before:auto"><div class="chap-head"><div class="num">i</div><div><h2>How to use this handbook</h2><p>For the owner and whoever handles hiring, payroll and the books</p></div></div>
+<div class="toc">
+<div><span>1</span>Hiring someone new<em>the checklist, start to finish</em></div>
+<div><span>2</span>Forms and where to get them<em>all free, all official</em></div>
+<div><span>3</span>I-9 and E-Verify<em>required for every hire in Alabama</em></div>
+<div><span>4</span>Employee or contractor<em>how to tell, and why it matters</em></div>
+<div><span>5</span>Time clock and payroll<em>from shifts to paychecks</em></div>
+<div><span>6</span>Commission<em>how the team is paid on sales</em></div>
+<div><span>7</span>Money coming in<em>plans, payments, refunds, late fees</em></div>
+<div><span>8</span>Money going out and records<em>costs, what to keep and for how long</em></div>
+<div><span>9</span>Cut-out cards<em>for your desk</em></div>
+</div>
+${note("Not legal or tax advice", "This handbook explains how we work and points to the official sources. Rules change. Confirm anything important with our accountant, the IRS, USCIS or the Alabama Department of Labor before relying on it.", true)}
+</section>
+${chap(
+  1,
+  "Hiring someone new",
+  "Do these in order, every time, for every hire",
+  `<ol class="script">
+<li><b>Make the offer</b>Agree on the job, pay (hourly, commission or both) and start date in writing. Only after they accept do any of the steps below.</li>
+<li><b>Form I-9, Section 1</b>The new hire fills it out on or before their first day of work.</li>
+<li><b>Form I-9, Section 2</b>Within 3 business days of their start date, you look at their original ID documents in person and complete Section 2.</li>
+<li><b>E-Verify</b>Within the same 3 business days, enter their I-9 details at e-verify.gov. You usually get a result in seconds.</li>
+<li><b>Tax forms</b>Federal Form W-4 and Alabama Form A-4 (Alabama does not accept the W-4 for state withholding). Give both to whoever runs payroll.</li>
+<li><b>Report the new hire to Alabama</b>Within 7 days of their first day, through the Alabama New-Hire program (online, or mail or fax a copy of the W-4 for small employers).</li>
+<li><b>Add them to the app</b>Settings → Team: name, their <b>company email</b> (tasks go straight to their Google Calendar and Tasks), and hourly pay if they're paid by the hour. Give them their Google sign-in.</li>
+<li><b>Training</b>Hand them the right handbook (caller or marketing), have them sign the sign-off line, and point them to Training in the app.</li>
+</ol>
+${note("Never", "Never run E-Verify on applicants before they're hired, never pick and choose who gets checked, and never ask for specific ID documents. The employee chooses which documents to show from the official list.", true)}`,
+  true,
+)}
+${chap(
+  2,
+  "Forms and where to get them",
+  "Every form below is free from the official source",
+  `${table(
+    ["Form", "What it's for", "Where to get it", "Who keeps it"],
+    [
+      ["I-9", "Proves the person may work in the U.S.", "uscis.gov/i-9", "We do, on file (not sent anywhere)"],
+      ["E-Verify", "Confirms the I-9 with the government", "e-verify.gov (free, enroll once)", "Case result kept with the I-9"],
+      ["W-4", "Federal income tax withholding", "irs.gov/w4", "Payroll"],
+      ["A-4", "Alabama income tax withholding", "revenue.alabama.gov (Forms)", "Payroll"],
+      ["New-hire report", "Alabama child support / unemployment matching", "labor.alabama.gov/NewHire", "Filed online; keep the confirmation"],
+      ["W-9", "Tax ID from an independent contractor", "irs.gov/w9", "The books, for year-end 1099s"],
+    ],
+  )}
+${note("Always use the current edition", "Download each form from the official page every time. Older editions of the I-9 in particular are not accepted.")}`,
+)}
+${chap(
+  3,
+  "I-9 and E-Verify",
+  "Alabama law requires every employer to use E-Verify for new hires",
+  `<p class="lead">E-Verify is <b>free</b>. Alabama's Beason-Hammon Act (2011) requires all employers in the state to enroll and check every new hire, and has applied since April 2012. Using it also protects us if a hire ever turns out not to be authorized to work.</p>
+<h3>Enrolling (once)</h3>
+${ul([
+  "Go to e-verify.gov and enroll the company.",
+  "Sign the agreement (the MOU) and complete the short online tutorial.",
+  "Keep the login with whoever does hiring.",
+])}
+<h3>For every new hire</h3>
+<ol class="script">
+<li><b>I-9 Section 1</b>The employee fills it out by day one.</li>
+<li><b>I-9 Section 2</b>You inspect their original documents in person within 3 business days, for example a driver's license plus a Social Security card, or a U.S. passport.</li>
+<li><b>Create the E-Verify case</b>Within 3 business days of the start date. Most come back "Employment Authorized" right away.</li>
+<li><b>If it comes back as a mismatch</b>Give the employee the notice E-Verify prints, let them decide whether to contest, and do not fire or penalize them while it's being resolved. Follow the steps E-Verify shows.</li>
+</ol>
+<h3>Keeping I-9s</h3>
+${ul([
+  "Keep each I-9 for <b>3 years after the hire date or 1 year after they leave, whichever is later</b>.",
+  "Store I-9s apart from regular personnel files; they hold ID details.",
+  "Paper or scanned copies are fine. Never put ID numbers in the team app.",
+  "You don't re-check people hired before we enrolled in E-Verify.",
+])}`,
+)}
+${chap(
+  4,
+  "Employee or contractor",
+  "How someone is classified decides taxes, forms and E-Verify",
+  `${table(
+    ["Usually an employee if…", "Usually a contractor if…"],
+    [
+      ["We set their hours or schedule", "They choose when and how they work"],
+      ["They clock in with our time clock", "They bill us per job or per invoice"],
+      ["We train them on our way of doing it", "They bring their own methods and tools"],
+      ["They work mainly for us, ongoing", "They have other clients and their own business"],
+    ],
+  )}
+${table(
+  ["", "Employee", "Contractor"],
+  [
+    ["Forms at hire", "I-9, E-Verify, W-4, A-4, new-hire report", "W-9 only"],
+    ["Taxes withheld", "Yes, by payroll", "No; they pay their own"],
+    ["Year-end form", "W-2", "1099-NEC (check the IRS's current threshold)"],
+  ],
+)}
+${note("When in doubt, treat them as an employee", "Calling an employee a contractor can bring back taxes and penalties. Anyone on the app's hourly time clock should be treated as an employee. Ask the accountant about anyone unclear.")}`,
+)}
+${chap(
+  5,
+  "Time clock and payroll",
+  "The app tracks the hours; payroll pays them",
+  `<h3>How the team clocks in</h3>
+${ul([
+  "Anyone with an hourly rate gets a <b>Clock in / Clock out</b> card at the top of the Tasks screen, on the web app and the phone app.",
+  "Hourly pay is set per person in Settings → Team → <b>Set hourly pay</b>. Leave it blank for commission-only people.",
+  "Each shift keeps the rate it started with, so a raise only affects later shifts.",
+  "Anyone on the clock for 10 hours gets flagged with an alert to the owner, in case they forgot to clock out.",
+])}
+<h3>Running payroll each week</h3>
+<ol class="script">
+<li><b>Open Timesheets</b>Owner or full access: Settings → Timesheets. Weeks run Monday to Sunday, Cullman time.</li>
+<li><b>Check every person's week</b>Look for missed clock-outs and shifts that look wrong.</li>
+<li><b>Fix a shift if needed</b>Tap the shift to change the date or times, or use Add a missed shift. The app records who made the change.</li>
+<li><b>Download the CSV</b>The payroll file has each person's hours and pay for the week.</li>
+<li><b>Add commission</b>From the Sales screen (chapter 6) for the pay period.</li>
+<li><b>Pay through payroll</b>Hand the file to whoever runs payroll, or enter it in the payroll service. Payroll handles withholding and tax filings.</li>
+</ol>
+${note("Overtime", "Hourly employees who work more than 40 hours in a week are owed overtime under federal law. Check the weekly totals before paying.")}`,
+)}
+${chap(
+  6,
+  "Commission",
+  "Set in Settings → Commission; the app does the math",
+  `${table(
+    ["What sold", "What the seller earns"],
+    [
+      ["A new plan", "One month of the plan up front, on the first payment"],
+      ["Every later payment", "10% of each payment, for up to 24 months"],
+      ["Yearly plan paid up front", "One month + 10% of the yearly payment, then 10% of each renewal"],
+      ["Month-to-month setup fee", "20% of the setup fee"],
+      ["One-time and per-item extras", "20% of what's charged"],
+      ["Priced-per-job extras", "20% of what's charged"],
+      ["Founding-customer free extras", "Nothing (they're free)"],
+    ],
+  )}
+<h3>Split sales</h3>
+${ul([
+  "If one person had the first real contact and another closed the sale within 30 days, the opener gets 40% of the up-front bonus and the closer gets the rest.",
+  "Ongoing 10% payments all go to the closer.",
+  "If a client cancels or is refunded within 60 days, the commission on that sale is taken back.",
+  "The owner's own sales don't earn commission; that money stays in the company.",
+])}
+<h3>Where to see it</h3>
+${ul([
+  "Everyone can open <b>What I'd earn</b> (Home or Settings) to see the commission on any plan, way to pay and extras.",
+  "The <b>Sales</b> screen shows \"Commission this month\" per person. It's an estimate built from paid sign-ups; check it against Stripe before paying.",
+])}`,
+)}
+${chap(
+  7,
+  "Money coming in",
+  "How clients pay us, and what happens when something goes wrong",
+  `${table(
+    ["How they pay", "Card fees (Stripe)", "Notes"],
+    [
+      ["Online (sign-up link, website Buy now)", "2.9% + 30¢ per charge", "Renewals charge the card on file automatically"],
+      ["Tap to Pay on our phone", "2.7% + 5¢, plus 10¢ per tap", "The tapped card becomes the card on file"],
+      ["Card typed on the phone", "Same as online", "Payment sheet in the phone app"],
+      ["Invoice (check or bank transfer)", "None", "Churches and some clients; Net 15 or 30"],
+    ],
+  )}
+<h3>Plans and ways to pay</h3>
+${plansTable}
+${payTable}
+<h3>When a payment fails</h3>
+${ul([
+  "Stripe retries and the app alerts the owner.",
+  "A $15 late fee can apply after 10 days, and interest of 8% a year after 30 days overdue (set in Settings → Sales).",
+  "At 30 days overdue the site can be taken offline; at 60 days the agreement can end with the balance due. Reinstatement is $49.",
+  "A chargeback counts as a missed payment plus the bank's $15 fee.",
+])}
+<h3>Refunds</h3>
+${ul([
+  "Only the owner (or full access) can refund, from the client's lead page → ↩ Refund.",
+  "The refund dialog shows what's left to refund and repeats the agreement's refund rules.",
+  "A full refund with the plan ended marks the sign-up unpaid, adds a note to the call log and alerts the team.",
+])}
+<h3>Referral credits</h3>
+${ul([
+  "When a referred business pays for a 6- or 12-month plan, the referring client gets 2 months of their plan free (up to 2 a year).",
+  "If the client pays through Stripe, the credit comes off their next invoices automatically.",
+  "If not, the app shows a \"by hand\" credit. Apply it on their next invoice, then mark it applied in the app.",
+])}`,
+)}
+${chap(
+  8,
+  "Money going out and records",
+  "Know what we pay for, and keep what the law requires",
+  `<h3>Costs &amp; usage</h3>
+<p>Settings → <b>Costs &amp; usage</b> lists every outside service we pay for (Cloudflare, Google Workspace, Google Maps data, Claude AI, email and so on), what each costs this month, and how close we are to each free allowance. The monthly budget is set there (default $150). The app sends an alert when a free allowance is 80% used, a renewal is due within 30 days, or we go over budget.</p>
+<h3>Monthly close</h3>
+<ul class="check">
+<li>Match Stripe payouts to paid sign-ups in the app (Sales screen).</li>
+<li>Check Costs &amp; usage against the actual bills.</li>
+<li>Apply any by-hand referral credits.</li>
+<li>Follow up on failed payments and open invoices.</li>
+<li>Pay commission for the month.</li>
+</ul>
+<h3>What to keep and for how long</h3>
+${table(
+  ["Record", "Keep for", "Where"],
+  [
+    ["Form I-9 (+ E-Verify case result)", "3 years after hire or 1 year after leaving, whichever is later", "Locked file, separate from personnel files"],
+    ["Payroll and employment tax records", "At least 4 years", "Payroll service / accountant"],
+    ["Timesheets", "At least 3 years (download the CSV each week)", "With payroll records"],
+    ["Signed client agreements", "As long as they're a client, plus several years", "In the app (each sign-up keeps its signed PDF)"],
+    ["W-9s from contractors", "At least 4 years", "The books"],
+  ],
+)}
+${note("Backups", "The app makes a weekly backup automatically, and the owner can download one any time from Settings → Team. Card and bank numbers are never stored by us; Stripe holds them.")}`,
+)}
+${chap(
+  9,
+  "Cut-out cards",
+  "Cut along the dashed lines and keep them at your desk",
+  `<div class="cards">
+${card("New hire checklist", `<ol style="font-size:8.8pt;margin-left:.18in">${["Offer accepted in writing", "I-9 Section 1 by day one", "I-9 Section 2 within 3 business days", "E-Verify within 3 business days", "W-4 and A-4 to payroll", "Alabama new-hire report within 7 days", "Add to app: email + hourly pay", "Handbook + sign-off + Training"].map((x) => `<li>${x}</li>`).join("")}</ol>`)}
+${card("Payday checklist", `<ol style="font-size:8.8pt;margin-left:.18in">${["Open Timesheets (Mon to Sun)", "Fix missed clock-outs", "Check for overtime (over 40 hours)", "Download the CSV", "Add commission from Sales", "Send to payroll"].map((x) => `<li>${x}</li>`).join("")}</ol>`)}
+${card("Commission at a glance", table(["Sale", "Earns"], [["New plan", "1 month up front"], ["Later payments", "10% for 24 months"], ["Setup fee", "20%"], ["One-time extras", "20%"], ["Split (30 days)", "Opener 40% of bonus"], ["Refund in 60 days", "Taken back"]]))}
+${card("Where to get forms", table(["Form", "Site"], [["I-9", "uscis.gov/i-9"], ["E-Verify", "e-verify.gov"], ["W-4", "irs.gov/w4"], ["A-4", "revenue.alabama.gov"], ["New hire", "labor.alabama.gov/NewHire"], ["W-9", "irs.gov/w9"]]))}
+${card("Keep records", table(["Record", "How long"], [["I-9", "3 yrs after hire / 1 yr after leaving (later)"], ["Payroll and taxes", "4+ years"], ["Timesheets", "3+ years"], ["Contractor W-9", "4+ years"]]), true)}
+</div><p class="scissors">- - - - - cut here - - - - -</p>`,
+  true,
+)}`;
+
 const doc = (body: string) => `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${body}</body></html>`;
 const footer = (label: string) =>
   `<div style="width:100%;font:600 7.5pt Helvetica,Arial,sans-serif;color:#7a869c;padding:0 .7in;display:flex;justify-content:space-between"><span>Underground Associates · ${label}</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`;
@@ -609,6 +843,7 @@ const browser = await chromium
 for (const [file, label, body] of [
   ["UA-Marketing-Training.pdf", "Marketing team handbook", marketing],
   ["UA-Caller-Training.pdf", "Caller handbook", callers],
+  ["UA-HR-Accounting-Handbook.pdf", "HR & accounting handbook", hr],
 ] as const) {
   const page = await browser.newPage({ viewport: { width: 816, height: 1056 } });
   await page.setContent(doc(body), { waitUntil: "load" });
