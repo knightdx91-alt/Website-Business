@@ -2708,10 +2708,18 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       )
         .bind(paid ? 1 : 0, signupId, id)
         .run();
-      if (paid)
+      if (paid) {
         await onPlanPaid(env, id, signupId).catch((err) =>
           console.error("referral credit", err),
         );
+        // Like a Stripe payment: the "payment not finished, call them" callback is done, and the call log says who ticked it.
+        await updateLead(env, id, { follow_up: null });
+        await env.DB.prepare(
+          "INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, 'Marked paid by hand (payment set up outside the app)', ?)",
+        )
+          .bind(newId(), id, session.name, now())
+          .run();
+      }
       await notify(env, {
         kind: "paid",
         actor: session,

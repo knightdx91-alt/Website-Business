@@ -1869,3 +1869,10 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   business with the same name…", sets `found_url` NULL and presence back to `none`. `forgetSiteImport` now also removes the founding
   year / email / social links that page filled in. The GA health row keeps the service account email and steps until a site has a
   property (`sites > 0`). `test/web-presence.test.ts`.
+- 🧪 Dry run "Doug's Diner" (Oct 2026, owner + Katy, hand-added fake restaurant, lead c13f41a9a89c4a60): besides the namesake fix above it
+  caught (1) the web lead page crashing for every lead with "reload is not defined": the 📬 I mailed it change called `bindMailed($app,
+  reload)` inside `bindFlyer()`, where `reload` isn't in scope (it's viewLead's); `bindFlyer(reload = () => render())` now. Android was
+  never affected. Check the web after any app.js change with the 21-route smoke script (scratchpad `dryrun/screens.mjs`: local dev on
+  8788 with `--host website-business.knightdx91.workers.dev`, login `local-test-pass-2026`, `pageerror` + "is not defined" on every
+  route). (2) "Payment is set up" (`/paid` true) now clears `follow_up` and writes "Marked paid by hand" in the call log, like a
+  Stripe payment does. (3) The GA Settings row hid the service account email once the account ID was saved (fixed above).

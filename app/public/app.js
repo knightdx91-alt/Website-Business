@@ -1119,7 +1119,7 @@ async function viewLead(id, intent) {
     bindSignup(l, reload);
     bindReferral(l, reload);
     bindContact(l);
-    bindFlyer();
+    bindFlyer(reload);
     if (l.salesStatus === "live" && owner) bindLive(l);
     if (C.domain) bindDomain(l);
     // Phones: the log card goes right under the header so a call can be logged without scrolling past everything.
@@ -1247,7 +1247,7 @@ async function viewLead(id, intent) {
 
   // Flyer: POST marks the lead Shown (callers may), then the printable page opens in a new tab (GET has no side effects).
   // Older servers mark Shown on the GET itself, so a 404 on the POST is fine.
-  function bindFlyer() {
+  function bindFlyer(reload = () => render()) {
     $app.querySelectorAll("[data-mailcode]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try {

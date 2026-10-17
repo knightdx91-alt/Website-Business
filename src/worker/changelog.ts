@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 64,
+    date: "2026-10-17",
+    title: "Web lead page fixed",
+    items: [
+      "The lead page in the web app (laptop / phone browser) showed \"reload is not defined\" since the 📬 I mailed it button came in this morning. Fixed; thanks Katy for reporting it. The Android app was never affected.",
+      "Ticking \"Payment is set up\" now also clears the \"payment not finished, call them\" callback and writes \"Marked paid by hand\" in the call log.",
+    ],
+  },
+  {
     n: 63,
     date: "2026-10-17",
     title: "No more namesakes' websites on our previews",
