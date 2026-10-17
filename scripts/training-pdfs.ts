@@ -179,7 +179,7 @@ ${ul([
   "Their name, photos, words and domain <b>belong to them</b>.",
   "Every lead has a private <b>preview link</b> we can text. It works for 14 days and needs no login.",
 ])}
-${note("Always", "Prices are said <b>per month</b>, never per day. If this handbook and the app ever disagree, the app is right: it always has the current prices.")}`,
+${note("Always", "Always quote prices <b>per month</b>, never per day. If this handbook and the app ever disagree, the app is right: it always has the current prices.")}`,
     true,
   );
 
