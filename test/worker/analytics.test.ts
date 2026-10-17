@@ -74,3 +74,16 @@ test("saving the Search Console code never wipes the Google Analytics the app se
   assert.equal(b.seo?.gaId, undefined, "blank = use the app's one on the next publish");
   assert.equal(b.seo?.ga?.property, "properties/1");
 });
+
+test("a live site with Google Analytics and no form still gets a privacy page and footer link", async () => {
+  // Church sites never carry a form, so this is the no-form case.
+  const ex = EXAMPLES.find((e) => e.record.category === "church")!;
+  const record = { ...ex.record, seo: { gaId: "G-TEST12345" } };
+  const live = await buildSite({ record, copy: ex.copy, site: { slug: ex.slug, look: ex.design, origin: "https://x.pages.dev" }, mode: "publish", allowSamples: true });
+  const privacy = live.files.get("privacy/index.html");
+  assert.ok(privacy, "privacy page built");
+  assert.match(String(privacy), /uses Google Analytics/);
+  assert.match(String(live.files.get("index.html")), /href="\/privacy\/"/);
+  const off = await buildSite({ record: { ...record, seo: {} }, copy: ex.copy, site: { slug: ex.slug, look: ex.design, origin: "https://x.pages.dev" }, mode: "publish", allowSamples: true });
+  if (!String(off.files.get("index.html")).includes("<form")) assert.equal(off.files.get("privacy/index.html"), undefined);
+});

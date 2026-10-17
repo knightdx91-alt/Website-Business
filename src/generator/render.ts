@@ -1,6 +1,6 @@
 import { CLIENT_SCRIPT } from "./client-script.ts";
 import { priceListNav, priceListTeaser, pricesPage } from "./pricelist.ts";
-import { actionBar, announcements, footer, gallery, header, hiring, sectionHead, type Ctx, todo } from "./components.ts";
+import { actionBar, announcements, footer, gallery, hasPrivacyPage, header, hiring, sectionHead, type Ctx, todo } from "./components.ts";
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
 import { html, jsonForScript, raw, type Raw } from "./html.ts";
@@ -147,8 +147,8 @@ function gaTag(ctx: Ctx): Raw {
 function privacyBody(ctx: Ctx): Raw {
   return html`<main id="main" class="section"><div class="wrap narrow">
 <h1>Privacy</h1>
-<p>When you send a request through this website, ${ctx.r.name} receives the details you enter (your name, phone number, email if given, and your message) so we can get back to you. We use them only to answer your request.</p>
-<p>We don't sell your information or share it with anyone else, except the service that delivers the message to us.</p>
+${ctx.hasForm ? html`<p>When you send a request through this website, ${ctx.r.name} receives the details you enter (your name, phone number, email if given, and your message) so we can get back to you. We use them only to answer your request.</p>
+<p>We don't sell your information or share it with anyone else, except the service that delivers the message to us.</p>` : html`<p>This website doesn't ask for your name, phone number or any other personal details. To reach ${ctx.r.name}, call or visit us.</p>`}
 ${ctx.mode === "publish" && ctx.r.seo?.gaId ? html`<p>This site uses Google Analytics, which sets cookies to count visits and see which pages and buttons people use. Google collects this for us; it doesn't tell us who you are. You can turn it off with Google's opt-out add-on (tools.google.com/dlpage/gaoptout) or by blocking cookies in your browser. We also count visits and button taps anonymously, without cookies.</p>` : html`<p>This site doesn't use advertising or tracking cookies. We count visits and button taps anonymously, without cookies or any personal details, so we know the site is helping.</p>`}
 <p>Questions? Call us at <a href="tel:${ctx.r.phone.e164}">${ctx.r.phone.display}</a>.</p>
 </div></main>`;
@@ -239,17 +239,21 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     pages.push({ path: p.path, html: page, noindex: p.noindex });
   }
 
-  if (ctx.hasForm) {
+  if (hasPrivacyPage(ctx)) {
     pages.push({
       path: "/privacy/",
       html: doc(ctx, pack, {
         path: "/privacy/",
         title: `Privacy | ${ctx.r.name}`.slice(0, 60),
-        description: `How ${ctx.r.name} handles the information you send through this website's request form. We use it only to answer you.`,
+        description: ctx.hasForm
+          ? `How ${ctx.r.name} handles the information you send through this website's request form. We use it only to answer you.`
+          : `How the ${ctx.r.name} website counts visits with Google Analytics, and how to turn that off. We never ask for personal details here.`,
         body: privacyBody(ctx),
         jsonLd: graph(webPageNode(ctx, "/privacy/", "Privacy", "Privacy")),
       }),
     });
+  }
+  if (ctx.hasForm) {
     pages.push({
       path: "/thanks/",
       html: doc(ctx, pack, {

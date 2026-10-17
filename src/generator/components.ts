@@ -641,7 +641,7 @@ ${ctx.theme.dna.footer === "bigcta" ? html`<div class="ftr__cta"><p>${ctx.copy.c
   )}${extra.reviews === false ? "" : html`<li><a href="${r.mapsUrl}" target="_blank" rel="noopener">Google reviews<span class="sr"> (opens in new tab)</span></a></li>`}</ul></div>
 </div>
 ${extra.note ?? ""}
-<p class="ftr__legal">© <span data-year>${new Date().getFullYear()}</span> ${r.name}${ctx.hasForm ? html` · <a href="/privacy/">Privacy</a>` : ""}${
+<p class="ftr__legal">© <span data-year>${new Date().getFullYear()}</span> ${r.name}${hasPrivacyPage(ctx) ? html` · <a href="/privacy/">Privacy</a>` : ""}${
     ctx.credit ? html` · Website by <a href="${ctx.credit.url}" rel="nofollow">${ctx.credit.company}</a> · <a href="${ctx.credit.changeUrl}" rel="nofollow">Request a change</a>` : ""
   }</p>
 </div></footer>`;
@@ -891,3 +891,8 @@ ${sectionHead(o.label ?? "Specials", o.title ?? "Current offers", undefined, "of
 }
 
 export { join };
+
+/** A privacy page whenever the site takes requests or carries Google Analytics (Google's terms require the notice). */
+export function hasPrivacyPage(ctx: Ctx): boolean {
+  return ctx.hasForm || (ctx.mode === "publish" && !!ctx.r.seo?.gaId);
+}
