@@ -591,6 +591,12 @@ export interface BusinessRecord {
   /** Where the opening's words sit when the main photo has its own sign or lettering: at the bottom of the photo (cover
    *  opening, the top of the photo shows clear) or under the photo (card opening, nothing on the photo). Unset = the design's. */
   heroText?: "bottom" | "below";
+  /** Words over the main photo moved up or down (Edit → Photo → Words position); unset = where the design puts them. */
+  heroMove?: "up" | "down" | "down2";
+  /** The tint over the main photo made lighter (Edit → Photo → Shade on the photo); unset = the design's. */
+  heroShade?: "lighter" | "lightest";
+  /** The main photo slid up or down behind the words (Edit → Photo → Photo position), past where cropping alone can move it. */
+  heroShift?: "up" | "down" | "down2";
   /** Grouped service menus: a line under each group heading ("Color" → "Any lightening adds Olaplex, $40"). */
   serviceNotes?: Record<string, string>;
   timezone: string;

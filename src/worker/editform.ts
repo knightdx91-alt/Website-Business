@@ -519,7 +519,10 @@ export function editForm(l: EditDetail): EditForm {
             sel("heroZoom", "Zoom in on phones (so a sign or detail is big enough to read)", hero.zoomPhone ? String(hero.zoomPhone) : "", withCurrent(ZOOM_OPTIONS, hero.zoomPhone ? String(hero.zoomPhone) : "")),
           ]
         : []),
-      sel("heroText", "Words on the main photo (when they cover a sign in the photo)", r.heroText || "", HERO_TEXT_OPTIONS),
+      sel("heroMove", "Words position (move the name and text up or down on the photo)", r.heroMove || "", HERO_MOVE_OPTIONS),
+      sel("heroShift", "Photo position (slide the picture up or down behind the words)", r.heroShift || "", HERO_SHIFT_OPTIONS),
+      sel("heroShade", "Shade on the photo (the dark tint under the words)", r.heroShade || "", HERO_SHADE_OPTIONS),
+      sel("heroText", "Or take the words off the photo", r.heroText || "", HERO_TEXT_OPTIONS),
     ],
     {
       kind: "photo",
@@ -3148,6 +3151,9 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
     heroFocus: has("heroFocus") ? v("heroFocus") || "" : undefined,
     heroZoom: has("heroZoom") ? (v("heroZoom") ? Number(v("heroZoom")) : null) : undefined,
     heroText: has("heroText") ? ((v("heroText") || "") as "" | "bottom" | "below") : undefined,
+    heroMove: has("heroMove") ? ((v("heroMove") || "") as "" | "up" | "down" | "down2") : undefined,
+    heroShade: has("heroShade") ? ((v("heroShade") || "") as "" | "lighter" | "lightest") : undefined,
+    heroShift: has("heroShift") ? ((v("heroShift") || "") as "" | "up" | "down" | "down2") : undefined,
     photoPicks: pickEdits(r as BusinessRecord, values),
     hiddenScenes: Object.keys(values).some((k) => k.startsWith("noscene_"))
       ? Object.keys(values)
@@ -3241,8 +3247,25 @@ export function photoPlace(p: { whatsNew?: boolean; band?: boolean; hidden?: boo
 }
 
 /** Edit → Photo → "Words on the main photo" (mirrored in app.js). */
-export const HERO_TEXT_OPTIONS: Array<[string, string]> = [
+export const HERO_MOVE_OPTIONS: Array<[string, string]> = [
   ["", "As designed"],
+  ["up", "Higher"],
+  ["down", "Lower"],
+  ["down2", "Much lower"],
+];
+export const HERO_SHIFT_OPTIONS: Array<[string, string]> = [
+  ["", "As is"],
+  ["up", "Higher"],
+  ["down", "Lower"],
+  ["down2", "Much lower"],
+];
+export const HERO_SHADE_OPTIONS: Array<[string, string]> = [
+  ["", "As designed"],
+  ["lighter", "Lighter"],
+  ["lightest", "Much lighter"],
+];
+export const HERO_TEXT_OPTIONS: Array<[string, string]> = [
+  ["", "No, keep them on the photo"],
   ["bottom", "Bottom of the photo"],
   ["below", "Under the photo"],
 ];

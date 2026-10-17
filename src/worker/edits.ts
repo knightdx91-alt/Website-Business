@@ -575,6 +575,9 @@ export const EditsSchema = z.object({
       heroZoom: z.number().min(1).max(3).nullable().optional(),
       /** Words on the main photo: "" = the design's, "bottom", "below". */
       heroText: z.enum(["", "bottom", "below"]).optional(),
+      heroMove: z.enum(["", "up", "down", "down2"]).optional(),
+      heroShade: z.enum(["", "lighter", "lightest"]).optional(),
+      heroShift: z.enum(["", "up", "down", "down2"]).optional(),
       /** Stock photos turned off for this site (file names); the list replaces the old one. */
       hiddenScenes: z.array(z.string().regex(/^[\w.-]{1,120}\.jpg$/)).max(100).optional(),
       /** The photo pickers: "" = automatic, "s:<stock file>", "g:<gallery photo key>" (main photo: becomes their main photo). */
@@ -1283,6 +1286,9 @@ export function applyEdits(
   if (r.media.hero && e.heroFocus !== undefined) r.media.hero.focus = e.heroFocus || undefined;
   if (r.media.hero && e.heroZoom !== undefined) r.media.hero.zoomPhone = e.heroZoom && e.heroZoom > 1 ? e.heroZoom : undefined;
   if (e.heroText !== undefined) r.heroText = e.heroText || undefined;
+  if (e.heroMove !== undefined) r.heroMove = e.heroMove || undefined;
+  if (e.heroShade !== undefined) r.heroShade = e.heroShade || undefined;
+  if (e.heroShift !== undefined) r.heroShift = e.heroShift || undefined;
   if (e.hiddenScenes !== undefined) r.hiddenScenes = e.hiddenScenes.length ? [...new Set(e.hiddenScenes)] : undefined;
   if (e.address) {
     const a = e.address;

@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 59,
+    date: "2026-10-17",
+    title: "Move the words and the photo separately",
+    items: [
+      "Edit → Photo has three new settings for the top of the page, on every website: Words position (Higher / Lower / Much lower), Photo position (slide the picture Higher / Lower / Much lower behind the words) and Shade on the photo (Lighter / Much lighter, when the photo looks too dark).",
+      "Mix them until a sign or the important part of the photo shows where you want it, then Save. “As designed” / “As is” puts each one back.",
+      "“Or take the words off the photo” is still there if the words should sit under the photo instead. Works in the phone app with no update.",
+    ],
+  },
+  {
     n: 58,
     date: "2026-10-17",
     title: "“Bottom of the photo” fixed on phones",

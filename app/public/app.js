@@ -1365,7 +1365,10 @@ async function viewLead(id, intent) {
   const FOCUS_OPTIONS = [["", "The middle"], ["50% 0%", "The top"], ["50% 30%", "Upper middle"], ["50% 70%", "Lower middle"], ["50% 100%", "The bottom"], ["0% 50%", "The left side"], ["100% 50%", "The right side"]];
   const ZOOM_OPTIONS = [["", "No zoom"], ["1.25", "A little (125%)"], ["1.5", "More (150%)"], ["1.75", "A lot (175%)"], ["2", "The most (200%)"]];
   const optsWith = (opts, cur) => (cur && !opts.some(([v]) => v === cur) ? opts.concat([[cur, `As set (${cur})`]]) : opts).map(([v, t]) => `<option value="${esc(v)}"${v === (cur || "") ? " selected" : ""}>${esc(t)}</option>`).join("");
-  const HERO_TEXT_OPTIONS = [["", "As designed"], ["bottom", "Bottom of the photo"], ["below", "Under the photo"]];
+  const HERO_TEXT_OPTIONS = [["", "No, keep them on the photo"], ["bottom", "Bottom of the photo"], ["below", "Under the photo"]];
+  const HERO_MOVE_OPTIONS = [["", "As designed"], ["up", "Higher"], ["down", "Lower"], ["down2", "Much lower"]];
+  const HERO_SHIFT_OPTIONS = [["", "As is"], ["up", "Higher"], ["down", "Lower"], ["down2", "Much lower"]];
+  const HERO_SHADE_OPTIONS = [["", "As designed"], ["lighter", "Lighter"], ["lightest", "Much lighter"]];
   function photoCardHtml(r, id) {
     const h = r.media.hero;
     return `<section class="card" id="card-photo"><h2>Photo</h2>
@@ -1374,7 +1377,10 @@ async function viewLead(id, intent) {
         ${h ? `<label class="field">Keep in view <span class="hint">when the photo is cropped</span><select name="heroFocus">${optsWith(FOCUS_OPTIONS, h.focus || "")}</select></label>
         <label class="field">Zoom in on phones <span class="hint">so a sign or detail is big enough to read</span><select name="heroZoom">${optsWith(ZOOM_OPTIONS, h.zoomPhone ? String(h.zoomPhone) : "")}</select></label>
         ${h.source !== "google" ? `<button class="linkbtn" type="button" data-eact="delhero">Remove main photo</button>` : ""}` : ""}
-        <label class="field">Words on the main photo <span class="hint">when the name covers a sign in the photo: “Bottom of the photo” keeps the top of the photo clear, “Under the photo” shows the photo with nothing on it</span><select name="heroText">${optsWith(HERO_TEXT_OPTIONS, r.heroText || "")}</select></label>
+        <label class="field">Words position <span class="hint">move the name and text up or down on the photo</span><select name="heroMove">${optsWith(HERO_MOVE_OPTIONS, r.heroMove || "")}</select></label>
+        <label class="field">Photo position <span class="hint">slide the picture up or down behind the words</span><select name="heroShift">${optsWith(HERO_SHIFT_OPTIONS, r.heroShift || "")}</select></label>
+        <label class="field">Shade on the photo <span class="hint">the dark tint under the words</span><select name="heroShade">${optsWith(HERO_SHADE_OPTIONS, r.heroShade || "")}</select></label>
+        <label class="field">Or take the words off the photo <span class="hint">“Bottom of the photo” keeps the top of the photo clear, “Under the photo” shows the photo with nothing on it</span><select name="heroText">${optsWith(HERO_TEXT_OPTIONS, r.heroText || "")}</select></label>
         <label class="field">Main photo<input type="file" id="photo" accept="image/*"></label>
         <label class="field">Describe the photo<input id="photoAlt" placeholder="e.g. Freshly mowed front lawn in Cullman"></label>
         <button class="btn btn--small" type="button" data-eact="upload">Upload photo</button>
@@ -1784,6 +1790,9 @@ async function viewLead(id, intent) {
           heroFocus: f.elements.heroFocus ? f.elements.heroFocus.value : undefined,
           heroZoom: f.elements.heroZoom ? (f.elements.heroZoom.value ? Number(f.elements.heroZoom.value) : null) : undefined,
           heroText: f.elements.heroText ? f.elements.heroText.value : undefined,
+          heroMove: f.elements.heroMove ? f.elements.heroMove.value : undefined,
+          heroShade: f.elements.heroShade ? f.elements.heroShade.value : undefined,
+          heroShift: f.elements.heroShift ? f.elements.heroShift.value : undefined,
           photoPicks: pickValues(f),
           hiddenScenes: f.querySelector('[name^="noscene_"]') ? [...f.querySelectorAll('[name^="noscene_"]')].filter((x) => x.checked).map((x) => x.name.slice(8) + ".jpg") : undefined,
           menuText: isR ? f.elements.menuText.value : undefined,

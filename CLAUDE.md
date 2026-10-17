@@ -1827,3 +1827,10 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   the app's preview WebView reported a viewport height that collapsed a `vh`-based version, words back on the sign, Oct 2026);
   desktop keeps the cover's left-to-right fade. `test/worker/photo-controls.test.ts`; sheets:
   scratchpad `htext/run.mts`.
+- ↕️ Words / photo position + shade (Oct 2026, owner's ask: keep the words on the photo, but shift them or the photo, and the photo's
+  bottom half was too dark): `record.heroMove` (up / down / down2 → `.hero__in` padding-top), `heroShift` (up / down / down2 →
+  `.hero__media img` translateY -18% / 22% / 42%, heroBg behind, a mask fades the moved photo's top edge) and `heroShade` (lighter /
+  lightest → the scrim's opacity .6 / .3 + a heroBg glow on the words). Edit → Photo selects (`HERO_MOVE_OPTIONS`,
+  `HERO_SHIFT_OPTIONS`, `HERO_SHADE_OPTIONS` in editform.ts + app.js), `<html data-hmove / data-hshift / data-hshade>`, rules in css.ts
+  (`html[data-…] .hero.hero--photo …`, specific enough to beat dna-css). Moving the words alone grows the opening and the photo with
+  it, hence the separate photo shift. Only applies to openings with the photo behind the words (`.hero--photo`).

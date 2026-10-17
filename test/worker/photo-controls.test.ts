@@ -146,3 +146,16 @@ test("words on the main photo: bottom of the photo (cover) or under it (card), o
   const off = applyEdits({ ...r0, heroText: "below" }, sampleCopy(), { record: { heroText: "" } } as never).record;
   assert.equal(off.heroText, undefined);
 });
+
+test("words position, photo position and shade: saved and on the page", async () => {
+  const r0 = salonWithPhotos();
+  const f = fields(r0);
+  for (const n of ["heroMove", "heroShift", "heroShade"]) assert.ok(f.some((x) => x.card === "photo" && x.name === n), n);
+  const { edits } = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { heroMove: "down", heroShift: "down2", heroShade: "lighter" });
+  const { record } = applyEdits(r0, sampleCopy(), edits as never);
+  assert.deepEqual([record.heroMove, record.heroShift, record.heroShade], ["down", "down2", "lighter"]);
+  const html = String((await buildSite({ record, copy: sampleCopy(), site: { slug: "s", look: "" }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
+  assert.match(html, /<html[^>]*data-hmove="down" data-hshade="lighter" data-hshift="down2"/);
+  const off = applyEdits(record, sampleCopy(), { record: { heroMove: "", heroShift: "", heroShade: "" } } as never).record;
+  assert.deepEqual([off.heroMove, off.heroShift, off.heroShade], [undefined, undefined, undefined]);
+});
