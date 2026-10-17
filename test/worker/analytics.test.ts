@@ -87,3 +87,19 @@ test("a live site with Google Analytics and no form still gets a privacy page an
   const off = await buildSite({ record: { ...record, seo: {} }, copy: ex.copy, site: { slug: ex.slug, look: ex.design, origin: "https://x.pages.dev" }, mode: "publish", allowSamples: true });
   if (!String(off.files.get("index.html")).includes("<form")) assert.equal(off.files.get("privacy/index.html"), undefined);
 });
+
+test("give access: a slow first try is retried, and 'already exists' counts as done", async () => {
+  const { grantViewer } = await import("../../src/worker/analytics.ts");
+  const sa = JSON.stringify({ client_email: "sa@p.iam.gserviceaccount.com", private_key: (await import("node:crypto")).generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs8", format: "pem" }), project_id: "p" });
+  const env = { GA_SERVICE_ACCOUNT: sa } as unknown as Env;
+  const record = { seo: { ga: { property: "properties/1" } } } as never;
+  let calls = 0;
+  const fake = (async (u: URL | RequestInfo) => {
+    if (String(u).includes("oauth2")) return new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }));
+    calls++;
+    if (calls === 1) throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    return new Response(JSON.stringify({ error: { message: "Access binding already exists" } }), { status: 409 });
+  }) as unknown as typeof fetch;
+  await grantViewer(env, record, "owner@gmail.com", fake);
+  assert.equal(calls, 2);
+});

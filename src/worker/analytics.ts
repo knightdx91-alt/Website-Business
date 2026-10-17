@@ -45,7 +45,7 @@ async function gaToken(sa: ServiceAccount, fetchFn: typeof fetch): Promise<strin
   const res = await fetchFn(TOKEN_URL, {
     method: "POST",
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: await fcmJwt(sa, undefined, SCOPE) }),
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`Google sign-in for Analytics failed (${res.status})`);
   const j = (await res.json()) as { access_token: string; expires_in: number };
@@ -55,12 +55,25 @@ async function gaToken(sa: ServiceAccount, fetchFn: typeof fetch): Promise<strin
 
 /** One Admin API call; Google's own message on failure (with a plain-words hint for the usual setup mistakes). */
 async function admin<T>(sa: ServiceAccount, path: string, body: unknown, fetchFn: typeof fetch): Promise<T> {
-  const res = await fetchFn(`${ADMIN}${path}`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${await gaToken(sa, fetchFn)}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(12000),
-  });
+  // Google's Admin API sometimes takes well over 12 s (a first "Give the owner access" timed out): wait 25 s, try once more.
+  const send = async () =>
+    fetchFn(`${ADMIN}${path}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${await gaToken(sa, fetchFn)}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(25000),
+    });
+  let res: Response;
+  try {
+    res = await send();
+  } catch (err) {
+    if (!/abort|timeout/i.test(String((err as Error)?.message ?? err))) throw err;
+    try {
+      res = await send();
+    } catch {
+      throw new Error("Google Analytics didn't answer in time. Wait a minute and try again; it may already have gone through.");
+    }
+  }
   const text = await res.text();
   if (!res.ok) {
     let msg = text.slice(0, 300);
@@ -168,7 +181,12 @@ export async function grantViewer(env: Env, record: BusinessRecord, email: strin
   if (!property) throw new Error("This site's Google Analytics wasn't set up by the app, so it can't share it");
   const sa = gaServiceAccount(env);
   if (!sa) throw new Error("Google Analytics isn't connected (no service account)");
-  await admin(sa, `/v1alpha/${property}/accessBindings`, { user: email, roles: ["predefinedRoles/viewer"] }, fetchFn);
+  try {
+    await admin(sa, `/v1alpha/${property}/accessBindings`, { user: email, roles: ["predefinedRoles/viewer"] }, fetchFn);
+  } catch (err) {
+    // A retry after a slow first try (or a second tap) finds the access already there: that's the outcome we wanted.
+    if (!/said 409|already exists/i.test(String((err as Error).message))) throw err;
+  }
 }
 
 /** The reports link for a property the app made ("properties/123" → analytics.google.com/…#/p123/…). */

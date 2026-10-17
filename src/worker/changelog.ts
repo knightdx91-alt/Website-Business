@@ -22,7 +22,7 @@ export const CHANGELOG: ChangeEntry[] = [
     date: "2026-10-17",
     title: "Web lead page fixed",
     items: [
-      "Client site → 📊 Google Analytics → \"Give the owner access\" works now (it said \"insufficient authentication scope\").",
+      "Client site → 📊 Google Analytics → \"Give the owner access\" works now (it said \"insufficient authentication scope\", then timed out once). Google can be slow: the app now waits longer and tries a second time. Google doesn't email the owner; they just find the site at analytics.google.com.",
       "Every live site with Google Analytics now has a Privacy page (linked in its footer) saying how visits are counted and how to opt out, even when the site has no contact form. Google's terms require it.",
       "The lead page in the web app (laptop / phone browser) showed \"reload is not defined\" since the 📬 I mailed it button came in this morning. Fixed; thanks Katy for reporting it. The Android app was never affected.",
       "Ticking \"Payment is set up\" now also clears the \"payment not finished, call them\" callback and writes \"Marked paid by hand\" in the call log.",
