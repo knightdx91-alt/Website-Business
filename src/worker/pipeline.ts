@@ -393,11 +393,14 @@ export async function forgetSiteImport(
   };
   if (lead.found_url) {
     change.found_url = null;
-    if (lead.presence === "elsewhere") {
+    // The search's page was the only reason for "elsewhere", "outdated (not linked from Google)" or "has a website".
+    if (lead.presence === "elsewhere" || /not linked from Google/i.test(lead.reason ?? "")) {
       change.presence = "none";
       change.reason = (lead.reason ?? "")
-        .replace(/^Page on [^·]+ not linked from Google/i, "No website")
-        .replace(/\s*·\s*$/, "");
+        .replace(/(Page on [^·]+|Has a website at [^·]+|[^·]*\(site not linked from Google\))\s*/i, "No website ")
+        .replace(/\s*·\s*/g, " · ")
+        .replace(/\s*·\s*$/, "")
+        .trim();
     }
   }
   await updateLead(env, lead.id, change);
