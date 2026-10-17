@@ -545,8 +545,7 @@ export function editForm(l: EditDetail): EditForm {
       }),
     );
     galleryFields.push(sel(`gfocus_${key}`, "Keep in view", p.focus || "", withCurrent(FOCUS_OPTIONS, p.focus || "")));
-    galleryFields.push(cb(`gnew_${key}`, "Show in “What's new” (photo row: swipe or arrows, tap to see it big)", p.whatsNew));
-    galleryFields.push(cb(`gband_${key}`, "Use as the big photo between sections (and behind the closing call)", p.band));
+    galleryFields.push(sel(`gwhere_${key}`, "Where it shows", photoPlace(p), PHOTO_PLACES));
     galleryFields.push(
       sel(`gpair_${key}`, "Before/after", p.pairWith || "", [
         ["", "Not a “before” photo"],
@@ -564,7 +563,7 @@ export function editForm(l: EditDetail): EditForm {
     "Photo gallery",
     [
       note(
-        "Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. They show as a photo grid on the site. Captions show under the photo (“Patio, Hanceville”); pick a photo's “after” to show the two side by side.",
+        "Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. Pick where each one shows: the Photos grid, the What's new row (swipe or arrows, tap to see it big), the big photo between sections (also behind the closing call), or nowhere. Captions show under the photo (“Patio, Hanceville”); pick a photo's “after” to show the two side by side.",
       ),
       ...galleryFields,
     ],
@@ -2557,8 +2556,13 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
       caption: v("gcap_" + key) || "",
       town: v("gtown_" + key) || "",
       pairWith: v("gpair_" + key) || "",
-      ...(has("gnew_" + key) ? { whatsNew: !!on("gnew_" + key) } : {}),
-      ...(has("gband_" + key) ? { band: !!on("gband_" + key) } : {}),
+      ...(has("gwhere_" + key)
+        ? { whatsNew: v("gwhere_" + key) === "new", band: v("gwhere_" + key) === "strip", hidden: v("gwhere_" + key) === "hidden" }
+        : {
+            // Older phone apps sent two ticks instead of the one choice.
+            ...(has("gnew_" + key) ? { whatsNew: !!on("gnew_" + key) } : {}),
+            ...(has("gband_" + key) ? { band: !!on("gband_" + key) } : {}),
+          }),
       ...(has("gfocus_" + key) ? { focus: v("gfocus_" + key) || "" } : {}),
     };
   }
@@ -3221,4 +3225,15 @@ function pickEdits(r: BusinessRecord, values: Record<string, unknown>): { hero?:
     if (typeof v === "string" && v !== now[slot]) out[slot] = v;
   }
   return Object.keys(out).length ? out : undefined;
+}
+
+/** Edit → Photo gallery → "Where it shows": each photo goes in one place on the site. */
+export const PHOTO_PLACES: Array<[string, string]> = [
+  ["grid", "Photos grid"],
+  ["new", "What's new row"],
+  ["strip", "Big photo between sections"],
+  ["hidden", "Don't show it"],
+];
+export function photoPlace(p: { whatsNew?: boolean; band?: boolean; hidden?: boolean }): string {
+  return p.hidden ? "hidden" : p.band ? "strip" : p.whatsNew ? "new" : "grid";
 }

@@ -53,6 +53,8 @@ export interface Image {
   whatsNew?: boolean;
   /** The owner picked this one for the wide photo between sections (and the closing call's backdrop), in place of a stock photo. */
   band?: boolean;
+  /** Kept on file but not shown anywhere on the site (Edit → Photo gallery → Where it shows → Don't show it). */
+  hidden?: boolean;
 }
 
 export type PriceMode = "none" | "exact" | "from" | "range" | "quote";

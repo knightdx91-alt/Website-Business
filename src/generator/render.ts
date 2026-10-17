@@ -164,7 +164,7 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   const heroScene = heroPick ?? scenes[0];
   const record: BusinessRecord = !heroOk && heroScene ? { ...input.record, media: { ...input.record.media, hero: heroScene } } : input.record;
   const heroSrc = record.media.hero?.src;
-  const galleryPhotos = record.media.gallery.filter((g) => g.source !== "google" || input.mode === "preview");
+  const galleryPhotos = record.media.gallery.filter((g) => !g.hidden && (g.source !== "google" || input.mode === "preview"));
   // Photos the owner picked for the wide strip go first, ahead of their other photos and the stock ones.
   // A stock photo picked for the strip counts as picked (it shows and turns the strip on), unless one of their own is picked.
   const stripPick = galleryPhotos.some((g) => g.band) ? undefined : sceneImage(picks.strip);

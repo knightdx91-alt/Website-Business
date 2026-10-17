@@ -61,8 +61,8 @@ test("stock photos: listed in Edit, a ticked one is replaced by the next, and ca
 
 test("a gallery photo picked for the wide strip replaces the stock photo there, even on a design without a strip", async () => {
   const r0 = salonWithPhotos();
-  assert.ok(fields(r0).some((x) => x.card === "gallery" && x.name === "gband_g1"));
-  const built = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { gcap_g1: "", gband_g1: true });
+  assert.ok(fields(r0).some((x) => x.card === "gallery" && x.name === "gwhere_g1"));
+  const built = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { gcap_g1: "", gwhere_g1: "strip" });
   const { record: r } = applyEdits(r0, sampleCopy(), built.edits as never);
   assert.equal(r.media.gallery[0]!.band, true);
   const look = (z: string) => `salon.blush_hour~circle~h5n2b3s4v4c0f1a1p0t0r0k1d2o0m0q0g0e0u0w0x3y4${z}`;
@@ -70,6 +70,8 @@ test("a gallery photo picked for the wide strip replaces the stock photo there, 
     const html = String((await buildSite({ record: r, copy: sampleCopy(), site: { slug: "s", look: look(z) }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
     const band = html.match(/<div class="pband[^"]*"[^>]*>(.*?)<\/div>/)?.[1] ?? "";
     assert.match(band, /src="\/assets\/owner\/g1\.jpg"/, `strip on ${z}`);
+    // It shows in one place only: not in the Photos grid as well.
+    assert.equal(html.split('src="/assets/owner/g1.jpg"').length - 1, 1, `once on ${z}`);
   }
   const plain = String((await buildSite({ record: r0, copy: sampleCopy(), site: { slug: "s", look: look("z0") }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
   assert.ok(!plain.includes('class="pband'));
@@ -105,7 +107,27 @@ test("photo pickers: swap the main photo and the strip for any stock photo or on
   assert.equal(a.media.gallery[0]!.band, true);
   // Saving the form without touching the pickers leaves a gallery tick alone.
   const r2 = salonWithPhotos();
-  const untouched = editsFromForm({ record: r2, copy: sampleCopy(), ...DETAIL } as never, { gcap_g1: "", gband_g1: true, pick_strip: "" });
+  const untouched = editsFromForm({ record: r2, copy: sampleCopy(), ...DETAIL } as never, { gcap_g1: "", gwhere_g1: "strip", pick_strip: "" });
   const b = applyEdits(r2, sampleCopy(), untouched.edits as never).record;
   assert.equal(b.media.gallery[0]!.band, true);
+});
+
+test("where a gallery photo shows: one place each, and nowhere when hidden", async () => {
+  const r0 = salonWithPhotos();
+  r0.media.gallery.push({ src: "/assets/owner/g2.jpg", alt: "Wash", source: "owner", width: 800, height: 600 });
+  const look = "salon.blush_hour~circle~h5n2b3s4v4c0f1a1p0t0r0k1d2o0m0q0g0e0u0w0x3y4z0";
+  const build = async (vals: Record<string, string>) => {
+    const { edits } = editsFromForm({ record: r0, copy: sampleCopy(), ...DETAIL } as never, { gcap_g1: "", gcap_g2: "", ...vals });
+    const { record } = applyEdits(r0, sampleCopy(), edits as never);
+    return String((await buildSite({ record, copy: sampleCopy(), site: { slug: "s", look }, mode: "preview", formEndpoint: "x" })).files.get("index.html"));
+  };
+  const count = (html: string, f: string) => html.split(`src="/assets/owner/${f}"`).length - 1;
+  const grid = await build({ gwhere_g1: "grid", gwhere_g2: "grid" });
+  assert.equal(count(grid, "g1.jpg"), 1);
+  const row = await build({ gwhere_g1: "new", gwhere_g2: "grid" });
+  assert.match(row, /carousel__track[\s\S]*g1\.jpg/);
+  assert.equal(count(row, "g1.jpg"), 1);
+  const hidden = await build({ gwhere_g1: "hidden", gwhere_g2: "grid" });
+  assert.equal(count(hidden, "g1.jpg"), 0);
+  assert.equal(count(hidden, "g2.jpg"), 1);
 });

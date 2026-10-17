@@ -665,7 +665,8 @@ export function actionBar(acts: Action[], dna?: Dna): Raw {
 /** Owner photos in a grid, or (with none yet) the pack's "send us photos" to-do in its place. */
 export function gallery(ctx: Ctx, todoTitle?: string, todoBody?: string): Raw {
   const row = ctx.newShown ? raw("") : photoRow(ctx);
-  const photos = ctx.r.media.gallery.filter((p) => !p.whatsNew && (ctx.mode === "preview" || p.source !== "google"));
+  // Each photo shows in one place: the grid, the What's new row or the big photo between sections (or nowhere).
+  const photos = ctx.r.media.gallery.filter((p) => !p.whatsNew && !p.band && !p.hidden && (ctx.mode === "preview" || p.source !== "google"));
   if (!photos.length) {
     if (row.value) {
       ctx.galleryShown = true;
@@ -701,7 +702,7 @@ function zoomable(p: Image, caption: string): Html {
  * and has arrows on wider screens; tapping a photo opens it big (lightbox in the client script, `[data-zoom]`).
  */
 export function newArrivals(ctx: Ctx): Raw {
-  const photos = ctx.r.media.gallery.filter((p) => p.whatsNew && (ctx.mode === "preview" || p.source !== "google"));
+  const photos = ctx.r.media.gallery.filter((p) => p.whatsNew && !p.band && !p.hidden && (ctx.mode === "preview" || p.source !== "google"));
   if (!photos.length) return raw("");
   ctx.newShown = true;
   const cap = (p: Image) => [p.caption, p.town].filter(Boolean).join(", ");

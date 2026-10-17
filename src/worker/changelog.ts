@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 56,
+    date: "2026-10-17",
+    title: "Pick where each photo shows",
+    items: [
+      "Edit → Photo gallery: every photo now has one “Where it shows” choice: Photos grid, What's new row, Big photo between sections, or Don't show it. A photo only appears in the place you pick, so it no longer shows up twice.",
+      "This replaces the two tick boxes (What's new, big photo). Photos you already ticked keep their place.",
+    ],
+  },
+  {
     n: 55,
     date: "2026-10-17",
     android: "2.82",

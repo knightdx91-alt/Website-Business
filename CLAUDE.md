@@ -1813,3 +1813,8 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `photoPicks.strip`. Only changed pickers are sent (web `pickValues` with `data-initial`, editform `pickEdits`). render.ts: a hero
   pick wins over a Google hero / the automatic scene, never over the owner's own; a strip pick goes into `ctx.photos` as a band photo
   (shows + turns the strip on). Web `pickGridHtml` radio tiles (`.picktile`), Android `PhotoPickRow` in EditScreen.
+- 📍 Where each photo shows (Oct 2026, owner's report: a photo picked for the strip also stayed in the Photos grid): Edit → Photo gallery
+  has one select per photo, `gwhere_<key>` (`PHOTO_PLACES` / `photoPlace()` in editform.ts, mirrored in app.js): grid / new (What's new
+  row, `whatsNew`) / strip (`band`) / hidden (new `Image.hidden`, kept on file, shown nowhere). `gallery()` and `newArrivals()` skip band
+  and hidden photos, render.ts drops hidden ones from `ctx.photos`, and a strip pick from the Stock photos card clears whatsNew / hidden.
+  Older phone apps' `gnew_` / `gband_` ticks still parse. Server-driven, so Android needed no build.
