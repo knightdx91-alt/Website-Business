@@ -1486,7 +1486,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       z.object({
         app: z.enum(["web", "android"]),
         screen: z.string().trim().max(120).optional(),
-        step: z.string().trim().max(120).optional(),
+        step: z.string().trim().max(1000).optional(),
         message: z.string().trim().min(1).max(1000),
         detail: z.string().trim().max(4000).optional(),
         device: z.string().trim().max(200).optional(),
@@ -1502,8 +1502,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     await notify(env, {
       kind: "problem",
       actor: session,
+      notifySelf: true,
       leadId: r.leadId ?? null,
-      text: `${session.name} reported a problem${r.screen ? ` on ${r.screen}` : ""}: ${r.message.slice(0, 160)}`,
+      text: `⚠️ ${session.name} reported a problem${r.screen ? ` on ${r.screen}` : ""}: ${(r.step && r.step.length > 3 ? `"${r.step}" (${r.message})` : r.message).slice(0, 300)}`,
     });
     return json({ ok: true, id });
   }

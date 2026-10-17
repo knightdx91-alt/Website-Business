@@ -33,6 +33,7 @@ const SCHEMA_BY_TYPE: Record<string, string> = {
   car_dealer: "AutoDealer",
   gas_station: "GasStation",
   laundry: "DryCleaningOrLaundry",
+  dry_cleaner: "DryCleaningOrLaundry",
   locksmith: "Locksmith",
   moving_company: "MovingCompany",
   real_estate_agency: "RealEstateAgent",
@@ -70,6 +71,19 @@ export const RENTAL_KINDS = {
   },
 } as const;
 export type RentalKind = keyof typeof RENTAL_KINDS;
+
+/** Shops the general pack sees often enough to label and seed (the owner confirms the list): Google calls them "laundry". */
+export const STORE_KINDS = {
+  dry_cleaner: {
+    label: "Dry Cleaner & Laundry",
+    seed: [["dry-cleaning", "Dry cleaning"], ["laundry", "Laundry & wash and fold"], ["pressing", "Pressing"], ["alterations", "Alterations & repairs"]],
+  },
+} as const;
+export type StoreKind = keyof typeof STORE_KINDS;
+
+export function storeKind(name: string, label = ""): StoreKind | null {
+  return /\b(dry ?clean\w*|laundr\w*|laundromat|wash (&|and) fold)\b/i.test(`${name} ${label}`) ? "dry_cleaner" : null;
+}
 
 /** "Bouncers Inflatable Rentals", "Cullman Porta Potty Rentals", "VIP Rents" with a party-rental kind typed in → its kind. */
 export function rentalKind(name: string, label = ""): RentalKind | null {

@@ -231,10 +231,12 @@ export function guessCategory(p: Place): CategoryId | null {
   if (isDealerName(n)) return "general";
   if (/\b(collision|body shop|paint (&|and) body|detail|wrecker|towing|small engine|mower repair|auto glass|autoglass|windshield|muffler|exhaust|auto ?parts|parts store|parts (&|and) supply)/.test(n)) return "auto";
   if (/\b(lawn|landscap|mowing|sod|irrigation)/.test(n)) return "landscaping";
+  // Dry cleaners and laundromats are shops, not house cleaners (L & L Dry Cleaners was built as a maid service, Oct 2026).
+  if (/\b(dry ?clean\w*|laundr\w*|laundromat|wash (&|and) fold|alterations?|tailor\w*)\b/.test(n)) return "general";
   if (/\b(clean|maid|janitor|(pressure|power|soft) ?wash)/.test(n)) return "cleaning";
   if (/\b(massage|day spa|bodywork)/.test(n)) return "salon";
   if (/screen ?print|embroider|monogram|\bsigns?\b|banners?|vinyl|decals|t-?shirts|\bprint(ing|ers)?\b|graphics/.test(n)) return "print";
-  if (/\b(boutique|gifts?|antiques?|thrift|consign|flowers?|florist|floral|feed|seed|furniture|mercantile|vintage|hardware|lumber|building supply|aquatics?|aquariums?|pet (shop|store|supply|supplies)|reptiles?)\b/.test(n)) return "retail";
+  if (/\b(boutique|gifts?|antiques?|thrift|consign|flowers?|florist|floral|feed|seed|furniture|mercantile|vintage|hardware|lumber|building supply|aquatics?|aquariums?|pet (shop|store|supply|supplies)|reptiles?|animal health|vet(erinary)? supply|livestock supply|tack (shop|store))\b/.test(n)) return "retail";
   if (/\b(paint|concrete|fenc|pest|termite|remodel|appliance|tree|stump|septic|excavat|dirt work|grading|dozer|backhoe|land clearing|garage door|gutter|weld|fabricat|flooring|floors?\b|carpet|drywall|sheetrock)/.test(n)) return "contractor";
   if (/\b(church|chapel|iglesia|tabernacle|parish|vfw|american legion|lions club|ruritan|masonic|food pantry|food bank|community center)\b/.test(n)) return "church";
   if (/\b(tax(es)?|impuestos|accounting|accountants?|bookkeep\w*|c\.?p\.?a\.?s?|insurance|seguros|financial (planning|advisors?|services))\b/.test(n)) return "finance";

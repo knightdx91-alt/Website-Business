@@ -147,7 +147,7 @@ fun ReportProblemDialog(api: Api, screen: String, leadId: String? = null, messag
         text = {
             Column {
                 Text("What were you trying to do? One line is plenty. The screen, the last error and the phone go along by themselves.", style = MaterialTheme.typography.bodyMedium)
-                OutlinedTextField(step, { step = it.take(120) }, label = { Text("What you were doing") }, placeholder = { Text("e.g. Tapping Take payment on Reyes Pizza") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                OutlinedTextField(step, { step = it.take(1000) }, label = { Text("What you were doing") }, placeholder = { Text("e.g. Tapping Take payment on Reyes Pizza") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                 if (last != null) Text("Last error: ${last.message}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
             }
         },

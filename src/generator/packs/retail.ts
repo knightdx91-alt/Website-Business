@@ -16,7 +16,7 @@ export function retailVariant(primaryType: string | undefined, types: string[], 
   if (all.includes("thrift_store") || /\b(thrift|consign\w*|resale|second ?hand|restore|rags)\b/.test(n)) return "thrift";
   if (all.includes("flea_market") || /\b(antiques?|vintage|pickers?|flea|salvage|collectibles)\b/.test(n)) return "antique";
   if (all.includes("hardware_store") || /\b(hardware|lumber|building supply|home center)\b/.test(n)) return "hardware";
-  if (/\b(feed|seed|co-?op|cooperative|farm supply|farm (&|and) home|mill|hay)\b/.test(n) || all.includes("garden_center")) return "farm_feed";
+  if (/\b(feed|seed|co-?op|cooperative|farm supply|farm (&|and) home|mill|hay|animal health|vet(erinary)? supply|livestock|tack|ranch supply|farm (&|and) ranch)\b/.test(n) || all.includes("garden_center")) return "farm_feed";
   if (all.includes("furniture_store") || /\b(furniture|mattress\w*|interiors|furnishings)\b/.test(n)) return "furniture";
   if (all.some((t) => /clothing_store|shoe_store/.test(t)) || /\b(boutique|apparel|clothing|threads|closet|outfitters|western wear|boots)\b/.test(n)) return "boutique";
   return "gift";

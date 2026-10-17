@@ -59,6 +59,8 @@ export interface EventInput {
   actorName?: string;
   /** People this is for (task assignees): they always see it and get the phone notification, whatever their alert mode. */
   forIds?: string[];
+  /** Also alert the person who did it (problem reports: several people share the owner login). */
+  notifySelf?: boolean;
 }
 
 interface EventRow {
@@ -74,13 +76,14 @@ interface EventRow {
 /** Records the event and pings everyone else's phones. Never throws: a failed notification mustn't break the action. */
 export async function notify(env: Env, e: EventInput): Promise<void> {
   try {
+    const actorId = e.notifySelf ? null : (e.actor?.userId ?? null);
     await env.DB.prepare(
       "INSERT INTO events (id, created_at, actor_id, actor_name, kind, lead_id, text, for_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
       .bind(
         newId(),
         now(),
-        e.actor?.userId ?? null,
+        actorId,
         e.actor?.name ?? e.actorName ?? null,
         e.kind,
         e.leadId ?? null,
@@ -88,7 +91,7 @@ export async function notify(env: Env, e: EventInput): Promise<void> {
         e.forIds?.length ? e.forIds.join(",") : null,
       )
       .run();
-    await pushAll(env, e.actor?.userId ?? null, e.kind, e.leadId ?? null, e.forIds ?? []);
+    await pushAll(env, actorId, e.kind, e.leadId ?? null, e.forIds ?? []);
     // Android phones: an instant "something's new" ping; each phone fetches its own filtered list.
     await fcmSend(env, { kind: "alerts" });
   } catch (err) {

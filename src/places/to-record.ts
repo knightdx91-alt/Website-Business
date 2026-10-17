@@ -9,7 +9,7 @@ import { salonVariant, seedSalonServices } from "../generator/packs/salon.ts";
 import { printVariant, seedPrintServices } from "../generator/packs/print.ts";
 import { restaurantVariant } from "../generator/packs/restaurant.ts";
 import { retailVariant, seedRetailCarry } from "../generator/packs/retail.ts";
-import { RENTAL_KINDS, rentalKind, seedRentals } from "../generator/packs/general.ts";
+import { RENTAL_KINDS, STORE_KINDS, rentalKind, seedRentals, storeKind } from "../generator/packs/general.ts";
 import { normalizeUsPhone } from "../generator/phone.ts";
 import type { BusinessRecord, CategoryId, Hours, Interval, RestaurantExt } from "../generator/types.ts";
 import type { Place, PlacePeriodPoint } from "./client.ts";
@@ -201,6 +201,17 @@ export function placeToRecord(p: Place, category: CategoryId): BusinessRecord {
       };
     }
     const storefront = !!p.formattedAddress && !p.pureServiceAreaBusiness && !/service area|no storefront/i.test(name);
+    const shop = storeKind(name, p.primaryTypeDisplayName?.text ?? "");
+    if (shop) {
+      return {
+        ...base,
+        variant: shop,
+        typeLabel: STORE_KINDS[shop].label,
+        services: STORE_KINDS[shop].seed.map(([id, n]) => ({ id, name: n, featured: true })),
+        serviceArea: storefront ? undefined : { towns: townsWithin(geo, 20, 8), counties: county ? [county] : [] },
+        ext: {},
+      };
+    }
     return {
       ...base,
       variant: p.primaryType || "other",

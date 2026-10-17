@@ -45,7 +45,7 @@ suspend fun Api.report(screen: String, step: String, message: String?, leadId: S
         .put("screen", screen.take(120))
         .put("message", (message ?: err?.message ?: "Something didn't work").take(1000))
         .put("device", "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · app ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})".take(200))
-    if (step.isNotBlank()) body.put("step", step.take(120))
+    if (step.isNotBlank()) body.put("step", step.take(1000))
     if (err != null) body.put("detail", JSONObject().put("method", err.method).put("path", err.path).put("status", err.status).put("message", err.message).put("at", err.at).toString().take(4000))
     else Api.lastSecureError?.let { body.put("detail", JSONObject().put("tls", it).toString().take(4000)) }
     if (leadId != null) body.put("leadId", leadId)

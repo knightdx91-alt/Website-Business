@@ -83,7 +83,7 @@
     const leadId = (/#\/(?:lead|edit|preview|pitch|walkin|gbp|full)\/([a-z0-9]+)/.exec(location.hash) || [])[1];
     try {
       await api("/report", { method: "POST", json: {
-        app: "web", screen: (location.hash || "#/").slice(0, 120), step: step.trim().slice(0, 120) || undefined,
+        app: "web", screen: (location.hash || "#/").slice(0, 120), step: step.trim().slice(0, 1000) || undefined,
         message: String(extra.message || (err && err.message) || "Something didn't work").slice(0, 1000),
         detail: JSON.stringify({ error: err, when: new Date().toISOString(), online: navigator.onLine, size: `${innerWidth}×${innerHeight}` }).slice(0, 4000),
         device: navigator.userAgent.slice(0, 200), leadId,

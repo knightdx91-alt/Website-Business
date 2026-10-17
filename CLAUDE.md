@@ -1851,3 +1851,13 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   button's href is pointed at the marker. Language links never carry two `lang` attributes now (`noLang` in spanishDoc). Checked in
   Chromium with locales en-US / es-US (scratchpad `lang/run.mts`). Careful: `\b` written through a Python heredoc into the
   CLIENT_SCRIPT template literal became a backspace; the test is `/^es(-|_|$)/i`.
+- 🐞 Problem reports reach everyone (Oct 2026, Katy's two reports alerted nobody; Android 2.84): Katy used the owner login, and event
+  lists / pushes leave out the actor's own events, so a report from the owner login was invisible to the owner. `notify({notifySelf:
+  true})` stores `actor_id` NULL (name kept), so `/api/report` alerts every owner / full-access login including the sender's, push
+  too. The alert text carries what they typed (`step`, now up to 1,000 chars on server, web and Android; the old 120 cap cut
+  Katy's off) and the error after it. Give each person their own login so call logs and alerts say who did what.
+  Same day: `guessCategory` sends dry cleaners / laundries / alterations to `general` (was `cleaning`, built as house cleaning),
+  where `storeKind()` (packs/general.ts) makes them variant `dry_cleaner` "Dry Cleaner & Laundry" (DryCleaningOrLaundry schema,
+  seeded services, storefront); `retailVariant` reads animal health / vet supply / livestock / tack / ranch supply as `farm_feed`
+  (Falkville Animal Health had fallen to `gift`). Both leads were rebuilt by SQL like `recategorizeLead` (scratchpad `rekind.mts`).
+  `test/store-kinds.test.ts`.

@@ -18,6 +18,19 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 62,
+    date: "2026-10-17",
+    android: "2.84",
+    title: "Problem reports always alert the owner",
+    items: [
+      "Every 🐞 Report this now sends an alert and a phone notification to the owner and full access, even when it was sent from the same login (before, a report sent from the owner login alerted nobody).",
+      "The alert shows what the person typed, not just \"Something didn't work\".",
+      "You can type a longer description now (up to 1,000 characters; it used to stop at 120).",
+      "Dry cleaners and laundries are built as a dry cleaner & laundry storefront, not house cleaning. L & L Dry Cleaners was rebuilt.",
+      "Feed, animal health, livestock and farm supply stores are built as farm & feed stores, not gift shops. Falkville Animal Health was rebuilt.",
+    ],
+  },
+  {
     n: 61,
     date: "2026-10-17",
     title: "Spanish sites switch by themselves",
