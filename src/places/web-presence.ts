@@ -1,5 +1,5 @@
 import { websiteProblem } from "./site-check.ts";
-import { isDirectoryPage } from "./site-import.ts";
+import { fetchPage, isDirectoryPage } from "./site-import.ts";
 import type { Place } from "./client.ts";
 import type { WebPresence } from "./qualify.ts";
 
@@ -89,6 +89,21 @@ export function townOf(address: string | undefined): string {
   return "Cullman";
 }
 
+/**
+ * Does a page found by a name search belong to THIS business? A common name finds a namesake elsewhere (a "Doug's Diner"
+ * added in Cullman found the Colorado chain's dougsdiner.com, and its photos and "since 2010" ended up on the preview). The
+ * page must carry the business's phone number, its town, or Alabama; a page that says none of them is someone else's.
+ */
+export function mentionsPlace(text: string, where: { town?: string; phone?: string }): boolean {
+  const digits = text.replace(/\D+/g, "");
+  const phone = (where.phone ?? "").replace(/\D+/g, "").slice(-10);
+  if (phone.length === 10 && digits.includes(phone)) return true;
+  const flat = ` ${text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ")} `;
+  const town = (where.town ?? "").trim();
+  if (town && new RegExp(`\\b${town.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(flat)) return true;
+  return /\bAlabama\b|,\s*AL\b|\bAL\s+3[56]\d{3}\b/.test(flat);
+}
+
 export async function searchBrave(key: string, q: string, fetchFn: typeof fetch = fetch): Promise<WebResult[]> {
   const u = new URL("https://api.search.brave.com/res/v1/web/search");
   u.searchParams.set("q", q);
@@ -115,7 +130,7 @@ export interface Resolved {
  * site is `has_site` (callers skip it in runs), a broken one `outdated`; a page on another site → `elsewhere`. Null when
  * nothing is found or the search fails (never blocks a run).
  */
-export async function resolvePresence(key: string | undefined, place: Pick<Place, "displayName" | "formattedAddress">, fetchFn: typeof fetch = fetch): Promise<Resolved | null> {
+export async function resolvePresence(key: string | undefined, place: Pick<Place, "displayName" | "formattedAddress"> & { nationalPhoneNumber?: string }, fetchFn: typeof fetch = fetch): Promise<Resolved | null> {
   const name = place.displayName?.text?.trim();
   if (!key || !name) return null;
   let found: FoundPage | null;
@@ -125,6 +140,9 @@ export async function resolvePresence(key: string | undefined, place: Pick<Place
     return null;
   }
   if (!found) return null;
+  // A namesake in another town or state isn't theirs. A page we can't read is judged on the search result alone, as before.
+  const page = await fetchPage(found.url, fetchFn, 8000).catch(() => ({ html: undefined }));
+  if (page.html && !mentionsPlace(page.html, { town: townOf(place.formattedAddress), phone: place.nationalPhoneNumber })) return null;
   if (!found.own) return { presence: "elsewhere", label: `Page on ${found.host}, not linked from Google`, url: found.url };
   const problem = await websiteProblem(found.url).catch(() => null);
   if (problem) return { presence: "outdated", label: `${problem} (site not linked from Google)`, url: found.url };

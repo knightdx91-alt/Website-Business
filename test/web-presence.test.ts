@@ -50,12 +50,27 @@ test("resolvePresence: no key or a failed search leaves the lead alone; a parent
   const failing = (async () => new Response("nope", { status: 500 })) as unknown as typeof fetch;
   assert.equal(await resolvePresence("k", place, failing), null);
   let q = "";
-  const ok = (async (u: URL | RequestInfo) => {
-    q = new URL(String(u)).searchParams.get("q") ?? "";
-    return new Response(JSON.stringify({ web: { results: lunas } }), { status: 200, headers: { "content-type": "application/json" } });
-  }) as unknown as typeof fetch;
-  const r = await resolvePresence("k", place, ok);
+  const serve = (pageHtml: string) =>
+    (async (u: URL | RequestInfo) => {
+      const url = new URL(String(u));
+      if (url.hostname !== "api.search.brave.com") return new Response(pageHtml, { status: 200, headers: { "content-type": "text/html" } });
+      q = url.searchParams.get("q") ?? "";
+      return new Response(JSON.stringify({ web: { results: lunas } }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as unknown as typeof fetch;
+  const r = await resolvePresence("k", place, serve("<h1>Luna's BBQ</h1><p>Smoked daily in Hanceville.</p>"));
   assert.equal(q, `"Luna's BBQ" Hanceville AL`);
   assert.equal(r?.presence, "elsewhere");
   assert.equal(r?.label, "Page on stonebridgewedding.com, not linked from Google");
+  // The same name on a page that never mentions their town, phone or Alabama is a namesake, not theirs.
+  assert.equal(await resolvePresence("k", place, serve("<h1>Luna's BBQ</h1><p>Austin, TX 78701</p>")), null);
+});
+
+test("a namesake's page in another state is not theirs", async () => {
+  const { mentionsPlace } = await import("../src/places/web-presence.ts");
+  const colorado = "<title>Doug's Diner | Local. Fresh. Original.</title><p>Locations in Fort Collins, Loveland and Longmont, CO 80538. Call (970) 555-1234.</p>";
+  assert.equal(mentionsPlace(colorado, { town: "Cullman", phone: "(256) 555-0147" }), false);
+  assert.equal(mentionsPlace("<p>Visit us at 101 Example Ave, Cullman</p>", { town: "Cullman" }), true);
+  assert.equal(mentionsPlace("<p>Call 256.555.0147 today</p>", { town: "Hanceville", phone: "+12565550147" }), true);
+  assert.equal(mentionsPlace("<p>Serving Hartselle, AL 35640</p>", { town: "Arab" }), true);
+  assert.equal(mentionsPlace("<p>Proudly serving north Alabama</p>", { town: "Arab" }), true);
 });

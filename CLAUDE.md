@@ -1861,3 +1861,11 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   seeded services, storefront); `retailVariant` reads animal health / vet supply / livestock / tack / ranch supply as `farm_feed`
   (Falkville Animal Health had fallen to `gift`). Both leads were rebuilt by SQL like `recategorizeLead` (scratchpad `rekind.mts`).
   `test/store-kinds.test.ts`.
+- 🔍 Namesakes aren't "their website" (Oct 2026, found in the Doug's Diner dry run: a hand-added Cullman "Doug's Diner" got the Colorado
+  chain's dougsdiner.com as its found page, its text, "since 2010" and 11 photos): `mentionsPlace(text, {town, phone})` in
+  web-presence.ts (their 10-digit phone, their town as a word, or Alabama / ", AL" / "AL 35xxx"). `resolvePresence` fetches the found
+  page and returns null when it says none of them (an unreadable page is judged on the search result as before); `runBuild` checks
+  the facts of a `found_url` import (not Google's own `websiteUri`) the same way and on a miss records `siteImport.error` "a different
+  business with the same name…", sets `found_url` NULL and presence back to `none`. `forgetSiteImport` now also removes the founding
+  year / email / social links that page filled in. The GA health row keeps the service account email and steps until a site has a
+  property (`sites > 0`). `test/web-presence.test.ts`.

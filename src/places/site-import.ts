@@ -264,7 +264,7 @@ export interface SiteImportResult {
 
 const UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128 Mobile Safari/537.36";
 
-async function fetchPage(url: string, fetchFn: typeof fetch, ms: number): Promise<{ html?: string; finalUrl?: string; error?: string }> {
+export async function fetchPage(url: string, fetchFn: typeof fetch, ms: number): Promise<{ html?: string; finalUrl?: string; error?: string }> {
   try {
     const res = await fetchFn(url, {
       headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5", "accept-language": "en-US,en;q=0.8" },

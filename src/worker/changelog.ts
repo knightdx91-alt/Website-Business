@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 63,
+    date: "2026-10-17",
+    title: "No more namesakes' websites on our previews",
+    items: [
+      "When the app searches the web for a business's own page, the page must now mention their phone number, their town or Alabama. A business with a common name (our test \"Doug's Diner\" found a Colorado chain) no longer gets someone else's photos, story or \"since\" year.",
+      "\"✖ Not their website\" now also removes the founding year, email and social links that page had filled in.",
+      "Settings → Google Analytics row keeps showing the service account email and the two Google steps until the first site really gets its Analytics.",
+    ],
+  },
+  {
     n: 62,
     date: "2026-10-17",
     android: "2.84",

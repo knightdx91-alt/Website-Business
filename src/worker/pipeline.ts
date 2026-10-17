@@ -18,7 +18,7 @@ import type { BusinessRecord, CategoryId, Copy, DesignNotes } from "../generator
 import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { groupById, MARKET } from "../places/queries.ts";
 import { qualify, scorePlace } from "../places/qualify.ts";
-import { resolvePresence } from "../places/web-presence.ts";
+import { mentionsPlace, resolvePresence, townOf } from "../places/web-presence.ts";
 import {
   applySiteFacts,
   fetchSitePhotos,
@@ -374,6 +374,14 @@ export async function forgetSiteImport(
   for (const sec of record.ext.retail?.priceList?.sections ?? [])
     for (const it of sec.items)
       if (it.image && gone.has(it.image.src)) it.image = undefined;
+  // Facts that page filled in (applySiteFacts) go too: a namesake's founding year must not stay on the site.
+  const was = record.existingSite;
+  if (was) {
+    if (was.foundedYear && record.foundedYear === was.foundedYear) record.foundedYear = undefined;
+    if (record.email && was.emails.includes(record.email)) record.email = undefined;
+    for (const k of ["facebook", "instagram", "tiktok", "youtube"] as const)
+      if (record.links.social[k] && record.links.social[k] === was.social[k]) record.links.social[k] = undefined;
+  }
   record.existingSite = undefined;
   record.siteImport = undefined;
   record.confirmed = record.confirmed.filter((c) => c !== "site_photos");
@@ -576,7 +584,26 @@ export async function runBuild(
           !!lead.rewrite;
     if (siteUrl && stale) {
       const got = await importSiteDetailed(siteUrl);
-      if (got.facts) {
+      // A page the web search found (not one Google links) must be about this business, or it's a namesake's.
+      const namesake =
+        !!got.facts &&
+        siteUrl === lead.found_url &&
+        !mentionsPlace(
+          [got.facts.title, got.facts.description, ...got.facts.headings, ...got.facts.paragraphs, ...got.facts.phones].join(" "),
+          { town: townOf(place.formattedAddress), phone: place.nationalPhoneNumber ?? record.phone.e164 },
+        );
+      if (namesake) {
+        record.siteImport = {
+          url: siteUrl,
+          triedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+          error: "a different business with the same name (the page has no phone, town or Alabama address of theirs)",
+        };
+        await env.DB.prepare(
+          "UPDATE leads SET found_url = NULL, presence = CASE WHEN presence IN ('elsewhere','outdated','has_site') THEN 'none' ELSE presence END WHERE id = ?",
+        )
+          .bind(lead.id)
+          .run();
+      } else if (got.facts) {
         record.existingSite = got.facts;
         record.siteImport = undefined;
         applySiteFacts(record, got.facts);
