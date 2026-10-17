@@ -52,8 +52,26 @@ test("links between pages stay inside /es/; the language switch goes back to the
   assert.ok(out.includes('<a href="/es/">Inicio</a>'));
   assert.ok(out.includes('href="/es/#visit"'));
   assert.ok(out.includes('href="/es/menu/"'));
-  assert.ok(out.includes('<a href="/menu/" lang="en">English</a>'));
+  assert.ok(out.includes('<a href="/menu/" lang="en" hreflang="en">English</a>'));
   assert.ok(out.includes('href="/assets/a.pdf"') && out.includes('href="/other/"'));
   assert.ok(out.includes('href="https://x.pages.dev/es/menu/"') && out.includes('content="https://x.pages.dev/es/menu/"'));
   assert.match(out, /<html lang="es"/);
+});
+
+test("language switch: header button on every page, a marker for the Spanish copy, English back without a clashing lang", async () => {
+  const ex = EXAMPLES[0]!;
+  const out = await buildSite({ record: ex.record, copy: { ...ex.copy, es: { ...ES_BASE, strings: { Menu: "Menú" } } }, site: { slug: ex.slug, look: ex.design }, mode: "preview", allowSamples: true });
+  const home = String(out.files.get("index.html"));
+  assert.match(home, /<a class="hdr__lang" href="\/es\/" lang="es" hreflang="es">Español<\/a>/);
+  assert.match(home, /<link rel="ua-es" href="\/es\/">/);
+  const esHome = String(out.files.get("es/index.html"));
+  const sw = esHome.match(/<a class="hdr__lang"[^>]*>[^<]*<\/a>/)![0];
+  assert.equal(sw, '<a class="hdr__lang" href="/" lang="en" hreflang="en">English</a>');
+  assert.ok(!/<a[^>]*lang="es"[^>]*lang="en"/.test(esHome), "no link carries both languages");
+  // Without full-site strings the one-page summary still switches back to English.
+  const summary = await buildSite({ record: ex.record, copy: { ...ex.copy, es: ES_BASE }, site: { slug: ex.slug, look: ex.design }, mode: "preview", allowSamples: true });
+  assert.match(String(summary.files.get("es/index.html")), /<a class="hdr__lang" href="\/" lang="en" hreflang="en">English<\/a>/);
+  // No Spanish copy: no switch at all.
+  const plain = await buildSite({ record: ex.record, copy: ex.copy, site: { slug: ex.slug, look: ex.design }, mode: "preview", allowSamples: true });
+  assert.ok(!String(plain.files.get("index.html")).includes("hdr__lang"));
 });

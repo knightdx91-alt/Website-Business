@@ -93,7 +93,8 @@ export function spanishDoc(html: string, o: { path: string; pagePaths: string[];
   let out = applyTranslations(html, o.map);
   out = out.replace(/<html lang="en"/, '<html lang="es"');
   // The language switch: on a Spanish page it goes back to the English one.
-  out = out.replace(/<a([^>]*?)href="\/es\/"([^>]*)>([\s\S]*?)<\/a>/g, (_m, a: string, b: string) => `<a${a}href="\u0000EN${o.path}"${b} lang="en">English</a>`);
+  const noLang = (s: string) => s.replace(/\s(?:hreflang|lang)="[^"]*"/g, "");
+  out = out.replace(/<a([^>]*?)href="\/es\/"([^>]*)>([\s\S]*?)<\/a>/g, (_m, a: string, b: string) => `<a${noLang(a)}href="\u0000EN${o.path}"${noLang(b)} lang="en" hreflang="en">English</a>`);
   out = out.replace(/\bhref="(\/[^"]*)"/g, (m, href: string) => {
     if (href.startsWith("/es/") || href.startsWith("/assets/")) return m;
     const p = href.replace(/[?#].*$/, "") || "/";

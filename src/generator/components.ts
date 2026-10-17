@@ -96,6 +96,7 @@ export function header(ctx: Ctx, nav: NavItem[], extra: { utilityLine?: Raw } = 
   return html`<a class="skip" href="#main">Skip to content</a>${util}
 <header class="hdr"><div class="wrap hdr__in">
 <a class="brand" href="/">${ctx.r.name}</a>
+${ctx.copy.es ? html`<a class="hdr__lang" href="/es/" lang="es" hreflang="es">Español</a>` : ""}
 <a class="hdr__call" href="${call.href}" aria-label="Call ${ctx.r.phone.display}">${icon("phone")}<span>${ctx.r.phone.display}</span></a>
 <button class="navbtn" type="button" data-nav-toggle aria-expanded="false" aria-controls="site-nav">${icon("menu", 26)}<span class="sr">Menu</span></button>
 <nav class="nav" id="site-nav" aria-label="Main"><ul>${nav.map((n) => html`<li><a href="${n.href}">${n.label}</a></li>`)}</ul></nav>

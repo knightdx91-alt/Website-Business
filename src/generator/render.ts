@@ -71,6 +71,9 @@ function doc(ctx: Ctx, pack: CategoryPack, o: DocOpts): string {
   const baseNav = ctx.copy.es ? [...pack.nav(ctx), { label: "Español", href: "/es/" }] : pack.nav(ctx);
   const nav = o.lang === "es" ? spanishNav(baseNav, ctx.copy.es) : baseNav;
   const alternates = ctx.copy.es && (o.path === "/" || o.path === "/es/") && !preview;
+  // Where this English page lives in Spanish (the page script sends Spanish-speaking phones there, and points the switch at it).
+  const fullSpanish = !!(ctx.copy.es?.strings && Object.keys(ctx.copy.es.strings).length);
+  const esTarget = ctx.copy.es && o.lang !== "es" && !o.path.endsWith(".html") ? (fullSpanish ? `/es${o.path}` : "/es/") : "";
   // Link previews (texts, Facebook) get the hero photo when it's one we may show; Google photos stay out of the HTML.
   const heroImg = ctx.r.media.hero;
   const ogImage = heroImg && heroImg.source !== "google" ? new URL(heroImg.src, origin).toString() : undefined;
@@ -80,6 +83,7 @@ function doc(ctx: Ctx, pack: CategoryPack, o: DocOpts): string {
 <title>${o.title}</title>
 <meta name="description" content="${o.description}">
 ${preview ? html`<meta name="robots" content="noindex, nofollow">` : o.noindex ? html`<meta name="robots" content="noindex"><link rel="canonical" href="${origin}${o.path}">` : html`<link rel="canonical" href="${origin}${o.path}">`}
+${esTarget ? html`<link rel="ua-es" href="${esTarget}">` : ""}
 ${alternates ? html`<link rel="alternate" hreflang="en" href="${origin}/"><link rel="alternate" hreflang="es" href="${origin}/es/"><link rel="alternate" hreflang="x-default" href="${origin}/">` : ""}
 ${!preview && ctx.r.seo?.googleSiteVerification ? html`<meta name="google-site-verification" content="${ctx.r.seo.googleSiteVerification}">` : ""}
 <meta name="theme-color" content="${ctx.theme.colors.heroBg}">
@@ -94,7 +98,7 @@ ${gaTag(ctx)}<script defer src="/assets/site.js"></script>
 <script type="application/ld+json">${jsonForScript(o.jsonLd)}</script>
 ${hasAnyHours(ctx.r.hours) ? html`<script type="application/json" id="hours-data">${jsonForScript({ tz: ctx.r.timezone, hours: ctx.r.hours })}</script>` : ""}
 </head><body>
-${header(ctx, nav, { utilityLine: pack.utilityLine?.(ctx) })}
+${o.lang === "es" ? raw(englishSwitch(header(ctx, nav, { utilityLine: pack.utilityLine?.(ctx) }).value)) : header(ctx, nav, { utilityLine: pack.utilityLine?.(ctx) })}
 ${raw(addLife(ctx, o.body.value))}
 ${raw(footer(ctx, nav, { note: pack.footerNote?.(ctx), reviews: pack.reviewsAllowed?.(ctx.r) ?? true }).value.replace(/^<footer[^>]*>/, (m) => m + footerEdge(ctx.theme.dna)))}
 ${actionBar(pack.actionBar(ctx), ctx.theme.dna)}
@@ -335,4 +339,12 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
 export function fontFilesFor(lookId: string): Array<{ pkg: string; file: string }> {
   const t = resolveTheme(lookId);
   return [t.fonts.heading, t.fonts.body].flatMap((f) => f.weights.map((w) => ({ pkg: f.pkg, file: fontFileName(f, w) })));
+}
+
+/** The one-page Spanish summary (/es/ without full-site strings): its header's language links go back to the English home. */
+function englishSwitch(header: string): string {
+  return header.replace(/<a([^>]*?)href="\/es\/"([^>]*)>[\s\S]*?<\/a>/g, (_m, a: string, b: string) => {
+    const strip = (s: string) => s.replace(/\s(?:hreflang|lang)="[^"]*"/g, "");
+    return `<a${strip(a)}href="/"${strip(b)} lang="en" hreflang="en">English</a>`;
+  });
 }

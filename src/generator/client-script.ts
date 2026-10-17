@@ -62,6 +62,22 @@ var d = document, root = d.documentElement;
 /* Spanish pages (/es/, html lang="es"): the few lines this script writes itself (open now, today's hours, next service,
    photo buttons) are said in Spanish too. Everything else on the page was translated when it was built. */
 var ES = root.lang === "es";
+/* Language: a phone set to Spanish opens the Spanish copy of the page by itself, unless the visitor picked a language here
+   before (the Español / English links remember it). The header switch goes straight to the same page in the other language. */
+(function () {
+  var K = "ua-lang", es = d.querySelector('link[rel="ua-es"]');
+  function get() { try { return localStorage.getItem(K); } catch (e) { return null; } }
+  d.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest ? e.target.closest("a[lang]") : null;
+    if (a && (a.lang === "es" || a.lang === "en")) { try { localStorage.setItem(K, a.lang); } catch (x) { /* private mode */ } }
+  }, true);
+  if (ES || !es) return;
+  var links = d.querySelectorAll("a.hdr__lang");
+  for (var i = 0; i < links.length; i++) links[i].href = es.href;
+  var pref = get(), first = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+  var wants = pref ? pref === "es" : /^es(-|_|$)/i.test(first);
+  if (wants && !/bot|crawl|spider|slurp|lighthouse/i.test(navigator.userAgent || "")) location.replace(es.href + location.hash);
+})();
 var ES_DAYS = { Sun: "dom", Mon: "lun", Tue: "mar", Wed: "mié", Thu: "jue", Fri: "vie", Sat: "sáb", Sunday: "domingo", Monday: "lunes", Tuesday: "martes", Wednesday: "miércoles", Thursday: "jueves", Friday: "viernes", Saturday: "sábado" };
 function L(s) {
   if (!ES || !s) return s;

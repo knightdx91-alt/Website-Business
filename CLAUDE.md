@@ -1843,3 +1843,11 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   unit; Android `FieldView` → Slider), web `heroAdjustFields` / `heroAdjustValues` (only moved sliders are sent). Live: web Preview
   "↕ Adjust the top photo" (`bindAdjust` sets the variables on the iframe's `<html>` while dragging, Save = `PUT /edits
   {record:{heroAdjust}}`), Android `PreviewScreen` panel (`evaluateJavascript`, re-applied on page load). `detail().heroAdjust`.
+- 🌎 Spanish auto-switch (Oct 2026, owner's ask): sites with `copy.es` get a header button `.hdr__lang` (components.ts `header()`,
+  "Español" → `/es/`; on Spanish pages `spanishDoc` turns it into "English" back to the same page, and `englishSwitch()` in render.ts
+  does it for the one-page summary) and a `<link rel="ua-es" href="/es<path>">` marker on English pages (`/es/` without full-site
+  strings). The page script (client-script.ts, top): a visitor whose first browser language is Spanish is `location.replace`d to the
+  marker (bots skipped) unless they chose before; any click on an `a[lang]` stores the choice in localStorage `ua-lang`; the header
+  button's href is pointed at the marker. Language links never carry two `lang` attributes now (`noLang` in spanishDoc). Checked in
+  Chromium with locales en-US / es-US (scratchpad `lang/run.mts`). Careful: `\b` written through a Python heredoc into the
+  CLIENT_SCRIPT template literal became a backspace; the test is `/^es(-|_|$)/i`.

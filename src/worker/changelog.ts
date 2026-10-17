@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 61,
+    date: "2026-10-17",
+    title: "Spanish sites switch by themselves",
+    items: [
+      "Websites with a Spanish version now open in Spanish on their own when the visitor's phone is set to Spanish, on whatever page they land on.",
+      "Every page has an Español / English button in the top bar (no longer only inside the menu). It goes to the same page in the other language, and the site remembers the visitor's choice next time.",
+      "Thrift & More and Reyes pizza have Spanish pages: open Edit and tap Save once so their previews pick this up. Sites go live with it automatically.",
+    ],
+  },
+  {
     n: 60,
     date: "2026-10-17",
     android: "2.83",

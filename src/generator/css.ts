@@ -87,6 +87,9 @@ p{margin:0 0 1em;text-wrap:pretty}
 .brand{font:${t.headingWeight} 1.3rem/1.1 var(--hf);color:var(--heading);text-decoration:none;margin-right:auto;padding:8px 0;max-width:60vw}
 .hdr__call{white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:.4em;min-width:48px;min-height:48px;border-radius:var(--btn-radius);background:var(--primary);color:var(--on-primary);text-decoration:none;font-weight:700;padding:0 12px}
 .hdr__call span{display:none}
+/* The language switch stays in sight on phones (the menu hides the nav link). */
+.hdr__lang{position:relative;z-index:1;margin-left:auto;display:inline-flex;align-items:center;min-height:40px;padding:0 10px;border:1.5px solid currentColor;border-radius:999px;font-size:.85rem;font-weight:700;text-decoration:none;color:inherit;white-space:nowrap}
+.hdr__lang+.hdr__call{margin-left:8px}
 .navbtn{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:0;background:transparent;color:var(--text);cursor:pointer;border-radius:var(--radius)}
 .nav ul{list-style:none;margin:0;padding:0}
 .nav a{display:block;padding:14px 4px;font-weight:700;text-decoration:none;color:var(--text);font-size:1.15rem;white-space:nowrap}
