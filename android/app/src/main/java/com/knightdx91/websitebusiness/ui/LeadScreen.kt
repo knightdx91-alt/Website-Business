@@ -780,6 +780,8 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                             else -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("Loading visits…", style = MaterialTheme.typography.bodySmall, color = muted) }
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
+                            // The publish card folds under More on live sites; Republish lives here too.
+                            if (canWork) Button(onClick = { if (detail.blockers.isEmpty()) publishAsk() else context.toast("Fix the checklist first, then Republish unlocks.") }, enabled = busy == null, colors = ButtonDefaults.buttonColors(containerColor = Good)) { Text(if (busy == "publish") "Publishing…" else "🔁 Republish changes") }
                             OutlinedButton(onClick = { textReport() }, enabled = stats != null) { Text("Text monthly report") }
                             if (!detail.noReviews) OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/reviewcard.pdf", "Review cards")) }) { Text("Review cards (QR)") }
                             OutlinedButton(onClick = { nav.navigate(pdfNav("/api/leads/${l.id}/tents.pdf", "Table tents")) }) { Text("QR table tents") }

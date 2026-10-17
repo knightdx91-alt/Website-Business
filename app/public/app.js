@@ -825,6 +825,7 @@
     return `<section class="card" id="livecard"><h2>Client site</h2>
       <div id="stats"><p class="muted small"><span class="spin"></span> Loading visits…</p></div>
       <div class="btns btns--full" style="margin-top:10px">
+        <button class="btn btn--good" type="button" data-republish>🔁 Republish changes</button>
         <button class="btn" id="report">Text monthly report</button>
         ${noReviews(l) ? "" : `<a class="btn" href="/api/leads/${l.id}/reviewcard" target="_blank" rel="noopener">Review cards (QR)</a>`}
         <a class="btn" href="/api/leads/${l.id}/tents" target="_blank" rel="noopener">QR table tents</a>
@@ -1122,6 +1123,12 @@ async function viewLead(id, intent) {
     bindFlyer(reload);
     if (l.salesStatus === "live" && owner) bindLive(l);
     if (C.domain) bindDomain(l);
+    // Live sites: the publish card sits under "More on this lead", so the Client site card carries its own Republish button.
+    $app.querySelector("[data-republish]")?.addEventListener("click", () => {
+      const b = $app.querySelector("[data-act=publish]");
+      if (b && !b.disabled) b.click();
+      else { const m = document.getElementById("morecards"); if (m) m.open = true; document.getElementById("publishcard")?.scrollIntoView({ behavior: "smooth" }); toast("Fix the checklist first, then Republish unlocks."); }
+    });
     // Phones: the log card goes right under the header so a call can be logged without scrolling past everything.
     // Unfolded: it stays in the right column. Moving the node keeps anything already typed.
     if (viewLead.unplace) viewLead.unplace();

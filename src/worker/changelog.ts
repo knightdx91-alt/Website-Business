@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 65,
+    date: "2026-10-17",
+    android: "2.85",
+    title: "Republish button on live sites",
+    items: [
+      "Live sites now have a green \"🔁 Republish changes\" button right on the Client site card (web and phone). Before, it was hidden under \"More on this lead\". Tap it after any edit, Spanish page or photo change so the live site shows it.",
+    ],
+  },
+  {
     n: 64,
     date: "2026-10-17",
     title: "Web lead page fixed",
