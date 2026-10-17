@@ -1822,6 +1822,8 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   "bottom" | "below" (Edit → Photo, select `heroText`, `HERO_TEXT_OPTIONS` in editform.ts + app.js; server-driven, so Android shows it).
   render.ts overrides the design's opening at build time (`settleDna` with hero `cover` for bottom, `card` for below) without
   touching the stored design id, and `<html data-htext>` drives two rules in dna-css.ts: below = the card overlaps the photo by
-  12 / 24 px instead of 64 / 128; bottom on phones = `padding-top:min(52vh,460px)` above the words + a fade in the look's own
-  `heroBg` that starts at 26% (desktop keeps the cover's left-to-right fade). `test/worker/photo-controls.test.ts`; sheets:
+  12 / 24 px instead of 64 / 128; bottom on phones = the photo only fills the top `clamp(220px,62vw,460px)` (+20 px) of the
+  opening, no scrim on it, the words sit below on the look's own `heroBg` with a 110 px fade just above them (sized by width:
+  the app's preview WebView reported a viewport height that collapsed a `vh`-based version, words back on the sign, Oct 2026);
+  desktop keeps the cover's left-to-right fade. `test/worker/photo-controls.test.ts`; sheets:
   scratchpad `htext/run.mts`.

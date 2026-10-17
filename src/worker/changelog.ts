@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 58,
+    date: "2026-10-17",
+    title: "“Bottom of the photo” fixed on phones",
+    items: [
+      "Edit → Photo → Words on the main photo → “Bottom of the photo” now shows the whole photo clear at the top on phones, with a short fade just above the words. It used to darken the bottom of the photo and, in the app's preview, slide the words back over it.",
+      "Already picked it? Open Edit and tap Save once so the preview rebuilds.",
+    ],
+  },
+  {
     n: 57,
     date: "2026-10-17",
     title: "Move the words off a sign in the main photo",
