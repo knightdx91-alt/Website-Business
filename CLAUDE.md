@@ -1783,9 +1783,9 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   cards) and `UA-Caller-Training.pdf` (11 pages: basics, prep, phone script, walk-in script + timing, sign-up + payment, 19 objection
   answers, logging + cadence, cut-out cards, sign-off line). Branded like the flyer (print navy / gold, UA badge, Montserrat /
   Inter); prices and plan contents are typed in the script from live Settings, so rerun after a price change. Not served by the app.
-  Third: `UA-HR-Accounting-Handbook.pdf` (10 pages: hiring checklist, forms + where to get them, I-9 / E-Verify (Alabama requires it),
+  Third: `UA-HR-Accounting-Handbook.pdf` (12 pages: hiring checklist, forms + where to get them, I-9 / E-Verify (Alabama requires it),
   employee vs contractor, time clock → payroll, commission rules from Settings, money in (Stripe fees, failed payments, refunds,
-  referral credits), money out + record keeping, cut-out cards). Not legal or tax advice; says so on its how-to page.
+  referral credits), money out + record keeping, owner pay (no commission; draws from profit, a Plus sale worked through, quarterly taxes, S-corp), cut-out cards). Not legal or tax advice; says so on its how-to page.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

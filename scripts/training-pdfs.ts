@@ -605,7 +605,7 @@ const hr = `${cover(
   "HR &amp; accounting handbook",
   "Hiring, pay and the money, done right.",
   "How we hire, verify and pay the team, how commission works, and how money comes in and goes out of Underground Associates.",
-  ["Hiring checklist", "Forms and where to get them", "I-9 and E-Verify", "Employee or contractor", "Time clock and payroll", "Commission", "Money coming in", "Money going out and records"],
+  ["Hiring checklist", "Forms and where to get them", "I-9 and E-Verify", "Employee or contractor", "Time clock and payroll", "Commission", "Money coming in", "Money going out and records", "Owner pay"],
 )}
 <section class="chap" style="page-break-before:auto"><div class="chap-head"><div class="num">i</div><div><h2>How to use this handbook</h2><p>For the owner and whoever handles hiring, payroll and the books</p></div></div>
 <div class="toc">
@@ -617,7 +617,8 @@ const hr = `${cover(
 <div><span>6</span>Commission<em>how the team is paid on sales</em></div>
 <div><span>7</span>Money coming in<em>plans, payments, refunds, late fees</em></div>
 <div><span>8</span>Money going out and records<em>costs, what to keep and for how long</em></div>
-<div><span>9</span>Cut-out cards<em>for your desk</em></div>
+<div><span>9</span>Owner pay<em>draws, taxes, what a sale leaves</em></div>
+<div><span>10</span>Cut-out cards<em>for your desk</em></div>
 </div>
 ${note("Not legal or tax advice", "This handbook explains how we work and points to the official sources. Rules change. Confirm anything important with our accountant, the IRS, USCIS or the Alabama Department of Labor before relying on it.", true)}
 </section>
@@ -820,12 +821,46 @@ ${note("Backups", "The app makes a weekly backup automatically, and the owner ca
 )}
 ${chap(
   9,
+  "Owner pay",
+  "The owner isn't paid commission; the owner is paid from profit",
+  `<p class="lead">The owner's own sales earn no commission (Settings → Commission, "owner earns" off). That money stays in the company. Whatever the company has left after its bills and the team's pay is the profit, and the profit is the owner's. The owner takes it out as an <b>owner's draw</b>: a transfer from the business account to their personal account.</p>
+<h3>What one sale leaves in the company</h3>
+${table(
+  ["First year, Plus plan ($89 a month, 12-month plan)", "Caller closes it", "Owner closes it"],
+  [
+    ["The client pays", "$1,068", "$1,068"],
+    ["Up-front bonus (one month of the plan)", "−$89", "$0"],
+    ["10% of the 11 later payments", "−$98", "$0"],
+    ["Stripe card fees (about 3%)", "about −$35", "about −$35"],
+    ["<b>Left in the company</b>", "<b>about $846</b>", "<b>about $1,033</b>"],
+  ],
+)}
+<p>Running costs (Cloudflare, Google Workspace, Claude, domains, hourly pay) come out of what's left. Settings → <b>Costs &amp; usage</b> shows them month by month. <b>What I'd earn</b> in the app shows the company's side of any plan, way to pay and extras.</p>
+<h3>Taking a draw</h3>
+<ol class="script">
+<li><b>Close the month first</b>Do the monthly close (chapter 8) so you know the real profit.</li>
+<li><b>Leave a cushion</b>Keep at least one month of running costs and next month's commission in the business account.</li>
+<li><b>Set aside taxes</b>Move about 25–30% of the profit to a separate tax savings account before drawing (see below).</li>
+<li><b>Draw the rest, or part of it</b>Transfer from the business account to your personal account and label it "Owner's draw" in the books. A draw is not payroll and nothing is withheld.</li>
+</ol>
+<h3>Taxes on owner pay</h3>
+${ul([
+  "As a single-member LLC, the owner is taxed on the <b>whole profit</b>, whether it's drawn out or left in the business.",
+  "That means self-employment tax (Social Security and Medicare, about 15.3%) plus federal and Alabama income tax.",
+  "Nothing is withheld from draws, so pay <b>quarterly estimated taxes</b> (IRS Form 1040-ES and Alabama Form 40ES). The usual due dates are April 15, June 15, September 15 and January 15.",
+  "Once profit is steady, ask the accountant about electing <b>S-corp</b> tax status. The owner then takes a reasonable salary through payroll and the rest as distributions, which often lowers self-employment tax.",
+  "If the company ever has more than one owner, how the profit is split (for example 60/40) goes in the LLC's operating agreement, not in the app.",
+])}
+${note("Keep money separate", "Pay personal bills from your personal account, never straight from the business account or card. Clean separation keeps the LLC's protection and makes taxes simple.", true)}`,
+)}
+${chap(
+  10,
   "Cut-out cards",
   "Cut along the dashed lines and keep them at your desk",
   `<div class="cards">
 ${card("New hire checklist", `<ol style="font-size:8.8pt;margin-left:.18in">${["Offer accepted in writing", "I-9 Section 1 by day one", "I-9 Section 2 within 3 business days", "E-Verify within 3 business days", "W-4 and A-4 to payroll", "Alabama new-hire report within 7 days", "Add to app: email + hourly pay", "Handbook + sign-off + Training"].map((x) => `<li>${x}</li>`).join("")}</ol>`)}
 ${card("Payday checklist", `<ol style="font-size:8.8pt;margin-left:.18in">${["Open Timesheets (Mon to Sun)", "Fix missed clock-outs", "Check for overtime (over 40 hours)", "Download the CSV", "Add commission from Sales", "Send to payroll"].map((x) => `<li>${x}</li>`).join("")}</ol>`)}
-${card("Commission at a glance", table(["Sale", "Earns"], [["New plan", "1 month up front"], ["Later payments", "10% for 24 months"], ["Setup fee", "20%"], ["One-time extras", "20%"], ["Split (30 days)", "Opener 40% of bonus"], ["Refund in 60 days", "Taken back"]]))}
+${card("Commission at a glance", table(["Sale", "Earns"], [["New plan", "1 month up front"], ["Later payments", "10% for 24 months"], ["Setup fee", "20%"], ["One-time extras", "20%"], ["Split (30 days)", "Opener 40% of bonus"], ["Refund in 60 days", "Taken back"], ["Owner's own sales", "No commission"]]))}
 ${card("Where to get forms", table(["Form", "Site"], [["I-9", "uscis.gov/i-9"], ["E-Verify", "e-verify.gov"], ["W-4", "irs.gov/w4"], ["A-4", "revenue.alabama.gov"], ["New hire", "labor.alabama.gov/NewHire"], ["W-9", "irs.gov/w9"]]))}
 ${card("Keep records", table(["Record", "How long"], [["I-9", "3 yrs after hire / 1 yr after leaving (later)"], ["Payroll and taxes", "4+ years"], ["Timesheets", "3+ years"], ["Contractor W-9", "4+ years"]]), true)}
 </div><p class="scissors">- - - - - cut here - - - - -</p>`,
