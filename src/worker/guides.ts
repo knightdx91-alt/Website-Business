@@ -143,6 +143,18 @@ export function tankBoardGuide(s: AppSettings): Guide {
         note: "Google's product photos and a supplier's catalog pictures are not theirs to use; the board's camera and their own photos are. Prices and counts in the sheet are the shop's responsibility: we load what they send.",
       },
       {
+        title: "On a website someone else built",
+        numbered: true,
+        steps: [
+          'A shop with its own website (a friend built it, Wix, GoDaddy, Squarespace, WordPress) keeps it. Sell them the Price list plan: the board, tablet, QR tags and price page all work without our website, and the live list goes into theirs.',
+          'On the lead page\'s board card: "🔌 Text their web person the setup page" (pick the web person in your texts), "Open the website setup page" to look at it yourself, or "Copy the website code" to paste it somewhere.',
+          'The setup page gives the web person three ways, best first: (1) one line of code in an HTML / Embed / Custom code block, which draws the live list in the site\'s own fonts and colors; (2) a frame version for builders that box pasted code in; (3) a plain link or button to the list on a page of its own. It names where that block lives in Wix, Squarespace, WordPress, GoDaddy, Shopify and Weebly, and shows the live list at the bottom.',
+          'Extras for the code: data-accent="#hex" for their brand color, data-tank="tank-3" to show one tank only (a page per tank).',
+          'After it\'s on: every change on the board or the tablet shows on their site within about a minute. Nobody edits the website for stock again.',
+        ],
+        note: "Ask them to delete any fish or price list typed by hand on their site, so there is only one list and it is always right.",
+      },
+      {
         title: "How a change reaches the website",
         numbered: true,
         steps: [

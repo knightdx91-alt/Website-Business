@@ -239,6 +239,8 @@ suspend fun Api.extrasLink(id: String): String = postJson("/leads/$id/extraslink
 suspend fun Api.clientLink(id: String): Pair<String, String> = postJson("/leads/$id/clientlink").let { it.optString("url") to it.optString("text") }
 
 /** Stock lookup: one search box over the board's list (`/c/<token>/find/`). Returns the link and a ready-to-send text. */
+/** Their own website: the setup page for their web person, the one-line code and the text to send (embed.ts). */
+suspend fun Api.embedLink(id: String): Triple<String, String, String> = postJson("/leads/$id/embedlink").let { Triple(it.optString("install"), it.optString("script"), it.optString("text")) }
 suspend fun Api.lookupLink(id: String): Pair<String, String> = postJson("/leads/$id/lookuplink").let { it.optString("url") to it.optString("text") }
 
 /** The practice lead only (owner): refunds, sign-ups, notes, tasks, published site, uploads and samples go back to square one. */

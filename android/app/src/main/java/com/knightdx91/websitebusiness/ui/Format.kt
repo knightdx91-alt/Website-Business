@@ -67,6 +67,11 @@ fun Context.sms(phone: String?, body: String) {
     startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:+1$d")).putExtra("sms_body", body))
 }
 
+/** A text with no number filled in: the person picks who gets it (a client's web person, a friend of the owner). */
+fun Context.smsAnyone(body: String) {
+    runCatching { startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:")).putExtra("sms_body", body)) }.onFailure { toast("No texting app") }
+}
+
 fun Context.openUrl(url: String) {
     runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure { toast("Nothing can open that") }
 }

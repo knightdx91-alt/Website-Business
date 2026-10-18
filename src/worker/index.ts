@@ -1,4 +1,6 @@
 import { gcalClientId, gcalLast, gtasksLast } from "./gcal.ts";
+import { embedSnippets, serveEmbed } from "./embed.ts";
+import { APP_ORIGIN } from "./tankboard.ts";
 import { runStripeAudit } from "./stripe-audit.ts";
 import { bareDomain, buyUrl, domainAvailable, DOMAIN_RE, suggestDomains, ourZone, wireDomain, type DomainStage } from "./domains.ts";
 import { gaLastError, gaServiceAccount, gaState, grantViewer, queueGaBackfill, reportsUrl } from "./analytics.ts";
@@ -3762,6 +3764,12 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       });
       return json({ url: link, text });
     }
+    if (action === "/embedlink" && m === "POST") {
+      // Their own website (built by someone else): the snippets for their web person + the instruction page to text them (embed.ts).
+      const sn = embedSnippets(lead.id, APP_ORIGIN);
+      const text = `Hi! Here's how to put ${lead.name}'s live stock list on your website: ${sn.install}  It has the code to paste (one line), plus a link-only option. The list updates by itself whenever the store changes stock on their phone or tablet.`;
+      return json({ ...sn, text });
+    }
     if (action === "/lookuplink" && m === "POST") {
       // The stock lookup: one search box over the board's list, for a shop that only wants to know "do we have it?" (lookup.ts).
       const link = (await clientLink(env, lead, url.origin)).replace(/\/?$/, "/find/");
@@ -4409,6 +4417,9 @@ async function handle(req: Request, env: Env): Promise<Response> {
       );
     if (station)
       return await serveStation(env, req, station[1]!, station[2]!, url.origin);
+    const embed = /^\/l\/([a-z0-9]+)\/(embed\.js|embed|stock|install)$/.exec(url.pathname);
+    if (embed && req.method === "GET")
+      return await serveEmbed(env, embed[1]!, embed[2]!, url, url.origin);
     const live =
       /^\/l\/([a-z0-9]+)\/(prices\.json|photo\/([A-Za-z0-9_.-]+))$/.exec(
         url.pathname,

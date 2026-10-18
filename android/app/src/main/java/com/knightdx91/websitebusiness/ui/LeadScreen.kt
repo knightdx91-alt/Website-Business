@@ -89,6 +89,7 @@ import com.knightdx91.websitebusiness.net.domain
 import com.knightdx91.websitebusiness.net.extrasLink
 import com.knightdx91.websitebusiness.net.clientLink
 import com.knightdx91.websitebusiness.net.lookupLink
+import com.knightdx91.websitebusiness.net.embedLink
 import com.knightdx91.websitebusiness.net.analyticsNow
 import com.knightdx91.websitebusiness.net.analyticsAccess
 import com.knightdx91.websitebusiness.net.boardLink
@@ -860,6 +861,9 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                             OutlinedButton(onClick = { act("clientopen") { val (url, _) = state.api.clientLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open it here") }
                             OutlinedButton(onClick = { act("lookuplink") { val (_, text) = state.api.lookupLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("🔎 Text them the stock lookup") }
                             OutlinedButton(onClick = { act("lookupopen") { val (url, _) = state.api.lookupLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open the lookup here") }
+                            OutlinedButton(onClick = { act("embedtext") { val (_, _, text) = state.api.embedLink(id); context.smsAnyone(text) } }, enabled = busy == null) { Text("🔌 Text their web person the setup page") }
+                            OutlinedButton(onClick = { act("embedopen") { val (url, _, _) = state.api.embedLink(id); context.openUrl(url) } }, enabled = busy == null) { Text("Open the website setup page") }
+                            OutlinedButton(onClick = { act("embedcopy") { val (_, code, _) = state.api.embedLink(id); context.copyText("Website code", code); context.toast("Code copied. Paste it into an HTML / embed block on their site.") } }, enabled = busy == null) { Text("Copy the website code") }
                             OutlinedButton(onClick = { act("boardpitch") { val (_, text) = state.api.boardLink(id); context.sms(l.phone, text) } }, enabled = busy == null) { Text("💬 Text them the ${detail.boardName} page") }
                             if (isOwner) OutlinedButton(onClick = {
                                 ask = Ask("Revoke old board links", "Stop every ${detail.boardName.lowercase()} link sent so far? You'll text them a new one.", "Revoke", danger = true) {

@@ -1882,3 +1882,13 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `stripe_cancel_log`). Not reachable over HTTP. 18 Oct 2026 audit: no subscriptions at all; $1 test charges ch_3UPrb3… (Katy's tap,
   12 Oct) and ch_3UOYJB… (extras test, 9 Oct) were refunded the same day with `stripe_refund_req` (JSON array of `ch_…`
   ids → full refunds, log in `stripe_refund_log`).
+- 🔌 Live stock on someone else's website (Oct 2026, owner's ask for King Fish, whose friend is building their site; Android 2.86;
+  `src/worker/embed.ts`, `test/worker/embed.test.ts`): public routes off the feed: `/l/<id>/embed.js` (one-line script, finds
+  `#ua-stock` / `[data-ua-stock]` or draws where the tag sits, inherits the host site's font + color, reads the feed from its own
+  `src` origin, refetches every 60 s; `data-accent`, `data-tank`), `/l/<id>/embed` (iframe page, `frame-ancestors *`, posts
+  `{uaStock, h}` so the parent snippet resizes it), `/l/<id>/stock` (full page for a plain link) and `/l/<id>/install` (the sheet for
+  their web person: three snippets with Copy, where the embed block is in Wix / Squarespace / WordPress / GoDaddy / Shopify / Weebly,
+  live preview). One renderer `RENDER` (`UAS()`, no backslashes or template strings inside) + scoped `.uas` CSS with a container
+  query (rows under 520 px). Feed items gained `facts` (`infoRows`). App: board card → "🔌 Text their web person the setup page"
+  (`sms:` with no number; Android `smsAnyone`), "Open the website setup page", "Copy the website code" (`POST /api/leads/:id/embedlink`,
+  owner + callers). Guide section "On a website someone else built". Checked in Chromium from a second origin (scratchpad `embedtest/`).

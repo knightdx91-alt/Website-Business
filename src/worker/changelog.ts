@@ -18,6 +18,18 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 67,
+    date: "2026-10-18",
+    android: "2.86",
+    title: "Live stock on a website someone else built",
+    items: [
+      "A shop that already has its own website can now show our live stock list on it. Sell them the Price list plan; the board, tablet and QR tags work as always.",
+      "On the lead page's board card: \"🔌 Text their web person the setup page\", \"Open the website setup page\" and \"Copy the website code\" (web and phone).",
+      "The setup page gives their web person one line of code to paste (the list takes on their site's fonts and colors), a frame version for picky site builders, and a plain link. It updates itself within a minute of every change on the board or tablet.",
+      "How-to: Settings → Guides → Live inventory → \"On a website someone else built\".",
+    ],
+  },
+  {
     n: 66,
     date: "2026-10-18",
     title: "No more \"Request a change\" on client sites",

@@ -4,7 +4,7 @@ import { hmac, safeEqual } from "./auth.ts";
 import { getLead, updateLead, type LeadRow } from "./db.ts";
 import { HttpError, newId, type Env } from "./env.ts";
 import { autoMatchPhotos, sectionSlug } from "../generator/packs/retail.ts";
-import { itemEmoji, kindWords, listKind, scanningOn } from "../generator/pricelist.ts";
+import { infoRows, itemEmoji, kindWords, listKind, scanningOn } from "../generator/pricelist.ts";
 import type {
   BusinessRecord,
   Copy,
@@ -170,6 +170,7 @@ export function pricesFeed(
             image: photo(it.image) ?? null,
             imageSrc: it.image?.src ?? null,
             info: it.info ?? null,
+            facts: infoRows(it.info ?? undefined, listKind(record)),
             barcode: it.barcode ?? "",
             sample: !!it.sample,
             emoji: it.sample ? itemEmoji(it.name, listKind(record)) : undefined,
