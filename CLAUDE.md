@@ -1892,3 +1892,7 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   query (rows under 520 px). Feed items gained `facts` (`infoRows`). App: board card → "🔌 Text their web person the setup page"
   (`sms:` with no number; Android `smsAnyone`), "Open the website setup page", "Copy the website code" (`POST /api/leads/:id/embedlink`,
   owner + callers). Guide section "On a website someone else built". Checked in Chromium from a second origin (scratchpad `embedtest/`).
+- Analytics health stays green after a takedown (Oct 2026, owner's report "why isn't Google Analytics green anymore"): the row counted live
+  leads with a GA property, and deleting Doug's Diner (the only one) turned it orange. `ensureAnalytics` now stamps settings key
+  `ga_verified` (`GA_VERIFIED_KEY`) on every successful property; the health input carries `analytics.verified` and the row is ok when
+  `sites > 0 || verified` (and no last error), wording "Connected and tested…". Live D1 got `ga_verified` by hand from the dry run.

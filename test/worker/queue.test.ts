@@ -164,6 +164,23 @@ test("health strip states", () => {
   assert.equal(items.length, 11);
 });
 
+test("Google Analytics stays green once a property was created, even with no site live", () => {
+  const base = {
+    stripeKey: true, stripeWebhook: true, stripePublishableKey: true, tap: { ready: true }, email: true, companyEmail: "x@y.z",
+    googleClientId: true, fcmClient: true, fcmServer: true, webPush: true, braveSearch: true, reviewLink: true, companyAddress: true,
+    plansPriced: 3,
+    spam: { turnstile: "on", blocked: 0 },
+  };
+  const ga = (extra: object) =>
+    healthItems({ ...base, analytics: { state: "on", serviceEmail: "sa@x.iam.gserviceaccount.com", lastError: null, sites: 0, ...extra } } as never)
+      .find((i) => i.id === "analytics")!;
+  assert.equal(ga({}).state, "warn");
+  assert.equal(ga({ verified: true }).state, "ok");
+  assert.match(ga({ verified: true }).detail, /Connected and tested/);
+  assert.equal(ga({ sites: 2 }).state, "ok");
+  assert.equal(ga({ verified: true, lastError: "denied" }).state, "warn");
+});
+
 const settings = (): AppSettings =>
   ({
     plans: [

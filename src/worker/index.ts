@@ -1438,6 +1438,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           lastError: (await gaLastError(env))?.error ?? null,
           sites:
             (await env.DB.prepare("SELECT COUNT(*) AS n FROM leads WHERE json_extract(record_json, '$.seo.ga.property') IS NOT NULL").first<{ n: number }>())?.n ?? 0,
+          verified: !!(await getSetting(env, "ga_verified")),
         },
         calendar: { serviceAccount: !!gaServiceAccount(env), clientId: gcalClientId(env), last: await gcalLast(env), tasks: await gtasksLast(env) },
       }),

@@ -20,6 +20,8 @@ const SCOPE = "https://www.googleapis.com/auth/analytics.edit https://www.google
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const ADMIN = "https://analyticsadmin.googleapis.com";
 export const GA_ERROR_KEY = "ga_last_error";
+/** When a property was last created for real: the setup is proven even after that site is taken down (health stays green). */
+export const GA_VERIFIED_KEY = "ga_verified";
 export const GA_ID_RE = /^G-[A-Z0-9]{4,15}$/;
 
 export function gaServiceAccount(env: Env): ServiceAccount | null {
@@ -155,6 +157,7 @@ export async function ensureAnalytics(env: Env, lead: LeadRow, origin: string, f
       .bind(crypto.randomUUID().replace(/-/g, "").slice(0, 16), lead.id, "App", `📊 Google Analytics set up for the live site (${ga.measurementId}).`, Date.now())
       .run();
     await setSetting(env, GA_ERROR_KEY, "");
+    await setSetting(env, GA_VERIFIED_KEY, String(Date.now()));
     return { ...lead, record_json };
   } catch (err) {
     const error = (err as Error).message;
