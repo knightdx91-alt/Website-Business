@@ -262,7 +262,7 @@ const LESSONS: Lesson[] = [
       "Confirm the facts the owner gave you: services, prices, the license number for trades, emergency terms for contractors, the team list for salons.",
       "Text wrong in tone? Rewrite regenerates it. Design not right? Try another design, or pick colours and layout under Edit → Design.",
       "Tap Publish to Cloudflare. The app runs its checks and pushes the site up. It's live at an address like businessname.pages.dev, and the lead turns Live. Later changes use the same button, now called Republish changes.",
-      'Live sites carry "Website by {company} · Request a change" in the footer. Their change requests and contact-form messages land in the Inbox and alert the team.',
+      'Live sites carry a small "Website by {company}" line in the footer. Clients text or call us with changes; their contact-form messages land in the Inbox and alert the team.',
     ],
     tryIt:
       "Open any Sold or Live lead and read its to-do list. Find where the photo is uploaded.",
@@ -337,7 +337,7 @@ const LESSONS: Lesson[] = [
       {
         q: "A live client texts that their hours changed.",
         options: [
-          "Tell them to use the Request a change link only",
+          "Tell them to fill out a form instead",
           "Edit the hours in the app and republish; thank them and note it in the call log",
           "Ignore it until the monthly report",
         ],

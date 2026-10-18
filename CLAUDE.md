@@ -1152,8 +1152,8 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   /menu/). Ordering hookup, rush build, logo, extra changes and ad management are services done by hand.
 - Follow-ups: marking a lead Shown (call log, status, flyer) books a callback 2 days out unless one is already coming
   (`autoCallback`). The share buttons include "Follow-up texts" (`FOLLOW_UPS` in app.js), each with a fresh preview link.
-- Live sites carry "Website by <company> · Request a change" in the footer (`credit` in BuildInput, publish only). The
-  link opens undergroundassociates.com/change?b=<lead> (sold/live leads only), which posts to the app Inbox and notifies.
+- Live sites carry "Website by <company>" (nofollow) in the footer (`credit` in BuildInput, publish only). The "Request a
+  change" link was removed (owner's call, Oct 2026); the /change page still exists for old links and posts to the Inbox.
 - Review asks: Settings → "Our Google review link" (`companyReviewUrl`) adds "Ask for a review" (text) on sold/live
   leads and a "Review us on Google" link in the company site footer.
 - Brand (Oct 2026): the owner's logo is the round "UA" badge (`app/public/brand/logo-original-512.png` is their file; `src/brand/logo.ts`

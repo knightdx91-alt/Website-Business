@@ -500,7 +500,7 @@ export function launchGuide(s: AppSettings): Guide {
       {
         title: "7. After launch",
         steps: [
-          "Changes: Edit, then Republish changes. Clients can also use \"Request a change\" in their site's footer; it lands in the Inbox.",
+          "Changes: Edit, then Republish changes. Clients text or call us with changes.",
           "Text monthly report: their visits and calls.",
           "Ask for a review and Review cards (QR): more reviews help them on Google too.",
         ],

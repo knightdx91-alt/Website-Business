@@ -29,7 +29,7 @@ export interface BuildInput {
   reviewTexts?: string[];
   /** Returns the bytes of an @fontsource woff2 file. Omit to leave fonts out (previews serve them separately). */
   loadFont?: (pkg: string, file: string) => Promise<Uint8Array>;
-  /** Live sites only: a small "Website by …" credit and a "Request a change" link for the business owner. */
+  /** Live sites only: a small "Website by …" credit (changeUrl is no longer shown). */
   credit?: { company: string; url: string; changeUrl: string };
   /** Prefix for every internal link and asset, e.g. "/p/abc123" when a preview is served under a path. */
   basePath?: string;

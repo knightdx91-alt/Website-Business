@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 66,
+    date: "2026-10-18",
+    title: "No more \"Request a change\" on client sites",
+    items: [
+      "Live client websites no longer show the \"Request a change\" link in the footer. The small \"Website by Underground Associates\" line stays.",
+      "Clients text or call us when they want something changed. Live sites pick this up the next time they're republished (the app republishes them all for you).",
+    ],
+  },
+  {
     n: 65,
     date: "2026-10-17",
     android: "2.85",

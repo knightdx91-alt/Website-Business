@@ -10,15 +10,15 @@ test("every example site passes the publish gate", async () => {
   }
 });
 
-test("live sites carry the credit and Request a change link; previews don't", async () => {
+test("live sites carry the credit (no Request a change link); previews don't", async () => {
   const ex = EXAMPLES[1]!;
   const credit = { company: "Underground Associates", url: "https://undergroundassociates.com", changeUrl: "https://undergroundassociates.com/change?b=abc123" };
   const live = await buildSite({ record: ex.record, copy: ex.copy, site: { slug: ex.slug, look: ex.design, origin: "https://example.test" }, mode: "publish", allowSamples: true, credit });
   const home = String(live.files.get("index.html"));
   assert.match(home, /Website by <a href="https:\/\/undergroundassociates.com" rel="nofollow">Underground Associates<\/a>/);
-  assert.match(home, /change\?b=abc123/);
+  assert.doesNotMatch(home, /change\?b=abc123|Request a change/);
   const preview = await buildSite({ record: ex.record, copy: ex.copy, site: { slug: ex.slug, look: ex.design }, mode: "preview", credit });
-  assert.doesNotMatch(String(preview.files.get("index.html")), /Request a change/);
+  assert.doesNotMatch(String(preview.files.get("index.html")), /Website by/);
 });
 
 test("owner gallery photos and hiring show on the home page", async () => {
