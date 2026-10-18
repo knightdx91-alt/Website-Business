@@ -3,7 +3,8 @@
  * Settings key `stripe_audit_req` (any value) → the minute cron lists every subscription that can still charge
  * (active / trialing / past_due / unpaid) and the last 30 charges into `stripe_audit`, then clears the request.
  * Settings key `stripe_cancel_req` = JSON array of subscription ids → each is cancelled now (no proration, no refund),
- * results go in `stripe_cancel_log`. Nothing here is reachable over HTTP; only someone with D1 access can ask.
+ * results go in `stripe_cancel_log`. `stripe_refund_req` = JSON array of charge ids (`ch_…`) → each is refunded in full
+ * (what's left of it), results in `stripe_refund_log`. Nothing here is reachable over HTTP; only someone with D1 access can ask.
  */
 import type { Env } from "./env.ts";
 import { getSetting, setSetting } from "./db.ts";
@@ -11,10 +12,15 @@ import { STRIPE_VERSION } from "./tap.ts";
 
 const LIVE = ["active", "trialing", "past_due", "unpaid"];
 
-async function call(env: Env, method: string, path: string): Promise<any> {
+async function call(env: Env, method: string, path: string, body?: URLSearchParams): Promise<any> {
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
     method,
-    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "stripe-version": STRIPE_VERSION },
+    headers: {
+      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      "stripe-version": STRIPE_VERSION,
+      ...(body ? { "content-type": "application/x-www-form-urlencoded" } : {}),
+    },
+    body,
   });
   const data = (await res.json()) as any;
   if (!res.ok) throw new Error(data?.error?.message ?? `HTTP ${res.status}`);
@@ -37,6 +43,21 @@ export async function runStripeAudit(env: Env): Promise<void> {
       }
     }
     await setSetting(env, "stripe_cancel_log", JSON.stringify({ at: Date.now(), log }));
+  }
+  const refund = await getSetting(env, "stripe_refund_req");
+  if (refund) {
+    await env.DB.prepare("DELETE FROM settings WHERE key = 'stripe_refund_req'").run();
+    const ids: string[] = (() => { try { return JSON.parse(refund); } catch { return []; } })();
+    const log = [];
+    for (const id of ids.filter((x) => /^ch_[A-Za-z0-9]+$/.test(x)).slice(0, 25)) {
+      try {
+        const r = await call(env, "POST", "refunds", new URLSearchParams({ charge: id, reason: "requested_by_customer" }));
+        log.push({ id, refund: r.id, amount: r.amount, status: r.status });
+      } catch (e) {
+        log.push({ id, error: (e as Error).message });
+      }
+    }
+    await setSetting(env, "stripe_refund_log", JSON.stringify({ at: Date.now(), log }));
   }
   if (!(await getSetting(env, "stripe_audit_req"))) return;
   await env.DB.prepare("DELETE FROM settings WHERE key = 'stripe_audit_req'").run();
