@@ -1,4 +1,5 @@
 import { gcalClientId, gcalLast, gtasksLast } from "./gcal.ts";
+import { runStripeAudit } from "./stripe-audit.ts";
 import { bareDomain, buyUrl, domainAvailable, DOMAIN_RE, suggestDomains, ourZone, wireDomain, type DomainStage } from "./domains.ts";
 import { gaLastError, gaServiceAccount, gaState, grantViewer, queueGaBackfill, reportsUrl } from "./analytics.ts";
 import { CHANGELOG, LATEST_CHANGE, changelogSeenKey, changesSince, unseenChanges } from "./changelog.ts";
@@ -4530,6 +4531,7 @@ async function handleScheduled(
     await queueRelive(env);
     await backfillMailCodes(env);
     await remindOpenShifts(env);
+    await runStripeAudit(env).catch((e) => console.error("stripe audit", e));
     return;
   }
   if (event.cron === CRON_WEEKLY_BACKUP) {

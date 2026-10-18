@@ -1876,3 +1876,8 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   8788 with `--host website-business.knightdx91.workers.dev`, login `local-test-pass-2026`, `pageerror` + "is not defined" on every
   route). (2) "Payment is set up" (`/paid` true) now clears `follow_up` and writes "Marked paid by hand" in the call log, like a
   Stripe payment does. (3) The GA Settings row hid the service account email once the account ID was saved (fixed above).
+- 💳 Stripe audit from here (Oct 2026, `src/worker/stripe-audit.ts`): the Stripe key is only a Worker secret, so to look at Stripe set D1
+  settings key `stripe_audit_req` = 1; the minute cron writes every subscription that can still charge + the last 30 charges to
+  `stripe_audit` (JSON) and clears the request. `stripe_cancel_req` = JSON array of `sub_…` ids cancels them (log in
+  `stripe_cancel_log`). Not reachable over HTTP. 18 Oct 2026 audit: no subscriptions at all; $1 test charges ch_3UPrb3… (Katy's tap,
+  12 Oct) and ch_3UOYJB… (extras test, 9 Oct) were never refunded.
