@@ -1114,7 +1114,7 @@ async function viewLead(id, intent) {
     const stage = l.salesStatus === "live" ? "live" : l.salesStatus === "sold" ? "sold" : l.salesStatus === "not_interested" ? "closed" : "open";
     const LAYOUT = {
       open:   { left: ["head", "step", "practice", "logtop", "website", "status", "notes"], right: ["signup", "log"], more: ["design", "board", "referral", "more"] },
-      sold:   { left: ["head", "step", "practice", "client", "logtop", "publish", "domain", "website", "notes"], right: ["signup", "log"], more: ["status", "design", "referral", "gbp", "extras", "review", "billing", "board", "more"] },
+      sold:   { left: ["head", "step", "practice", "client", "logtop", "publish", "domain", "website", "notes"], right: ["signup", "extras", "log"], more: ["status", "design", "referral", "gbp", "review", "billing", "board", "more"] },
       live:   { left: ["head", "step", "practice", "client", "live", "domain", "website", "notes"], right: ["review", "extras", "billing", "gbp"], more: ["signup", "referral", "board", "publish", "more"] },
       closed: { left: ["head", "step", "practice", "logtop", "status", "website", "notes"], right: ["log"], more: ["signup", "design", "board", "referral", "more"] },
     }[stage];
