@@ -173,7 +173,7 @@ private fun totals(o: PlanOptions, p: PlanOffer, billing: String, picks: Map<Int
         if (a.unit == "quote" || (a.isDomain() && p.includesDomain())) continue
         val cents = (a.amount * 100).roundToLong()
         when (a.unit) {
-            "month" -> { val amt = if (yearly) cents * 12 else cents; again += amt; today += amt }
+            "month" -> { val amt = if (yearly) cents * 12 else cents; again += amt; today += amt + (a.setup * 100).roundToLong() }
             "each" -> today += cents * q.coerceIn(1, MAX_QTY)
             else -> today += cents
         }

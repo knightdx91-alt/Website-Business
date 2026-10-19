@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 70,
+    date: "2026-10-19",
+    android: "2.88",
+    title: "Domain name: $11 upfront, then $2 a month",
+    items: [
+      "The \"Domain name, bought for you\" extra is now $11 upfront (the first registration), then $2 a month. Every price list, the sign-up page and phone sign-up totals, the agreement, the company website, Plans & answers, the domain card, training and guides say so. Still free on Pro.",
+      "Owner: Settings → Extras has a new \"Upfront\" amount for monthly extras (charged once with the first payment).",
+    ],
+  },
+  {
     n: 69,
     date: "2026-10-19",
     title: "Donation details no longer block publishing",

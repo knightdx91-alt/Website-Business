@@ -103,20 +103,23 @@ function extraLines(
       continue;
     }
     const cents = Math.round(a.price * 100);
-    if (a.unit === "month")
+    if (a.unit === "month") {
       lines.push({
         name: a.name,
         amount: interval === "year" ? cents * 12 : cents,
         qty: 1,
         interval,
       });
-    else lines.push({ name: a.name, amount: cents, qty: p.qty });
+      // The upfront part of a monthly extra (the domain's registration) is charged once, with the first payment.
+      if (a.setup && a.setup > 0)
+        lines.push({ name: `${a.name}: upfront`, amount: Math.round(a.setup * 100), qty: 1 });
+    } else lines.push({ name: a.name, amount: cents, qty: p.qty });
     extras.push({
       name: a.name,
       qty: p.qty,
       price:
         a.unit === "month" && interval === "year"
-          ? `$${a.price * 12}/year`
+          ? `${a.setup ? `$${a.setup} upfront, then ` : ""}$${a.price * 12}/year`
           : addonPrice(a),
     });
   }
@@ -385,6 +388,7 @@ export function pickerHtml(s: AppSettings, o: PickerOptions): string {
     free,
     addons: s.addons.map((a) => ({
       price: a.price,
+      setup: a.unit === "month" ? (a.setup ?? 0) : 0,
       unit: a.unit,
       domain: isDomainAddon(a),
       text: addonPrice(a),
@@ -482,7 +486,7 @@ function m(c){return "$"+(c%100?(c/100).toFixed(2):c/100)}
 function u(){var p=d.plans[v("plan")];if(!p)return;var b=v("billing"),inv=b==="${INVOICE_BILLING}",y=b==="annual",iv=y?"year":"month";var today=Math.round(p.monthly*(y?12-d.free:1)*100),again=today;
 var setup=(p.setup||0)+(b==="flex"?d.flexSetup:0);today+=Math.round(setup*100);
 d.addons.forEach(function(a,i){var c=f.querySelector('[name="x_'+i+'"]'),fr=a.domain&&p.domain;if(c&&a.domain){var pp=c.closest(".opt").querySelector(".pk-price");if(pp)pp.textContent=fr?"included with "+p.name:a.text;}if(!c||!c.checked||a.unit==="quote"||fr)return;var q=a.unit==="each"?Math.max(1,parseInt((f.querySelector('[name="q_'+i+'"]')||{}).value)||1):1;var amt=Math.round(a.price*100)*q;
-if(a.unit==="month"){amt=y?amt*12:amt;again+=amt;}today+=amt;});
+if(a.unit==="month"){amt=y?amt*12:amt;again+=amt;today+=Math.round((a.setup||0)*100);}today+=amt;});
 var r=f.querySelector('[name="billing"]:checked');if(r&&r.closest("details"))r.closest("details").open=true;
 document.getElementById("pk-today").innerHTML=(inv?"On your first invoice: ":"Due today: ")+"<strong>"+m(today)+"</strong>";document.getElementById("pk-then").textContent="Then "+m(again)+" per "+iv+(inv?", invoiced.":", charged automatically.");
 var go=document.getElementById("pk-go");if(go&&go.dataset.pay)go.textContent=inv&&go.dataset.invoice?go.dataset.invoice:go.dataset.pay;}

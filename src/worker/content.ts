@@ -92,7 +92,7 @@ export const PLAN_QUESTIONS: Array<[string, string]> = [
   ],
   [
     "Wants their own .com?",
-    "Any plan: they buy it, or we buy it in their name and add it to the bill (free on Pro)",
+    "Any plan: they buy it, or we buy it in their name: $11 upfront, then $2 a month (free on Pro)",
   ],
 ];
 
@@ -470,7 +470,7 @@ export function playbookObjections(
     ],
     [
       "“Do I need to buy a domain name?” / “What's a domain?”",
-      "A domain is your web address, like smithplumbing.com. You've got three choices. Use the free address that comes with every plan (like smithplumbing.pages.dev). Buy your own at Cloudflare, GoDaddy or Namecheap, about $10 to $15 a year, and we hook it up. Or we buy it for you and add a small charge to your monthly bill; it's included with Pro. Whichever you pick, it's in your name and it belongs to you.",
+      "A domain is your web address, like smithplumbing.com. You've got three choices. Use the free address that comes with every plan (like smithplumbing.pages.dev). Buy your own at Cloudflare, GoDaddy or Namecheap, about $10 to $15 a year, and we hook it up. Or we buy it for you in your name: $11 upfront, then $2 a month on your bill; it's included with Pro. Whichever you pick, it's in your name and it belongs to you.",
     ],
     [
       "“I need to think about it.”",

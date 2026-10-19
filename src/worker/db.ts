@@ -137,6 +137,8 @@ export interface AddOn {
   name: string;
   price: number;
   unit: "month" | "each" | "one-time" | "quote";
+  /** Monthly extras only: a one-time amount charged with the first payment (the domain's $11 registration), then `price` a month. */
+  setup?: number | null;
   /** One customer-facing sentence on what they get. */
   about?: string;
   /** Contract terms for this extra; blank uses the standard terms in contract.ts. */
@@ -192,11 +194,14 @@ export const generalAddons = (addons: AddOn[]) =>
   addons.filter((a) => addonGroup(a) !== "inventory");
 
 /** "$49 one-time", "$129/month", "$35 each", or "priced per job". */
-export function addonPrice(a: Pick<AddOn, "price" | "unit">): string {
+export function addonPrice(a: Pick<AddOn, "price" | "unit"> & { setup?: number | null }): string {
   if (a.unit === "quote") return "priced per job";
-  const p = `$${Number.isInteger(a.price) ? a.price : a.price.toFixed(2)}`;
+  const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+  const p = usd(a.price);
   return a.unit === "month"
-    ? `${p}/month`
+    ? a.setup
+      ? `${usd(a.setup)} upfront, then ${p}/month`
+      : `${p}/month`
     : a.unit === "each"
       ? `${p} each`
       : `${p} one-time`;
@@ -209,6 +214,13 @@ export function addonPrice(a: Pick<AddOn, "price" | "unit">): string {
  * Whichever they pick, the domain belongs to them.
  */
 export const DOMAIN_EXTRA = /\bdomain\b/i;
+/** The Domain name extra's price in words for lessons and guides: "$11 upfront, then $2 a month". */
+export function domainPriceWords(s: Pick<AppSettings, "addons">): string {
+  const a = s.addons.find((x) => isDomainAddon(x));
+  if (!a) return "$11 upfront, then $2 a month";
+  return addonPrice(a).replace("/month", " a month");
+}
+
 export const isDomainAddon = (a: Pick<AddOn, "name">): boolean =>
   DOMAIN_EXTRA.test(a.name);
 /** A plan whose includes promise "Your own domain name" (Pro): the Domain name extra is free on it. */
@@ -339,9 +351,10 @@ export const DEFAULT_ADDONS: AddOn[] = [
   {
     name: "Domain name, bought for you",
     price: 2,
+    setup: 11,
     unit: "month",
     about:
-      "We buy your web address (like yourbusiness.com) in your name and renew it every year, added to your monthly bill. It belongs to you; if you ever leave, we transfer it to you. Included with Pro.",
+      "We buy your web address (like yourbusiness.com) in your name: $11 upfront to register it, then $2 a month on your bill and we renew it every year. It belongs to you; if you ever leave, we transfer it to you. Included with Pro.",
   },
 ];
 
@@ -759,9 +772,20 @@ export function mergeSettings<T extends object>(base: T, patch: Record<string, u
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue;
     if (v === null) delete out[k];
-    else out[k] = stripNulls(v);
+    else out[k] = stripNulls(k === "addons" ? keepAddonSetup(out[k], v) : v);
   }
   return out as T;
+}
+
+/** An app that predates the extras' upfront amount sends addons without a `setup` key: keep the saved one (matched by name). */
+function keepAddonSetup(old: unknown, next: unknown): unknown {
+  if (!Array.isArray(old) || !Array.isArray(next)) return next;
+  const byName = new Map(old.map((a) => [String((a as AddOn)?.name ?? "").toLowerCase(), (a as AddOn)?.setup]));
+  return next.map((a) => {
+    if (!a || typeof a !== "object" || "setup" in a) return a;
+    const setup = byName.get(String((a as AddOn).name ?? "").toLowerCase());
+    return setup ? { ...(a as object), setup } : a;
+  });
 }
 
 function stripNulls(v: unknown): unknown {

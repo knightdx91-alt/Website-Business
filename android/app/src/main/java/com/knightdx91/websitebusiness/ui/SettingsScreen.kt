@@ -164,8 +164,10 @@ private class PlanForm(val id: String, name: String, setup: String, monthly: Str
     val legend get() = when (id) { "basic" -> "Plan 1"; "plus" -> "Plan 2 (recommended)"; else -> "Plan 3" }
 }
 
-private class AddonForm(name: String, price: String, unit: String, about: String, terms: String, group: String = "general", founderPick: Boolean = false) {
+private class AddonForm(name: String, price: String, unit: String, about: String, terms: String, group: String = "general", founderPick: Boolean = false, setup: String = "") {
     val key = nextRowKey++
+    /** Monthly extras: charged once with the first payment (the domain's registration), then the monthly price. */
+    var setup by mutableStateOf(setup)
     var group by mutableStateOf(group)
     /** Founding customers may pick this extra free (one-time / each extras only). */
     var founderPick by mutableStateOf(founderPick)
@@ -253,7 +255,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
         }
         // Existing extras show their own terms, else the standard terms for that extra (the web textarea does the same, so saving keeps them).
         s.optJSONArray("addons").objects().forEachIndexed { i, a ->
-            addons.add(AddonForm(a.txt("name"), numText(a, "price", ""), a.str("unit") ?: "one-time", a.txt("about"), a.str("terms") ?: extraTerms.getOrNull(i) ?: "", a.str("group") ?: (if (INVENTORY_EXTRA.containsMatchIn(a.txt("name"))) "inventory" else "general"), a.optBoolean("founderPick")))
+            addons.add(AddonForm(a.txt("name"), numText(a, "price", ""), a.str("unit") ?: "one-time", a.txt("about"), a.str("terms") ?: extraTerms.getOrNull(i) ?: "", a.str("group") ?: (if (INVENTORY_EXTRA.containsMatchIn(a.txt("name"))) "inventory" else "general"), a.optBoolean("founderPick"), numText(a, "setup", "")))
         }
     }
 
@@ -342,6 +344,7 @@ private class SettingsForm(s: JSONObject, extraTerms: List<String>, defaultTerms
             if (a.terms.isNotBlank()) o.put("terms", a.terms.trim())
             o.put("group", a.group)
             if (a.founderPick) o.put("founderPick", true)
+            o.put("setup", if (a.unit == "month" && a.setup.isNotBlank()) numOrZero(a.setup, "$name upfront") else JSONObject.NULL)
             addonsArr.put(o)
         }
         b.put("addons", addonsArr)
@@ -977,6 +980,7 @@ private fun ExtrasCard(f: SettingsForm) {
             if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Field(a.name, { a.name = it }, "Extra ${i + 1}", placeholder = "New extra", caps = KeyboardCapitalization.Sentences)
             Field(a.price, { a.price = it }, "Price (\$)", keyboard = KeyboardType.Decimal)
+            if (a.unit == "month") Field(a.setup, { a.setup = it }, "Upfront, charged once (\$)", placeholder = "Blank = none", keyboard = KeyboardType.Decimal)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
                 UNIT_OPTIONS.forEach { (id, label) -> FilterChip(selected = a.unit == id, onClick = { a.unit = id }, label = { Text(label) }) }
             }

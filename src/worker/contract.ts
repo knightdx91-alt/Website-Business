@@ -25,7 +25,7 @@ import {
 const STANDARD_EXTRA_TERMS: Array<[RegExp, string]> = [
   [
     /\bdomain\b/i,
-    "We register the web address you choose in your name (or your business's name) where the registrar allows, connect it to your site, and renew it every year while your plan is active; the price on your order covers the registration and renewals, and it is included with plans that list a domain. The domain belongs to you. Ask and we transfer it to you, or to the registrar you name, within 10 business days once your balance is paid; registrars lock a new domain against moving for 60 days after it is bought. After a transfer, or if your plan ends, you renew it yourself. Premium or unusual endings (anything but common ones like .com, .net or .org) are quoted first. We can't promise a name is available until it is registered.",
+    "We register the web address you choose in your name (or your business's name) where the registrar allows, connect it to your site, and renew it every year while your plan is active; the upfront amount on your order covers the first registration and the monthly amount covers the renewals, and it is included with plans that list a domain. The domain belongs to you. Ask and we transfer it to you, or to the registrar you name, within 10 business days once your balance is paid; registrars lock a new domain against moving for 60 days after it is bought. After a transfer, or if your plan ends, you renew it yourself. Premium or unusual endings (anything but common ones like .com, .net or .org) are quoted first. We can't promise a name is available until it is registered.",
   ],
   [
     /order|book/i,

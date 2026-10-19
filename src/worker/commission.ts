@@ -200,12 +200,13 @@ export function quoteCommission(s: AppSettings, input: QuoteInput, rules = commi
       items.push({
         what: a.name,
         kind: "monthly extra",
-        price: yearly ? `${dollars(pay)} a year` : `${dollars(cents)} a month`,
+        price: `${a.setup ? `${dollars(Math.round(a.setup * 100))} upfront, then ` : ""}${yearly ? `${dollars(pay)} a year` : `${dollars(cents)} a month`}`,
         bonus: yearly ? cents * months + pct(pay, r) : cents * months,
         residual: pct(pay, r),
-        how: yearly
+        how: (yearly
           ? `One month of it (${dollars(cents * months)}) + ${r}% of its yearly charge; ${r}% of each renewal`
-          : `One month of it up front, then ${r}% of each monthly charge, like the plan`,
+          : `One month of it up front, then ${r}% of each monthly charge, like the plan`) +
+          (a.setup ? ". The upfront part pays for the registration itself, so it earns nothing" : ""),
       });
     } else if (a.unit === "quote") {
       const charged = Math.round(Math.max(0, input.quoteDollars ?? 0) * 100);

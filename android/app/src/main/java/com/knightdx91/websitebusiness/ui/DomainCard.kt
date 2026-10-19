@@ -100,7 +100,7 @@ fun DomainCard(state: AppState, id: String, name: String, live: Boolean) {
                         Spacer(Modifier.width(8.dp))
                         Button(onClick = { loadIdeas(query) }, enabled = !busy && query.isNotBlank()) { Text("Check") }
                     }
-                    Text("The free .pages.dev address works the whole time. A domain is the \"Domain name, bought for you\" extra on their order (\$2 a month, included with Pro).", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 6.dp))
+                    Text("The free .pages.dev address works the whole time. A domain is the \"Domain name, bought for you\" extra on their order (\$11 upfront, then \$2 a month; included with Pro).", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 6.dp))
                 }
                 d.stage == "buy" -> {
                     Status(d.domain ?: "", "Not bought yet", Warn)

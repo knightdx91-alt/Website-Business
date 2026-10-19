@@ -433,7 +433,7 @@ export function guideById(id: string, s: AppSettings): Guide | null {
 export function launchGuide(s: AppSettings): Guide {
   const domain = s.addons.find((a) => isDomainAddon(a));
   const pro = s.plans.find((p) => p.id === "pro")?.name || "Pro";
-  const domainPrice = domain ? addonPrice(domain) : "$2/month";
+  const domainPrice = domain ? addonPrice(domain) : "$11 upfront, then $2/month";
   return {
     id: "launch",
     title: "🚀 From yes to live: site, domain, Google & analytics",

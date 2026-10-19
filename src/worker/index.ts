@@ -1806,6 +1806,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
             z.object({
               name: z.string().trim().min(1).max(60),
               price: z.number().min(0).max(10_000),
+              setup: z.number().min(0).max(10_000).nullish(),
               unit: z.enum(["month", "each", "one-time", "quote"]),
               about: z.string().trim().max(200).nullish(),
               terms: z.string().trim().max(1500).nullish(),

@@ -1,4 +1,4 @@
-import { isListPlan, promoRules, type AppSettings } from "./db.ts";
+import { domainPriceWords, isListPlan, promoRules, type AppSettings } from "./db.ts";
 
 /**
  * The in-app training course (🎓 Training on Home; owner and callers): the whole job from a lead appearing to a live site
@@ -204,7 +204,7 @@ const LESSONS: Lesson[] = [
     steps: [
       "Tap 📋 Show plans and let them read {basicName}, {plusName} and {proName}. The page is customer-facing: no notes, no commission, just the plans.",
       'Start the sign-up: in the app, the lead\'s "Sign them up" card → Sign up; on the web, Choose <plan> under Show plans opens the same page. Pick the plan, the way to pay (6- or 12-month plan with no setup fee, month to month with the setup fee, or a year up front at a discount) and any extras they want.',
-      "Ask about their web address before they sign: (1) the free address that comes with every plan (theirbusiness.pages.dev, no cost), (2) a domain they buy themselves, or already own, that we connect, or (3) we buy it for them: tick the \"Domain name, bought for you\" extra and it's added to their monthly bill (it's included with {proName}). Whichever they pick, the domain is theirs.",
+      "Ask about their web address before they sign: (1) the free address that comes with every plan (theirbusiness.pages.dev, no cost), (2) a domain they buy themselves, or already own, that we connect, or (3) we buy it for them: tick the \"Domain name, bought for you\" extra: {domainPrice} on their bill (it's included with {proName}). Whichever they pick, the domain is theirs.",
       "The agreement appears, built from exactly what they picked. Hand them the phone: they type their full name, draw their signature and tap agree. Nothing is stored until they sign.",
       "Want them to read it first? 📄 Show them the agreement opens a preview for any plan with nothing signed, and ⬇ PDF gives them a copy.",
       'Churches and some clients prefer an invoice. The sign-up offers "Pay by check or bank transfer" where it\'s allowed; the owner then sends the invoice.',
@@ -286,9 +286,9 @@ const LESSONS: Lesson[] = [
     who: "owner",
     why: "The .pages.dev address works, but customers remember smithplumbing.com. However they get it, the domain stays theirs.",
     steps: [
-      "Every client picks at sign-up: the free address (theirbusiness.pages.dev, nothing to do) or their own domain, which we always buy on our Cloudflare account in their name (the \"Domain name, bought for you\" extra on their order; free on {proName}). Check the lead's sign-up card to see which.",
+      "Every client picks at sign-up: the free address (theirbusiness.pages.dev, nothing to do) or their own domain, which we always buy on our Cloudflare account in their name (the \"Domain name, bought for you\" extra on their order, {domainPrice}; free on {proName}). Check the lead's sign-up card to see which.",
       'On the Sold or Live lead, open the "🌐 Their domain" card. It lists name ideas and says which are Free or Taken; type another name and tap Check if none fit. Tap Use this on the one they want.',
-      "Tap Copy name & open Cloudflare and register it there (paste the name in the search). Put the client's business name and contact as the registrant, leave auto-renew on. It costs about $10 to $15 a year at cost; their monthly charge covers it. If they ever leave, transfer it to them within 10 business days once they're paid up (registrars lock a new domain for 60 days).",
+      "Tap Copy name & open Cloudflare and register it there (paste the name in the search). Put the client's business name and contact as the registrant, leave auto-renew on. It costs about $10 to $15 a year at cost; their upfront charge covers the first registration and the monthly charge the renewals. If they ever leave, transfer it to them within 10 business days once they're paid up (registrars lock a new domain for 60 days).",
       "Back in the app, tap I bought it. The app connects it (the bare name and www) to their site, or on publish if the site isn't live yet. There's no DNS record to add yourself.",
       "Within minutes (sometimes an hour) the card turns ● Working: the site switches to the new address by itself, everyone gets an alert, and the .pages.dev address keeps working. The app checks every 5 minutes even if you never tap anything.",
       "{proName} includes business email. With the domain on Cloudflare, set up free email forwarding (info@theirbusiness.com → the inbox they already use), or a Google Workspace mailbox billed to them by Google.",
@@ -533,6 +533,7 @@ export function trainingCourse(s: AppSettings): { lessons: Lesson[] } {
     basicName: basic?.name ?? "Basic",
     plusName: plus?.name ?? "Plus",
     proName: pro?.name ?? "Pro",
+    domainPrice: domainPriceWords(s),
     fromMonthly,
     listPlan:
       list && list.monthly > 0

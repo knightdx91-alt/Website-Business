@@ -68,6 +68,8 @@ export function plansOptions(s: AppSettings, category?: string) {
       price: addonPriceText(a),
       unit: a.unit,
       amount: a.price,
+      /** Monthly extras: charged once with the first payment (the domain registration). */
+      setup: a.unit === "month" ? (a.setup ?? 0) : 0,
       group: addonGroup(a),
     })),
   };

@@ -887,7 +887,7 @@
         box.innerHTML = `<p class="small">Every domain is bought on our Cloudflare, in the client's name, so the app can hook it up by itself. Pick one:</p>
           <div id="domideas"></div>
           <form id="domq" class="row" style="margin-top:8px"><label class="field" style="margin:0;flex:1"><span class="sr-only">Try a name</span><input name="q" placeholder="Try another name, e.g. reyespizza.com" autocapitalize="off" autocomplete="off" spellcheck="false"></label><button class="btn" style="flex:none">Check</button></form>
-          <p class="small muted">The free .pages.dev address works the whole time. A domain is the "Domain name, bought for you" extra on their order ($2 a month, included with Pro).</p>`;
+          <p class="small muted">The free .pages.dev address works the whole time. A domain is the "Domain name, bought for you" extra on their order ($11 upfront, then $2 a month; included with Pro).</p>`;
         box.querySelector("#domq").addEventListener("submit", (e) => { e.preventDefault(); const q = e.target.q.value.trim(); if (q) ideas(q); });
         ideas("");
       } else if (stage === "buy") {
@@ -2244,7 +2244,7 @@ async function viewLead(id, intent) {
     ["Wants proof it's working?", "Plus (monthly report)"],
     ["Wants everything done for them, or has lots of competition?", "Pro"],
     ["Wants a business email (info@theirbusiness.com)?", "Pro (free email forwarding, or a Google mailbox Google bills them for)"],
-    ["Wants their own .com?", "Any plan: they buy it, or we buy it in their name and add it to the bill (free on Pro)"],
+    ["Wants their own .com?", "Any plan: they buy it, or we buy it in their name: $11 upfront, then $2 a month (free on Pro)"],
   ];
 
   // Common things owners say on the call, and an honest answer to each.
@@ -2267,7 +2267,7 @@ async function viewLead(id, intent) {
       ["“Do I have to pay extra for email?”",
         "No. Pro comes with a business email like info@yourbusiness.com that forwards free to the email you already use. If you want a full mailbox you can send from too, we set up Google's for you and Google bills you directly, about $7 to $8 a month. We don't mark it up."],
       ["“Do I need to buy a domain name?” / “What's a domain?”",
-        "A domain is your web address, like smithplumbing.com. You've got three choices. Use the free address that comes with every plan (like smithplumbing.pages.dev). Buy your own at Cloudflare, GoDaddy or Namecheap, about $10 to $15 a year, and we hook it up. Or we buy it for you and add a small charge to your monthly bill; it's included with Pro. Whichever you pick, it's in your name and it belongs to you."],
+        "A domain is your web address, like smithplumbing.com. You've got three choices. Use the free address that comes with every plan (like smithplumbing.pages.dev). Buy your own at Cloudflare, GoDaddy or Namecheap, about $10 to $15 a year, and we hook it up. Or we buy it for you in your name: $11 upfront, then $2 a month on your bill; it's included with Pro. Whichever you pick, it's in your name and it belongs to you."],
       ["“I need to think about it.”",
         "Of course. Can I ask what you want to think over: the price, or whether it'll bring in business? (Answer that.) I'll text you the preview so you can look at it tonight. Is Thursday good for a quick call back? (Log the callback.)"],
       ["“I need to talk to my wife / husband / partner.”",
@@ -4223,7 +4223,7 @@ async function viewLead(id, intent) {
     { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out and add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
   ];
   const UNIT_LABEL = { month: "/month", each: " each", "one-time": " one-time", quote: " (priced per job)" };
-  const addonPrice = (a) => (a.unit === "quote" ? "Priced per job" : `${money(a.price)}${UNIT_LABEL[a.unit] || ""}`);
+  const addonPrice = (a) => (a.unit === "quote" ? "Priced per job" : `${a.unit === "month" && a.setup ? `${money(a.setup)} upfront, then ` : ""}${money(a.price)}${UNIT_LABEL[a.unit] || ""}`);
   // Inventory add-ons are listed together everywhere (mirrors addonGroup in db.ts).
   const INVENTORY_EXTRA = /price tag|shelf label|tablet|scanner|scanning|stock list|inventory|price list|stock board|tank board/i;
   const addonGroup = (a) => a.group || (INVENTORY_EXTRA.test(a.name) ? "inventory" : "general");
@@ -4483,6 +4483,7 @@ async function viewLead(id, intent) {
         <p class="small muted">Shown on the sign-up page, the website and in call guides. Leave a name blank to remove it. "Inventory add-ons" are listed together as the live price list's pieces. "🎁 Founder pick" marks an extra the first clients may choose free (Discounts, above).</p>
         ${[...s.addons, { name: "", price: "", unit: "one-time" }].map((a, i) => `<div class="addon"><div class="row"><label class="field" style="flex:2"><span class="sr-only">Extra ${i + 1}</span><input name="addon_${i}_name" value="${esc(a.name)}" placeholder="New extra" maxlength="60"></label>
           <label class="field"><span class="sr-only">Price</span><input name="addon_${i}_price" type="number" min="0" inputmode="decimal" value="${a.price}" placeholder="$"></label>
+          <label class="field" title="Monthly extras only: charged once with the first payment (like a domain's registration)"><span class="sr-only">Upfront</span><input name="addon_${i}_setup" type="number" min="0" inputmode="decimal" value="${a.setup ?? ""}" placeholder="Upfront $"></label>
           <label class="field"><span class="sr-only">Per</span><select name="addon_${i}_unit">${Object.entries(UNIT_LABEL).map(([k, v]) => `<option value="${k}"${a.unit === k ? " selected" : ""}>${k === "quote" ? "quote per job" : v.trim().replace("/", "per ")}</option>`).join("")}</select></label>
           <label class="field"><span class="sr-only">Group</span><select name="addon_${i}_group" title="Where it is listed"><option value="general"${a.name && addonGroup(a) !== "inventory" ? " selected" : ""}>Extras</option><option value="inventory"${a.name && addonGroup(a) === "inventory" ? " selected" : ""}>Inventory add-ons</option></select></label>
           <label class="check" style="flex:1 1 150px" title="Founding customers pick one of the ticked extras free (one-time or per-item extras only)"><input type="checkbox" name="addon_${i}_founder"${a.founderPick ? " checked" : ""}> 🎁 Founder pick</label></div>
@@ -4542,7 +4543,7 @@ async function viewLead(id, intent) {
         const addons = [];
         for (let i = 0; f.elements[`addon_${i}_name`]; i++) {
           const name = v(`addon_${i}_name`);
-          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), unit: f.elements[`addon_${i}_unit`].value, group: f.elements[`addon_${i}_group`] ? f.elements[`addon_${i}_group`].value : undefined, about: v(`addon_${i}_about`) || undefined, terms: v(`addon_${i}_terms`) || undefined, founderPick: f.elements[`addon_${i}_founder`] && f.elements[`addon_${i}_founder`].checked ? true : undefined });
+          if (name) addons.push({ name, price: Number(v(`addon_${i}_price`) || 0), setup: f.elements[`addon_${i}_unit`].value === "month" && Number(v(`addon_${i}_setup`)) > 0 ? Number(v(`addon_${i}_setup`)) : null, unit: f.elements[`addon_${i}_unit`].value, group: f.elements[`addon_${i}_group`] ? f.elements[`addon_${i}_group`].value : undefined, about: v(`addon_${i}_about`) || undefined, terms: v(`addon_${i}_terms`) || undefined, founderPick: f.elements[`addon_${i}_founder`] && f.elements[`addon_${i}_founder`].checked ? true : undefined });
         }
         if (plans.some((p) => !p.monthly)) return toast("Give every plan a monthly price");
         const terms = v("terms");

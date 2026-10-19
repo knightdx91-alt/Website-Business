@@ -126,7 +126,7 @@ data class ReferredBy(val id: String, val name: String, val months: Int)
 
 data class PlanTerms(val min: Int, val short: Int, val commits: List<Int>, val commitWords: String, val flex: Double, val free: Int)
 
-data class AddonInfo(val name: String, val about: String, val price: String, val unit: String, /** The raw price in dollars (0 for "priced per job"). */ val amount: Double = 0.0, /** "inventory" = a piece of the live price list, listed under its own heading. */ val group: String = "general")
+data class AddonInfo(val name: String, val about: String, val price: String, val unit: String, /** The raw price in dollars (0 for "priced per job"). */ val amount: Double = 0.0, /** "inventory" = a piece of the live price list, listed under its own heading. */ val group: String = "general", /** Monthly extras: charged once with the first payment (the domain's registration). */ val setup: Double = 0.0)
 
 data class PlanOptions(
     val church: Boolean,
@@ -176,7 +176,7 @@ data class PlanOptions(
                 prefillEmail = j.optJSONObject("prefill")?.optString("email") ?: "",
                 founder = j.optJSONObject("founder")?.let { f -> FounderOffer(f.optInt("slotsLeft"), f.optInt("total"), f.optJSONArray("choices").objects().map { c -> FounderChoice(c.optInt("index"), c.optString("name"), c.optString("price"), c.optString("about")) }) },
                 referredBy = j.optJSONObject("referredBy")?.let { r -> ReferredBy(r.optString("id"), r.optString("name"), r.optInt("months")) },
-                addons = j.optJSONArray("addons").objects().map { AddonInfo(it.optString("name"), it.optString("about"), it.optString("price"), it.optString("unit"), it.optDouble("amount", priceInText(it.optString("price"))), it.optString("group", "general")) },
+                addons = j.optJSONArray("addons").objects().map { AddonInfo(it.optString("name"), it.optString("about"), it.optString("price"), it.optString("unit"), it.optDouble("amount", priceInText(it.optString("price"))), it.optString("group", "general"), it.optDouble("setup", 0.0)) },
             )
         }
     }
