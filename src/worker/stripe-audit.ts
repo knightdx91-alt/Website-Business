@@ -59,6 +59,26 @@ export async function runStripeAudit(env: Env): Promise<void> {
     }
     await setSetting(env, "stripe_refund_log", JSON.stringify({ at: Date.now(), log }));
   }
+  // `stripe_card_req` = a customer id → what the extras "card on file" lookup finds for them (stripe_card_log).
+  const cardReq = await getSetting(env, "stripe_card_req");
+  if (cardReq) {
+    await env.DB.prepare("DELETE FROM settings WHERE key = 'stripe_card_req'").run();
+    const out: Record<string, unknown> = { at: Date.now(), customer: cardReq };
+    try {
+      const c = await call(env, "GET", `customers/${cardReq}`);
+      out.customerDefault = c.invoice_settings?.default_payment_method ?? null;
+      out.defaultSource = c.default_source ?? null;
+      const subs = await call(env, "GET", `subscriptions?customer=${cardReq}&status=all&limit=5`);
+      out.subs = subs.data.map((x: any) => ({ id: x.id, status: x.status, pm: x.default_payment_method, source: x.default_source }));
+      const pms = await call(env, "GET", `payment_methods?customer=${cardReq}&limit=5`);
+      out.pms = pms.data.map((x: any) => ({ id: x.id, type: x.type, card: x.card ? `${x.card.brand} ${x.card.last4}` : null }));
+      const { cardOnFile } = await import("./extras-pay.ts");
+      out.found = await cardOnFile(env, cardReq);
+    } catch (e) {
+      out.error = (e as Error).message;
+    }
+    await setSetting(env, "stripe_card_log", JSON.stringify(out));
+  }
   if (!(await getSetting(env, "stripe_audit_req"))) return;
   await env.DB.prepare("DELETE FROM settings WHERE key = 'stripe_audit_req'").run();
   try {
