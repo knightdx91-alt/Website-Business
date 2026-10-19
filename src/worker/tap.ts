@@ -33,7 +33,7 @@ export const TAP_TOKEN_MINUTES = 10;
 /** Settings key holding the Stripe Terminal Location id (tml_…). Kept apart from app_settings, which the app rewrites. */
 const LOCATION_KEY = "terminal_location";
 /** Stripe's smallest charge. */
-const MIN_CENTS = 50;
+export const MIN_CENTS = 50;
 
 interface StripeError {
   error?: { message?: string; code?: string; type?: string };
@@ -46,7 +46,7 @@ interface StripeError {
  */
 export const STRIPE_VERSION = "2026-08-26.dahlia";
 
-async function stripe<T>(
+export async function stripe<T>(
   env: Env,
   path: string,
   params: Record<string, unknown>,
@@ -70,7 +70,7 @@ async function stripe<T>(
   return data;
 }
 
-async function stripeGet<T>(
+export async function stripeGet<T>(
   env: Env,
   path: string,
   query: Record<string, unknown> = {},
@@ -180,7 +180,7 @@ interface TapSignupRow {
   created_at: number;
 }
 
-interface PaymentIntentObj {
+export interface PaymentIntentObj {
   id: string;
   status: string;
   amount: number;
@@ -210,7 +210,7 @@ async function signupRow(env: Env, signupId: string): Promise<TapSignupRow> {
   return row;
 }
 
-function nonce(): string {
+export function nonce(): string {
   const b = crypto.getRandomValues(new Uint8Array(12));
   return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
@@ -461,11 +461,11 @@ export function nextPeriodStart(
   return Math.floor(d.getTime() / 1000);
 }
 
-function money(cents: number): string {
+export function money(cents: number): string {
   return `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 }
 
-function longDate(unixSeconds: number): string {
+export function longDate(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",

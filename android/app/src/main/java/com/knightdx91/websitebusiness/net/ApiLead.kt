@@ -288,3 +288,25 @@ suspend fun Api.analyticsNow(id: String): String = postJson("/leads/$id/analytic
 
 /** "Give the owner access": their Google address becomes a viewer on the property the app made. */
 suspend fun Api.analyticsAccess(id: String, email: String) { postJson("/leads/$id/analytics/access", org.json.JSONObject().put("email", email)) }
+
+/** `POST /api/leads/:id/extras`: extras added in the app for a client (picks = Settings index → how many). Returns the new order's id. */
+suspend fun Api.addExtras(id: String, picks: Map<Int, Int>, approvedBy: String): JSONObject =
+    postJson(
+        "/leads/$id/extras",
+        JSONObject()
+            .put("picks", org.json.JSONArray().apply { picks.forEach { (i, q) -> put(JSONObject().put("index", i).put("qty", q)) } })
+            .put("approvedBy", approvedBy),
+    )
+
+/** Tap to Pay for an unpaid extras order: the token for TapToPayActivity (or `alreadyPaid`). */
+suspend fun Api.extrasTap(id: String, purchaseId: String): JSONObject = postJson("/leads/$id/extrastap/$purchaseId")
+
+/** "Type in the card numbers" for an extras order: a SetupIntent for Stripe's payment sheet. */
+suspend fun Api.extrasCardStart(id: String, purchaseId: String): PayStart = PayStart.from(postJson("/leads/$id/extracard/$purchaseId"))
+
+/** After the sheet saved the card: charge it and mark the extras paid. */
+suspend fun Api.extrasCardDone(id: String, purchaseId: String, setupIntentId: String): PayDone =
+    PayDone.from(postJson("/leads/$id/extrapaid/$purchaseId", JSONObject().put("setupIntentId", setupIntentId)))
+
+/** Removes an unpaid extras order added by mistake. */
+suspend fun Api.removeExtras(id: String, purchaseId: String) { deleteJson("/leads/$id/extras/$purchaseId") }

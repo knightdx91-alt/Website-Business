@@ -1502,6 +1502,16 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   OFFER_HINT, PLAN_QUESTIONS ("Wants their own .com?") and the objection "Do I need to buy a domain name?" (app.js + content.ts);
   training: the question is a step in "Signing them up", "Their own domain and email" covers buying it on our Cloudflare with
   the client as registrant; the lead's domain card (web + Android) lists the three; /pricing FAQ (`domainFaq`); the costs guide.
+- 🛒 Extras added in the app (19 Oct 2026, owner's ask; Android 2.89; `src/worker/extras-pay.ts`, migration 0029 `purchases.stripe_payment_intent
+  / paid_via / tap_nonce / added_by`): the lead page's 🛒 Extras card (Sold / Live; web `extrasAddHtml` / `bindExtrasAdd`, Android
+  `ui/ExtrasAdd.kt` `ExtrasAddSection`) → `POST /api/leads/:id/extras {picks, approvedBy}` (owner + callers; `addExtrasInApp`: a purchases
+  row with the extras agreement text, signer "<name> (approved in person; added by X)", no drawn signature; the signed service
+  agreement's payment authorization covers approved extras). Each unpaid order: `POST /extrastap/:pid` (card_present PaymentIntent,
+  tap token `p<purchaseId>`; `/api/tap/*` routes check `extrasTapAuth` first, so TapToPayActivity needs no change), `POST
+  /extracard/:pid` + `POST /extrapaid/:pid {setupIntentId}` (the payment sheet; LeadScreen `typeCardExtras` shares the sheet with
+  `typeCard` via `cardPurchase`), web `POST /extracheckout/:pid` (Stripe Checkout, kind extras), `DELETE /extras/:pid` (unpaid only).
+  `activateExtras`: monthly lines start their own subscription (metadata kind extras) one month out, paid = 1, note + alert. Webhook
+  `payment_intent.succeeded` kind `extras_tap` finishes a tap the phone never reported. The practice lead charges only the $1 item.
 - 🔐 Bundled trust anchors (Oct 2026, Android 2.62): the morning Cloudflare reissued every certificate from Google Trust Services
   (13 Oct, 02:07 UTC; WE1 → GTS Root R4), Chris's phone showed "java.security.cert.CertPathValidatorException: Trust anchor for
   certification path not found" while the owner's worked. `res/xml/network_security_config.xml` (manifest

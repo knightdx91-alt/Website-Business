@@ -299,15 +299,19 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
 
     // "Type in the card numbers": Stripe's payment sheet saves the card (SetupIntent), then the server charges today's amount.
     var cardSignup by remember { mutableStateOf<String?>(null) }
+    /** Set instead of cardSignup when the sheet is paying an extras order. */
+    var cardPurchase by remember { mutableStateOf<String?>(null) }
     var cardSecret by remember { mutableStateOf<String?>(null) }
     val cardSheet = remember {
         PaymentSheet.Builder(
             PaymentSheetResultCallback { result ->
                 val sid = cardSignup
+                val pid = cardPurchase
                 val secret = cardSecret
                 when (result) {
-                    is PaymentSheetResult.Completed -> if (sid != null && secret != null) act("card") {
-                        val d = state.api.payComplete(sid, secret.substringBefore("_secret_"))
+                    is PaymentSheetResult.Completed -> if ((sid != null || pid != null) && secret != null) act("card") {
+                        val d = if (pid != null) state.api.extrasCardDone(id, pid, secret.substringBefore("_secret_"))
+                        else state.api.payComplete(sid!!, secret.substringBefore("_secret_"))
                         context.toast(d.message ?: buildString {
                             append("✅ Paid ").append(money(d.amountCents))
                             if (!d.card.isNullOrBlank()) append(" with ").append(d.card)
@@ -326,8 +330,28 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
             val p = state.api.payStart(signupId)
             PaymentConfiguration.init(context, p.publishableKey)
             cardSignup = signupId
+            cardPurchase = null
             cardSecret = p.clientSecret
             cardSheet.presentWithSetupIntent(p.clientSecret, PaymentSheet.Configuration.Builder(meta?.companyName?.ifBlank { null } ?: "Underground Associates").allowsDelayedPaymentMethods(false).build())
+        }
+    }
+
+    fun typeCardExtras(purchaseId: String) {
+        act("card") {
+            val p = state.api.extrasCardStart(id, purchaseId)
+            PaymentConfiguration.init(context, p.publishableKey)
+            cardSignup = null
+            cardPurchase = purchaseId
+            cardSecret = p.clientSecret
+            cardSheet.presentWithSetupIntent(p.clientSecret, PaymentSheet.Configuration.Builder(meta?.companyName?.ifBlank { null } ?: "Underground Associates").allowsDelayedPaymentMethods(false).build())
+        }
+    }
+
+    fun tapExtras(purchaseId: String) {
+        act("tap") {
+            val r = state.api.extrasTap(id, purchaseId)
+            if (r.optBoolean("alreadyPaid")) { context.toast("Already paid ✅"); load(); return@act }
+            context.startActivity(TapToPayActivity.intent(context, r.getString("token"), state.api.origin))
         }
     }
 
@@ -927,10 +951,22 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
             }
 
             // ---- extras, review ask, billing (sold / live) ----
-            if (client && (live || showMore)) item {
+            if (client) item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("🛒 Extras", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        if (canWork) ExtrasAddSection(
+                            state = state,
+                            leadId = id,
+                            purchases = detail.purchases,
+                            signer = detail.signups.firstOrNull { it.paid }?.signerName ?: detail.signups.firstOrNull()?.signerName ?: "",
+                            tapReady = meta?.tapReady == true,
+                            cardReady = meta?.cardReady == true,
+                            busy = busy != null,
+                            onTap = { tapExtras(it) },
+                            onCard = { typeCardExtras(it) },
+                            onChanged = { scope.launch { load() } },
+                        )
                         Text("Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${if (meta?.checkoutOnline == true) " online" else ""}. Good for 30 days.", style = MaterialTheme.typography.bodySmall, color = muted)
                         OutlinedButton(onClick = {
                             act("extras") {

@@ -1085,7 +1085,8 @@ async function viewLead(id, intent) {
     C.domain = (l.salesStatus === "live" || l.salesStatus === "sold") && work ? domainCardHtml() : "";
     C.gbp = (l.salesStatus === "live" || l.salesStatus === "sold") && work && ready ? gbpCardHtml(l) : "";
     C.extras = `${l.salesStatus === "live" || l.salesStatus === "sold" ? `<section class="card"><h2>🛒 Extras</h2><p class="small muted">Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${meta.checkout && meta.checkout.online ? " online" : ""}. Good for 30 days.</p>
-        <div class="btns btns--full"><button class="btn" type="button" data-extraslink>💬 Text “Buy extras” link</button></div></section>` : ""}`;
+        <div class="btns btns--full"><button class="btn" type="button" data-extraslink>💬 Text “Buy extras” link</button></div>
+        ${work ? extrasAddHtml(l) : ""}</section>` : ""}`;
     C.review = l.salesStatus === "live" || l.salesStatus === "sold" ? reviewAskHtml() : "";
     C.billing = `${(l.salesStatus === "live" || l.salesStatus === "sold") && work ? `<section class="card"><h2>💳 Billing</h2><p class="small muted">Their Stripe billing portal: update the card, see invoices, change or cancel the subscription.</p>
         <div class="btns btns--full"><button class="btn" type="button" data-act="portal">Open billing portal</button></div></section>` : ""}`;
@@ -1177,6 +1178,7 @@ async function viewLead(id, intent) {
     };
     if (ready && l.salesStatus !== "live") bindShareButtons(l);
     bindReviewAsk(l);
+    bindExtrasAdd(l, reload);
     act("lost", async () => {
       const card = document.getElementById("logcard");
       if (!card) return;
@@ -3562,6 +3564,63 @@ async function viewLead(id, intent) {
     catch (err) { toast(err.message); b.disabled = false; }
   });
 
+  /** Extras added here and paid on the spot: unpaid orders with tap / type-the-card buttons, then the add form. */
+  function extrasAddHtml(l) {
+    const unpaid = (l.purchases || []).filter((p) => !p.paid && p.dueCents >= 50);
+    const label = (p) => esc([...(p.extras || []).map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...(p.quotes || []).map((q) => `${q} (quote)`)].join(", "));
+    return `${unpaid.map((p) => `<div class="xpay" style="margin-top:12px"><p><strong>${label(p)}</strong> · ${money(p.dueCents / 100)} due · not paid yet</p>
+        <div class="btns">${tapReady() && isAndroid() ? `<button class="btn btn--small btn--primary" type="button" data-xtap="${esc(p.id)}">💳 Take payment by tap</button>` : ""}
+        ${meta.checkout && meta.checkout.online ? `<button class="btn btn--small" type="button" data-xcard="${esc(p.id)}">⌨️ Type in the card numbers</button>` : ""}
+        <button class="linkbtn" type="button" data-xdel="${esc(p.id)}">Remove</button></div></div>`).join("")}
+      <details style="margin-top:12px" data-xadd><summary><strong>➕ Add an extra now (they pay here)</strong></summary><div class="xadd small muted">Loading the extras…</div></details>`;
+  }
+  function bindExtrasAdd(l, reload) {
+    const box = $app.querySelector("[data-xadd]");
+    $app.querySelectorAll("[data-xtap]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        const res = await api(`/leads/${l.id}/extrastap/${b.dataset.xtap}`, { method: "POST" });
+        if (res.alreadyPaid) { toast("Already paid ✅"); reload(); return; }
+        toast(`Hand the phone over: ${money(res.amountCents / 100)} by tap`);
+        location.href = res.intentUrl;
+      } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+    $app.querySelectorAll("[data-xcard]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { const res = await api(`/leads/${l.id}/extracheckout/${b.dataset.xcard}`, { method: "POST" }); location.href = res.url; }
+      catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+    $app.querySelectorAll("[data-xdel]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Remove these unpaid extras?")) return;
+      try { await api(`/leads/${l.id}/extras/${b.dataset.xdel}`, { method: "DELETE" }); toast("Removed"); reload(); } catch (err) { toast(err.message); }
+    }));
+    if (!box) return;
+    box.addEventListener("toggle", async () => {
+      if (!box.open || box.dataset.loaded) return;
+      box.dataset.loaded = "1";
+      const slot = box.querySelector(".xadd");
+      try {
+        const o = await api(`/plans/options?lead=${l.id}`);
+        const signer = ((l.signups || []).find((x) => x.paid) || (l.signups || [])[0] || {}).signerName || l.contact || "";
+        slot.classList.remove("muted");
+        slot.innerHTML = `<form id="xform">${(o.addons || []).map((a, i) => a.unit === "quote" ? "" : `<label class="check" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" name="x_${i}"> <span style="flex:1">${esc(a.name)} · <span class="muted">${esc(a.price)}</span></span>${a.unit === "each" ? `<input name="q_${i}" type="number" min="1" max="20" value="1" style="width:4em" aria-label="How many">` : ""}</label>`).join("")}
+          <label class="field" style="margin-top:8px"><span>Who approved it (their name)</span><input name="who" value="${esc(signer)}" maxlength="80" required></label>
+          <p class="small muted">Their service agreement already lets us charge approved extras to their card. Monthly extras renew on the same card.</p>
+          <div class="btns btns--full"><button class="btn btn--primary" type="submit">Add the extras</button></div></form>`;
+        slot.querySelector("#xform").addEventListener("submit", async (ev) => {
+          ev.preventDefault();
+          const f = ev.target;
+          const picks = (o.addons || []).map((a, index) => ({ index, on: f.elements[`x_${index}`] && f.elements[`x_${index}`].checked, qty: Number((f.elements[`q_${index}`] || {}).value) || 1 })).filter((p) => p.on).map(({ index, qty }) => ({ index, qty }));
+          if (!picks.length) { toast("Tick at least one extra"); return; }
+          try {
+            const res = await api(`/leads/${l.id}/extras`, { method: "POST", json: { picks, approvedBy: f.elements.who.value.trim() } });
+            toast(`Added: ${res.summary}. ${res.dueCents ? `${money(res.dueCents / 100)} due; take the payment below.` : ""}`);
+            reload();
+          } catch (err) { toast(err.message); }
+        });
+      } catch (err) { slot.textContent = err.message; }
+    });
+  }
   function bindReviewAsk(l) {
     $app.querySelectorAll("[data-lookuplink]").forEach((lb) => lb.addEventListener("click", async () => {
       const open = lb.dataset.lookuplink === "open";

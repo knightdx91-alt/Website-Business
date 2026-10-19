@@ -1,3 +1,14 @@
+import {
+  addExtrasInApp,
+  completeExtrasCard,
+  completeExtrasTap,
+  extrasTapAuth,
+  extrasTapSession,
+  removeExtras,
+  startExtrasCard,
+  startExtrasCheckout,
+  startExtrasTap,
+} from "./extras-pay.ts";
 import { gcalClientId, gcalLast, gtasksLast } from "./gcal.ts";
 import { embedSnippets, serveEmbed } from "./embed.ts";
 import { APP_ORIGIN } from "./tankboard.ts";
@@ -1016,6 +1027,19 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       path === "/tap/log") &&
     req.headers.has("authorization")
   ) {
+    // An extras order's token ("p<purchaseId>") goes to its own bookkeeping; the native screen can't tell them apart.
+    const xrow = await extrasTapAuth(env, req.headers.get("authorization"));
+    if (xrow) {
+      if (path === "/tap/session" && m === "GET") return json(await extrasTapSession(env, xrow));
+      if (path === "/tap/connection_token" && m === "POST") return json(await connectionToken(env));
+      if (path === "/tap/log" && m === "POST")
+        return json(await tapLog(env, { ...xrow, id: `p${xrow.id}` } as never, await body(req, TapLogBody)));
+      if (path === "/tap/complete" && m === "POST") {
+        const { paymentIntentId } = await body(req, z.object({ paymentIntentId: z.string().regex(/^pi_[A-Za-z0-9]+$/) }));
+        return json(await completeExtrasTap(env, { purchaseId: xrow.id, paymentIntentId, actorName: "Tap to Pay" }));
+      }
+      throw new HttpError(404, "Not found");
+    }
     const row = await tapAuth(env, req.headers.get("authorization"));
     if (path === "/tap/session" && m === "GET")
       return json(await tapSession(env, row));
@@ -2701,6 +2725,28 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         }),
       );
     }
+    // Extras added in the app and paid on the spot (extras-pay.ts).
+    if (action === "/extras" && !sub && m === "POST") {
+      const b = await body(
+        req,
+        z.object({
+          picks: z.array(z.object({ index: z.number().int().min(0).max(40), qty: z.number().int().min(1).max(20) })).min(1).max(30),
+          approvedBy: z.string().trim().min(2).max(80),
+        }),
+      );
+      return json(await addExtrasInApp(env, { leadId: id, picks: b.picks, approvedBy: b.approvedBy, actorName: session.name }));
+    }
+    if (action === "/extras" && sub && m === "DELETE") return json(await removeExtras(env, id, sub));
+    if (action === "/extrastap" && sub && m === "POST")
+      return json(await startExtrasTap(env, { leadId: id, purchaseId: sub, origin: url.origin }));
+    if (action === "/extracard" && sub && m === "POST")
+      return json(await startExtrasCard(env, { leadId: id, purchaseId: sub }));
+    if (action === "/extrapaid" && sub && m === "POST") {
+      const { setupIntentId } = await body(req, z.object({ setupIntentId: z.string().regex(/^seti_[A-Za-z0-9]+$/) }));
+      return json(await completeExtrasCard(env, { leadId: id, purchaseId: sub, setupIntentId, actorName: session.name }));
+    }
+    if (action === "/extracheckout" && sub && m === "POST")
+      return json(await startExtrasCheckout(env, { leadId: id, purchaseId: sub, origin: url.origin }));
     if (action === "/cardpay" && m === "POST") {
       const { signupId } = await body(
         req,

@@ -18,6 +18,17 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 71,
+    date: "2026-10-19",
+    android: "2.89",
+    title: "Add an extra and take the payment right in the app",
+    items: [
+      "On a client's lead page (Sold or Live), the 🛒 Extras card has \"➕ Add an extra now (they pay here)\": tick the extras (and how many), type who approved it, tap Add the extras.",
+      "The new order shows right there with two buttons: \"💳 Take payment by tap\" and \"⌨️ Type in the card numbers\". Monthly extras then renew on the same card every month; one-time ones are charged once.",
+      "Added one by mistake? Tap Remove before it's paid. On the web app, the card button opens Stripe's secure card page.",
+    ],
+  },
+  {
     n: 70,
     date: "2026-10-19",
     android: "2.88",

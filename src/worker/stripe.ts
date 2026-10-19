@@ -1,3 +1,4 @@
+import { completeExtrasTap } from "./extras-pay.ts";
 import { notify } from "./notify.ts";
 import { onPlanPaid } from "./referrals.ts";
 import { getLead, updateLead } from "./db.ts";
@@ -173,6 +174,13 @@ export async function handleStripeEvent(
       leadId: row && row.lead_id !== "web" ? row.lead_id : null,
       text: `💵 ${who} paid ${money(o.amount_total)}${row?.lead_id === "web" ? " (website order: add them with ➕ Add a business)" : ""}`,
     });
+  } else if (
+    event.type === "payment_intent.succeeded" &&
+    meta.kind === "extras_tap" &&
+    meta.purchaseId
+  ) {
+    // An extras tap the phone may not have reported (idempotent, like signup_tap above).
+    await completeExtrasTap(env, { purchaseId: meta.purchaseId, paymentIntentId: String(o.id), actorName: "Stripe" });
   } else if (
     event.type === "checkout.session.completed" &&
     meta.kind === "extras" &&
