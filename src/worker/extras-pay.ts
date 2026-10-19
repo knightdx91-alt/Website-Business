@@ -24,6 +24,7 @@ import {
   nonce,
   stripe,
   stripeGet,
+  stripeProduct,
   tapIntentUrl,
   tapStatus,
   terminalLocation,
@@ -457,10 +458,12 @@ async function activateExtras(
       {
         customer: o.customer,
         default_payment_method: o.paymentMethod,
-        items: recurring.map((l) => ({
-          quantity: l.qty,
-          price_data: { currency: "usd", unit_amount: l.amount, product_data: { name: l.name }, recurring: { interval: "month" } },
-        })),
+        items: await Promise.all(
+          recurring.map(async (l) => ({
+            quantity: l.qty,
+            price_data: { currency: "usd", unit_amount: l.amount, product: await stripeProduct(env, l.name), recurring: { interval: "month" } },
+          })),
+        ),
         billing_cycle_anchor: anchor,
         proration_behavior: "none",
         off_session: true,

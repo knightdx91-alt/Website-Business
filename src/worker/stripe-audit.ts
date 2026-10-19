@@ -59,6 +59,20 @@ export async function runStripeAudit(env: Env): Promise<void> {
     }
     await setSetting(env, "stripe_refund_log", JSON.stringify({ at: Date.now(), log }));
   }
+  // `extras_charge_req` = "<leadId>:<purchaseId>" → charges that extras order to the card on file (extras_charge_log).
+  const chargeReq = await getSetting(env, "extras_charge_req");
+  if (chargeReq) {
+    await env.DB.prepare("DELETE FROM settings WHERE key = 'extras_charge_req'").run();
+    const [leadId, purchaseId] = chargeReq.split(":");
+    let out: Record<string, unknown>;
+    try {
+      const { chargeExtrasOnFile } = await import("./extras-pay.ts");
+      out = { ...(await chargeExtrasOnFile(env, { leadId: leadId!, purchaseId: purchaseId!, actorName: "Owner" })) };
+    } catch (e) {
+      out = { error: (e as Error).message };
+    }
+    await setSetting(env, "extras_charge_log", JSON.stringify({ at: Date.now(), req: chargeReq, ...out }));
+  }
   // `stripe_card_req` = a customer id → what the extras "card on file" lookup finds for them (stripe_card_log).
   const cardReq = await getSetting(env, "stripe_card_req");
   if (cardReq) {

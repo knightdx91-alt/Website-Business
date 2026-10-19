@@ -27,6 +27,19 @@ import { notify } from "./notify.ts";
 import { onPlanPaid } from "./referrals.ts";
 import type { Session } from "./auth.ts";
 
+/**
+ * A Stripe Product id for a subscription line's name. Subscriptions' `price_data` takes `product` (an id), not
+ * `product_data` (only Checkout accepts that), so each name gets one Product, remembered in settings `stripe_product.<name>`.
+ */
+export async function stripeProduct(env: Env, name: string): Promise<string> {
+  const key = `stripe_product.${name.toLowerCase().slice(0, 80)}`;
+  const known = await getSetting(env, key);
+  if (known) return known;
+  const p = await stripe<{ id: string }>(env, "products", { name: name.slice(0, 250) }, `prod:${key}`);
+  await setSetting(env, key, p.id);
+  return p.id;
+}
+
 /** The Android app's package; the page opens `intent://tap…;package=<this>` so Chrome hands off to it. */
 export const TAP_PACKAGE = "com.knightdx91.websitebusiness";
 export const TAP_TOKEN_MINUTES = 10;
@@ -637,15 +650,17 @@ async function activatePlan(
       {
         customer: o.customer,
         default_payment_method: o.paymentMethod,
-        items: recurring.map((l) => ({
-          quantity: l.qty,
-          price_data: {
-            currency: "usd",
-            unit_amount: l.amount,
-            product_data: { name: l.name },
-            recurring: { interval: l.interval },
-          },
-        })),
+        items: await Promise.all(
+          recurring.map(async (l) => ({
+            quantity: l.qty,
+            price_data: {
+              currency: "usd",
+              unit_amount: l.amount,
+              product: await stripeProduct(env, l.name),
+              recurring: { interval: l.interval },
+            },
+          })),
+        ),
         billing_cycle_anchor: anchor,
         proration_behavior: "none",
         off_session: true,

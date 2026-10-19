@@ -1516,6 +1516,11 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   web scrolls to the order), and `POST /extracharge/:pid` = `chargeExtrasOnFile` charges the card Stripe already has (`cardOnFile`:
   customer default → active subscription's → any card; `purchasesFor().cardOnFile` when a paid sign-up has a Stripe subscription or
   a tap / card payment) → "💳 Charge their card on file" on both apps.
+  Subscriptions from the app (activatePlan in tap.ts, activateExtras) must use `price_data.product` = an id: `product_data` is
+  Checkout-only and Stripe refused it ("unknown parameter items[0][price_data][product_data]") after the $13 was already charged.
+  `stripeProduct(env, name)` makes one Product per line name (settings `stripe_product.<name>`). D1 key `extras_charge_req` =
+  "<leadId>:<purchaseId>" runs `chargeExtrasOnFile` from the minute cron (log in `extras_charge_log`); `stripe_card_req` = cus_… logs
+  what the card-on-file lookup finds.
 - 🔐 Bundled trust anchors (Oct 2026, Android 2.62): the morning Cloudflare reissued every certificate from Google Trust Services
   (13 Oct, 02:07 UTC; WE1 → GTS Root R4), Chris's phone showed "java.security.cert.CertPathValidatorException: Trust anchor for
   certification path not found" while the owner's worked. `res/xml/network_security_config.xml` (manifest
