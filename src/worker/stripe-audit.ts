@@ -1,13 +1,13 @@
 /**
  * Stripe audit from the server (the Stripe key is a Worker secret, so the dev container can't call Stripe itself).
  * Settings key `stripe_audit_req` (any value) → the minute cron lists every subscription that can still charge
- * (active / trialing / past_due / unpaid) and the last 30 charges into `stripe_audit`, then clears the request.
+ * (active / trialing / past_due / unpaid), the last 30 charges and the last 10 SetupIntents / PaymentIntents into `stripe_audit`, then clears the request.
  * Settings key `stripe_cancel_req` = JSON array of subscription ids → each is cancelled now (no proration, no refund),
  * results go in `stripe_cancel_log`. `stripe_refund_req` = JSON array of charge ids (`ch_…`) → each is refunded in full
  * (what's left of it), results in `stripe_refund_log`. Nothing here is reachable over HTTP; only someone with D1 access can ask.
  */
 import type { Env } from "./env.ts";
-import { getSetting, setSetting } from "./db.ts";
+import { getSetting, getSettings, setSetting } from "./db.ts";
 import { STRIPE_VERSION } from "./tap.ts";
 
 const LIVE = ["active", "trialing", "past_due", "unpaid"];
@@ -96,7 +96,37 @@ export async function runStripeAudit(env: Env): Promise<void> {
       description: c.description,
       metadata: c.metadata,
     }));
-    await setSetting(env, "stripe_audit", JSON.stringify({ at: Date.now(), subs, charges }));
+    const si = await call(env, "GET", "setup_intents?limit=10");
+    const setups = si.data.map((x: any) => ({
+      id: x.id,
+      status: x.status,
+      created: x.created,
+      metadata: x.metadata,
+      error: x.last_setup_error?.message ?? null,
+      pm: x.payment_method,
+    }));
+    // Does the publishable key (Settings) belong to the same Stripe account as the secret key? PaymentSheet needs both.
+    let pkCheck: unknown = null;
+    const pk = (await getSettings(env)).stripePublishableKey;
+    const first = si.data[0];
+    if (pk && first?.client_secret) {
+      const r = await fetch(`https://api.stripe.com/v1/setup_intents/${first.id}?client_secret=${encodeURIComponent(first.client_secret)}`, {
+        headers: { authorization: `Bearer ${pk}`, "stripe-version": STRIPE_VERSION },
+      });
+      const j = (await r.json().catch(() => ({}))) as any;
+      pkCheck = { pkMode: pk.slice(0, 8), status: r.status, error: j?.error?.message ?? null, account: (await call(env, "GET", "account").catch(() => null))?.id ?? null };
+    }
+    const pi = await call(env, "GET", "payment_intents?limit=10");
+    const intents = pi.data.map((x: any) => ({
+      id: x.id,
+      status: x.status,
+      amount: x.amount,
+      created: x.created,
+      types: x.payment_method_types,
+      metadata: x.metadata,
+      error: x.last_payment_error?.message ?? null,
+    }));
+    await setSetting(env, "stripe_audit", JSON.stringify({ at: Date.now(), subs, charges, setups, intents, pkCheck }));
   } catch (e) {
     await setSetting(env, "stripe_audit", JSON.stringify({ at: Date.now(), error: (e as Error).message }));
   }

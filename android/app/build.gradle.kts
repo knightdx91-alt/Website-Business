@@ -19,8 +19,8 @@ android {
         applicationId = "com.knightdx91.websitebusiness"
         minSdk = 26
         targetSdk = 35
-        versionCode = 92
-        versionName = "2.86"
+        versionCode = 93
+        versionName = "2.87"
         // The Worker the app talks to. The Tap to Pay intent:// link may name another origin with ?o=.
         buildConfigField("String", "BASE_URL", "\"https://app.undergroundassociates.com\"")
         // Stripe's Tap to Pay library ships arm64 + armeabi-v7a natives (~20 MB each). Every phone that can run
@@ -83,7 +83,7 @@ dependencies {
     implementation("com.stripe:stripeterminal-taptopay:6.0.0")
     implementation("com.stripe:stripeterminal-core:6.0.0")
     // Stripe PaymentSheet: typing a card into the phone on the in-person sign-up (ui/SignupScreen.kt).
-    implementation("com.stripe:stripe-android:22.8.1")
+    implementation("com.stripe:stripe-android:23.23.0")
     // Firebase Cloud Messaging: instant update + alert pushes (push/Push.kt). Initialised from Settings, no google-services.json.
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging")

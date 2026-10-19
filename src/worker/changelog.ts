@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 68,
+    date: "2026-10-19",
+    android: "2.87",
+    title: "Tap to Pay and card entry fixed",
+    items: [
+      "Tap to Pay works again after a first try: the phone kept using the first payment's pass, so every later tap stopped at \"This payment was restarted\". Update the app, then start the payment again from the lead page.",
+      "The \"type the card in\" form uses Stripe's newest version, which fixes typing card numbers on newer Android phones.",
+    ],
+  },
+  {
     n: 67,
     date: "2026-10-18",
     android: "2.86",

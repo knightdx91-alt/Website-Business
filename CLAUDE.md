@@ -1881,7 +1881,13 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `stripe_audit` (JSON) and clears the request. `stripe_cancel_req` = JSON array of `sub_…` ids cancels them (log in
   `stripe_cancel_log`). Not reachable over HTTP. 18 Oct 2026 audit: no subscriptions at all; $1 test charges ch_3UPrb3… (Katy's tap,
   12 Oct) and ch_3UOYJB… (extras test, 9 Oct) were refunded the same day with `stripe_refund_req` (JSON array of `ch_…`
-  ids → full refunds, log in `stripe_refund_log`).
+  ids → full refunds, log in `stripe_refund_log`). The audit also lists the last 10 SetupIntents / PaymentIntents and `pkCheck`
+  (reads the newest SetupIntent with Settings' publishable key: 200 = the pk and the secret key are the same account).
+- Tap to Pay "This payment was restarted" (19 Oct 2026, Android 2.87): Stripe Terminal is initialised once per process and keeps
+  its ConnectionTokenProvider, which had captured the FIRST TapToPayActivity's TapApi, so every later tap fetched a connection token
+  with a stale single-use token. The provider now reads `TapToPayActivity.currentApi` (set on each screen). Same release: card
+  sheet (`stripe-android`) 22.8.1 → 23.23.0 after "it won't let me type the card numbers" on the Fold (Android 17); it has no OkHttp
+  dependency, so the Terminal OkHttp 4.12 rule still holds.
 - 🔌 Live stock on someone else's website (Oct 2026, owner's ask for King Fish, whose friend is building their site; Android 2.86;
   `src/worker/embed.ts`, `test/worker/embed.test.ts`): public routes off the feed: `/l/<id>/embed.js` (one-line script, finds
   `#ua-stock` / `[data-ua-stock]` or draws where the tag sits, inherits the host site's font + color, reads the feed from its own

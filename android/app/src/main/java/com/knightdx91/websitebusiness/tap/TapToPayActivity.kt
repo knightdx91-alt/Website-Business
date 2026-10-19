@@ -65,6 +65,13 @@ class TapToPayActivity : Activity() {
         /** Opened straight from the app's lead screen (no deep link needed). */
         fun intent(context: Context, token: String, origin: String): Intent =
             Intent(context, TapToPayActivity::class.java).putExtra(EXTRA_TOKEN, token).putExtra(EXTRA_ORIGIN, origin)
+
+        /**
+         * Stripe Terminal is set up once per app process and keeps its ConnectionTokenProvider for good, so the provider
+         * must read the CURRENT payment's token from here. Capturing the first screen's TapApi made every later tap ask
+         * with a stale single-use token ("This payment was restarted").
+         */
+        @Volatile private var currentApi: TapApi? = null
     }
 
     private lateinit var business: TextView
@@ -111,7 +118,7 @@ class TapToPayActivity : Activity() {
             fail(getString(R.string.tapOpenFromApp), null)
             return
         }
-        api = TapApi(origin, token)
+        api = TapApi(origin, token).also { currentApi = it }
         startFlow()
     }
 
@@ -186,6 +193,7 @@ class TapToPayActivity : Activity() {
 
     private fun initTerminal() {
         val a = api ?: return
+        currentApi = a
         step = "init"
         try {
             if (!Terminal.isInitialized()) {
@@ -196,7 +204,8 @@ class TapToPayActivity : Activity() {
                         override fun fetchConnectionToken(callback: ConnectionTokenCallback) {
                             thread {
                                 try {
-                                    callback.onSuccess(a.connectionToken())
+                                    val now = currentApi ?: throw IllegalStateException("Start the payment again from the app.")
+                                    callback.onSuccess(now.connectionToken())
                                 } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                                     callback.onFailure(ConnectionTokenException(e.message ?: "Couldn't get a connection token", e))
                                 }
