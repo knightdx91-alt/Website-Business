@@ -865,8 +865,7 @@ private fun ResultCard(
                             Text(if (onPhone) "Last step: hand the phone back to $company to take the payment." else "Last step: payment.", fontWeight = FontWeight.SemiBold)
                             if (result.tapReady) Button(onClick = onTap, enabled = !payBusy, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(52.dp)) { Text("💳 Tap card on this phone") }
                             if (result.cardReady) {
-                                if (result.tapReady) OutlinedButton(onClick = onCard, enabled = !payBusy, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(52.dp)) { Text("Enter card on this phone") }
-                                else Button(onClick = onCard, enabled = !payBusy, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(52.dp)) { Text("Enter card on this phone") }
+                                Button(onClick = onCard, enabled = !payBusy, modifier = Modifier.fillMaxWidth().padding(top = if (result.tapReady) 8.dp else 10.dp).height(52.dp)) { Text("⌨️ Type in the card numbers") }
                             }
                             if (result.checkoutUrl != null) {
                                 if (onPhone) TextButton(onClick = onText, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("Text them the payment link") }

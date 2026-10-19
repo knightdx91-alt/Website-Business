@@ -42,6 +42,8 @@ data class Meta(
     val tapReady: Boolean,
     val tapWhy: String?,
     val checkoutOnline: Boolean,
+    /** A card can be typed into Stripe's payment sheet on this phone (secret + publishable key set). */
+    val cardReady: Boolean = false,
     val fcm: FcmConfig? = null,
     val fcmServer: Boolean = false,
     /** Alert preference: all / mine / important (Settings → Alerts). */
@@ -73,6 +75,7 @@ data class Meta(
                 tapReady = tap.optBoolean("ready"),
                 tapWhy = tap.str("why"),
                 checkoutOnline = j.optJSONObject("checkout")?.optBoolean("online") ?: false,
+                cardReady = j.optJSONObject("checkout")?.optBoolean("cardReady") ?: false,
                 fcm = j.optJSONObject("fcm")?.optJSONObject("client")?.let { c -> FcmConfig(c.optString("appId"), c.optString("apiKey"), c.optString("projectId"), c.optString("senderId")) },
                 fcmServer = j.optJSONObject("fcm")?.optBoolean("server") ?: false,
                 alertMode = me.optString("alertMode", "all"),

@@ -1888,6 +1888,12 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   with a stale single-use token. The provider now reads `TapToPayActivity.currentApi` (set on each screen). Same release: card
   sheet (`stripe-android`) 22.8.1 → 23.23.0 after "it won't let me type the card numbers" on the Fold (Android 17); it has no OkHttp
   dependency, so the Terminal OkHttp 4.12 rule still holds.
+  Owner's rule the same day: "⌨️ Type in the card numbers" is its own button wherever payment is taken. Android: the lead page's
+  sign-up card (under Take payment by tap; `typeCard()` in LeadScreen = payStart → PaymentSheet → payComplete, needs
+  `Meta.cardReady` from `/meta.checkout.cardReady`) and the sign-up screen's last step (a full Button, not outlined). Web: the
+  lead page's sign-up card (`data-cardpay`) → `POST /api/leads/:id/cardpay {signupId}` = `startCardCheckout` in tap.ts: a fresh
+  Stripe Checkout session for an already-signed sign-up, re-priced from its plan / extras, metadata kind signup (the webhook marks
+  it paid), back to `#/lead/<id>`; the practice lead and invoice sign-ups are refused.
 - 🔌 Live stock on someone else's website (Oct 2026, owner's ask for King Fish, whose friend is building their site; Android 2.86;
   `src/worker/embed.ts`, `test/worker/embed.test.ts`): public routes off the feed: `/l/<id>/embed.js` (one-line script, finds
   `#ua-stock` / `[data-ua-stock]` or draws where the tag sits, inherits the host site's font + color, reads the feed from its own

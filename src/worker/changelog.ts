@@ -21,10 +21,11 @@ export const CHANGELOG: ChangeEntry[] = [
     n: 68,
     date: "2026-10-19",
     android: "2.87",
-    title: "Tap to Pay and card entry fixed",
+    title: "Tap to Pay fixed + a Type in the card numbers button",
     items: [
       "Tap to Pay works again after a first try: the phone kept using the first payment's pass, so every later tap stopped at \"This payment was restarted\". Update the app, then start the payment again from the lead page.",
-      "The \"type the card in\" form uses Stripe's newest version, which fixes typing card numbers on newer Android phones.",
+      "New button \"⌨️ Type in the card numbers\" right under \"💳 Take payment by tap\" on the lead page's sign-up card (and on the sign-up screen after they sign): Stripe's card form opens, they type the card, it's charged and saved for renewals. On the web app the same button opens Stripe's secure card page.",
+      "The card form uses Stripe's newest version, which fixes typing card numbers on newer Android phones.",
     ],
   },
   {

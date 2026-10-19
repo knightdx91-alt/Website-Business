@@ -228,6 +228,7 @@ import {
   setupTap,
   startCardSetup,
   startTap,
+  startCardCheckout,
   tapAuth,
   tapSession,
   tapStatus,
@@ -2697,6 +2698,15 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           origin: url.origin,
           session,
         }),
+      );
+    }
+    if (action === "/cardpay" && m === "POST") {
+      const { signupId } = await body(
+        req,
+        z.object({ signupId: z.string().regex(/^[a-z0-9]+$/) }),
+      );
+      return json(
+        await startCardCheckout(env, { signupId, leadId: id, origin: url.origin }),
       );
     }
     if (action === "/paid" && m === "POST") {

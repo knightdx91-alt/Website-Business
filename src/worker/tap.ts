@@ -11,7 +11,7 @@
  * and the daily cron (`reconcileTaps`) finish the same bookkeeping if the phone died between the tap and the call.
  */
 import { tapToken, verifyTap } from "./auth.ts";
-import { priceSignup, stripeForm, type Pick } from "./checkout.ts";
+import { checkoutParams, createCheckout, priceSignup, stripeForm, type Pick } from "./checkout.ts";
 import {
   getLead,
   getSetting,
@@ -792,6 +792,50 @@ export async function startCardSetup(
     publishableKey: settings.stripePublishableKey,
     amountCents: row.due_cents ?? 0,
   };
+}
+
+/**
+ * "Type in the card numbers" from the web app (no native payment sheet there): a fresh Stripe Checkout page for a
+ * sign-up that is already signed, priced again from what was signed. The webhook (metadata kind signup + signupId)
+ * marks it paid like any sign-up link payment.
+ */
+export async function startCardCheckout(
+  env: Env,
+  o: { signupId: string; leadId: string; origin: string },
+): Promise<{ url: string; amountCents: number }> {
+  if (!env.STRIPE_SECRET_KEY) throw new HttpError(409, "Stripe isn't connected");
+  const row = await signupRow(env, o.signupId);
+  if (row.lead_id !== o.leadId) throw new HttpError(404, "No such sign-up");
+  if (row.paid) throw new HttpError(409, "This sign-up is already paid");
+  const lead = await getLead(env, row.lead_id);
+  if (!lead) throw new HttpError(404, "No such lead");
+  if (isPayTest(lead))
+    throw new HttpError(409, "The practice lead takes cards on the phone app only (tap or type the card in).");
+  const settings = await getSettings(env);
+  const plan = JSON.parse(row.plan_json) as { id?: string; billing?: string };
+  const extras = row.extras_json ? (JSON.parse(row.extras_json) as { picks?: Pick[]; invoice?: boolean; founder?: number | null }) : {};
+  if (extras.invoice) throw new HttpError(409, "This one pays by invoice");
+  const order = priceSignup(settings, plan.id ?? "plus", plan.billing ?? "standard", extras.picks ?? [], {
+    category: lead.category,
+    founder: extras.founder ?? null,
+  });
+  const customer = await ensureCustomer(env, row, lead);
+  const back = `${o.origin}/#/lead/${row.lead_id}`;
+  const session = await createCheckout(
+    env,
+    checkoutParams({
+      order,
+      successUrl: back,
+      cancelUrl: back,
+      clientReferenceId: row.lead_id,
+      customer,
+      metadata: { kind: "signup", signupId: row.id, leadId: row.lead_id },
+    }),
+  );
+  await env.DB.prepare("UPDATE signups SET stripe_customer = ?, stripe_session = ? WHERE id = ?")
+    .bind(customer, session.id, row.id)
+    .run();
+  return { url: session.url, amountCents: order.dueToday };
 }
 
 export async function completeCardSetup(

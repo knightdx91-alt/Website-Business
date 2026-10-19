@@ -1,5 +1,11 @@
 package com.knightdx91.websitebusiness.ui
 
+import com.knightdx91.websitebusiness.net.payComplete
+import com.knightdx91.websitebusiness.net.payStart
+import com.stripe.android.PaymentConfiguration
+import com.stripe.android.paymentsheet.PaymentSheet
+import com.stripe.android.paymentsheet.PaymentSheetResult
+import com.stripe.android.paymentsheet.PaymentSheetResultCallback
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -288,6 +294,40 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
             val r = state.api.startTap(id, signupId)
             if (r.optBoolean("alreadyPaid")) { context.toast("Already paid ✅"); load(); return@act }
             context.startActivity(TapToPayActivity.intent(context, r.getString("token"), state.api.origin))
+        }
+    }
+
+    // "Type in the card numbers": Stripe's payment sheet saves the card (SetupIntent), then the server charges today's amount.
+    var cardSignup by remember { mutableStateOf<String?>(null) }
+    var cardSecret by remember { mutableStateOf<String?>(null) }
+    val cardSheet = remember {
+        PaymentSheet.Builder(
+            PaymentSheetResultCallback { result ->
+                val sid = cardSignup
+                val secret = cardSecret
+                when (result) {
+                    is PaymentSheetResult.Completed -> if (sid != null && secret != null) act("card") {
+                        val d = state.api.payComplete(sid, secret.substringBefore("_secret_"))
+                        context.toast(d.message ?: buildString {
+                            append("✅ Paid ").append(money(d.amountCents))
+                            if (!d.card.isNullOrBlank()) append(" with ").append(d.card)
+                        })
+                        load()
+                    }
+                    is PaymentSheetResult.Canceled -> {}
+                    is PaymentSheetResult.Failed -> context.toast(result.error.message ?: "The card didn't go through")
+                }
+            },
+        )
+    }.build()
+
+    fun typeCard(signupId: String) {
+        act("card") {
+            val p = state.api.payStart(signupId)
+            PaymentConfiguration.init(context, p.publishableKey)
+            cardSignup = signupId
+            cardSecret = p.clientSecret
+            cardSheet.presentWithSetupIntent(p.clientSecret, PaymentSheet.Configuration.Builder(meta?.companyName?.ifBlank { null } ?: "Underground Associates").allowsDelayedPaymentMethods(false).build())
         }
     }
 
@@ -711,6 +751,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                             Text(if (s.paid) "✅ Paid" else if (s.invoice) "Invoice: not paid yet" else "⚠️ Payment not finished", color = if (s.paid) Good else Warn, style = MaterialTheme.typography.bodyMedium)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 if (!s.paid && !s.invoice && canWork && meta?.tapReady == true && s.dueCents >= 50) Button(onClick = { tap(s.id) }, enabled = busy == null) { Text("💳 Take payment by tap · ${money(s.dueCents)}") }
+                                if (!s.paid && !s.invoice && canWork && meta?.cardReady == true && s.dueCents >= 50) Button(onClick = { typeCard(s.id) }, enabled = busy == null) { Text("⌨️ Type in the card numbers · ${money(s.dueCents)}") }
                                 OutlinedButton(onClick = { nav.navigate(pdfNav("/api/agreements/s/${s.id}.pdf", "Signed agreement")) }) { Text("📄 Signed agreement") }
                                 if (s.paid && isOwner) OutlinedButton(onClick = { refundFor = s.id }, enabled = busy == null) { Text("↩ Refund") }
                             }

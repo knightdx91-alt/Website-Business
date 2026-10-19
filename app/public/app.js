@@ -662,6 +662,9 @@
   }
   function tapButtonHtml(x) {
     if (x.paid || (x.extras && x.extras.invoice)) return "";
+    return tapOnlyHtml(x) + (meta.checkout && meta.checkout.online ? `<p><button class="btn btn--small" type="button" data-cardpay="${esc(x.id)}">⌨️ Type in the card numbers</button> <span class="small muted">opens Stripe's secure card page on this screen</span></p>` : "");
+  }
+  function tapOnlyHtml(x) {
     if (!tapReady()) return meta.tap && meta.tap.why && meta.checkout && meta.checkout.online ? `<p class="small muted">💳 Tap to Pay isn't set up yet: <a href="#/settings">Settings → Tap to Pay</a>.</p>` : "";
     return isAndroid()
       ? `<p><button class="btn btn--small btn--primary" type="button" data-tap="${esc(x.id)}">💳 Take payment by tap</button> <span class="small muted">${x.dueCents ? `${money(x.dueCents / 100)} now, renewals on the same card` : ""}</span></p>`
@@ -793,6 +796,14 @@
         toast(`Hand the phone over: ${money(res.amountCents / 100)} by tap`);
         watchTap(l.id, b.dataset.tap, after);
         location.href = res.intentUrl;
+      } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+    card.querySelectorAll("[data-cardpay]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        const res = await api(`/leads/${l.id}/cardpay`, { method: "POST", json: { signupId: b.dataset.cardpay } });
+        toast(`Opening the card page: ${money(res.amountCents / 100)}`);
+        location.href = res.url;
       } catch (err) { toast(err.message); } finally { b.disabled = false; }
     }));
     const more = card.querySelector("[data-signup-more]");
