@@ -1020,7 +1020,8 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   are **preview only**: `gallery()` already leaves Google photos out in publish mode and now adds the suggested to-do "Send us your own
   photos" under the grid in previews, and `lintSite` blocks publishing only on a Google hero / logo (not gallery photos, which simply
   don't print). Edit → Photo gallery says how many came from Google with "Remove all Google photos" (`DELETE /gallery/google`; a
-  single one is `/gallery/google-<n>`; the route deletes R2 files only for owner photos). Nothing from Google is ever stored or
+  single one is `/gallery/google-<n>`; the route deletes R2 files only for owner photos; the lead-route regex's last part takes
+  dashes since 19 Oct 2026, before which removing one Google photo answered "Not found" and kept it). Nothing from Google is ever stored or
   re-hosted (Places terms); the owner's own photos still come through "Import their website" or the Edit uploads. `test/worker/google-import.test.ts`.
   Local check: run wrangler dev with `--var GOOGLE_PLACES_API_KEY:"$GOOGLE_PLACES_API_KEY"` (the `.dev.vars` key is a placeholder);
   the rebuild then fails on the placeholder Claude key, which is fine for checking the import itself.

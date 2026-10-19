@@ -2530,7 +2530,7 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
 
   // Actions are letters, optionally ".pdf" (flyer.pdf, reviewcard.pdf, tents.pdf, window.pdf for the Android app).
   const leadMatch =
-    /^\/leads\/([a-z0-9]+)(\/[a-z]+(?:\.pdf)?)?(?:\/([a-z0-9]+))?$/.exec(path);
+    /^\/leads\/([a-z0-9]+)(\/[a-z]+(?:\.pdf)?)?(?:\/([a-z0-9]+(?:-[a-z0-9]+)*))?$/.exec(path);
   if (leadMatch) {
     const id = leadMatch[1]!;
     const action = leadMatch[2] ?? "";
