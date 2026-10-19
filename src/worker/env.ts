@@ -46,7 +46,9 @@ export type Job =
     }
   | { type: "build"; leadId: string }
   /** One-time (Oct 2026): give an open lead's preview the life knobs (edges, decoration, photos) and re-render it. */
-  | { type: "relive"; leadId: string };
+  | { type: "relive"; leadId: string }
+  /** Render the preview again with the same design and copy (no AI), so its to-dos / publish blockers are current. */
+  | { type: "rerender"; leadId: string };
 
 export function json(
   data: unknown,

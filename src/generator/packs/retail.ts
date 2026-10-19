@@ -86,7 +86,7 @@ export function donations(r: BusinessRecord): RetailDonations {
   return r.ext.retail?.donations ?? {};
 }
 
-/** True while the owner hasn't told us what they take and when: the required to-do that blocks publishing. */
+/** True while the owner hasn't told us what they take and when: a suggested to-do (owner's call, Oct 2026: it never blocks publishing; the section then says to call). */
 export function donationsMissing(r: BusinessRecord): boolean {
   const d = donations(r);
   return donationsOn(r) && (!d.accepts?.length || !d.dropOffHours);
@@ -110,7 +110,7 @@ ${d.dropOffHours ? html`<p><strong>Drop-off hours:</strong> ${d.dropOffHours}</p
 ${d.receipts ? html`<p>We're a nonprofit. Ask at the counter and we'll give you a receipt for your donation.</p>` : ""}
 ${d.pickup ? html`<p>${d.pickupNote || "Furniture or a big load? We may be able to pick it up."} <a href="#pickup">Request a pickup</a>.</p>` : ""}
 <div class="btns">${button(call, "secondary")}${button(action(r, "directions")!, "ghost")}</div>
-${donationsMissing(r) ? todo(ctx, "Tell us what you accept for donations and your drop-off hours", "List what you take, what you can't (mattresses, TVs, car seats…), when people can drop things off, and whether you pick up furniture. We only ever show your own list.", true) : ""}
+${donationsMissing(r) ? todo(ctx, "Tell us what you accept for donations and your drop-off hours", "List what you take, what you can't (mattresses, TVs, car seats…), when people can drop things off, and whether you pick up furniture. We only ever show your own list. Until then the section just says to call.") : ""}
 </div></section>
 ${d.pickup ? contactForm(ctx, [], [], [
   { name: "items", label: "What you'd like picked up", required: true, autocomplete: "off" },

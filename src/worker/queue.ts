@@ -263,6 +263,7 @@ export function cardForTodo(title: string, category: string): string {
   if (/sample items/.test(t)) return category === "retail" ? "retail" : "pricelist";
   if (/old website/.test(t)) return "confirm";
   if (/counter services|special-order|tow|24\/7/.test(t)) return category === "auto" && /counter|special-order/.test(t) ? "parts" : "auto";
+  if (/donation/.test(t)) return "donations";
   if (/hours/.test(t)) return "facts";
   if (/customer quotes/.test(t)) return "quotes";
   if (/popular dishes|what you make/.test(t)) return "menu";

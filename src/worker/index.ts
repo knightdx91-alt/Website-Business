@@ -254,7 +254,7 @@ import {
   dnaHints,
   renderPreview,
   runBuild,
-  runRestyle, runRelive, queueRelive,
+  runRestyle, runRelive, queueRelive, runRerender, queueRerender,
   runSearch,
   importSitePhotos,
   forgetSiteImport,
@@ -4520,6 +4520,7 @@ async function handleQueue(batch: MessageBatch<Job>, env: Env): Promise<void> {
       else if (msg.body.type === "build") await runBuild(env, msg.body);
       else if (msg.body.type === "restyle") await runRestyle(env, msg.body);
       else if (msg.body.type === "relive") await runRelive(env, msg.body);
+      else if (msg.body.type === "rerender") await runRerender(env, msg.body);
       msg.ack();
     } catch (err) {
       console.error("job failed", msg.body, err);
@@ -4551,6 +4552,7 @@ async function handleScheduled(
     await republishDirty(env);
     await requeueStuck(env);
     await queueRelive(env);
+    await queueRerender(env, "rerender_donations_v1", "retail");
     await backfillMailCodes(env);
     await remindOpenShifts(env);
     await runStripeAudit(env).catch((e) => console.error("stripe audit", e));

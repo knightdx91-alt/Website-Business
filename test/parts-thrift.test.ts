@@ -82,7 +82,7 @@ test("parts copy may not claim shipping, prices, stock or brands the owner didn'
 const thrift = (donations: NonNullable<BusinessRecord["ext"]["retail"]>["donations"] | undefined, variant = "thrift") =>
   categoryRecord("retail", { name: "Sample Thrift", variant, showStreetAddress: true, ext: { retail: donations ? { donations } : {} } });
 
-test("thrift stores get a Donations section that blocks publishing until the owner fills it in", async () => {
+test("thrift stores get a Donations section; an empty one is only a suggestion, never a publish blocker", async () => {
   assert.equal(retailVariant("thrift_store", [], "Second Chance Resale"), "thrift");
   const empty = await buildSite({ record: thrift(undefined), copy: sampleCopy(), site: { slug: "t", look: "" }, mode: "preview" });
   const home = String(empty.files.get("index.html"));
@@ -91,7 +91,8 @@ test("thrift stores get a Donations section that blocks publishing until the own
   assert.ok(!home.includes("We gladly take"), "no columns before the owner's lists");
   assert.ok(!home.includes('id="pickup"'), "no pickup form unless turned on");
   assert.ok(!empty.files.has("privacy/index.html"), "no form, no privacy page");
-  assert.ok(empty.todos.includes("Tell us what you accept for donations and your drop-off hours"));
+  assert.ok(!empty.todos.some((t) => /donations/.test(t)), "not required");
+  assert.ok(!(empty.lint.publishBlockers ?? []).some((t) => /donations/.test(t)), "doesn't block publishing");
   assert.ok(donationsMissing(thrift(undefined)));
 
   const filled = thrift({ accepts: ["Clothing", "Housewares"], doesNotAccept: ["Mattresses", "TVs"], dropOffHours: "Monday to Saturday, 10 to 4", pickup: true, receipts: true });

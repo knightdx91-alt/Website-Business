@@ -748,3 +748,19 @@ export async function queueRelive(env: Env): Promise<void> {
   const ids = rows.results.map((r) => r.id);
   for (let i = 0; i < ids.length; i += 100) await env.JOBS.sendBatch(ids.slice(i, i + 100).map((leadId) => ({ body: { type: "relive", leadId } as Job })));
 }
+
+/** Re-renders a ready preview as it is (same design, same copy): picks up generator rule changes such as a to-do no longer blocking. */
+export async function runRerender(env: Env, job: Extract<Job, { type: "rerender" }>): Promise<void> {
+  const lead = await getLead(env, job.leadId);
+  if (!lead || lead.status !== "ready" || !lead.record_json || !lead.copy_json || !lead.look) return;
+  await renderPreview(env, lead, JSON.parse(lead.record_json) as BusinessRecord, JSON.parse(lead.copy_json) as Copy, lead.look);
+}
+
+/** Once per `key`: re-renders every ready lead of `category` that isn't live (the donations to-do stopped blocking, Oct 2026). */
+export async function queueRerender(env: Env, key: string, category: string): Promise<void> {
+  if (await env.DB.prepare("SELECT 1 FROM settings WHERE key = ?").bind(key).first()) return;
+  await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind(key, now()).run();
+  const rows = await env.DB.prepare("SELECT id FROM leads WHERE status = 'ready' AND category = ? AND sales_status != 'live'").bind(category).all<{ id: string }>();
+  const ids = rows.results.map((r) => r.id);
+  for (let i = 0; i < ids.length; i += 100) await env.JOBS.sendBatch(ids.slice(i, i + 100).map((leadId) => ({ body: { type: "rerender", leadId } as Job })));
+}

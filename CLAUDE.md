@@ -926,8 +926,9 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
 - Thrift donations (retail pack, `ext.retail.donations`, Oct 2026): on by default for `thrift` (`donationsOn` in actions.ts), any shop can
   turn it on in Edit → "Donations" (`donationsEditCard`). Section #donations after What's new: intro `note`, "We gladly take" /
   "We can't take" chips (`accepts` / `doesNotAccept`), `dropOffHours`, nonprofit `receipts` line, and with `pickup` a "Request a furniture
-  pickup" form (#pickup, fields items/address/best_day, `hasForm` becomes true). REQUIRED to-do until `accepts` and `dropOffHours` are
-  filled (`donationsMissing`). Nav "Donations", hero "Donate items". The thrift brief says the site's jobs are "open / where" and
+  pickup" form (#pickup, fields items/address/best_day, `hasForm` becomes true). SUGGESTED to-do until `accepts` and `dropOffHours` are
+  filled (`donationsMissing`; owner's call 19 Oct 2026: it never blocks publishing, the section says to call; `cardForTodo` sends it to
+  the `donations` card; the one-off `queueRerender` key `rerender_donations_v1` re-rendered retail previews so old blockers cleared). Nav "Donations", hero "Donate items". The thrift brief says the site's jobs are "open / where" and
   donations and never states what's accepted unless given. Form posts: `FIELDS` in `src/worker/forms.ts` lists every generator form
   field (+ hidden `topic`); `requestSummary` puts the part + vehicle or pickup items in the notification, `requestLine` in the Inbox.
 - Tax & finance (`packs/finance.ts`, research/tax-finance.md): variants tax_prep / accounting / insurance / financial_advisor

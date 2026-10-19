@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 69,
+    date: "2026-10-19",
+    title: "Donation details no longer block publishing",
+    items: [
+      "A thrift store's \"what you accept for donations and drop-off hours\" is now a suggestion, not a must: the site can go live without it, and the Donations section just says to call until they tell us.",
+      "In Finish & publish, that line now opens the Donations card in Edit (it used to open Facts).",
+    ],
+  },
+  {
     n: 68,
     date: "2026-10-19",
     android: "2.87",
