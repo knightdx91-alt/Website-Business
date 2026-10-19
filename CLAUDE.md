@@ -1761,6 +1761,8 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `upgradeCalendars()` also backfills open tasks into Google Tasks. Needs the Google Tasks API enabled in project 475092517584
   and scope https://www.googleapis.com/auth/tasks added to the same delegation entry; health item `gtasks`, settings key
   `gtasks_last`. Without it everything stays on calendar events.
+  While `gtasks_last` says the delegation is missing (19 Oct 2026: it still is), `upgradeCalendars` skips the Google Tasks step for 6 h:
+  its failed tries had used all 5 slots every round, so new tasks never reached the calendar.
 - 🌐 Their domain name in Edit (Oct 2026, owner's ask "a place to put their purchased domain name"): Edit card "Their domain name"
   (web section + `EDIT_CARD_ID` `domain`; editform card `domain`, field `customDomain`, so Android's Edit has it with no app build).
   `setLeadDomain(env, lead, domain|null, origin)` + `domainStatus()` in index.ts (shared by `/domain` GET/PUT/DELETE, the web Edit save,

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Session } from "./auth.ts";
-import { getSettings } from "./db.ts";
+import { getSetting, getSettings } from "./db.ts";
 import { HttpError, newId, now, type Env } from "./env.ts";
 import { gcalDelete, gcalUpsert, gtaskDelete, gtaskDone, gtaskUpsert, onDomain, type CalEvent } from "./gcal.ts";
 import { sendEmailDetailed } from "./mail.ts";
@@ -848,7 +848,16 @@ export async function upgradeCalendars(env: Env): Promise<number> {
   let n = 0;
   // Open tasks (dated or not) not yet in everyone's Google Tasks.
   const open = await env.DB.prepare(`${SELECT} WHERE t.done_at IS NULL ORDER BY t.updated_at DESC LIMIT 50`).all<TaskRow & { lead_name: string | null }>();
-  for (const row of open.results) {
+  // While Google Tasks isn't allowed for the domain (the delegation scope is missing), every try fails; retrying each round used up
+  // all 5 slots and starved the calendar step below. Try again every 6 hours instead.
+  let gtasksLast: { ok?: boolean; error?: string; at?: number } = {};
+  try {
+    gtasksLast = JSON.parse((await getSetting(env, "gtasks_last")) ?? "{}");
+  } catch {
+    gtasksLast = {};
+  }
+  const tasksBlocked = gtasksLast.ok === false && /delegation/i.test(gtasksLast.error ?? "") && Date.now() - (gtasksLast.at ?? 0) < 6 * 3600_000;
+  for (const row of tasksBlocked ? [] : open.results) {
     if (n >= 5) break;
     const inTasks = gtasksOf(row);
     const want = (await calendarRecipients(env, row.assignee, s)).emails.filter((e) => onDomain(e, domain));
