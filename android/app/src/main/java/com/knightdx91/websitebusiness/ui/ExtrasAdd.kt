@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
@@ -53,16 +54,35 @@ fun ExtrasAddSection(
     busy: Boolean,
     onTap: (String) -> Unit,
     onCard: (String) -> Unit,
+    onFile: (String) -> Unit,
     onChanged: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    // Right after Add: ask how they pay, so nothing is left "added but not charged".
+    var justAdded by remember { mutableStateOf<String?>(null) }
+    purchases.firstOrNull { it.id == justAdded && !it.paid }?.let { p ->
+        AlertDialog(
+            onDismissRequest = { justAdded = null },
+            title = { Text("Take ${money(p.dueCents)} now") },
+            text = { Text("${p.items.joinToString(", ")} is added but not charged yet. How do they pay?") },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    if (p.cardOnFile) TextButton(onClick = { justAdded = null; onFile(p.id) }) { Text("💳 Charge their card on file") }
+                    if (tapReady) TextButton(onClick = { justAdded = null; onTap(p.id) }) { Text("💳 Take payment by tap") }
+                    if (cardReady) TextButton(onClick = { justAdded = null; onCard(p.id) }) { Text("⌨️ Type in the card numbers") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { justAdded = null }) { Text("Later") } },
+        )
+    }
     purchases.filter { !it.paid && it.dueCents >= 50 }.forEach { p ->
         HorizontalDivider(Modifier.padding(vertical = 8.dp))
         Text(p.items.joinToString(", "), fontWeight = FontWeight.SemiBold)
         Text("${money(p.dueCents)} due · not paid yet", style = MaterialTheme.typography.bodySmall, color = Warn)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
+            if (p.cardOnFile) Button(onClick = { onFile(p.id) }, enabled = !busy) { Text("💳 Charge their card on file · ${money(p.dueCents)}") }
             if (tapReady) Button(onClick = { onTap(p.id) }, enabled = !busy) { Text("💳 Take payment by tap · ${money(p.dueCents)}") }
             if (cardReady) Button(onClick = { onCard(p.id) }, enabled = !busy) { Text("⌨️ Type in the card numbers · ${money(p.dueCents)}") }
             TextButton(onClick = {
@@ -72,7 +92,8 @@ fun ExtrasAddSection(
                 }
             }) { Text("Remove") }
         }
-        if (!tapReady && !cardReady) Text("Payments on the phone aren't set up yet: Settings → Tap to Pay, and the Stripe publishable key.", style = MaterialTheme.typography.bodySmall, color = muted)
+        Text("⚠️ Not charged until you tap one of these.", style = MaterialTheme.typography.bodySmall, color = Warn)
+        if (!tapReady && !cardReady && !p.cardOnFile) Text("Payments on the phone aren't set up yet: Settings → Tap to Pay, and the Stripe publishable key.", style = MaterialTheme.typography.bodySmall, color = muted)
     }
 
     var open by remember { mutableStateOf(false) }
@@ -119,11 +140,13 @@ fun ExtrasAddSection(
                     val r = state.api.addExtras(leadId, picks.toMap(), who.trim())
                     val due = r.optLong("dueCents", 0L)
                     context.toast("Added: ${r.optString("summary")}${if (due > 0) ". ${money(due)} due; take the payment below." else ""}")
-                    picks.clear(); open = false; onChanged()
+                    picks.clear(); open = false
+                    if (due > 0) justAdded = r.optString("purchaseId")
+                    onChanged()
                 } catch (e: Api.Unauthorized) { state.signOut() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
                     context.toast(e.message ?: "Couldn't add the extras")
                 } finally { saving = false }
             }
-        }, enabled = !saving && !busy, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Add the extras") }
+        }, enabled = !saving && !busy, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Add the extras, then take payment") }
     }
 }

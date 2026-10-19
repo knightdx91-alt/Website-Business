@@ -23,7 +23,7 @@ data class DnaRecipe(val id: String, val name: String, val about: String)
 data class NamedOption(val id: String, val name: String, val soldTo: String? = null)
 
 /** Extras a client bought later through a Buy extras link. */
-data class Purchase(val id: String, val items: List<String>, val dueCents: Long, val paid: Boolean, val createdAt: Long)
+data class Purchase(val id: String, val items: List<String>, val dueCents: Long, val paid: Boolean, val createdAt: Long, /** Their plan payment left a card in Stripe that unpaid extras can be charged to. */ val cardOnFile: Boolean = false)
 
 data class Cadence(val day: Int, val next: String)
 
@@ -130,7 +130,7 @@ data class LeadFull(
                     val items = ArrayList<String>()
                     p.optJSONArray("extras").objects().forEach { e -> items.add(if (e.optInt("qty", 1) > 1) "${e.optString("name")} ×${e.optInt("qty")}" else e.optString("name")) }
                     p.optJSONArray("quotes").strings().forEach { items.add("$it (quote)") }
-                    Purchase(p.optString("id"), items, p.optLong("dueCents", 0L), p.optBoolean("paid"), p.optLong("createdAt"))
+                    Purchase(p.optString("id"), items, p.optLong("dueCents", 0L), p.optBoolean("paid"), p.optLong("createdAt"), p.optBoolean("cardOnFile"))
                 },
                 website = j.str("website"),
                 siteImportError = j.optJSONObject("siteImport")?.str("error"),
@@ -310,3 +310,6 @@ suspend fun Api.extrasCardDone(id: String, purchaseId: String, setupIntentId: St
 
 /** Removes an unpaid extras order added by mistake. */
 suspend fun Api.removeExtras(id: String, purchaseId: String) { deleteJson("/leads/$id/extras/$purchaseId") }
+
+/** Charges an unpaid extras order to the card the client already paid their plan with. */
+suspend fun Api.extrasChargeOnFile(id: String, purchaseId: String): PayDone = PayDone.from(postJson("/leads/$id/extracharge/$purchaseId"))

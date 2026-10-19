@@ -18,6 +18,17 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 72,
+    date: "2026-10-19",
+    android: "2.90",
+    title: "Charge extras to the card on file",
+    items: [
+      "Adding an extra doesn't charge anything by itself. Right after you tap \"Add the extras, then take payment\", the app now asks how they pay.",
+      "New: \"💳 Charge their card on file\" for clients who already paid their plan with a card: one tap, no card needed in hand. Tap and \"Type in the card numbers\" are still there.",
+      "Unpaid extras say \"⚠️ Not charged until you tap one of these.\"",
+    ],
+  },
+  {
     n: 71,
     date: "2026-10-19",
     android: "2.89",

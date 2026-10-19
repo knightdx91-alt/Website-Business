@@ -5,6 +5,7 @@ import com.knightdx91.websitebusiness.net.payStart
 import com.knightdx91.websitebusiness.net.extrasCardDone
 import com.knightdx91.websitebusiness.net.extrasCardStart
 import com.knightdx91.websitebusiness.net.extrasTap
+import com.knightdx91.websitebusiness.net.extrasChargeOnFile
 import com.stripe.android.PaymentConfiguration
 import com.stripe.android.paymentsheet.PaymentSheet
 import com.stripe.android.paymentsheet.PaymentSheetResult
@@ -968,6 +969,13 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                             busy = busy != null,
                             onTap = { tapExtras(it) },
                             onCard = { typeCardExtras(it) },
+                            onFile = { pid ->
+                                act("card") {
+                                    val d = state.api.extrasChargeOnFile(id, pid)
+                                    context.toast(d.message ?: "✅ Paid ${money(d.amountCents)}")
+                                    load()
+                                }
+                            },
                             onChanged = { scope.launch { load() } },
                         )
                         Text("Text them a link to add extras (photo shoot, Spanish page, social posts…) and pay${if (meta?.checkoutOnline == true) " online" else ""}. Good for 30 days.", style = MaterialTheme.typography.bodySmall, color = muted)

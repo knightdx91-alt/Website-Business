@@ -114,12 +114,19 @@ export async function purchasesFor(env: Env, leadId: string) {
       paid: number;
       created_at: number;
     }>();
+  // A paid sign-up through Stripe left a card on file, so unpaid extras can be charged to it (extras-pay.ts).
+  const onFile = await env.DB.prepare(
+    "SELECT 1 AS x FROM signups WHERE lead_id = ? AND paid = 1 AND stripe_customer IS NOT NULL AND (stripe_subscription IS NOT NULL OR paid_via IN ('tap', 'card')) LIMIT 1",
+  )
+    .bind(leadId)
+    .first<{ x: number }>();
   return rows.results.map((r) => ({
     id: r.id,
     ...(JSON.parse(r.items_json) as OrderExtras),
     dueCents: r.due_cents,
     paid: !!r.paid,
     createdAt: r.created_at,
+    cardOnFile: !!onFile,
   }));
 }
 

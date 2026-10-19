@@ -3569,9 +3569,11 @@ async function viewLead(id, intent) {
     const unpaid = (l.purchases || []).filter((p) => !p.paid && p.dueCents >= 50);
     const label = (p) => esc([...(p.extras || []).map((e) => (e.qty > 1 ? `${e.name} ×${e.qty}` : e.name)), ...(p.quotes || []).map((q) => `${q} (quote)`)].join(", "));
     return `${unpaid.map((p) => `<div class="xpay" style="margin-top:12px"><p><strong>${label(p)}</strong> · ${money(p.dueCents / 100)} due · not paid yet</p>
-        <div class="btns">${tapReady() && isAndroid() ? `<button class="btn btn--small btn--primary" type="button" data-xtap="${esc(p.id)}">💳 Take payment by tap</button>` : ""}
+        <div class="btns">${p.cardOnFile && meta.checkout && meta.checkout.online ? `<button class="btn btn--small btn--primary" type="button" data-xfile="${esc(p.id)}">💳 Charge their card on file · ${money(p.dueCents / 100)}</button>` : ""}
+        ${tapReady() && isAndroid() ? `<button class="btn btn--small btn--primary" type="button" data-xtap="${esc(p.id)}">💳 Take payment by tap</button>` : ""}
         ${meta.checkout && meta.checkout.online ? `<button class="btn btn--small" type="button" data-xcard="${esc(p.id)}">⌨️ Type in the card numbers</button>` : ""}
         <button class="linkbtn" type="button" data-xdel="${esc(p.id)}">Remove</button></div></div>`).join("")}
+      ${unpaid.length ? `<p class="small" style="color:#a24b08;margin-top:6px">⚠️ Not charged until you tap a payment button above.</p>` : ""}
       <details style="margin-top:12px" data-xadd><summary><strong>➕ Add an extra now (they pay here)</strong></summary><div class="xadd small muted">Loading the extras…</div></details>`;
   }
   function bindExtrasAdd(l, reload) {
@@ -3584,6 +3586,12 @@ async function viewLead(id, intent) {
         toast(`Hand the phone over: ${money(res.amountCents / 100)} by tap`);
         location.href = res.intentUrl;
       } catch (err) { toast(err.message); } finally { b.disabled = false; }
+    }));
+    $app.querySelectorAll("[data-xfile]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Charge their card on file now?")) return;
+      b.disabled = true;
+      try { const res = await api(`/leads/${l.id}/extracharge/${b.dataset.xfile}`, { method: "POST" }); toast(res.message || "Paid ✅"); reload(); }
+      catch (err) { toast(err.message); } finally { b.disabled = false; }
     }));
     $app.querySelectorAll("[data-xcard]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
@@ -3606,7 +3614,7 @@ async function viewLead(id, intent) {
         slot.innerHTML = `<form id="xform">${(o.addons || []).map((a, i) => a.unit === "quote" ? "" : `<label class="check" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" name="x_${i}"> <span style="flex:1">${esc(a.name)} · <span class="muted">${esc(a.price)}</span></span>${a.unit === "each" ? `<input name="q_${i}" type="number" min="1" max="20" value="1" style="width:4em" aria-label="How many">` : ""}</label>`).join("")}
           <label class="field" style="margin-top:8px"><span>Who approved it (their name)</span><input name="who" value="${esc(signer)}" maxlength="80" required></label>
           <p class="small muted">Their service agreement already lets us charge approved extras to their card. Monthly extras renew on the same card.</p>
-          <div class="btns btns--full"><button class="btn btn--primary" type="submit">Add the extras</button></div></form>`;
+          <div class="btns btns--full"><button class="btn btn--primary" type="submit">Add the extras, then take payment</button></div></form>`;
         slot.querySelector("#xform").addEventListener("submit", async (ev) => {
           ev.preventDefault();
           const f = ev.target;
@@ -3614,8 +3622,10 @@ async function viewLead(id, intent) {
           if (!picks.length) { toast("Tick at least one extra"); return; }
           try {
             const res = await api(`/leads/${l.id}/extras`, { method: "POST", json: { picks, approvedBy: f.elements.who.value.trim() } });
-            toast(`Added: ${res.summary}. ${res.dueCents ? `${money(res.dueCents / 100)} due; take the payment below.` : ""}`);
-            reload();
+            toast(res.dueCents ? `Added. Not charged yet: take the ${money(res.dueCents / 100)} now with one of the payment buttons.` : `Added: ${res.summary}.`);
+            await reload();
+            const pay = $app.querySelector(".xpay");
+            if (pay) { pay.scrollIntoView({ block: "center" }); pay.style.outline = "3px solid #fca311"; pay.style.borderRadius = "8px"; }
           } catch (err) { toast(err.message); }
         });
       } catch (err) { slot.textContent = err.message; }

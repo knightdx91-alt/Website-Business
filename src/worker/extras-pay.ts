@@ -350,6 +350,68 @@ export async function completeExtrasCard(
   });
 }
 
+/** The client's saved card in Stripe (from their plan payment), or null: the customer's default, their plan's, else any card. */
+export async function cardOnFile(env: Env, customer: string): Promise<{ id: string; label: string } | null> {
+  const label = (pm: { id: string; card?: { brand?: string; last4?: string } }) => ({
+    id: pm.id,
+    label: pm.card?.brand ? `${pm.card.brand.replace(/^\w/, (c) => c.toUpperCase())} ••${pm.card.last4 ?? ""}` : "card on file",
+  });
+  type PM = { id: string; card?: { brand?: string; last4?: string } };
+  const c = await stripeGet<{ invoice_settings?: { default_payment_method?: PM | null } }>(env, `customers/${customer}`, {
+    "expand[]": "invoice_settings.default_payment_method",
+  }).catch(() => null);
+  if (c?.invoice_settings?.default_payment_method?.id) return label(c.invoice_settings.default_payment_method);
+  const subs = await stripeGet<{ data: Array<{ default_payment_method?: PM | null }> }>(env, "subscriptions", {
+    customer,
+    status: "active",
+    "expand[]": "data.default_payment_method",
+  }).catch(() => null);
+  const fromSub = subs?.data.find((x) => x.default_payment_method?.id)?.default_payment_method;
+  if (fromSub) return label(fromSub);
+  const pms = await stripeGet<{ data: PM[] }>(env, "payment_methods", { customer, type: "card", limit: "1" }).catch(() => null);
+  return pms?.data[0] ? label(pms.data[0]) : null;
+}
+
+/** POST /api/leads/:id/extracharge/:pid: charges the extras to the card the client already paid their plan with. */
+export async function chargeExtrasOnFile(
+  env: Env,
+  o: { leadId: string; purchaseId: string; actorName: string },
+): Promise<TapResult> {
+  const row = await payable(env, o.leadId, o.purchaseId);
+  const lead = await getLead(env, row.lead_id);
+  const customer = row.stripe_customer ?? (await ensureCustomer(env, row));
+  const card = await cardOnFile(env, customer);
+  if (!card) throw new HttpError(409, "No card on file for them yet. Use tap or type the card in.");
+  const pi = await stripe<PaymentIntentObj>(
+    env,
+    "payment_intents",
+    {
+      amount: row.due_cents,
+      currency: "usd",
+      customer,
+      payment_method: card.id,
+      off_session: true,
+      confirm: true,
+      ...(row.signer_email ? { receipt_email: row.signer_email } : {}),
+      description: `Extras for ${lead?.name ?? "client"}: ${names(row).join(", ")}`.slice(0, 300),
+      metadata: { kind: "extras_onfile", purchaseId: row.id, leadId: row.lead_id },
+    },
+    `pi:xfile:${row.id}`,
+  );
+  if (pi.status !== "succeeded")
+    throw new HttpError(402, pi.status === "requires_action" ? "Their bank wants to verify this charge. Use tap or type the card in instead." : `The charge didn't go through (${pi.status}).`);
+  return activateExtras(env, row, {
+    customer,
+    paymentMethod: card.id,
+    paidCents: row.due_cents,
+    paidRef: pi.id,
+    card: card.label,
+    how: "on the card on file",
+    via: "onfile",
+    actorName: o.actorName,
+  });
+}
+
 /** POST /api/leads/:id/extracheckout/:pid (web app): Stripe's own card page for the order; the webhook marks it paid. */
 export async function startExtrasCheckout(
   env: Env,

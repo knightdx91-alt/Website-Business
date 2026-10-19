@@ -1512,6 +1512,10 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `typeCard` via `cardPurchase`), web `POST /extracheckout/:pid` (Stripe Checkout, kind extras), `DELETE /extras/:pid` (unpaid only).
   `activateExtras`: monthly lines start their own subscription (metadata kind extras) one month out, paid = 1, note + alert. Webhook
   `payment_intent.succeeded` kind `extras_tap` finishes a tap the phone never reported. The practice lead charges only the $1 item.
+  Adding does NOT charge (the owner thought it had, 19 Oct 2026; Android 2.90): after Add the apps ask how they pay (Android dialog,
+  web scrolls to the order), and `POST /extracharge/:pid` = `chargeExtrasOnFile` charges the card Stripe already has (`cardOnFile`:
+  customer default → active subscription's → any card; `purchasesFor().cardOnFile` when a paid sign-up has a Stripe subscription or
+  a tap / card payment) → "💳 Charge their card on file" on both apps.
 - 🔐 Bundled trust anchors (Oct 2026, Android 2.62): the morning Cloudflare reissued every certificate from Google Trust Services
   (13 Oct, 02:07 UTC; WE1 → GTS Root R4), Chris's phone showed "java.security.cert.CertPathValidatorException: Trust anchor for
   certification path not found" while the owner's worked. `res/xml/network_security_config.xml` (manifest

@@ -1,5 +1,6 @@
 import {
   addExtrasInApp,
+  chargeExtrasOnFile,
   completeExtrasCard,
   completeExtrasTap,
   extrasTapAuth,
@@ -2745,6 +2746,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       const { setupIntentId } = await body(req, z.object({ setupIntentId: z.string().regex(/^seti_[A-Za-z0-9]+$/) }));
       return json(await completeExtrasCard(env, { leadId: id, purchaseId: sub, setupIntentId, actorName: session.name }));
     }
+    if (action === "/extracharge" && sub && m === "POST")
+      return json(await chargeExtrasOnFile(env, { leadId: id, purchaseId: sub, actorName: session.name }));
     if (action === "/extracheckout" && sub && m === "POST")
       return json(await startExtrasCheckout(env, { leadId: id, purchaseId: sub, origin: url.origin }));
     if (action === "/cardpay" && m === "POST") {
