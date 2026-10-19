@@ -2,6 +2,9 @@ package com.knightdx91.websitebusiness.ui
 
 import com.knightdx91.websitebusiness.net.payComplete
 import com.knightdx91.websitebusiness.net.payStart
+import com.knightdx91.websitebusiness.net.extrasCardDone
+import com.knightdx91.websitebusiness.net.extrasCardStart
+import com.knightdx91.websitebusiness.net.extrasTap
 import com.stripe.android.PaymentConfiguration
 import com.stripe.android.paymentsheet.PaymentSheet
 import com.stripe.android.paymentsheet.PaymentSheetResult
@@ -959,7 +962,7 @@ fun LeadScreen(state: AppState, nav: NavHostController, id: String, step: String
                             state = state,
                             leadId = id,
                             purchases = detail.purchases,
-                            signer = detail.signups.firstOrNull { it.paid }?.signerName ?: detail.signups.firstOrNull()?.signerName ?: "",
+                            signer = detail.detail.signups.firstOrNull { it.paid }?.signerName ?: detail.detail.signups.firstOrNull()?.signerName ?: "",
                             tapReady = meta?.tapReady == true,
                             cardReady = meta?.cardReady == true,
                             busy = busy != null,
