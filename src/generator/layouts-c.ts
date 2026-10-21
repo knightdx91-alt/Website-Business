@@ -282,7 +282,7 @@ body{counter-reset:sec}
       const checker = (a: string, b: string, sz = 16) => `repeating-conic-gradient(${a} 0 25%,${b} 0 50%) 0 0/${sz}px ${sz}px`;
       return `.hdr{background:var(--secondary);border-bottom:4px double ${k.alpha(c.onSecondary, 0.7)}}
 .brand{color:var(--on-secondary);text-transform:uppercase;letter-spacing:.06em}
-.navbtn,.nav a{color:var(--on-secondary)}
+.navbtn,.hdr__lang,.nav a{color:var(--on-secondary)}
 .js .nav{background:var(--secondary)}
 .js .nav li{border-color:${k.alpha(c.onSecondary, 0.25)}}
 .hdr__call{box-shadow:0 0 0 2px var(--on-secondary)}

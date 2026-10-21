@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 73,
+    date: "2026-10-21",
+    title: "The Español button shows on every site",
+    items: [
+      "On designs with a dark top bar, the \"Español\" button at the top of client sites was dark text on a dark bar, so it looked like the Spanish version was missing. It now takes the bar's own text color.",
+      "Live sites with a Spanish version republish by themselves within a few minutes; nothing to do.",
+    ],
+  },
+  {
     n: 72,
     date: "2026-10-19",
     android: "2.90",

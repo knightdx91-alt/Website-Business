@@ -128,7 +128,7 @@ ${INFLOW_MEDIA}
       return `/* layout: poster */
 .hdr{background:var(--bar-bg);border:0}
 .brand{color:var(--on-bar);text-transform:uppercase;letter-spacing:.05em}
-.navbtn{color:var(--on-bar)}
+.navbtn,.hdr__lang{color:var(--on-bar)}
 .nav a{color:var(--on-bar)}
 .js .nav{background:var(--bar-bg)}
 .js .nav li{border-color:${withAlpha(c.onBar, 0.2)}}

@@ -19,7 +19,7 @@ export const LAYOUTS_A = {
       return `${SAFE}
 .hdr{background:var(--bar-bg);border-bottom:0}
 .brand{color:var(--on-bar)}
-.navbtn,.nav a{color:var(--on-bar)}
+.navbtn,.hdr__lang,.nav a{color:var(--on-bar)}
 .js .nav{background:var(--bar-bg)}
 .js .nav li{border-color:${k.alpha(c.onBar, 0.2)}}
 .hdr :focus-visible{outline-color:var(--on-bar)}
@@ -228,7 +228,7 @@ ${SOLID_CREDIT}
       return `${SAFE}
 .hdr{background:var(--primary);border-bottom:0}
 .brand{color:var(--on-primary);text-transform:uppercase;letter-spacing:.04em;font-size:1.12rem}
-.navbtn,.nav a{color:var(--on-primary)}
+.navbtn,.hdr__lang,.nav a{color:var(--on-primary)}
 .js .nav{background:var(--primary)}
 .js .nav li{border-color:${k.alpha(c.onPrimary, 0.25)}}
 .hdr__call{background:var(--secondary);color:var(--on-secondary)}

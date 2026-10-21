@@ -333,7 +333,7 @@ main>.section[id] .section__label::before{content:counter(bt,decimal-leading-zer
       const band3 = "main>section.section:nth-of-type(3n)";
       const rule = `10px solid ${c.text}`;
       return `.hdr{background:var(--hero-bg);border-bottom:0;--focus:var(--on-hero)}
-.brand,.navbtn,.nav a{color:var(--on-hero)}
+.brand,.navbtn,.hdr__lang,.nav a{color:var(--on-hero)}
 .js .nav{background:var(--hero-bg)}
 .js .nav li{border-color:${k.alpha(c.onHero, 0.3)}}
 .hero{display:flex;flex-direction:column;text-align:center}

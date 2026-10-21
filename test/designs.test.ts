@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { FONTS } from "../src/generator/fonts.ts";
-import { LAYOUT_IDS, LAYOUTS } from "../src/generator/layouts.ts";
+import { LAYOUT_IDS, LAYOUTS, layoutCss } from "../src/generator/layouts.ts";
 import { packFor } from "../src/generator/packs/index.ts";
 import { buildSite } from "../src/generator/render.ts";
 import { LOOKS, looksFor, resolveTheme } from "../src/generator/themes.ts";
@@ -67,6 +67,20 @@ test("looks and layouts build lint-clean together", async () => {
       const out = await buildSite({ record: recordFor(LOOKS[look]!.category), copy: sampleCopy(), site: { slug: "d", look: design }, mode: "preview" });
       assert.deepEqual(out.lint.errors, [], design);
       if (layout !== "classic") assert.ok(String(out.files.get("assets/site.css")).includes(`/* layout: ${layout} */`), design);
+    }
+  }
+});
+
+test("the Español button takes the header's text color in every layout (it was dark on dark headers)", () => {
+  const look = looksFor("restaurant")[0]!;
+  for (const id of LAYOUT_IDS) {
+    const css = layoutCss(resolveTheme(`${look}~${id}`));
+    for (const rule of css.match(/[^{}]+\{[^{}]*\}/g) ?? []) {
+      const [sel, body] = rule.split("{");
+      const list = sel!.split(",").map((s) => s.trim());
+      if (list.some((s) => /(^|\s)\.navbtn$/.test(s)) && /(^|;)color:/.test(body!) && !/background:/.test(body!)) {
+        assert.ok(list.some((s) => s.endsWith(".hdr__lang")), `${id}: ${rule.trim()}`);
+      }
     }
   }
 });

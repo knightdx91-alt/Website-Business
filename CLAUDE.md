@@ -1874,6 +1874,9 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   button's href is pointed at the marker. Language links never carry two `lang` attributes now (`noLang` in spanishDoc). Checked in
   Chromium with locales en-US / es-US (scratchpad `lang/run.mts`). Careful: `\b` written through a Python heredoc into the
   CLIENT_SCRIPT template literal became a backspace; the test is `/^es(-|_|$)/i`.
+  The header button is `color:inherit`; layouts that colour the header's `.navbtn` (dark bars: poster and others) must list
+  `.hdr__lang` in the same rule, or the button is dark on dark (Thrift & More, 21 Oct 2026: "the Spanish version isn't showing").
+  `test/designs.test.ts` checks every layout.
 - 🐞 Problem reports reach everyone (Oct 2026, Katy's two reports alerted nobody; Android 2.84): Katy used the owner login, and event
   lists / pushes leave out the actor's own events, so a report from the owner login was invisible to the owner. `notify({notifySelf:
   true})` stores `actor_id` NULL (name kept), so `/api/report` alerts every owner / full-access login including the sender's, push

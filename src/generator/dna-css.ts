@@ -208,7 +208,7 @@ html[data-hero="billboard"] .hero__band .hero__credit{position:static;text-align
 @media (max-width:599px){.util__in>span:first-child{display:none}}
 /* top bar: see-through over the opening, solid once scrolled */
 html[data-nav="overlay"] .hdr{position:fixed;left:0;right:0;top:0;background:transparent;border-bottom:0;color:var(--on-hero);transition:transform .25s ease,background .2s ease}
-html[data-nav="overlay"] .brand,html[data-nav="overlay"] .navbtn{color:inherit}
+html[data-nav="overlay"] .brand,html[data-nav="overlay"] .navbtn,html[data-nav="overlay"] .hdr__lang{color:inherit}
 html[data-nav="overlay"].js .hdr.is-scrolled,html[data-nav="overlay"] .nav-open .hdr{background:var(--surface);color:var(--text);border-bottom:1px solid ${line}}
 html[data-nav="overlay"] .hero__in{padding-top:104px}
 html[data-nav="overlay"] .hero--cover .hero__in{padding-top:120px}
