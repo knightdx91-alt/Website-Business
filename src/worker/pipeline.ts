@@ -782,7 +782,8 @@ export async function rebuildRequested(env: Env): Promise<void> {
 export async function queueRerender(env: Env, key: string, category: string): Promise<void> {
   if (await env.DB.prepare("SELECT 1 FROM settings WHERE key = ?").bind(key).first()) return;
   await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind(key, now()).run();
-  const rows = await env.DB.prepare("SELECT id FROM leads WHERE status = 'ready' AND category = ? AND sales_status != 'live'").bind(category).all<{ id: string }>();
+  // category "*" = every category (a change every preview should pick up, like the menu's Home link).
+  const rows = await env.DB.prepare("SELECT id FROM leads WHERE status = 'ready' AND (category = ?1 OR ?1 = '*') AND sales_status != 'live'").bind(category).all<{ id: string }>();
   const ids = rows.results.map((r) => r.id);
   for (let i = 0; i < ids.length; i += 100) await env.JOBS.sendBatch(ids.slice(i, i + 100).map((leadId) => ({ body: { type: "rerender", leadId } as Job })));
 }

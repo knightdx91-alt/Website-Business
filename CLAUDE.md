@@ -1830,6 +1830,9 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   photos / reviews / the closing call. `gallery()` and `newArrivals()` skip featured photos. Menu text: `# Section | note` →
   `MenuSection.note` (parseMenuText / menuToText). Nine One Four (539a32bef637402c) got its typed menu, 10 owner photos (hero = the
   patio doors) and lost the Google gallery the same day. `test/featured-photos.test.ts`, `test/menu-notes.test.ts`.
+- 🏠 Home link (Oct 2026, owner's ask): `header()` in components.ts puts `{href: "/", label: "Home"}` first in every site's nav (the ☰
+  menu on phones, the bar / sidebar on desktop) unless a pack's nav already links "/". `queueRerender(env, key, "*")` re-renders
+  every ready non-live preview once (key `rerender_home_link_v1`); live sites were republished through `prices_dirty`.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

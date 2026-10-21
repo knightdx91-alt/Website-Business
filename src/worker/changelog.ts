@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 76,
+    date: "2026-10-21",
+    title: "Home link in every site's menu",
+    items: [
+      "Every client site's menu (the ☰ button on phones, the menu bar on computers) now starts with \"Home\", so visitors on the menu page or any other page can get back to the start in one tap. Spanish pages say \"Inicio\".",
+      "Live sites republish with it by themselves, and every preview is redrawn with it over the next few minutes. Nothing to do.",
+    ],
+  },
+  {
     n: 75,
     date: "2026-10-21",
     title: "Food photo mosaic + menu section notes",
