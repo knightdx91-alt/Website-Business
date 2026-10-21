@@ -341,6 +341,10 @@ if (zs.length) {
     var b = zs[lbCur], im = b.querySelector("img");
     // The photo the page already shows (previews prefix every address, so data-zoom alone can point at the wrong folder).
     lbImg.src = (im && (im.currentSrc || im.src)) || b.getAttribute("data-zoom"); lbImg.alt = im ? im.alt : "";
+    // Sized in pixels, not vh: an app's preview view can report a viewport height of almost nothing, which left only the caption.
+    var vh = window.innerHeight || root.clientHeight || 0;
+    if (vh < 320) vh = (window.screen && screen.height) || 640;
+    lbImg.style.maxHeight = Math.max(240, vh - 140) + "px";
     lbCap.textContent = b.getAttribute("data-cap") || "";
   };
   var lbClose = function () { lb.hidden = true; root.style.overflow = ""; if (lbBack) lbBack.focus(); };

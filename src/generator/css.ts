@@ -414,7 +414,7 @@ html[data-hshade] .hero.hero--photo .hero__in .btn,html[data-hshade] .hero.hero-
 .lightbox{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:56px 12px}
 .lightbox[hidden]{display:none}
 .lightbox figure{margin:0;max-width:100%;max-height:100%;display:flex;flex-direction:column;align-items:center}
-.lightbox img{max-width:min(1200px,100%);max-height:calc(100vh - 140px);object-fit:contain;border-radius:6px}
+.lightbox img{display:block;width:auto;height:auto;max-width:min(1200px,100%);min-width:120px;max-height:calc(100vh - 140px);object-fit:contain;border-radius:6px}
 .lightbox figcaption{color:#fff;margin-top:10px;text-align:center}
 .lightbox button{position:absolute;border:0;background:rgba(255,255,255,.16);color:#fff;width:48px;height:48px;border-radius:50%;font-size:30px;line-height:44px;cursor:pointer}
 .lightbox__close{top:10px;right:10px}

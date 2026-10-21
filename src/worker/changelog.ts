@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 78,
+    date: "2026-10-21",
+    title: "Tapping a photo on a site shows the photo again",
+    items: [
+      "On some phones (the app's own preview among them), tapping a photo to see it bigger showed only its caption on a dark screen. The big photo now sizes itself from the phone's real screen, so it always shows.",
+      "Previews are redrawn with the fix over the next few minutes; live sites republish with it by themselves. Nothing to do.",
+    ],
+  },
+  {
     n: 77,
     date: "2026-10-21",
     title: "Every new site comes with Spanish ready, behind one button",

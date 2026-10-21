@@ -4615,6 +4615,7 @@ async function handleScheduled(
     await queueRelive(env);
     await queueRerender(env, "rerender_donations_v1", "retail");
     await queueRerender(env, "rerender_home_link_v1", "*");
+    await queueRerender(env, "rerender_lightbox_v1", "*");
     await rerenderRequested(env).catch((e) => console.error("rerender request", e));
     await rebuildRequested(env).catch((e) => console.error("rebuild request", e));
     await backfillMailCodes(env);
