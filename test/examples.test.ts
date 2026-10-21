@@ -55,3 +55,16 @@ test("a Spanish page renders at /es/ with Spanish hours and a menu link", async 
   assert.match(String(out.files.get("index.html")), /href="\/es\/">Español/);
   assert.match(String(out.files.get("index.html")), /hreflang="es"/);
 });
+
+test("published pages ask for the stylesheet and script by version, so a client domain's browser cache can't keep old ones", async () => {
+  const ex = EXAMPLES[0]!;
+  const build = (record: typeof ex.record) => buildSite({ record, copy: ex.copy, site: { slug: ex.slug, look: ex.design, origin: "https://example.test" }, mode: "publish", allowSamples: true });
+  const out = await build(ex.record);
+  const home = String(out.files.get("index.html"));
+  const v = home.match(/href="\/assets\/site\.css\?v=([0-9a-f]{8})"/)?.[1];
+  assert.ok(v, "stylesheet carries a version");
+  assert.match(home, /src="\/assets\/site\.js\?v=[0-9a-f]{8}"/);
+  assert.ok(out.files.get("assets/site.css"), "the file itself keeps its plain name");
+  const again = await build(ex.record);
+  assert.equal(String(again.files.get("index.html")).match(/site\.css\?v=([0-9a-f]{8})/)?.[1], v, "same CSS, same version");
+});

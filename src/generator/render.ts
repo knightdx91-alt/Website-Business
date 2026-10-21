@@ -297,6 +297,14 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   }
 
   if (input.mode === "publish") {
+    // A version tag on the stylesheet and script: a client's own domain may let browsers keep /assets/* for hours
+    // (the zone's Browser Cache TTL beats our _headers), so each publish gives changed files a new address.
+    const tag = (path: string, body: string) => `/assets/${path}?v=${shortHash(body)}"`;
+    for (const [path, content] of files) {
+      if (typeof content === "string" && path.endsWith(".html")) {
+        files.set(path, content.replaceAll('/assets/site.css"', tag("site.css", css)).replaceAll('/assets/site.js"', tag("site.js", CLIENT_SCRIPT)));
+      }
+    }
     const origin = originFor(ctx);
     files.set("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`);
     files.set(
@@ -337,6 +345,13 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
     }
   }
   return { files, lint, todos: [...new Set(ctx.todos)], suggestions: [...new Set(ctx.suggestions)], look };
+}
+
+/** FNV-1a, 8 hex characters: enough to tell one build of a file from the next. */
+function shortHash(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16).padStart(8, "0");
 }
 
 /** Every font file a look needs, so callers can serve or bundle them. */

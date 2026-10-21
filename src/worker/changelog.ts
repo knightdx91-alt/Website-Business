@@ -24,6 +24,7 @@ export const CHANGELOG: ChangeEntry[] = [
     items: [
       "On designs with a dark top bar, the \"Español\" button at the top of client sites was dark text on a dark bar, so it looked like the Spanish version was missing. It now takes the bar's own text color.",
       "Live sites with a Spanish version republish by themselves within a few minutes; nothing to do.",
+      "Design changes now show at once on a client's own domain too: before, a phone that had visited the site could keep the old look for up to 4 hours (a private / incognito window showed the new one).",
     ],
   },
   {

@@ -1877,6 +1877,9 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   The header button is `color:inherit`; layouts that colour the header's `.navbtn` (dark bars: poster and others) must list
   `.hdr__lang` in the same rule, or the button is dark on dark (Thrift & More, 21 Oct 2026: "the Spanish version isn't showing").
   `test/designs.test.ts` checks every layout.
+  Same day, "shows in incognito, not in regular": a client domain's zone (Browser Cache TTL, 4 h) overrides our `_headers` max-age=0
+  for /assets/*, so returning phones kept the old site.css. Published pages now link `/assets/site.css?v=<fnv hash>` and
+  `site.js?v=…` (render.ts publish mode, `shortHash`); the files keep their plain names. Previews are unchanged.
 - 🐞 Problem reports reach everyone (Oct 2026, Katy's two reports alerted nobody; Android 2.84): Katy used the owner login, and event
   lists / pushes leave out the actor's own events, so a report from the owner login was invisible to the owner. `notify({notifySelf:
   true})` stores `actor_id` NULL (name kept), so `/api/report` alerts every owner / full-access login including the sender's, push
