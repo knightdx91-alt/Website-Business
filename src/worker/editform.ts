@@ -645,12 +645,14 @@ export function editForm(l: EditDetail): EditForm {
     "Spanish page",
     [
       note(
-        c.es
-          ? "This site has a Spanish page at /es/, linked as “Español” in the menu. Rewrite it after big text changes."
-          : "Optional extra. AI translates the site's text into a Spanish page with Spanish buttons and hours (about 20 seconds).",
+        c.es && !c.es.hidden
+          ? "Spanish is ON: every page is also at /es/, with an “Español” button. Remove turns it off (the translation is kept, so turning it back on is instant)."
+          : c.es
+            ? "A Spanish version is already written and kept off the site. Tap Write Spanish page to turn it on (instant; a live site updates within a couple of minutes)."
+            : "Optional extra. AI translates the whole site into Spanish (about 20 seconds); a live site updates within a couple of minutes.",
       ),
     ],
-    { kind: "spanish", hasSpanish: !!c.es },
+    { kind: "spanish", hasSpanish: !!c.es && !c.es.hidden },
   );
 
   card(

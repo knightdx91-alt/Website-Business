@@ -724,8 +724,10 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?:
     heroAdjust: record ? heroAdjustOf(record) : null,
     /** Typed in by hand: no Google Maps listing, so no Google import, review link or Google photos. */
     notOnGoogle: isManualPlaceId(l.place_id),
-    /** The site has a Spanish page at /es/ (share buttons offer a Spanish link). */
-    hasSpanish: !!copy?.es,
+    /** The site has its Spanish version turned on at /es/ (share buttons offer a Spanish link). */
+    hasSpanish: !!copy?.es && !copy.es.hidden,
+    /** A Spanish version is written (on or kept off the site): turning it on is instant. */
+    spanishReady: !!copy?.es,
     /** Google Analytics on the live site: the ID in use, and the reports link + sharing when the app made the property. */
     analytics: record?.seo?.gaId
       ? { id: record.seo.gaId, auto: record.seo.ga?.measurementId === record.seo.gaId, reportsUrl: record.seo.ga?.measurementId === record.seo.gaId ? reportsUrl(record.seo.ga.property) : null }
@@ -3715,14 +3717,20 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       await siteUpdated(env, session, lead, ["gallery"]);
       return json(detail((await getLead(env, id))!));
     }
-    // Spanish page (extra): AI translation of the current text, stored in copy.es; DELETE removes the page.
+    // Spanish page (extra), stored in copy.es. Every new build writes one kept off the site (hidden); POST turns it on
+    // (instant when written, else translates now) or, when it's already on, translates it afresh; DELETE turns it off and
+    // keeps the translation. A live site republishes either way (prices_dirty → republishDirty).
     if (action === "/spanish" && (m === "POST" || m === "DELETE")) {
       if (!lead.record_json || !lead.copy_json)
         throw new HttpError(409, "This site hasn't finished building yet");
       const record = JSON.parse(lead.record_json) as BusinessRecord;
       const copy = JSON.parse(lead.copy_json) as Copy;
-      if (m === "DELETE") delete copy.es;
-      else {
+      const wasOn = !!copy.es && !copy.es.hidden;
+      if (m === "DELETE") {
+        if (copy.es) copy.es.hidden = true;
+      } else if (copy.es?.hidden) {
+        delete copy.es.hidden;
+      } else {
         const settings = await getSettings(env);
         const { es, usage } = await translateToSpanish(
           new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
@@ -3733,8 +3741,10 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
         copy.es = { ...es, strings: {} };
       }
       await renderPreview(env, lead, record, copy, lead.look ?? "");
+      const isOn = !!copy.es && !copy.es.hidden;
+      if (lead.live_url && wasOn !== isOn) await updateLead(env, lead.id, { prices_dirty: 1 });
       await siteUpdated(env, session, lead, [
-        m === "DELETE" ? "Spanish page removed" : "Spanish page",
+        m === "DELETE" ? "Spanish turned off" : wasOn ? "Spanish rewritten" : "Spanish turned on",
       ]);
       return json(detail((await getLead(env, id))!));
     }
@@ -4003,8 +4013,9 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       // {lang: "es"} links straight to the Spanish page (/es/), for owners who read Spanish first.
       const body = (await req.json().catch(() => ({}))) as { lang?: string };
       const es = body?.lang === "es";
-      if (es && !(lead.copy_json && (JSON.parse(lead.copy_json) as Copy).es))
-        throw new HttpError(409, "There's no Spanish page yet. Edit → Spanish page → Write Spanish page first.");
+      const esCopy = lead.copy_json ? (JSON.parse(lead.copy_json) as Copy).es : undefined;
+      if (es && (!esCopy || esCopy.hidden))
+        throw new HttpError(409, "Spanish isn't turned on yet. Edit → Spanish page → turn it on first.");
       const token = await shareToken(env, id);
       return json({ url: `${url.origin}/s/${token}/${es ? "es/" : ""}`, expiresInDays: 14 });
     }

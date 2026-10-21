@@ -18,6 +18,17 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 77,
+    date: "2026-10-21",
+    title: "Every new site comes with Spanish ready, behind one button",
+    items: [
+      "When a new site is built, its Spanish version is written at the same time and kept off the site. Customers don't see it until you turn it on.",
+      "To turn it on: Edit → Spanish page → \"🇲🇽 Turn Spanish on\" (on the phone app: \"Write Spanish page\"). It's instant: the Español button and every /es/ page appear right away, and a live site updates by itself within a couple of minutes.",
+      "Turning it off (\"Turn Spanish off\", or \"Remove\" on the phone) keeps the translation, so turning it back on is instant again. \"Rewrite Spanish\" translates the whole site afresh after big text changes.",
+      "Sites built before today don't have one waiting: turning Spanish on for them writes it then (about 20 seconds), as before.",
+    ],
+  },
+  {
     n: 76,
     date: "2026-10-21",
     title: "Home link in every site's menu",

@@ -75,3 +75,13 @@ test("language switch: header button on every page, a marker for the Spanish cop
   const plain = await buildSite({ record: ex.record, copy: ex.copy, site: { slug: ex.slug, look: ex.design }, mode: "preview", allowSamples: true });
   assert.ok(!String(plain.files.get("index.html")).includes("hdr__lang"));
 });
+
+test("a Spanish version kept off the site (hidden) builds exactly like no Spanish at all", async () => {
+  const ex = EXAMPLES[0]!;
+  const base = { record: ex.record, site: { slug: ex.slug, look: ex.design }, mode: "preview" as const, allowSamples: true };
+  const plain = await buildSite({ ...base, copy: ex.copy });
+  const hidden = await buildSite({ ...base, copy: { ...ex.copy, es: { ...ES_BASE, strings: { Menu: "Menú" }, hidden: true } } });
+  assert.deepEqual([...hidden.files.keys()].sort(), [...plain.files.keys()].sort());
+  assert.equal(String(hidden.files.get("index.html")), String(plain.files.get("index.html")));
+  assert.ok(![...hidden.files.keys()].some((p) => p.startsWith("es/")));
+});

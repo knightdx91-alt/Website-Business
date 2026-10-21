@@ -197,7 +197,8 @@ export async function buildSite(input: BuildInput): Promise<BuildOutput> {
   ].filter((p) => p.src !== heroSrc);
   const ctx: Ctx = {
     r: record,
-    copy: input.copy,
+    // A Spanish version that's written but switched off builds as if there were none.
+    copy: input.copy.es?.hidden ? { ...input.copy, es: undefined } : input.copy,
     theme,
     mode: input.mode,
     site: { ...input.site, look },

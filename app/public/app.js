@@ -1519,9 +1519,15 @@ async function viewLead(id, intent) {
       </section>`;
   }
   function esCardHtml(id, c) {
+    const on = !!(c.es && !c.es.hidden), ready = !!c.es;
+    const text = on ? "Spanish is <b>on</b>: every page is also at /es/, with an “Español” button. Turning it off keeps the translation, so turning it back on is instant."
+      : ready ? "A Spanish version is already written and kept off the site. Turn it on and it shows right away (a live site updates within a couple of minutes)."
+      : "AI translates the whole site into Spanish (about 20 seconds). A live site updates within a couple of minutes.";
     return `<section class="card" id="card-es"><h2>Spanish page</h2>
-        <p class="small muted">${c.es ? "This site has a Spanish page at /es/, linked as “Español” in the menu. Rewrite it after big text changes." : "Optional extra. AI translates the site's text into a Spanish page with Spanish buttons and hours (about 20 seconds)."}</p>
-        <div class="btns"><button class="btn btn--small" type="button" data-eact="es-write">${c.es ? "Rewrite Spanish page" : "Write Spanish page"}</button>${c.es ? `<a class="btn btn--small" href="#/full/${id}/es">See it</a><button class="btn btn--small" type="button" data-eact="es-remove">Remove</button>` : ""}</div>
+        <p class="small muted">${text}</p>
+        <div class="btns">${on
+          ? `<button class="btn btn--small" type="button" data-eact="es-remove">Turn Spanish off</button><a class="btn btn--small" href="#/full/${id}/es">See it</a><button class="btn btn--small" type="button" data-eact="es-write" data-rewrite="1">Rewrite Spanish</button>`
+          : `<button class="btn btn--small btn--primary" type="button" data-eact="es-write">🇲🇽 Turn Spanish on</button>`}</div>
       </section>`;
   }
 
@@ -1809,14 +1815,15 @@ async function viewLead(id, intent) {
           toast("Photo removed");
           await refreshCards("card-gallery");
         } else if (act === "es-write") {
-          busy("Writing… (about 20 seconds)");
+          if (b.dataset.rewrite && !confirm("Translate the whole site into Spanish again?")) return;
+          busy(b.dataset.rewrite ? "Writing… (about 20 seconds)" : "Turning Spanish on…");
           await api(`/leads/${id}/spanish`, { method: "POST" });
-          toast("Spanish page ready");
+          toast(b.dataset.rewrite ? "Spanish rewritten" : "Spanish is on");
           await refreshCards("card-es");
         } else if (act === "es-remove") {
-          if (!confirm("Remove the Spanish page?")) return;
+          if (!confirm("Turn the Spanish version off? (It's kept, so you can turn it back on any time.)")) return;
           await api(`/leads/${id}/spanish`, { method: "DELETE" });
-          toast("Spanish page removed");
+          toast("Spanish is off");
           await refreshCards("card-es");
         }
       } catch (err) { toast(err.message); } finally { idle(); }

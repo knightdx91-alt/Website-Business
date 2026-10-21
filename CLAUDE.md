@@ -1959,3 +1959,10 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   leads with a GA property, and deleting Doug's Diner (the only one) turned it orange. `ensureAnalytics` now stamps settings key
   `ga_verified` (`GA_VERIFIED_KEY`) on every successful property; the health input carries `analytics.verified` and the row is ok when
   `sites > 0 || verified` (and no last error), wording "Connected and tested…". Live D1 got `ga_verified` by hand from the dry run.
+- 🇲🇽 Spanish written with every site, off until turned on (Oct 2026, owner's ask): `SpanishCopy.hidden`. `runBuild` writes `copy.es`
+  (`translateToSpanish`, the copy model, metered) with `hidden: true` whenever it writes copy and there is no Spanish to keep;
+  `buildSite` treats a hidden one as absent (no /es/, no Español button, no ua-es marker) while `syncSpanish` keeps its `strings`
+  filled, so turning it on is instant. `POST /api/leads/:id/spanish` = unhide when hidden, else translate (fresh when already on);
+  `DELETE` = hide (keeps the translation). A live site gets `prices_dirty = 1` when the on/off state changes. `detail().hasSpanish` =
+  on (share links, editform card), `spanishReady` = written. Web card "🇲🇽 Turn Spanish on / off / Rewrite Spanish"; Android's
+  existing Write / Remove buttons do the same with no build. Cost: roughly 10–20¢ more per new site (summary + every line).

@@ -14,6 +14,7 @@ import { pickDesign } from "../generator/design.ts";
 import type { DnaHints } from "../generator/dna.ts";
 import { buildSite } from "../generator/render.ts";
 import { syncSpanish } from "./spanish-sync.ts";
+import { translateToSpanish } from "../copy/spanish.ts";
 import type { BusinessRecord, CategoryId, Copy, DesignNotes } from "../generator/types.ts";
 import { RESTAURANT_FLAGS, searchText, type Place } from "../places/client.ts";
 import { groupById, MARKET } from "../places/queries.ts";
@@ -664,6 +665,18 @@ export async function runBuild(
         ? (JSON.parse(lead.copy_json) as Copy)
         : undefined;
       if (old?.es) copy.es = old.es;
+      // Every site gets a Spanish version written with it, kept off the site until the team turns it on
+      // (Edit → Spanish page). renderPreview's syncSpanish then translates every page's lines. Never fails the build.
+      else {
+        try {
+          const { es, usage } = await translateToSpanish(client, { record, copy, model: settings.copyModel });
+          const p = MODEL_PRICES[settings.copyModel ?? ""] ?? MODEL_PRICES["claude-opus-5-5"]!;
+          await addUsage(env, { aiIn: usage.input, aiOut: usage.output, costMicro: Math.round(usage.input * p.input + usage.output * p.output) });
+          copy.es = { ...es, strings: {}, hidden: true };
+        } catch {
+          // No Spanish yet: "Write Spanish page" still makes one on demand.
+        }
+      }
     }
     await renderPreview(env, lead, record, copy, look);
     if (lead.rewrite) await updateLead(env, lead.id, { rewrite: 0 });

@@ -735,6 +735,8 @@ export interface SpanishCopy {
   nav?: Record<string, string>;
   /** The whole site in Spanish: every visible English text on the built pages → its Spanish (generator/translate.ts). With it, /es/ is a full copy of every page; without it (older Spanish pages), the short summary page. */
   strings?: Record<string, string>;
+  /** Written automatically with every new site but kept off the site (no /es/ pages, no Español button) until the team turns it on. */
+  hidden?: boolean;
 }
 
 export interface Site {
