@@ -22,7 +22,7 @@ export const CHANGELOG: ChangeEntry[] = [
     date: "2026-10-21",
     title: "The live price list is now a Plus and Pro feature (not Basic)",
     items: [
-      "The Basic plan no longer lists the live price list. It's included in Plus and Pro, or on its own as the Price list plan.",
+      "The plan cards (Basic, Plus and Pro) no longer list the live price list. It's still sold on its own as the Price list plan.",
       "Changed everywhere it's described: the plan cards on undergroundassociates.com, the pricing and price-list pages, Show them the plans, Plans & answers, the guides and the training.",
       "When a shop whose stock changes wants the price list with a website, sign them up for Plus or Pro.",
     ],

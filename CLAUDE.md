@@ -1981,7 +1981,6 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   Lightbox (same day): the zoomed photo's max-height is set in pixels from `innerHeight` (screen height when that's under 320 px),
   because the app's preview WebView can report a collapsed vh and Nine One Four's tapped photos showed only their captions.
 - 📋 Live price list is Plus / Pro only (21 Oct 2026, owner's call): the Basic plan's includes line "Live price list with QR tags and a
-  tablet display, if your stock changes" moved to Plus (live Settings by SQL + SUGGESTED_PLANS in app.js + content.ts; Pro has
-  "Everything in Plus"), `EVERY_PLAN` dropped it, and every "every plan / any website plan" sentence about the price list now says
+  tablet display, if your stock changes" is gone from every plan card (live Settings by SQL + SUGGESTED_PLANS in app.js + content.ts), `EVERY_PLAN` dropped it, and every "every plan / any website plan" sentence about the price list now says
   Plus and Pro (company.ts pricing / price-list / strips / FAQs, Show plans + Plans & answers inventory notes, guides.ts, training.ts).
   Wording only: the app doesn't stop a Basic client's site from having a price list.

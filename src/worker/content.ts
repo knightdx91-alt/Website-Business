@@ -550,7 +550,7 @@ export const SUGGESTED_PLANS: Plan[] = [
     setup: 0,
     monthly: 89,
     includes:
-      "Everything in Basic\nLive price list with QR tags and a tablet display, if your stock changes\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter",
+      "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter",
   },
   {
     id: "pro",
