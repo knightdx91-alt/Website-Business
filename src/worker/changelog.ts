@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 74,
+    date: "2026-10-21",
+    title: "Extra sections: a section of the owner's own",
+    items: [
+      "New Edit card \"Extra sections\" on every site: up to 3 sections in the owner's words (a $5 grab bag, a cause they support, a rewards card), each with a heading, a few paragraphs, an optional photo from the Photo gallery beside it and one button (directions, call or text).",
+      "They show near the bottom of the home page, before the closing call. Spanish sites translate them on their own.",
+      "Leave a section's heading empty and save to remove it. Works on the phone app's Edit too, no update needed.",
+    ],
+  },
+  {
     n: 73,
     date: "2026-10-21",
     title: "The Español button shows on every site",

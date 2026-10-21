@@ -317,6 +317,15 @@ const url = (
   ...o,
 });
 
+/** Edit → Extra sections: how many, and the button choices (mirrored in app.js). */
+export const EXTRA_SECTIONS = 3;
+export const EXTRA_BUTTONS: Array<[string, string]> = [
+  ["", "No button"],
+  ["directions", "Get directions"],
+  ["call", "Call us"],
+  ["text", "Text us (if the number takes texts)"],
+];
+
 export const photoKey = (src: string): string =>
   src.split("/").pop()!.split(".")[0]!;
 
@@ -665,6 +674,29 @@ export function editForm(l: EditDetail): EditForm {
     ],
     { collapsed: !(r.hiring && r.hiring.roles && r.hiring.roles.length) },
   );
+
+  const extras: AnyRecord[] = r.extraSections || [];
+  const photoChoices: Array<[string, string]> = [
+    ["", "No photo"],
+    ...(r.media?.gallery || []).map((p: AnyRecord): [string, string] => [p.src, p.caption || p.alt || photoKey(p.src)]),
+  ];
+  const extraFields: Field[] = [
+    note(
+      "Optional. Up to 3 sections of the owner's own, in their words: a $5 grab bag, a cause they support, a rewards card. Each shows before the closing call, with an optional photo from the Photo gallery beside it and one button. Leave the heading empty to remove a section.",
+    ),
+  ];
+  for (let i = 1; i <= EXTRA_SECTIONS; i++) {
+    const x = extras[i - 1] || {};
+    extraFields.push(
+      h3(`Section ${i}`),
+      txt(`xs${i}Title`, "Heading", x.title || "", { max: 80, placeholder: i === 1 ? "$5 grab bags" : "" }),
+      txt(`xs${i}Label`, "Small label above it (optional)", x.label || "", { max: 40, placeholder: i === 1 ? "Giving back" : "" }),
+      ta(`xs${i}Body`, "What it says (a blank line starts a new paragraph)", x.body || "", 4, { max: 1500 }),
+      sel(`xs${i}Photo`, "Photo beside it", x.image || "", photoChoices),
+      sel(`xs${i}Btn`, "Button", x.button || "", EXTRA_BUTTONS),
+    );
+  }
+  card("extra", "Extra sections", extraFields, { collapsed: !extras.length });
 
   card(
     "events",
@@ -3080,6 +3112,17 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
       : undefined;
 
   const hiringRoles = (lines("hiringRoles") || []).slice(0, 8);
+  const extraSections = has("xs1Title")
+    ? Array.from({ length: EXTRA_SECTIONS }, (_, k) => k + 1)
+        .map((i) => ({
+          title: v(`xs${i}Title`) || "",
+          body: values[`xs${i}Body`] == null ? "" : String(values[`xs${i}Body`]).trim(),
+          label: v(`xs${i}Label`) || undefined,
+          image: v(`xs${i}Photo`) || undefined,
+          button: v(`xs${i}Btn`) || undefined,
+        }))
+        .filter((x) => x.title && x.body)
+    : undefined;
 
   const record: AnyRecord = clean({
     name: v("name"),
@@ -3137,6 +3180,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
         ? { roles: hiringRoles, how: v("hiringHow") || "" }
         : null
       : undefined,
+    extraSections,
     events: has("events") ? events.slice(0, 20) : undefined,
     email: isP ? v("email") : undefined,
     designHelp: isP ? on("designHelp") : undefined,

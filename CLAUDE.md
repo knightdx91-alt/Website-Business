@@ -1811,6 +1811,14 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   FMLA only from 50 employees with our own 6-week unpaid leave until then, Alabama jury duty pay, USERRA, voting, PUMP Act, workers'
   comp from 5 employees; the app does not track paid time off), commission rules from Settings, money in (Stripe fees, failed payments, refunds,
   referral credits), money out + record keeping, owner pay (no commission; draws from profit, a Plus sale worked through, quarterly taxes, S-corp), cut-out cards). Not legal or tax advice; says so on its how-to page.
+- ➕ Extra sections (Oct 2026, owner's ask for Thrift & More's "$5 grab bags"; no Android build needed): `record.extraSections`
+  (≤3 {label?, title, body, image? = a gallery src, button? call | directions | text}) → `extraSections(ctx)` in components.ts,
+  inserted by render.ts `withExtras` before the closing CTA (before the jobs), alternating band, the photo beside the words
+  (`.about--photo`; Google gallery photos never in publish mode), paragraphs split on blank lines. Edit card "Extra sections"
+  (web `extraSectionsCardHtml` / `extraSectionsEditValues` inside app.js's IIFE, `EDIT_CARD_ID` `extra`; editform card `extra`,
+  fields `xs<n>Title/Label/Body/Photo/Btn`, `EXTRA_SECTIONS` / `EXTRA_BUTTONS`), edits `extraSections` (zod, empty heading =
+  dropped). Full-site Spanish picks the words up through `syncSpanish`. D1 key `rerender_req` = lead ids → the minute cron
+  re-renders those previews (`rerenderRequested` in pipeline.ts) after a record is changed by SQL. `test/worker/extra-sections.test.ts`.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

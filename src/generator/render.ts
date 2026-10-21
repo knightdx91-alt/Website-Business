@@ -1,6 +1,6 @@
 import { CLIENT_SCRIPT } from "./client-script.ts";
 import { priceListNav, priceListTeaser, pricesPage } from "./pricelist.ts";
-import { actionBar, announcements, footer, gallery, hasPrivacyPage, header, hiring, sectionHead, type Ctx, todo } from "./components.ts";
+import { actionBar, announcements, extraSections, footer, gallery, hasPrivacyPage, header, hiring, sectionHead, type Ctx, todo } from "./components.ts";
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
 import { html, jsonForScript, raw, type Raw } from "./html.ts";
@@ -120,6 +120,9 @@ function withExtras(ctx: Ctx, body: Raw): Raw {
   // A taste of the live price list on the home page (the full list is its own page in the menu).
   const stock = priceListTeaser(ctx).value;
   if (stock) out = /<section class="cta[ "]/.test(out) ? out.replace(/<section class="cta[ "]/, (m) => stock + m) : out.replace("</main>", `${stock}</main>`);
+  // The owner's own sections (a grab-bag special, a cause they support) go before the closing call, like the jobs.
+  const own = extraSections(ctx).value;
+  if (own) out = /<section class="cta[ "]/.test(out) ? out.replace(/<section class="cta[ "]/, (m) => own + m) : out.replace("</main>", `${own}</main>`);
   const jobs = hiring(ctx).value;
   if (jobs) out = /<section class="cta[ "]/.test(out) ? out.replace(/<section class="cta[ "]/, (m) => jobs + m) : out.replace("</main>", `${jobs}</main>`);
   // Sample stock put on the price list to show a prospect how it works never goes live: a REQUIRED to-do until it is removed.

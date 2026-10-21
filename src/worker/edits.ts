@@ -604,6 +604,18 @@ export const EditsSchema = z.object({
         })
         .nullable()
         .optional(),
+      extraSections: z
+        .array(
+          z.object({
+            label: z.string().trim().max(40).optional(),
+            title: z.string().trim().min(1).max(80),
+            body: z.string().trim().min(1).max(1500),
+            image: z.string().trim().max(300).optional(),
+            button: z.enum(["call", "directions", "text"]).optional(),
+          }),
+        )
+        .max(3)
+        .optional(),
       events: z
         .array(
           z.object({
@@ -1269,6 +1281,16 @@ export function applyEdits(
       e.hiring && e.hiring.roles.length
         ? { roles: e.hiring.roles, how: e.hiring.how || undefined }
         : undefined;
+  if (e.extraSections !== undefined)
+    r.extraSections = e.extraSections.length
+      ? e.extraSections.map((x) => ({
+          title: x.title,
+          body: x.body,
+          ...(x.label ? { label: x.label } : {}),
+          ...(x.image && r.media.gallery.some((p) => p.src === x.image) ? { image: x.image } : {}),
+          ...(x.button ? { button: x.button } : {}),
+        }))
+      : undefined;
   if (e.events !== undefined)
     r.events = e.events.length
       ? e.events.map((x) => ({

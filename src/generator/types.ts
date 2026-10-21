@@ -635,6 +635,9 @@ export interface BusinessRecord {
   };
   /** Optional "We're hiring" section: the jobs open and how to apply, in the owner's words. */
   hiring?: { roles: string[]; how?: string };
+  /** Up to 3 sections of the owner's own (a $5 grab bag, a cause they support): heading, words, an optional photo
+   * from their gallery and an optional button. Shown before the closing call to action, in the owner's words. */
+  extraSections?: ExtraSection[];
   /** Dated events, specials and announcements in the owner's words; past ones drop off on their own. */
   events?: EventItem[];
   reputation: { rating?: number; count?: number; displayMode: "link_only" | "owner_stated"; ownerStatedText?: string };
@@ -740,3 +743,13 @@ export interface Site {
 }
 
 export type BuildMode = "preview" | "publish";
+
+/** One section of the owner's own (Edit → Extra sections). `body` paragraphs are split on blank lines. */
+export interface ExtraSection {
+  label?: string;
+  title: string;
+  body: string;
+  /** A gallery photo's src (owner photos only on the live site). */
+  image?: string;
+  button?: "call" | "directions" | "text";
+}

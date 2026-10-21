@@ -756,6 +756,16 @@ export async function runRerender(env: Env, job: Extract<Job, { type: "rerender"
   await renderPreview(env, lead, JSON.parse(lead.record_json) as BusinessRecord, JSON.parse(lead.copy_json) as Copy, lead.look);
 }
 
+/** D1 settings key `rerender_req` = lead ids (comma-separated): the minute cron re-renders those previews and clears the key
+ * (for a record changed by SQL from Claude Code). */
+export async function rerenderRequested(env: Env): Promise<void> {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'rerender_req'").first<{ value: string }>();
+  if (!row) return;
+  await env.DB.prepare("DELETE FROM settings WHERE key = 'rerender_req'").run();
+  const ids = row.value.split(",").map((x) => x.trim()).filter((x) => /^[a-z0-9]+$/.test(x)).slice(0, 50);
+  if (ids.length) await env.JOBS.sendBatch(ids.map((leadId) => ({ body: { type: "rerender", leadId } as Job })));
+}
+
 /** Once per `key`: re-renders every ready lead of `category` that isn't live (the donations to-do stopped blocking, Oct 2026). */
 export async function queueRerender(env: Env, key: string, category: string): Promise<void> {
   if (await env.DB.prepare("SELECT 1 FROM settings WHERE key = ?").bind(key).first()) return;

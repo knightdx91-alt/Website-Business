@@ -266,7 +266,7 @@ import {
   dnaHints,
   renderPreview,
   runBuild,
-  runRestyle, runRelive, queueRelive, runRerender, queueRerender,
+  runRestyle, runRelive, queueRelive, runRerender, queueRerender, rerenderRequested,
   runSearch,
   importSitePhotos,
   forgetSiteImport,
@@ -4603,6 +4603,7 @@ async function handleScheduled(
     await requeueStuck(env);
     await queueRelive(env);
     await queueRerender(env, "rerender_donations_v1", "retail");
+    await rerenderRequested(env).catch((e) => console.error("rerender request", e));
     await backfillMailCodes(env);
     await remindOpenShifts(env);
     await runStripeAudit(env).catch((e) => console.error("stripe audit", e));

@@ -1543,7 +1543,7 @@ async function viewLead(id, intent) {
   }
 
   /** Edit card heading → editform card id, so a checklist line (#/edit/<id>/<card>) can open the right card. */
-  const EDIT_CARD_ID = { "Confirm with the owner": "confirm", "Design": "design", "Facts (only if the owner says so)": "facts", "Links": "links", "Text": "text", "Menu": "menu", "Services": "services", "Services & area": "services", "Customer quotes": "quotes", "Photo": "photo", "Photo gallery": "gallery", "Stock photos": "stock", "Spanish page": "es", "We're hiring": "hiring", "Events & specials": "events", "Awards & proof": "proof", "Closures, parking & payment": "visit", "Auto parts details": "parts", "Auto shop details": "auto", "Church & nonprofit details": "church", "Commercial cleaning details": "cleaning", "What's included": "cleaning", "Contractor details": "contractor", "Lawn & landscape details": "landscaping", "Live price list & QR labels": "pricelist", "Kind of business": "kind", "Plans & pricing": "plans", "Print shop details": "print", "Restaurant details": "restaurant", "Shop details": "retail", "Tax & finance details": "finance", "Salon details": "salon", "Massage details": "salon", "Grooming details": "salon", "Their current website": "site", "Their domain name": "domain" };
+  const EDIT_CARD_ID = { "Confirm with the owner": "confirm", "Design": "design", "Facts (only if the owner says so)": "facts", "Links": "links", "Text": "text", "Menu": "menu", "Services": "services", "Services & area": "services", "Customer quotes": "quotes", "Photo": "photo", "Photo gallery": "gallery", "Stock photos": "stock", "Spanish page": "es", "We're hiring": "hiring", "Extra sections": "extra", "Events & specials": "events", "Awards & proof": "proof", "Closures, parking & payment": "visit", "Auto parts details": "parts", "Auto shop details": "auto", "Church & nonprofit details": "church", "Commercial cleaning details": "cleaning", "What's included": "cleaning", "Contractor details": "contractor", "Lawn & landscape details": "landscaping", "Live price list & QR labels": "pricelist", "Kind of business": "kind", "Plans & pricing": "plans", "Print shop details": "print", "Restaurant details": "restaurant", "Shop details": "retail", "Tax & finance details": "finance", "Salon details": "salon", "Massage details": "salon", "Grooming details": "salon", "Their current website": "site", "Their domain name": "domain" };
   function tagEditCards(jumpTo) {
     $app.querySelectorAll("section.card").forEach((card) => {
       const h = card.querySelector(":scope > h2");
@@ -1631,6 +1631,7 @@ async function viewLead(id, intent) {
         <label class="field">Jobs open (one per line)<textarea name="hiringRoles" rows="3" placeholder="Line cook&#10;Server">${esc(((r.hiring || {}).roles || []).join("\n"))}</textarea></label>
         <label class="field">How to apply<input name="hiringHow" maxlength="240" value="${esc((r.hiring || {}).how || "")}" placeholder="Stop by between 2 and 4, or give us a call."></label>
       </section>
+      ${extraSectionsCardHtml(r)}
       <section class="card"><h2>Events &amp; specials</h2>
         <p class="small muted">Optional. Dated things in the owner's words: an event, a sale, a coupon, a deadline, a distribution day. One per line as <b>date | title | time | details | link</b>. Dates are YYYY-MM-DD; write <b>2026-11-01..2026-11-30</b> for something that runs for a while. Past items drop off the site on their own.</p>
         <label class="field">Coming up<textarea name="events" rows="4" placeholder="2026-10-25 | Trunk or Treat | 5–7 PM | Candy, games and hot dogs in the parking lot.&#10;2026-11-01..2026-11-30 | $20 off any brake job | | Mention this website.">${esc(eventLines(r.events))}</textarea></label>
@@ -1860,6 +1861,7 @@ async function viewLead(id, intent) {
           ...(isRt ? { retail: retailEditValues(f, r) } : { priceList: priceListEditValues(f) }),
           ...(isP ? { print: printEditValues(f) } : {}),
           hiring: (() => { const roles = (val("hiringRoles") || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 8); return roles.length ? { roles, how: val("hiringHow") || "" } : null; })(),
+          extraSections: extraSectionsEditValues(f),
           events: parseEventLines(val("events") || ""),
           ...(isP ? { email: val("email"), designHelp: on("designHelp"), proofBeforePrint: on("proofBeforePrint"), ...(r.variant === "signs" ? { install: on("install") } : {}) } : {}),
           ...(isRt ? { giftCards: on("giftCards"), delivery: on("delivery"), donations: donationsEditValues(f) } : {}),
@@ -5227,4 +5229,29 @@ async function viewLead(id, intent) {
   addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   render();
+  // Edit → Extra sections (mirrors EXTRA_SECTIONS / EXTRA_BUTTONS in src/worker/editform.ts).
+  function extraSectionsCardHtml(r) {
+    const EXTRA_BUTTONS = [["", "No button"], ["directions", "Get directions"], ["call", "Call us"], ["text", "Text us (if the number takes texts)"]];
+    const xs = r.extraSections || [];
+    const photos = (r.media && r.media.gallery) || [];
+    const opt = (v, label, cur) => `<option value="${esc(v)}"${v === (cur || "") ? " selected" : ""}>${esc(label)}</option>`;
+    const slot = (i) => {
+      const x = xs[i - 1] || {};
+      return `<h3>Section ${i}</h3>
+        <label class="field">Heading<input name="xs${i}Title" maxlength="80" value="${esc(x.title || "")}"${i === 1 ? ' placeholder="$5 grab bags"' : ""}></label>
+        <label class="field">Small label above it (optional)<input name="xs${i}Label" maxlength="40" value="${esc(x.label || "")}"${i === 1 ? ' placeholder="Giving back"' : ""}></label>
+        <label class="field">What it says (a blank line starts a new paragraph)<textarea name="xs${i}Body" rows="4" maxlength="1500">${esc(x.body || "")}</textarea></label>
+        <label class="field">Photo beside it<select name="xs${i}Photo">${opt("", "No photo", x.image)}${photos.map((p) => opt(p.src, p.caption || p.alt || p.src.split("/").pop(), x.image)).join("")}</select></label>
+        <label class="field">Button<select name="xs${i}Btn">${EXTRA_BUTTONS.map(([v, l]) => opt(v, l, x.button)).join("")}</select></label>`;
+    };
+    return `<section class="card"><h2>Extra sections</h2>
+      <p class="small muted">Optional. Up to 3 sections of the owner's own, in their words: a $5 grab bag, a cause they support, a rewards card. Each shows before the closing call, with an optional photo from the Photo gallery beside it and one button. Leave the heading empty to remove a section.</p>
+      ${[1, 2, 3].map(slot).join("")}</section>`;
+  }
+  function extraSectionsEditValues(f) {
+    const val = (n) => { const el = f.elements[n]; return el ? String(el.value || "").trim() : ""; };
+    return [1, 2, 3]
+      .map((i) => ({ title: val(`xs${i}Title`), label: val(`xs${i}Label`) || undefined, body: val(`xs${i}Body`), image: val(`xs${i}Photo`) || undefined, button: val(`xs${i}Btn`) || undefined }))
+      .filter((x) => x.title && x.body);
+  }
 })();

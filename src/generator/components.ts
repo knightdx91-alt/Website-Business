@@ -762,6 +762,27 @@ ${sectionHead("Jobs", "We're hiring", h.how || "Want to work with us? Get in tou
 </div></section>`;
 }
 
+/** The owner's own sections (Edit → Extra sections), each with an optional gallery photo beside the words and one button. */
+export function extraSections(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const list = (r.extraSections ?? []).filter((s) => s.title.trim() && s.body.trim());
+  return join(
+    list.map((s, i) => {
+      const img = s.image ? r.media.gallery.find((p) => p.src === s.image && !p.hidden && (ctx.mode !== "publish" || p.source !== "google")) : undefined;
+      const btn = s.button ? action(r, s.button) : undefined;
+      const words = html`${sectionHead(s.label || undefined, s.title, undefined, `extra${i + 1}-title`)}${s.body
+        .split(/\n\s*\n/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .map((p) => html`<p>${p}</p>`)}${btn ? html`<div class="btns"><a class="btn btn--secondary" href="${btn.href}"${btn.external ? raw(' target="_blank" rel="noopener"') : ""}>${icon(btn.icon)}<span>${btn.label}</span>${btn.external ? html`<span class="sr"> (opens in new tab)</span>` : ""}</a></div>` : ""}`;
+      return html`<section class="section${i % 2 ? "" : " section--band"}" id="extra${i + 1}" aria-labelledby="extra${i + 1}-title"><div class="wrap${img ? "" : " narrow"}">${
+        img ? html`<div class="about about--photo"><div>${words}</div>${imageTag(img)}</div>` : words
+      }</div></section>`;
+    }),
+    "",
+  );
+}
+
 export function imageTag(img: Image, opts: { lazy?: boolean; cls?: string } = {}): Html {
   const pos = img.focus && /^\d{1,3}% \d{1,3}%$/.test(img.focus) ? raw(` style="object-position:${img.focus}"`) : "";
   return html`<img src="${img.src}" alt="${img.alt}"${pos}${img.width ? raw(` width="${img.width}" height="${img.height}"`) : ""}${
