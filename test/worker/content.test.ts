@@ -156,7 +156,7 @@ test("GET /api/plans/options prices every way to pay for every plan, with what i
   assert.deepEqual(o.plans.map((p) => p.id), ["basic", "plus", "pro", "list"]);
   const plus = o.plans[1]!;
   assert.equal(plus.perDay, 2.93);
-  assert.deepEqual(plus.includes.slice(0, 2), ["Everything in Basic", "Monthly visitor report by text"]);
+  assert.deepEqual(plus.includes.slice(0, 2), ["Everything in Basic", "Live price list with QR tags and a tablet display, if your stock changes"]);
   assert.deepEqual(plus.options.map((x) => [x.id, x.dueTodayCents]), [["short", 8900], ["standard", 8900], ["flex", 8900 + 29900], ["annual", 89000]]);
   assert.equal(plus.options[0]!.label, "6-month plan");
   assert.match(plus.options[2]!.detail, /\$299 setup · no minimum/);

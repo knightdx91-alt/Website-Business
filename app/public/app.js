@@ -2121,7 +2121,7 @@ async function viewLead(id, intent) {
     pro: "Everything handled for you, every month.",
     list: "Just the prices: a live price page, QR tags, a tablet and your board. Not a website.",
   };
-  const EVERY_PLAN = ["We build it for you", "Fast, secure hosting", "Changes when you text us", "Made for phones", "A live price list with QR tags and a tablet display, if your stock changes", "Your name, photos and words stay yours"];
+  const EVERY_PLAN = ["We build it for you", "Fast, secure hosting", "Changes when you text us", "Made for phones", "Your name, photos and words stay yours"];
 
   async function viewShowPlans(leadId) {
     stopPolling();
@@ -2160,7 +2160,7 @@ async function viewLead(id, intent) {
       <section class="show__box"><h2>Ways to pay</h2><div class="show__ways">
         ${payWays(s, plans, church).map(([h, d]) => `<div><h3>${esc(h)}</h3><p>${d}</p></div>`).join("")}
       </div></section>
-      ${[["general", "Extras"], ["inventory", "Inventory add-ons"]].map(([g, h]) => { const list = (s.addons || []).filter((a) => addonGroup(a) === g); return list.length ? `<section class="show__box"><h2>${h}</h2>${g === "inventory" ? `<p class="show__fine" style="margin-top:0">For the live price list: with the ${esc((plans.find((p) => p.id === "list") || { name: "Price list" }).name)} plan or any website plan.</p>` : ""}<ul class="show__addons">${list.map((a) => `<li><span>${esc(a.name)}${a.about ? `<small>${esc(a.about)}</small>` : ""}</span><strong>${esc(addonPrice(a))}</strong></li>`).join("")}</ul></section>` : ""; }).join("")}
+      ${[["general", "Extras"], ["inventory", "Inventory add-ons"]].map(([g, h]) => { const list = (s.addons || []).filter((a) => addonGroup(a) === g); return list.length ? `<section class="show__box"><h2>${h}</h2>${g === "inventory" ? `<p class="show__fine" style="margin-top:0">For the live price list: with the ${esc((plans.find((p) => p.id === "list") || { name: "Price list" }).name)} plan, or included in the Plus and Pro website plans.</p>` : ""}<ul class="show__addons">${list.map((a) => `<li><span>${esc(a.name)}${a.about ? `<small>${esc(a.about)}</small>` : ""}</span><strong>${esc(addonPrice(a))}</strong></li>`).join("")}</ul></section>` : ""; }).join("")}
       <p class="show__fine">You see your website before you pay anything, and nothing goes live until you say so. Cancel with 30 days' notice${t.commits.length ? ` once your ${commitWords(t)} plan's months are up` : ""}.</p>
     </div>`;
     $app.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", async () => {
@@ -2653,7 +2653,7 @@ async function viewLead(id, intent) {
         <li><strong>Yearly rate:</strong> 12 months for the price of ${12 - ct.free} (${ct.free} months free), so it fits one budget line. ${plans.filter((p) => p.monthly).map((p) => `${esc(p.name)} ${money(p.monthly * (12 - ct.free))}/year`).join(" · ")}.</li>
         <li><strong>Expect a check or an invoice:</strong> many pay from the church account, not a card. Say yes to that; the owner sends the invoice.</li>
         <li><strong>Decisions take a meeting:</strong> deacons, elders, a board or the post. Leave the flyer for it, ask when it is, and set the callback for the day after.</li></ul></section>` : ""; })()}
-      ${[["general", "Extras", "Offer one when it fits. Any extra goes with any plan."], ["inventory", "Inventory add-ons", "The live price list system in pieces: offer these to shops whose stock changes, with the Price list plan or any website plan."]].map(([g, h, intro]) => { const list = (s.addons || []).filter((a) => addonGroup(a) === g); return list.length ? `<section class="card"><h2>${h}</h2><p class="small muted">${intro}</p><ul class="list">${list.map((a) => `<li><strong>${esc(a.name)}</strong> · ${esc(addonPrice(a))}${a.about ? `<br><span class="small">${esc(a.about)}</span>` : ""}${offerHint(a.name) ? `<br><span class="small muted">Offer to: ${esc(offerHint(a.name))}</span>` : ""}</li>`).join("")}</ul></section>` : ""; }).join("")}
+      ${[["general", "Extras", "Offer one when it fits. Any extra goes with any plan."], ["inventory", "Inventory add-ons", "The live price list system in pieces: offer these to shops whose stock changes, with the Price list plan, or included in Plus and Pro."]].map(([g, h, intro]) => { const list = (s.addons || []).filter((a) => addonGroup(a) === g); return list.length ? `<section class="card"><h2>${h}</h2><p class="small muted">${intro}</p><ul class="list">${list.map((a) => `<li><strong>${esc(a.name)}</strong> · ${esc(addonPrice(a))}${a.about ? `<br><span class="small">${esc(a.about)}</span>` : ""}${offerHint(a.name) ? `<br><span class="small muted">Offer to: ${esc(offerHint(a.name))}</span>` : ""}</li>`).join("")}</ul></section>` : ""; }).join("")}
       <section class="card"><h2>If they say…</h2>
         <label class="field">Find an answer<input id="objq" type="search" placeholder="price, contract, Facebook…" autocomplete="off"></label>
         <div id="objs">${objections.map(([q, a]) => `<details class="obj"><summary>${esc(q)}</summary><p>${a}</p></details>`).join("")}</div></section>
@@ -4298,8 +4298,8 @@ async function viewLead(id, intent) {
   // Priced from market research (Oct 2026): pay-monthly website services charge $78-150/mo, Hibu $99-159/mo,
   // Google Business Profile management $100-400/mo on its own.
   const SUGGESTED_PLANS = [
-    { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page\nLive price list with QR tags and a tablet display, if your stock changes" },
-    { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
+    { id: "basic", name: "Basic", setup: 0, monthly: 49, includes: "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page" },
+    { id: "plus", name: "Plus", setup: 0, monthly: 89, includes: "Everything in Basic\nLive price list with QR tags and a tablet display, if your stock changes\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter" },
     { id: "pro", name: "Pro", setup: 0, monthly: 149, includes: "Everything in Plus\nMonthly Google profile posts and photo updates\nYour own domain name, bought and renewed for you, in your name\nBusiness email (info@yourbusiness.com): free forwarding to the email you already use, or a full Google mailbox we set up, billed to you by Google\nPriority changes" },
     { id: "list", name: "Price list", setup: 0, monthly: 29, includes: "A live price page for your business, with a section for every tank, shelf, bin or row\nYour board: change names, prices, counts and photos from your phone, any time, no login\nPut your whole list on at once: paste it from a spreadsheet or your register's export\nSold out hides an item until it's back; the page shows how many are left\nQR price tags for every section (first sheet included) and a tablet display page\nStaff mode on the tablet: count stock in and out and add new items, PIN-locked\nFast, secure hosting; changes when you text us\nNo minimum: cancel any time. Upgrade to a full website any time" },
   ];

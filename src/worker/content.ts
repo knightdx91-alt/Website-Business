@@ -26,7 +26,6 @@ export const EVERY_PLAN = [
   "Fast, secure hosting",
   "Changes when you text us",
   "Made for phones",
-  "A live price list with QR tags and a tablet display, if your stock changes",
   "Your name, photos and words stay yours",
 ];
 
@@ -543,7 +542,7 @@ export const SUGGESTED_PLANS: Plan[] = [
     setup: 0,
     monthly: 49,
     includes:
-      "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page\nLive price list with QR tags and a tablet display, if your stock changes",
+      "Your website on fast, secure hosting\nSmall text, hours and photo updates\nTap-to-call and directions on every page",
   },
   {
     id: "plus",
@@ -551,7 +550,7 @@ export const SUGGESTED_PLANS: Plan[] = [
     setup: 0,
     monthly: 89,
     includes:
-      "Everything in Basic\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter",
+      "Everything in Basic\nLive price list with QR tags and a tablet display, if your stock changes\nMonthly visitor report by text\nGoogle Business Profile tune-up\nGoogle review QR cards for your counter",
   },
   {
     id: "pro",

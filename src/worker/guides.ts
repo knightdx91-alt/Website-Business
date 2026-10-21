@@ -82,7 +82,7 @@ export function tankBoardGuide(s: AppSettings): Guide {
         title: "What we sell it for",
         steps: [
           `Just the inventory system, no website: ${listLine}. The agreement says plainly it is not a website plan.`,
-          "With any website plan (Basic, Plus, Pro): the price page, the board and the tablet display are included.",
+          "With the Plus or Pro website plan: the price page, the board and the tablet display are included. Basic doesn't include it.",
           `${tagLine}. The first sheet is included with the ${list?.name ?? "Price list"} plan; reprints (renamed tanks, new tanks, wear) are a new sheet.`,
           'Everything inventory-related is listed together as "Inventory add-ons" (Settings → Extras sets the group): on the website, Show plans, the sign-up page and Plans & answers.',
           SCANNING_LINE,
@@ -393,7 +393,7 @@ export function displayGuide(s: AppSettings): Guide {
         title: "Selling it (it's free, so sell the plan)",
         steps: [
           'The line: "Change the price on your phone, and the sign on the tank changes too." Then hold your phone next to a tablet and show it: mark something sold out, watch it vanish from the screen.',
-          `It's included with the ${list?.name ?? "Price list"} plan and every website plan. You're selling the plan; the display is the part they'll remember.`,
+          `It's included with the ${list?.name ?? "Price list"} plan and the Plus and Pro website plans. You're selling the plan; the display is the part they'll remember.`,
           "If you set the tablets up for them (buy, mount, configure), $99 per tablet installed is fair: about $60 of hardware and 20 minutes of your time. Add it to the invoice as a one-off, or quote it by hand; it isn't a listed extra.",
           "Pair it with QR tags: the screen for the person at the tank, the tag for the person who wants to take the price home.",
           "Good fits: fish and reptile stores, plant nurseries (a screen per bench), produce stands, bakery cases, antique malls (booth map at the door), feed stores (a screen by the bulk bins).",
@@ -614,9 +614,8 @@ export function customerBoardPitch(
   const item = W.item;
   const list = s.plans.find((p) => p.id === "list" && p.monthly);
   const site = s.plans.filter((p) => p.id !== "list" && p.monthly);
-  const cheapest = site.length
-    ? site.reduce((a, p) => (p.monthly < a.monthly ? p : a))
-    : null;
+  // The live price list comes with Plus and Pro (not Basic, owner's call Oct 2026).
+  const plus = site.find((p) => p.id === "plus") ?? null;
   const tags = s.addons.find((a) => /price tag|shelf label/i.test(a.name));
   const company = s.companyName || "Underground Associates";
   const you = o.business || "your shop";
@@ -672,9 +671,9 @@ export function customerBoardPitch(
       list
         ? `Just the price page, board and tags: ${list.name}, $${list.monthly} a month. No minimum; cancel any time.${tags ? ` Your first sheet of QR tags is included.` : ""}`
         : "Ask us about the Price list plan.",
-      cheapest
-        ? `With a full website: included in every website plan, from $${cheapest.monthly} a month.`
-        : "Included with every website plan.",
+      plus
+        ? `With a full website: included in the ${plus.name} and Pro plans, from $${plus.monthly} a month. Not in Basic.`
+        : "Included with the Plus and Pro website plans.",
       tags
         ? `More QR tag sheets (8 tags each): ${addonPrice(tags)}.`
         : "QR tags are an extra.",

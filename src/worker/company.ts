@@ -172,7 +172,7 @@ function faq(s: AppSettings): Array<[string, string]> {
     ],
     [
       "My prices or stock change all the time. Can the site keep up?",
-      "Yes. Every plan includes a live price list: a page with a section for every tank, shelf, bin or row that you change from your phone, with QR tags for the shelf and a tablet display by the stock. A whole inventory pastes in from a spreadsheet, and the Barcode scanning add-on counts packaged goods in and out. Shops that only want that, with no website, take the Price list plan.",
+      "Yes. The Plus and Pro plans include a live price list: a page with a section for every tank, shelf, bin or row that you change from your phone, with QR tags for the shelf and a tablet display by the stock. A whole inventory pastes in from a spreadsheet, and the Barcode scanning add-on counts packaged goods in and out. Shops that only want that, with no website, take the Price list plan.",
     ],
     [
       "Who owns my content?",
@@ -1266,7 +1266,7 @@ const TRADES: Trade[] = [
       ],
       [
         "My prices change every day. Can the site keep up?",
-        "Yes. The live price list has a section for every tank, shelf or bin, and you change names, prices, counts and photos from your phone; the page follows within a minute, and a QR tag on the shelf opens that section. Packaged goods scan in and out by barcode on the tablet. It comes with every plan, or on its own as the Price list plan.",
+        "Yes. The live price list has a section for every tank, shelf or bin, and you change names, prices, counts and photos from your phone; the page follows within a minute, and a QR tag on the shelf opens that section. Packaged goods scan in and out by barcode on the tablet. It comes with the Plus and Pro plans, or on its own as the Price list plan.",
       ],
     ],
   },
@@ -1580,7 +1580,7 @@ function priceListHtml(s: AppSettings): string {
     .filter(Boolean)
     .slice(0, 4);
   return `<section class="sec" id="price-list"><div class="wrap narrow"><h2>Just need a live price list?</h2>
-<p class="lead">For any business whose stock changes: fish stores, nurseries, bakeries, resale, auto parts and tire shops, car lots. A price page with a section for every tank, shelf, bin or row, QR tags, a board you update from your phone, a tablet display with barcode scanning, and a whole inventory pasted in from a spreadsheet. ${money(p.monthly)} a month, no minimum, or included with every website plan.</p>
+<p class="lead">For any business whose stock changes: fish stores, nurseries, bakeries, resale, auto parts and tire shops, car lots. A price page with a section for every tank, shelf, bin or row, QR tags, a board you update from your phone, a tablet display with barcode scanning, and a whole inventory pasted in from a spreadsheet. ${money(p.monthly)} a month, no minimum, or included with the Plus and Pro website plans.</p>
 <ul>${lines.map((x) => `<li>${e(x)}</li>`).join("")}</ul>
 <p><a class="btn btn--small" href="/price-list">How it works</a> <a class="btn btn--small btn--line" href="/examples/juniper-finch/prices/">See an example</a> <a class="btn btn--small btn--line" href="/start?plan=${p.id}">Start the ${e(p.name)} plan</a></p></div></section>`;
 }
@@ -1715,7 +1715,7 @@ function extrasHtml(s: AppSettings, o: { compact?: boolean } = {}): string {
   const inv = inventoryAddons(s.addons);
   const list = listPlan(s);
   const invHtml = inv.length
-    ? `<div class="xinv" id="inventory-addons"><h3 class="xgroup">Inventory add-ons</h3><p>The pieces of the <a href="/price-list">live price list</a>, for the ${list ? e(list.name) : "Price list"} plan or any website plan. The price page, the board, the tablet display page and your first sheet of QR tags are included; these are the extras around them.</p><ul class="xlist">${inv.map((a) => `<li><div class="xlist__row"><b>${e(a.name)}</b><span>${e(addonPrice(a))}</span></div>${a.about ? `<p>${e(a.about)}</p>` : ""}</li>`).join("")}</ul></div>`
+    ? `<div class="xinv" id="inventory-addons"><h3 class="xgroup">Inventory add-ons</h3><p>The pieces of the <a href="/price-list">live price list</a>, for the ${list ? e(list.name) : "Price list"} plan or the Plus and Pro plans. The price page, the board, the tablet display page and your first sheet of QR tags are included; these are the extras around them.</p><ul class="xlist">${inv.map((a) => `<li><div class="xlist__row"><b>${e(a.name)}</b><span>${e(addonPrice(a))}</span></div>${a.about ? `<p>${e(a.about)}</p>` : ""}</li>`).join("")}</ul></div>`
     : "";
   return `<section class="sec" id="extras"><div class="wrap"><h2>Extras</h2><p class="lead">Add any of these to any plan, at sign-up or later. <a href="/add-ons">See each extra with an Add button</a>. Already a client? <a href="/extras">Add extras here</a>.</p>
 <div class="xcols">${[...groups.entries()].map(([unit, list]) => `<div><h3 class="xgroup">${e(UNIT_GROUP[unit] ?? unit)}</h3><ul class="xlist">${list.map((a) => `<li><div class="xlist__row"><b>${e(a.name)}</b><span>${e(addonPrice(a))}</span></div>${a.about ? `<p>${e(a.about)}</p>` : ""}</li>`).join("")}</ul></div>`).join("")}</div>
@@ -2070,7 +2070,7 @@ function priceListTeaser(s: AppSettings): string {
   const p = listPlan(s);
   return `<section class="sec" id="price-list-teaser"><div class="wrap narrow"><div class="card"><p class="eyebrow">New for shops</p>
 <h2 style="margin-top:6px">A price list that changes when you change it</h2>
-<p>Fish store, nursery, bakery, parts counter, tire shop, car lot, resale: change what's in a tank, case, bin or row from your phone, and the price page, the QR tag on the shelf and the screen by the tank all follow within a minute.${p ? ` Included with every website plan, or on its own for ${money(p.monthly)} a month with no minimum.` : ""}</p>
+<p>Fish store, nursery, bakery, parts counter, tire shop, car lot, resale: change what's in a tank, case, bin or row from your phone, and the price page, the QR tag on the shelf and the screen by the tank all follow within a minute.${p ? ` Included with the Plus and Pro website plans, or on its own for ${money(p.monthly)} a month with no minimum.` : ""}</p>
 <p><a class="btn btn--small" href="/price-list">See how it works</a></p></div></div></section>`;
 }
 
@@ -2079,10 +2079,11 @@ async function priceListPage(env: Env): Promise<Response> {
   const s = await getSettings(env);
   const name = s.companyName || "Underground Associates";
   const p = listPlan(s);
-  const lowest = lowestOf(s);
+  // The live price list comes with Plus and Pro, not Basic (owner's call, Oct 2026).
+  const plusPrice = s.plans.find((x) => x.id === "plus")?.monthly;
   const tags = s.addons.find((a) => /price tag|shelf label/i.test(a.name));
   const title = `Live price list, QR price tags and Stock board for any shop | ${name}`;
-  const description = `For Cullman-area shops whose stock changes daily: a price page with a section per tank or shelf, QR tags that open it, a board you update from your phone, a tablet display by the tank, barcode scanning for packaged stock, and a whole inventory loaded from a spreadsheet in one go. For fish stores, parts counters, nurseries, bakeries, lots and any shop.${p ? ` ${money(p.monthly)} a month, no minimum, or included with any website plan.` : ""}`;
+  const description = `For Cullman-area shops whose stock changes daily: a price page with a section per tank or shelf, QR tags that open it, a board you update from your phone, a tablet display by the tank, barcode scanning for packaged stock, and a whole inventory loaded from a spreadsheet in one go. For fish stores, parts counters, nurseries, bakeries, lots and any shop.${p ? ` ${money(p.monthly)} a month, no minimum, or included with the Plus and Pro website plans.` : ""}`;
   const serviceLd = {
     "@type": "Service",
     "@id": `${ORIGIN}/price-list#service`,
@@ -2172,7 +2173,7 @@ async function priceListPage(env: Env): Promise<Response> {
 <p class="small muted" style="margin-top:14px">Anything with a section name you can stick a label on and stock that doesn't sit still.</p></div></div></section>
 <section class="sec" id="pricing"><div class="wrap narrow"><h2>What it costs</h2><ul class="ticks">
 ${p ? `<li><strong>Just the price list, board and tags:</strong> the ${e(p.name)} plan, ${money(p.monthly)} a month. No minimum term and no setup fee; cancel any time with 30 days' notice.${tags ? " Your first sheet of QR tags is included." : ""}</li>` : ""}
-<li><strong>With a website:</strong> included in every website plan${lowest ? `, from ${money(lowest)} a month` : ""}. Every month on the ${p ? e(p.name) : "Price list"} plan counts toward a website later; the price page just becomes part of it.</li>
+<li><strong>With a website:</strong> included in the Plus and Pro plans${plusPrice ? `, from ${money(plusPrice)} a month` : ""}. Every month on the ${p ? e(p.name) : "Price list"} plan counts toward a website later; the price page just becomes part of it.</li>
 ${inventoryAddons(s.addons)
   .map(
     (a) =>
@@ -2250,7 +2251,7 @@ ${
       )
         .map((p) => planCard(p, s, { full: true }))
         .join("")}</div>
-<p class="paynote">Every plan includes hosting, security, the changes you ask for, and the <a href="/price-list">live price list</a> with QR tags and a tablet display if your stock changes. Rather see your site first? <a href="/#contact">Get the free preview</a> and decide after.</p>
+<p class="paynote">Every plan includes hosting, security and the changes you ask for; Plus and Pro add the <a href="/price-list">live price list</a> with QR tags and a tablet display if your stock changes. Rather see your site first? <a href="/#contact">Get the free preview</a> and decide after.</p>
 ${waysToPayHtml(s)}
 <h3 class="xgroup">Leaving early</h3><p>${earlyCancelText(s)}</p>
 ${s.churchAnnualMonthsFree ? `<p class="small muted">Churches and nonprofits: 12 months for the price of ${12 - s.churchAnnualMonthsFree} on a yearly plan, and we can invoice instead of taking a card.</p>` : ""}
@@ -2266,7 +2267,7 @@ ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</
     [
       [
         "What does the monthly price cover?",
-        "Your website, fast secure hosting, the security certificate, backups, and the text, hours and photo changes you ask for. Every plan also includes the live price list, its board, the QR tags' first sheet and the tablet display page if your stock changes. Plus and Pro add the Google profile work and reports listed on the cards.",
+        "Your website, fast secure hosting, the security certificate, backups, and the text, hours and photo changes you ask for. Plus and Pro add the live price list (its board, the QR tags' first sheet and the tablet display page) if your stock changes, plus the Google profile work and reports listed on the cards.",
       ],
       [
         "Is the price the same every month?",
@@ -2292,7 +2293,7 @@ ${quotes.length ? `<section class="sec"><div class="wrap"><h2>From our clients</
       ],
       [
         "Is the live price list extra?",
-        "No. It comes with every website plan. On its own, with no website, it is the Price list plan with no minimum term. The pieces around it are listed as inventory add-ons: barcode scanning, more QR tag sheets, and loading your stock list for you. Tablets and handheld scanners are your own; any $40 to $80 Android tablet and any $25 to $40 keyboard-mode scanner work.",
+        "No. It comes with the Plus and Pro website plans. On its own, with no website, it is the Price list plan with no minimum term. The pieces around it are listed as inventory add-ons: barcode scanning, more QR tag sheets, and loading your stock list for you. Tablets and handheld scanners are your own; any $40 to $80 Android tablet and any $25 to $40 keyboard-mode scanner work.",
       ],
       [
         "Can I pay by check or bank transfer?",

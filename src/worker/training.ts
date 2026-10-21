@@ -362,7 +362,7 @@ const LESSONS: Lesson[] = [
       'A long list: on the board, "Put a whole list on at once" takes a paste from Excel or Google Sheets or a .csv from their register. "Check it first" shows what it made of each column; then Add & update or Replace everything. Up to 2,000 items. The full steps are in the Live inventory guide (Settings → Guides).',
       'QR price tags: once the site is live, QR price tags on the lead prints a sheet of 8 labels per section. Laminate them. They never need reprinting for a price change, only when a section is renamed or added. More sheets are the "QR price tags & shelf labels" extra.',
       "Tablet: the 📺 link on each section in the board, opened in Chrome on any tablet, shows that section full-screen and live. Staff unlock it with a PIN (set on the board under Tablet & staff), a staff NFC tag or a code approved from the phone, and can change stock right there. Customers tap an item to read its info card.",
-      "Price: {listPlan}, no minimum, or included in every website plan. Every month on it counts toward a website later. The full how-to, with set-up steps and trouble, is Settings → Guides.",
+      "Price: {listPlan}, no minimum, or included in the Plus and Pro website plans (not Basic). Every month on it counts toward a website later. The full how-to, with set-up steps and trouble, is Settings → Guides.",
     ],
     tryIt:
       'On the Payment test lead, tap 🧪 Add sample items (the board card under "More on this lead", or the Preview screen) and look at the home page section and the In stock page. Then open the Payment test lead, tap Open it here, add a section and two items with counts, then open a 📺 link and watch them appear. Read "Show them the … board" once as if you were the shop owner.',
