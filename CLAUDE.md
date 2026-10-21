@@ -1818,7 +1818,9 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   (web `extraSectionsCardHtml` / `extraSectionsEditValues` inside app.js's IIFE, `EDIT_CARD_ID` `extra`; editform card `extra`,
   fields `xs<n>Title/Label/Body/Photo/Btn`, `EXTRA_SECTIONS` / `EXTRA_BUTTONS`), edits `extraSections` (zod, empty heading =
   dropped). Full-site Spanish picks the words up through `syncSpanish`. D1 key `rerender_req` = lead ids → the minute cron
-  re-renders those previews (`rerenderRequested` in pipeline.ts) after a record is changed by SQL. `test/worker/extra-sections.test.ts`.
+  re-renders those previews (`rerenderRequested` in pipeline.ts) after a record is changed by SQL. `rebuild_req` = lead ids → a text rewrite like the app's
+  "Rewrite the text" (`rebuildRequested`: rewrite = 1, queued, build job; design, photos and owner facts kept). A rewrite replaces
+  `copy.heroTagline`, so an owner's own slogan is set again afterwards (Nine One Four: "Good food. Good people. Great times."). `test/worker/extra-sections.test.ts`.
 - 🍽️ Food / featured photo mosaic + menu notes (Oct 2026, owner's ask for Nine One Four: "better than the carousel"): `Image.featured`
   (Edit → Photo gallery → Where it shows → "Food / featured photo mosaic"; `PHOTO_PLACES` / `photoPlace` in editform.ts + app.js,
   `galleryMeta[src].featured`; a strip pick clears it) → `featuredPhotos(ctx)` in components.ts: ≥2 photos (≤9; Google only in

@@ -766,6 +766,18 @@ export async function rerenderRequested(env: Env): Promise<void> {
   if (ids.length) await env.JOBS.sendBatch(ids.map((leadId) => ({ body: { type: "rerender", leadId } as Job })));
 }
 
+/** D1 settings key `rebuild_req` = lead ids: the minute cron rewrites their text (same as the app's "Rewrite the text"),
+ * keeping the design, photos and owner facts. */
+export async function rebuildRequested(env: Env): Promise<void> {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'rebuild_req'").first<{ value: string }>();
+  if (!row) return;
+  await env.DB.prepare("DELETE FROM settings WHERE key = 'rebuild_req'").run();
+  for (const id of row.value.split(",").map((x) => x.trim()).filter((x) => /^[a-z0-9]+$/.test(x)).slice(0, 10)) {
+    await env.DB.prepare("UPDATE leads SET rewrite = 1, status = 'queued', updated_at = ? WHERE id = ?").bind(Date.now(), id).run();
+    await env.JOBS.send({ type: "build", leadId: id });
+  }
+}
+
 /** Once per `key`: re-renders every ready lead of `category` that isn't live (the donations to-do stopped blocking, Oct 2026). */
 export async function queueRerender(env: Env, key: string, category: string): Promise<void> {
   if (await env.DB.prepare("SELECT 1 FROM settings WHERE key = ?").bind(key).first()) return;
