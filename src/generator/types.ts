@@ -55,6 +55,8 @@ export interface Image {
   band?: boolean;
   /** Kept on file but not shown anywhere on the site (Edit → Photo gallery → Where it shows → Don't show it). */
   hidden?: boolean;
+  /** In the photo mosaic ("From our kitchen" on restaurants, "Our work" elsewhere) instead of the Photos grid. */
+  featured?: boolean;
 }
 
 export type PriceMode = "none" | "exact" | "from" | "range" | "quote";

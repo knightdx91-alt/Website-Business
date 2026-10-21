@@ -384,6 +384,16 @@ html[data-hshade] .hero.hero--photo .hero__in .btn,html[data-hshade] .hero.hero-
 .smenu__dots{flex:1;min-width:16px;border-bottom:2px dotted color-mix(in srgb,var(--text) 30%,transparent);transform:translateY(-.3em)}
 .smenu__pr{font-weight:700;white-space:nowrap;color:var(--heading);font-variant-numeric:tabular-nums}
 @media (min-width:900px){.smenu__list{columns:2;column-gap:56px}.smenu__list li{break-inside:avoid}}
+.mosaic{display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:clamp(150px,44vw,240px);grid-auto-flow:dense;gap:8px;list-style:none;margin:24px 0 0;padding:0}
+.mosaic li{min-width:0}
+.mosaic li:first-child{grid-column:span 2;grid-row:span 2}
+.mosaic li:last-child:nth-child(even){grid-column:span 2}
+.mosaic__tile{position:relative;display:block;width:100%;height:100%;padding:0;border:0;background:#111;cursor:zoom-in;overflow:hidden;border-radius:var(--radius)}
+.mosaic__tile img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .6s var(--ease)}
+.mosaic__tile:hover img,.mosaic__tile:focus-visible img{transform:scale(1.05)}
+.mosaic__cap{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:36px 12px 10px;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.72));color:#fff;font-weight:700;text-align:left;line-height:1.25}
+.mosaic__price{flex:none;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.92);color:#111;font-size:.88rem;font-variant-numeric:tabular-nums}
+@media (min-width:760px){.mosaic{grid-template-columns:repeat(3,1fr);grid-auto-rows:210px;gap:12px}.mosaic li:last-child:nth-child(even){grid-column:auto}.mosaic--2{grid-template-columns:repeat(2,1fr);grid-auto-rows:340px}.mosaic--2 li:first-child,.mosaic--4 li:first-child{grid-column:auto;grid-row:auto}.mosaic--4{grid-template-columns:repeat(2,1fr);grid-auto-rows:260px}.mosaic--5{grid-template-columns:repeat(4,1fr)}}
 .zoomable{display:block;width:100%;padding:0;border:0;background:none;color:inherit;cursor:zoom-in;border-radius:var(--radius)}
 .carousel{position:relative;margin:24px 0 8px}
 .carousel__track{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;list-style:none;margin:0;padding:0 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}

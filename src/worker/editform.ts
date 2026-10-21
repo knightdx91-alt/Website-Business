@@ -594,7 +594,7 @@ export function editForm(l: EditDetail): EditForm {
     "Photo gallery",
     [
       note(
-        "Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. Pick where each one shows: the Photos grid, the What's new row (swipe or arrows, tap to see it big), the big photo between sections (also behind the closing call), or nowhere. Captions show under the photo (“Patio, Hanceville”); pick a photo's “after” to show the two side by side.",
+        "Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. Pick where each one shows: the Photos grid, the What's new row (swipe or arrows, tap to see it big), the big photo between sections (also behind the closing call), the food / featured photo mosaic (a big lead photo and smaller ones; on a restaurant, a caption that matches a menu item shows its price), or nowhere. Captions show under the photo (“Patio, Hanceville”); pick a photo's “after” to show the two side by side.",
       ),
       ...galleryFields,
     ],
@@ -2611,7 +2611,7 @@ export function editsFromForm(l: EditDetail, values: FormValues): EditsResult {
       town: v("gtown_" + key) || "",
       pairWith: v("gpair_" + key) || "",
       ...(has("gwhere_" + key)
-        ? { whatsNew: v("gwhere_" + key) === "new", band: v("gwhere_" + key) === "strip", hidden: v("gwhere_" + key) === "hidden" }
+        ? { whatsNew: v("gwhere_" + key) === "new", band: v("gwhere_" + key) === "strip", hidden: v("gwhere_" + key) === "hidden", featured: v("gwhere_" + key) === "featured" }
         : {
             // Older phone apps sent two ticks instead of the one choice.
             ...(has("gnew_" + key) ? { whatsNew: !!on("gnew_" + key) } : {}),
@@ -3303,10 +3303,11 @@ export const PHOTO_PLACES: Array<[string, string]> = [
   ["grid", "Photos grid"],
   ["new", "What's new row"],
   ["strip", "Big photo between sections"],
+  ["featured", "Food / featured photo mosaic"],
   ["hidden", "Don't show it"],
 ];
-export function photoPlace(p: { whatsNew?: boolean; band?: boolean; hidden?: boolean }): string {
-  return p.hidden ? "hidden" : p.band ? "strip" : p.whatsNew ? "new" : "grid";
+export function photoPlace(p: { whatsNew?: boolean; band?: boolean; hidden?: boolean; featured?: boolean }): string {
+  return p.hidden ? "hidden" : p.band ? "strip" : p.featured ? "featured" : p.whatsNew ? "new" : "grid";
 }
 
 /** Edit → Photo → "Words on the main photo" (mirrored in app.js). */

@@ -1819,6 +1819,15 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   fields `xs<n>Title/Label/Body/Photo/Btn`, `EXTRA_SECTIONS` / `EXTRA_BUTTONS`), edits `extraSections` (zod, empty heading =
   dropped). Full-site Spanish picks the words up through `syncSpanish`. D1 key `rerender_req` = lead ids → the minute cron
   re-renders those previews (`rerenderRequested` in pipeline.ts) after a record is changed by SQL. `test/worker/extra-sections.test.ts`.
+- 🍽️ Food / featured photo mosaic + menu notes (Oct 2026, owner's ask for Nine One Four: "better than the carousel"): `Image.featured`
+  (Edit → Photo gallery → Where it shows → "Food / featured photo mosaic"; `PHOTO_PLACES` / `photoPlace` in editform.ts + app.js,
+  `galleryMeta[src].featured`; a strip pick clears it) → `featuredPhotos(ctx)` in components.ts: ≥2 photos (≤9; Google only in
+  previews), `.mosaic` grid in css.ts (phone 2 columns with a full-width lead photo; desktop 3 columns with a 2×2 lead, `mosaic--2/4/5`
+  layouts), caption on the photo, the price of a restaurant menu / price-list item whose name equals the caption, every tile a
+  `[data-zoom]` lightbox button, "See the full menu" on restaurants. render.ts `withExtras` puts it right after `#menu`, else before
+  photos / reviews / the closing call. `gallery()` and `newArrivals()` skip featured photos. Menu text: `# Section | note` →
+  `MenuSection.note` (parseMenuText / menuToText). Nine One Four (539a32bef637402c) got its typed menu, 10 owner photos (hero = the
+  patio doors) and lost the Google gallery the same day. `test/featured-photos.test.ts`, `test/menu-notes.test.ts`.
 - Local testing: `.dev.vars` (gitignored) + `npx wrangler d1 migrations apply website-business --local`
   + `npx wrangler dev --local`, then use http://localhost:8787 (cookies are Secure).
 - Don't publish a real business for testing. Use a made-up record and delete the Pages

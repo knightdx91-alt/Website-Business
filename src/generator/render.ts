@@ -1,6 +1,6 @@
 import { CLIENT_SCRIPT } from "./client-script.ts";
 import { priceListNav, priceListTeaser, pricesPage } from "./pricelist.ts";
-import { actionBar, announcements, extraSections, footer, gallery, hasPrivacyPage, header, hiring, sectionHead, type Ctx, todo } from "./components.ts";
+import { actionBar, announcements, extraSections, featuredPhotos, footer, gallery, hasPrivacyPage, header, hiring, sectionHead, type Ctx, todo } from "./components.ts";
 import { buildCss, fontFileName } from "./css.ts";
 import { hasAnyHours } from "./hours.ts";
 import { html, jsonForScript, raw, type Raw } from "./html.ts";
@@ -108,6 +108,16 @@ ${actionBar(pack.actionBar(ctx), ctx.theme.dna)}
 /** Sections every pack gets: the owner's photo gallery (before reviews, unless the pack placed it) and "We're hiring" (before the closing call to action). */
 function withExtras(ctx: Ctx, body: Raw): Raw {
   let out = body.value;
+  // The photo mosaic sits right after the menu on a restaurant, else before the photo grid / reviews / closing call.
+  const mosaic = featuredPhotos(ctx).value;
+  if (mosaic) {
+    const menu = /<section class="section[^"]*" id="menu"[\s\S]*?<\/section>/.exec(out);
+    if (menu) out = out.slice(0, menu.index + menu[0].length) + mosaic + out.slice(menu.index + menu[0].length);
+    else {
+      const at = /<section class="section[^"]*" id="(photos|latest|reviews)"|<section class="cta[ "]/.exec(out);
+      out = at ? out.slice(0, at.index) + mosaic + out.slice(at.index) : out.replace("</main>", `${mosaic}</main>`);
+    }
+  }
   if (!ctx.galleryShown) {
     const photos = gallery(ctx).value;
     if (photos) out = out.includes('id="reviews"') ? out.replace(/<section class="section[^"]*" id="reviews"/, (m) => photos + m) : out.replace("</main>", `${photos}</main>`);

@@ -699,6 +699,7 @@ export const EditsSchema = z.object({
               whatsNew: z.boolean(),
               band: z.boolean(),
               hidden: z.boolean(),
+              featured: z.boolean(),
               focus: z.string().trim().regex(/^(\d{1,3}% \d{1,3}%)?$/),
             })
             .partial(),
@@ -1475,7 +1476,7 @@ export function applyPhotoPicks(r: BusinessRecord, p: { hero?: string; strip?: s
       const mine = !!own && key(g.src) === own;
       g.band = mine ? true : undefined;
       // The strip is now its only place on the page.
-      if (mine) g.whatsNew = g.hidden = undefined;
+      if (mine) g.whatsNew = g.hidden = g.featured = undefined;
     }
     if (p.strip.startsWith("s:") && sceneImage(p.strip.slice(2))) picks.strip = p.strip.slice(2);
     else delete picks.strip;
@@ -1533,6 +1534,7 @@ function applyTlcEdits(
       if (m.whatsNew !== undefined) p.whatsNew = m.whatsNew || undefined;
       if (m.band !== undefined) p.band = m.band || undefined;
       if (m.hidden !== undefined) p.hidden = m.hidden || undefined;
+      if (m.featured !== undefined) p.featured = m.featured || undefined;
       if (m.focus !== undefined) p.focus = m.focus || undefined;
       // A pair only points at another photo that is on the record (and not at itself).
       if (m.pairWith !== undefined) {

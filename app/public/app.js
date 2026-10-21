@@ -1508,7 +1508,7 @@ async function viewLead(id, intent) {
   }
   function galleryCardHtml(id, r) {
     return `<section class="card" id="card-gallery"><h2>Photo gallery</h2>
-        <p class="small muted">Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. Pick where each one shows: the Photos grid, the What's new row (swipe or arrows, tap to see it big), the big photo between sections (also behind the closing call), or nowhere.</p>${r.media.gallery.some((p) => p.source === "google") ? `<p class="small muted">${r.media.gallery.filter((p) => p.source === "google").length} of these came from their Google listing (Import from their Google page). They show in the preview only and are left out of the live site. <button class="linkbtn" type="button" data-eact="delphoto" data-photo="google">Remove all Google photos</button></p>` : ""}
+        <p class="small muted">Up to 24 of the owner's own photos (the photo shoot extra): their place, their work, their team. Pick where each one shows: the Photos grid, the What's new row (swipe or arrows, tap to see it big), the big photo between sections (also behind the closing call), the food / featured photo mosaic (a big lead photo and smaller ones; on a restaurant, a caption that matches a menu item shows its price), or nowhere.</p>${r.media.gallery.some((p) => p.source === "google") ? `<p class="small muted">${r.media.gallery.filter((p) => p.source === "google").length} of these came from their Google listing (Import from their Google page). They show in the preview only and are left out of the live site. <button class="linkbtn" type="button" data-eact="delphoto" data-photo="google">Remove all Google photos</button></p>` : ""}
         ${r.media.gallery.length ? `<ul class="thumbs" style="grid-template-columns:1fr">${r.media.gallery.map((p) => { const key = photoKey(p.src); return `<li style="text-align:left"><div class="row" style="align-items:flex-start"><img src="/p/${id}${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy" style="width:88px;flex:none"><div style="flex:1;min-width:0"><div class="row"><label class="field">Caption<input name="gcap_${esc(key)}" maxlength="80" value="${esc(p.caption || "")}" placeholder="Patio"></label><label class="field">Town<input name="gtown_${esc(key)}" maxlength="40" value="${esc(p.town || "")}" placeholder="Hanceville"></label></div><label class="field">Where it shows<select name="gwhere_${esc(key)}">${PHOTO_PLACES.map(([v, t]) => `<option value="${v}"${photoPlace(p) === v ? " selected" : ""}>${t}</option>`).join("")}</select></label><label class="field">Keep in view<select name="gfocus_${esc(key)}">${optsWith(FOCUS_OPTIONS, p.focus || "")}</select></label>
             <label class="field">Before/after<select name="gpair_${esc(key)}"><option value="">Not a “before” photo</option>${r.media.gallery.filter((o) => o !== p).map((o) => { const ok = photoKey(o.src); return `<option value="${esc(ok)}"${p.pairWith === ok ? " selected" : ""}>This is the BEFORE of: ${esc(o.caption || o.alt || ok)}</option>`; }).join("")}</select></label>
             <button class="linkbtn" type="button" data-eact="delphoto" data-photo="${esc(key)}">Remove</button></div></div></li>`; }).join("")}</ul>
@@ -2698,8 +2698,8 @@ async function viewLead(id, intent) {
   /* ---------- trades, lawn & cleaning (Oct 2026): plans, guarantee, offers, gallery captions, category details ---------- */
   const photoKey = (src) => src.split("/").pop().split(".")[0];
   // Mirrors PHOTO_PLACES / photoPlace in editform.ts: each gallery photo shows in one place.
-  const PHOTO_PLACES = [["grid", "Photos grid"], ["new", "What's new row"], ["strip", "Big photo between sections"], ["hidden", "Don't show it"]];
-  const photoPlace = (p) => (p.hidden ? "hidden" : p.band ? "strip" : p.whatsNew ? "new" : "grid");
+  const PHOTO_PLACES = [["grid", "Photos grid"], ["new", "What's new row"], ["strip", "Big photo between sections"], ["featured", "Food / featured photo mosaic"], ["hidden", "Don't show it"]];
+  const photoPlace = (p) => (p.hidden ? "hidden" : p.band ? "strip" : p.featured ? "featured" : p.whatsNew ? "new" : "grid");
   function galleryMetaValues(f, r) {
     const out = {};
     for (const p of r.media.gallery) {
@@ -2707,7 +2707,7 @@ async function viewLead(id, intent) {
       if (!f.elements["gcap_" + key]) continue;
       out[p.src] = { caption: f.elements["gcap_" + key].value.trim(), town: (f.elements["gtown_" + key] || { value: "" }).value.trim(), pairWith: (f.elements["gpair_" + key] || { value: "" }).value };
       const where = f.elements["gwhere_" + key];
-      if (where) Object.assign(out[p.src], { whatsNew: where.value === "new", band: where.value === "strip", hidden: where.value === "hidden" });
+      if (where) Object.assign(out[p.src], { whatsNew: where.value === "new", band: where.value === "strip", hidden: where.value === "hidden", featured: where.value === "featured" });
       if (f.elements["gfocus_" + key]) out[p.src].focus = f.elements["gfocus_" + key].value;
     }
     return Object.keys(out).length ? out : undefined;

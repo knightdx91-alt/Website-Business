@@ -667,7 +667,7 @@ export function actionBar(acts: Action[], dna?: Dna): Raw {
 export function gallery(ctx: Ctx, todoTitle?: string, todoBody?: string): Raw {
   const row = ctx.newShown ? raw("") : photoRow(ctx);
   // Each photo shows in one place: the grid, the What's new row or the big photo between sections (or nowhere).
-  const photos = ctx.r.media.gallery.filter((p) => !p.whatsNew && !p.band && !p.hidden && (ctx.mode === "preview" || p.source !== "google"));
+  const photos = ctx.r.media.gallery.filter((p) => !p.whatsNew && !p.band && !p.hidden && !p.featured && (ctx.mode === "preview" || p.source !== "google"));
   if (!photos.length) {
     if (row.value) {
       ctx.galleryShown = true;
@@ -693,6 +693,30 @@ ${photos.some((p) => p.source === "google") ? todo(ctx, "Send us your own photos
 </div></section>`;
 }
 
+/** The photo mosaic: owner photos placed "Food / featured photos" in Edit → Photo gallery. A big lead photo and smaller
+ * ones around it, each captioned on the photo (on a restaurant, a caption that names a menu item also shows its price),
+ * every one opening big when tapped. Needs two photos; Google photos only in previews. */
+export function featuredPhotos(ctx: Ctx): Raw {
+  const r = ctx.r;
+  const photos = r.media.gallery.filter((p) => p.featured && !p.hidden && (ctx.mode === "preview" || p.source !== "google")).slice(0, 9);
+  if (photos.length < 2) return raw("");
+  const prices = new Map<string, string>();
+  for (const sec of [...(r.ext.restaurant?.menu?.sections ?? []), ...(r.ext.retail?.priceList?.sections ?? [])])
+    for (const it of sec.items) if (it.price && !prices.has(it.name.toLowerCase())) prices.set(it.name.toLowerCase(), it.price);
+  const food = r.category === "restaurant";
+  return html`<section class="section" id="featured" aria-labelledby="featured-title"><div class="wrap">
+${sectionHead(food ? "From our kitchen" : "Our work", food ? "Fresh off the line" : "A closer look", undefined, "featured-title")}
+<ul class="mosaic mosaic--${Math.min(photos.length, 6)}">${photos.map((p) => {
+    const cap = p.caption || "";
+    const price = cap ? prices.get(cap.toLowerCase()) : undefined;
+    return html`<li><button type="button" class="mosaic__tile" data-zoom="${p.src}" data-cap="${[cap, price].filter(Boolean).join(" · ")}" aria-label="${cap ? `See it bigger: ${cap}` : "See this photo bigger"}">${imageTag(p)}${
+      cap ? html`<span class="mosaic__cap"><span>${cap}</span>${price ? html`<span class="mosaic__price">${price}</span>` : ""}</span>` : ""
+    }</button></li>`;
+  })}</ul>
+${food && r.ext.restaurant?.menu ? html`<div class="btns" style="margin-top:20px"><a class="btn btn--secondary" href="/menu/">See the full menu</a></div>` : ""}
+</div></section>`;
+}
+
 /** A photo that opens big when tapped (the client script's lightbox picks up every `[data-zoom]`). */
 function zoomable(p: Image, caption: string): Html {
   return html`<button type="button" class="zoomable" data-zoom="${p.src}" data-cap="${caption}" aria-label="${caption ? `See it bigger: ${caption}` : "See this photo bigger"}">${imageTag(p)}</button>`;
@@ -703,7 +727,7 @@ function zoomable(p: Image, caption: string): Html {
  * and has arrows on wider screens; tapping a photo opens it big (lightbox in the client script, `[data-zoom]`).
  */
 export function newArrivals(ctx: Ctx): Raw {
-  const photos = ctx.r.media.gallery.filter((p) => p.whatsNew && !p.band && !p.hidden && (ctx.mode === "preview" || p.source !== "google"));
+  const photos = ctx.r.media.gallery.filter((p) => p.whatsNew && !p.band && !p.hidden && !p.featured && (ctx.mode === "preview" || p.source !== "google"));
   if (!photos.length) return raw("");
   ctx.newShown = true;
   const cap = (p: Image) => [p.caption, p.town].filter(Boolean).join(", ");

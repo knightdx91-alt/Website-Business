@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 75,
+    date: "2026-10-21",
+    title: "Food photo mosaic + menu section notes",
+    items: [
+      "New place for a gallery photo: Edit → Photo gallery → Where it shows → \"Food / featured photo mosaic\". Two or more photos make a section with one big photo and smaller ones around it, the caption on each photo, and a tap opens it full screen. On a restaurant it sits right after the menu and is called \"From our kitchen\"; anywhere else it's \"Our work\".",
+      "On a restaurant, caption a food photo with the menu item's exact name (\"Cuban\") and its price shows on the photo too.",
+      "Menus: a section line can carry a note now, like \"# Wraps | $13, served with one side\". The note shows under the section name on the menu page.",
+    ],
+  },
+  {
     n: 74,
     date: "2026-10-21",
     title: "Extra sections: a section of the owner's own",
