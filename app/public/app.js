@@ -842,19 +842,22 @@
         <a class="btn" href="/api/leads/${l.id}/tents" target="_blank" rel="noopener">QR table tents</a>
         <a class="btn" href="/api/leads/${l.id}/window" target="_blank" rel="noopener">Window sign (QR)</a>
         <a class="btn" href="/api/leads/${l.id}/pricetags.pdf" target="_blank" rel="noopener">QR price tags</a></div>
-      <h3 style="margin-top:16px">📊 Google Analytics</h3>
+      <h3 style="margin-top:16px">📊 Google Analytics &amp; Search Console</h3>
       ${analyticsHtml(l)}
       </section>`;
   }
 
   // Google Analytics on the live site (src/worker/analytics.ts): the ID, the reports link and sharing with the owner.
   function analyticsHtml(l) {
-    const a = l.analytics;
+    const a = l.analytics, g = l.searchConsole;
+    const gsc = g ? `<p class="small">🔎 Search Console: ${g.verified ? `<strong>verified</strong>${g.sitemap ? ", sitemap sent" : ""}. Google is told about every page.` : `waiting to verify (the app keeps trying)${g.error ? `: ${esc(g.error)}` : "."}`}${g.verified ? ` <a href="${esc(g.reportsUrl)}" target="_blank" rel="noopener">Open in Search Console</a>` : ""}</p>` : "";
+    const access = (a && a.reportsUrl) || (g && g.verified) ? `<button class="btn btn--small" type="button" data-ga-access>Give the owner access</button>` : "";
     if (!a) return `<p class="small muted">Not on this site yet. It's added by itself when the site is published once Google Analytics is connected (Settings → Website).</p>
-      <div class="btns"><button class="btn btn--small" type="button" data-ga-now>Set it up now</button></div>`;
+      <div class="btns"><button class="btn btn--small" type="button" data-ga-now>Set it up now</button>${access}</div>${gsc}`;
     return `<p class="small">On every page of the live site: <strong>${esc(a.id)}</strong>${a.auto ? " (made by the app)" : " (their own)"}.</p>
-      <div class="btns">${a.reportsUrl ? `<a class="btn btn--small" href="${esc(a.reportsUrl)}" target="_blank" rel="noopener">Open their reports</a><button class="btn btn--small" type="button" data-ga-access>Give the owner access</button>` : ""}</div>
-      ${a.auto ? `<p class="small muted">Give the owner access with their Google (Gmail) address and they can open their own reports at analytics.google.com.</p>` : ""}`;
+      <div class="btns">${a.reportsUrl ? `<a class="btn btn--small" href="${esc(a.reportsUrl)}" target="_blank" rel="noopener">Open their reports</a>` : ""}${access}</div>
+      ${gsc}
+      ${access ? `<p class="small muted">Give the owner access with their Google (Gmail) address and they can open their own numbers at analytics.google.com and search.google.com/search-console.</p>` : ""}`;
   }
 
   // 🌐 Their domain (src/worker/domains.ts): pick a name (free or taken), buy it on our Cloudflare, the app hooks it up.
@@ -3706,7 +3709,7 @@ async function viewLead(id, intent) {
       const email = (prompt("The owner's Google address (Gmail or Google Workspace). They'll be able to see their own reports:", "") || "").trim();
       if (!email) return;
       gaAccess.disabled = true;
-      try { await api(`/leads/${l.id}/analytics/access`, { method: "POST", json: { email } }); toast(`Done. ${email} can open analytics.google.com and see ${l.record ? l.record.name : l.name}.`); }
+      try { const r = await api(`/leads/${l.id}/analytics/access`, { method: "POST", json: { email } }); toast(`Done: ${email} can see ${l.record ? l.record.name : l.name} in ${r.done.join(" and ")}.${r.problems && r.problems.length ? ` (${r.problems[0]})` : ""}`); }
       catch (err) { toast(err.message); } finally { gaAccess.disabled = false; }
     });
     const xb = $app.querySelector("[data-extraslink]");

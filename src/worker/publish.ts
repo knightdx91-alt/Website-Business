@@ -1,5 +1,6 @@
 import { wireDomain } from "./domains.ts";
 import { ensureAnalytics } from "./analytics.ts";
+import { finishSearchConsole, prepareSearchConsole } from "./searchconsole.ts";
 import { syncSpanish } from "./spanish-sync.ts";
 import { zipSync } from "fflate";
 import { lockDesign } from "./exclusive.ts";
@@ -171,6 +172,8 @@ export async function publishLead(
   const origin = siteOrigin(lead, pagesOrigin);
   // Its own Google Analytics property the first time it goes live (never blocks the publish; see analytics.ts).
   lead = await ensureAnalytics(env, lead, origin);
+  // And a Search Console verification code for this address (verified after the deploy; see searchconsole.ts).
+  lead = await prepareSearchConsole(env, lead, origin);
   const built = await buildForPublish(
     env,
     { ...lead, pages_project: project.name },
@@ -186,6 +189,7 @@ export async function publishLead(
     sales_status: "live",
   });
   await lockDesign(env, lead); // a live site's design is its own: open leads sharing it get a new one
+  await finishSearchConsole(env, lead.id).catch((e) => console.error("search console", lead.id, e)); // cron retries if not yet
   return { url: origin, pagesUrl: pagesOrigin };
 }
 

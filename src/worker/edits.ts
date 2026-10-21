@@ -1263,7 +1263,7 @@ export function applyEdits(
     const seo = { ...(r.seo ?? {}) };
     if (e.seo.googleSiteVerification !== undefined) seo.googleSiteVerification = e.seo.googleSiteVerification || undefined;
     if (e.seo.gaId !== undefined) seo.gaId = e.seo.gaId || undefined;
-    r.seo = seo.googleSiteVerification || seo.gaId || seo.ga ? seo : undefined;
+    r.seo = seo.googleSiteVerification || seo.gaId || seo.ga || seo.gsc ? seo : undefined;
   }
   if (e.links) {
     const l = e.links;

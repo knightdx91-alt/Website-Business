@@ -493,9 +493,9 @@ export function launchGuide(s: AppSettings): Guide {
         steps: [
           "Google finds new sites by itself, but it can take weeks. These get them showing up for their own name in days.",
           'Their Google Business Profile (the biggest one): the lead\'s Google profile tools → text the owner the "add us as Manager" steps. Once you have access, put the site address in the profile\'s Website field.',
-          "Google Search Console (search.google.com/search-console, our company Google account): Add property → URL prefix → https://theirdomain.com → HTML tag → copy only the code inside content=\"…\".",
-          "In the app: Edit → Links → Search Console code, paste, save, then tap Republish changes on the lead page.",
-          "Back in Search Console: Verify → Sitemaps → submit sitemap.xml → URL inspection on the home page → Request indexing. Add the client as a user if they want to see it.",
+          "Google Search Console is set up by the app when the site goes live: it verifies the site, sends Google the sitemap and adds our company Google address as an owner. The lead page's 📊 Google Analytics & Search Console box says \"verified, sitemap sent\" when it's done (when their own domain starts working, it's done again for the new address).",
+          "Optional, speeds up the first listing: search.google.com/search-console (our company Google account) → pick their site → URL inspection on the home page → Request indexing.",
+          "\"Give the owner access\" in that box adds the client's Google address to their Search Console and Google Analytics. Only if a client brings their own Search Console code: Edit → Links → Search Console code, save, Republish changes.",
           "Get listed everywhere (on the lead): Bing Places (import from their Google profile) and Apple Business Connect.",
         ],
         note: "Their name usually shows the site within a few days to two weeks. Ranking for \"pizza near me\" style searches takes longer and comes mostly from their Google profile and reviews.",

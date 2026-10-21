@@ -1966,3 +1966,17 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   `DELETE` = hide (keeps the translation). A live site gets `prices_dirty = 1` when the on/off state changes. `detail().hasSpanish` =
   on (share links, editform card), `spanishReady` = written. Web card "🇲🇽 Turn Spanish on / off / Rewrite Spanish"; Android's
   existing Write / Remove buttons do the same with no build. Cost: roughly 10–20¢ more per new site (summary + every line).
+- 🔎 Search Console on every live site (Oct 2026, owner's ask; `src/worker/searchconsole.ts`, `test/worker/searchconsole.test.ts`): `publishLead`
+  calls `prepareSearchConsole` (Site Verification API `token`, META, for `siteId(origin)`; code stored as `record.seo.gsc {site, token}`
+  and written as a second google-site-verification meta on published pages, beside an owner-typed `googleSiteVerification`), then after
+  the deploy `finishSearchConsole`: `webResource?verificationMethod=META` (our service account = verified owner), Search Console API
+  `PUT sites/<site>` + `PUT …/sitemaps/<site>sitemap.xml`, owners Settings `ownerEmail` + `gbpEmail` added to the webResource; call-log
+  note; `gsc.verified/sitemap/owners`. Not verified yet → `gsc.tries/error`, the minute cron's `retrySearchConsole` (minute % 5 == 2,
+  3 a tick, 12 tries). A new address (own domain working) gets a new code on the next publish. Service account = GA's
+  (GA_SERVICE_ACCOUNT else FCM_SERVICE_ACCOUNT); needs "Site Verification API" + "Google Search Console API" on in its project; errors
+  in settings key `gsc_last_error`, first success stamps `gsc_verified` and `queueGscBackfill` (key `gsc_backfill_v1`) republishes every
+  unverified live site once. `detail().searchConsole`, web box "📊 Google Analytics & Search Console", health item `searchconsole`
+  (section Website). "Give the owner access" (`/analytics/access`) now adds the client to whichever of GA / Search Console the app made.
+  Request indexing has no API (Google's Indexing API is for job posts only); the sitemap covers it.
+  Lightbox (same day): the zoomed photo's max-height is set in pixels from `innerHeight` (screen height when that's under 320 px),
+  because the app's preview WebView can report a collapsed vh and Nine One Four's tapped photos showed only their captions.

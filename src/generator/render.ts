@@ -86,6 +86,7 @@ ${preview ? html`<meta name="robots" content="noindex, nofollow">` : o.noindex ?
 ${esTarget ? html`<link rel="ua-es" href="${esTarget}">` : ""}
 ${alternates ? html`<link rel="alternate" hreflang="en" href="${origin}/"><link rel="alternate" hreflang="es" href="${origin}/es/"><link rel="alternate" hreflang="x-default" href="${origin}/">` : ""}
 ${!preview && ctx.r.seo?.googleSiteVerification ? html`<meta name="google-site-verification" content="${ctx.r.seo.googleSiteVerification}">` : ""}
+${!preview && ctx.r.seo?.gsc?.token && ctx.r.seo.gsc.token !== ctx.r.seo.googleSiteVerification ? html`<meta name="google-site-verification" content="${ctx.r.seo.gsc.token}">` : ""}
 <meta name="theme-color" content="${ctx.theme.colors.heroBg}">
 ${ctx.statsEndpoint ? html`<meta name="wb-stats" content="${ctx.statsEndpoint}">` : ""}
 <meta property="og:type" content="website"><meta property="og:title" content="${o.title}"><meta property="og:description" content="${o.description}"><meta property="og:url" content="${origin}${o.path}">

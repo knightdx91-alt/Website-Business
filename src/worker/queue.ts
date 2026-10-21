@@ -409,6 +409,8 @@ export interface HealthInput {
   spam: { turnstile: "on" | "key" | "secret" | "off"; blocked: number };
   /** Google Analytics for client sites (src/worker/analytics.ts): setup state, the service account to add, the last failure. */
   analytics?: { state: "on" | "account" | "secret" | "off"; serviceEmail: string | null; lastError: string | null; sites: number; verified?: boolean };
+  /** Google Search Console for client sites (src/worker/searchconsole.ts). */
+  searchConsole?: { serviceEmail: string | null; lastError: string | null; sites: number; verified: boolean };
   /** Tasks written straight into Google Calendar (gcal.ts): service account present, its client ID, the last try. */
   calendar?: {
     serviceAccount: boolean;
@@ -556,6 +558,23 @@ export function healthItems(h: HealthInput): HealthItem[] {
                     ? "Connected and tested. Every published site gets its own Google Analytics property (none live right now)."
                     : `Account saved; no site has been set up yet. Before the first publish: (2) In Google Cloud (the project of ${h.analytics.serviceEmail ?? "the service account"}), switch on "Google Analytics Admin API". (3) Google Analytics → Admin → Account access management → add ${h.analytics.serviceEmail ?? "the service account's email"} as Administrator. This turns green after the first site gets its property.`
                 : `Not set up yet. (1) analytics.google.com → Admin → Create account "Underground Associates Clients"; copy its Account ID into Settings → Website → "Google Analytics account for client sites". (2) In Google Cloud (the project of ${h.analytics.serviceEmail ?? "the service account"}), switch on "Google Analytics Admin API". (3) Google Analytics → Admin → Account access management → add ${h.analytics.serviceEmail ?? "the service account's email"} as Administrator.${h.analytics.state === "account" ? " Step 1 is the one missing." : h.analytics.state === "secret" ? " The Worker has no service account (GA_SERVICE_ACCOUNT or FCM_SERVICE_ACCOUNT)." : ""}`,
+            section: "Website",
+          },
+        ]
+      : []),
+    ...(h.searchConsole
+      ? [
+          {
+            id: "searchconsole",
+            label: "Google Search Console on client sites",
+            state: (h.searchConsole.serviceEmail && !h.searchConsole.lastError && (h.searchConsole.sites > 0 || h.searchConsole.verified) ? "ok" : "warn") as HealthItem["state"],
+            detail: !h.searchConsole.serviceEmail
+              ? "Not set up: the Worker has no Google service account (GA_SERVICE_ACCOUNT or FCM_SERVICE_ACCOUNT)."
+              : h.searchConsole.lastError
+                ? `The last setup failed: ${h.searchConsole.lastError}. In Google Cloud (the project of ${h.searchConsole.serviceEmail}) → APIs & Services → Library, switch on "Site Verification API" and "Google Search Console API", then republish any live site.`
+                : h.searchConsole.sites > 0 || h.searchConsole.verified
+                  ? `Every published site is verified in Search Console and its sitemap sent by itself (${h.searchConsole.sites} so far). Your Google address (Settings → Owner's Google address) is added as an owner, so they all show at search.google.com/search-console.`
+                  : `Ready to test. In Google Cloud (the project of ${h.searchConsole.serviceEmail}) → APIs & Services → Library, switch on "Site Verification API" and "Google Search Console API". The next publish sets it up; once one works, every live site is done by itself.`,
             section: "Website",
           },
         ]

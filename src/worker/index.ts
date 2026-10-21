@@ -16,6 +16,7 @@ import { APP_ORIGIN } from "./tankboard.ts";
 import { runStripeAudit } from "./stripe-audit.ts";
 import { bareDomain, buyUrl, domainAvailable, DOMAIN_RE, suggestDomains, ourZone, wireDomain, type DomainStage } from "./domains.ts";
 import { gaLastError, gaServiceAccount, gaState, grantViewer, queueGaBackfill, reportsUrl } from "./analytics.ts";
+import { grantSearchConsole, gscLastError, queueGscBackfill, retrySearchConsole } from "./searchconsole.ts";
 import { CHANGELOG, LATEST_CHANGE, changelogSeenKey, changesSince, unseenChanges } from "./changelog.ts";
 import { relocate } from "./relocate.ts";
 import { photoPickChoices, stockPhotosOf } from "../generator/scenes.ts";
@@ -731,6 +732,10 @@ function detail(l: LeadRow & { latest_signup_paid?: number | null }, o: { sold?:
     /** Google Analytics on the live site: the ID in use, and the reports link + sharing when the app made the property. */
     analytics: record?.seo?.gaId
       ? { id: record.seo.gaId, auto: record.seo.ga?.measurementId === record.seo.gaId, reportsUrl: record.seo.ga?.measurementId === record.seo.gaId ? reportsUrl(record.seo.ga.property) : null }
+      : null,
+    /** Google Search Console on the live site (set up by the app on publish): verified, sitemap sent, the last problem. */
+    searchConsole: record?.seo?.gsc
+      ? { site: record.seo.gsc.site, verified: !!record.seo.gsc.verified, sitemap: !!record.seo.gsc.sitemap, error: record.seo.gsc.verified ? null : record.seo.gsc.error ?? null, reportsUrl: `https://search.google.com/search-console?resource_id=${encodeURIComponent(record.seo.gsc.site)}` }
       : null,
     existingSite: record?.existingSite
       ? {
@@ -1467,6 +1472,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
           sites:
             (await env.DB.prepare("SELECT COUNT(*) AS n FROM leads WHERE json_extract(record_json, '$.seo.ga.property') IS NOT NULL").first<{ n: number }>())?.n ?? 0,
           verified: !!(await getSetting(env, "ga_verified")),
+        },
+        searchConsole: {
+          serviceEmail: gaServiceAccount(env)?.client_email ?? null,
+          lastError: (await gscLastError(env))?.error ?? null,
+          sites:
+            (await env.DB.prepare("SELECT COUNT(*) AS n FROM leads WHERE json_extract(record_json, '$.seo.gsc.verified') IS NOT NULL").first<{ n: number }>())?.n ?? 0,
+          verified: !!(await getSetting(env, "gsc_verified")),
         },
         calendar: { serviceAccount: !!gaServiceAccount(env), clientId: gcalClientId(env), last: await gcalLast(env), tasks: await gtasksLast(env) },
       }),
@@ -3982,19 +3994,23 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
       });
       return json(out);
     }
-    // Google Analytics: "Give the owner access" (their Google address becomes a viewer on the property the app made).
+    // "Give the owner access": their Google address becomes a viewer on the Analytics property and an owner of the site in
+    // Search Console (whichever the app set up).
     if (action === "/analytics" && sub === "access" && m === "POST") {
       const { email } = await body(req, z.object({ email: z.string().trim().toLowerCase().email().max(200) }));
       if (!lead.record_json) throw new HttpError(409, "This site hasn't finished building yet");
-      try {
-        await grantViewer(env, JSON.parse(lead.record_json) as BusinessRecord, email);
-      } catch (err) {
-        throw new HttpError(502, (err as Error).message);
-      }
+      const rec = JSON.parse(lead.record_json) as BusinessRecord;
+      const done: string[] = [];
+      const problems: string[] = [];
+      if (rec.seo?.ga?.property)
+        await grantViewer(env, rec, email).then(() => done.push("Google Analytics"), (err) => problems.push((err as Error).message));
+      if (rec.seo?.gsc?.verified)
+        await grantSearchConsole(env, rec, email).then(() => done.push("Search Console"), (err) => problems.push((err as Error).message));
+      if (!done.length) throw new HttpError(problems.length ? 502 : 409, problems[0] ?? "Neither Google Analytics nor Search Console was set up by the app for this site");
       await env.DB.prepare("INSERT INTO lead_notes (id, lead_id, author, outcome, body, created_at) VALUES (?, ?, ?, NULL, ?, ?)")
-        .bind(newId(), id, session.name, `📊 Gave ${email} access to their Google Analytics.`, now())
+        .bind(newId(), id, session.name, `📊 Gave ${email} access to their ${done.join(" and ")}.`, now())
         .run();
-      return json({ ok: true });
+      return json({ ok: true, done, problems });
     }
     // Google Analytics now (live sites without it): set the property up and republish with the tag.
     if (action === "/analytics" && !sub && m === "POST") {
@@ -4602,8 +4618,10 @@ async function handleScheduled(
     await announceUpdate(env);
     // Once Google Analytics is connected, every live site is republished once to get its own property (analytics.ts).
     await queueGaBackfill(env).catch((e) => console.error("ga backfill", e));
+    await queueGscBackfill(env).catch((e) => console.error("gsc backfill", e));
     // Client domains waiting on their DNS record: switch the site over once Cloudflare says it works.
     await checkDomains(env).catch((e) => console.error("domain check", e));
+    if (new Date().getUTCMinutes() % 5 === 2) await retrySearchConsole(env).catch((e) => console.error("gsc retry", e));
     // Tasks still on someone's calendar as an emailed invite move straight into it once Google allows it (gcal.ts).
     if (new Date().getUTCMinutes() % 3 === 0) {
       await upgradeCalendars(env).catch((e) => console.error("calendar upgrade", e));

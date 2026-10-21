@@ -18,6 +18,16 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 79,
+    date: "2026-10-21",
+    title: "Google Search Console set up by itself for every live site",
+    items: [
+      "When a site is published, the app now registers it with Google Search Console, proves it's ours, sends Google the list of its pages (the sitemap) and adds our company Google address as an owner. No codes to copy any more.",
+      "On the lead page, the 📊 Google Analytics & Search Console box shows \"Search Console: verified, sitemap sent\" with a link. \"Give the owner access\" now gives the client both their Analytics and their Search Console.",
+      "Owner, one-time: Google Cloud (the project of our service account) → APIs & Services → Library → switch on \"Site Verification API\" and \"Google Search Console API\". Settings → Connections shows the exact project. Once the first site works, every live site is done by itself.",
+    ],
+  },
+  {
     n: 78,
     date: "2026-10-21",
     title: "Tapping a photo on a site shows the photo again",

@@ -634,6 +634,9 @@ export interface BusinessRecord {
     gaId?: string;
     /** The Google Analytics property and stream the app made for this site (for the reports link and sharing). */
     ga?: { property: string; stream: string; measurementId: string; at?: number };
+    /** Google Search Console set up by the app (src/worker/searchconsole.ts): the property (live address + "/"), the
+     * HTML-tag code built into published pages, when it verified / the sitemap went in, our owners added, the last problem. */
+    gsc?: { site: string; token: string; verified?: number; sitemap?: number; owners?: string[]; tries?: number; error?: string };
   };
   /** Optional "We're hiring" section: the jobs open and how to apply, in the owner's words. */
   hiring?: { roles: string[]; how?: string };
