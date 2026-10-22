@@ -18,6 +18,15 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 81,
+    date: "2026-10-22",
+    title: "Search Console: how to see a client's site",
+    items: [
+      "Every live client site is verified in Google Search Console by the app, but it only shows in your Search Console list once you add it.",
+      "Signed in as post@ or profiles@: Add property → URL prefix (not Domain) → https://theirsite.com/ (with the ending slash). It verifies at once, no Cloudflare step.",
+    ],
+  },
+  {
     n: 80,
     date: "2026-10-21",
     title: "The live price list is now a Plus and Pro feature (not Basic)",

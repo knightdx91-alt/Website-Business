@@ -573,7 +573,7 @@ export function healthItems(h: HealthInput): HealthItem[] {
               : h.searchConsole.lastError
                 ? `The last setup failed: ${h.searchConsole.lastError}. In Google Cloud (the project of ${h.searchConsole.serviceEmail}) → APIs & Services → Library, switch on "Site Verification API" and "Google Search Console API", then republish any live site.`
                 : h.searchConsole.sites > 0 || h.searchConsole.verified
-                  ? `Every published site is verified in Search Console and its sitemap sent by itself (${h.searchConsole.sites} so far). Your Google address (Settings → Owner's Google address) is added as an owner, so they all show at search.google.com/search-console.`
+                  ? `Every published site is verified in Search Console and its sitemap sent by itself (${h.searchConsole.sites} so far). Your Google address (Settings → Owner's Google address) is added as an owner. To see one in Search Console, signed in as that address: Add property → URL prefix → the site's address with https:// and the ending slash; it verifies at once, no Cloudflare step.`
                   : `Ready to test. In Google Cloud (the project of ${h.searchConsole.serviceEmail}) → APIs & Services → Library, switch on "Site Verification API" and "Google Search Console API". The next publish sets it up; once one works, every live site is done by itself.`,
             section: "Website",
           },
