@@ -387,6 +387,7 @@
       ${contactLine(l) ? `<div class="lead__meta">${contactLine(l)}</div>` : ""}
       ${lastNoteLine(l)}
       ${l.followUp && (l.salesStatus === "new" || l.salesStatus === "shown") ? `<div>${followChip(l.followUp)}</div>` : ""}
+      ${expiryLine(l)}
       <div class="btns btns--full">
         ${l.status === "ready" ? `<a class="btn btn--small btn--primary" href="#/pitch/${l.id}">📞 Call guide</a>` : `<a class="btn btn--small" href="${telHref(l.phone)}">📞 Call</a>`}
         ${l.status === "ready" ? `<a class="btn btn--small" href="#/preview/${l.id}">Preview</a>` : ""}
@@ -461,6 +462,14 @@
     const s = l.nextStep;
     if (!s) return "";
     return `<section class="card step step--${esc(s.key)}"><p class="step__eyebrow">Next step</p><h2>${STEP_ICON[s.key] || "👉"} ${esc(s.title)}</h2>${s.detail ? `<p class="small">${esc(s.detail)}</p>` : ""}<div class="btns">${stepButton(l, s, { onPage: true })}</div></section>`;
+  }
+
+  /** "⏳ Expires Nov 12 (in 19 days)": when the daily clean-up takes the preview down (red inside a week). Nothing for sold / live leads. */
+  function expiryLine(l, cls = "lead__meta") {
+    if (!l.expiresLabel) return "";
+    const soon = l.expiresAt - Date.now() < 7 * 86400000;
+    const why = l.expiresKept === "callback" ? " · kept for the callback" : l.expiresKept === "flyer" ? " · kept for the flyer code" : "";
+    return `<div class="${cls}"${soon ? ` style="color:var(--bad, #b42318);font-weight:600"` : ""}>⏳ ${esc(l.expiresLabel)}${why}</div>`;
   }
 
   /** "👤 Ask for: Maria · mornings" when the lead has a contact person or best time on file. */
@@ -1027,7 +1036,7 @@ async function viewLead(id, intent) {
     const C = {};
     C.head = `<section class="card">
         <h1>${esc(r ? r.name : l.name)}</h1>
-        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}${work && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="webcheck" title="Search the web for a page Google doesn't show">🔎 Re-check website</button>${l.notOnGoogle ? "" : ` <button class="btn btn--small" type="button" data-act="googleimport" title="Pull the latest hours, phone, rating, payment and parking info and photo from their Google listing, then rewrite the text">🔄 Import from their Google page</button>`}` : ""}</p>${l.notOnGoogle ? `<p class="small" style="color:var(--warn)">📍 Not on Google Maps. This site was built from what was typed in: check every detail with the owner, and offer the Google profile setup so customers can find them on Maps.</p>` : ""}${l.googleImportedAt ? `<p class="small muted">Refreshed from their Google page ${esc(new Date(l.googleImportedAt).toLocaleDateString())}.</p>` : ""}${foundLine(l)}
+        <p class="muted">${esc(l.variantLabel || CATEGORY_LABEL[l.category] || "")} · ${esc(l.reason || "")}${work && l.salesStatus !== "live" ? ` <button class="btn btn--small" type="button" data-act="webcheck" title="Search the web for a page Google doesn't show">🔎 Re-check website</button>${l.notOnGoogle ? "" : ` <button class="btn btn--small" type="button" data-act="googleimport" title="Pull the latest hours, phone, rating, payment and parking info and photo from their Google listing, then rewrite the text">🔄 Import from their Google page</button>`}` : ""}</p>${l.notOnGoogle ? `<p class="small" style="color:var(--warn)">📍 Not on Google Maps. This site was built from what was typed in: check every detail with the owner, and offer the Google profile setup so customers can find them on Maps.</p>` : ""}${l.googleImportedAt ? `<p class="small muted">Refreshed from their Google page ${esc(new Date(l.googleImportedAt).toLocaleDateString())}.</p>` : ""}${expiryLine(l, "small")}${foundLine(l)}
         ${l.rating ? `<p><span class="stars">★ ${l.rating.toFixed(1)}</span> on Google</p>` : ""}
         <p>${esc(l.address || "")}</p>
         <div id="askbox"></div>

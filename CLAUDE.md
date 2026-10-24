@@ -1984,3 +1984,9 @@ settings key `changelog_seen.<userId>`, `POST /api/changelog/seen`), in the phon
   tablet display, if your stock changes" is gone from every plan card (live Settings by SQL + SUGGESTED_PLANS in app.js + content.ts), `EVERY_PLAN` dropped it, and every "every plan / any website plan" sentence about the price list now says
   Plus and Pro (company.ts pricing / price-list / strips / FAQs, Show plans + Plans & answers inventory notes, guides.ts, training.ts).
   Wording only: the app doesn't stop a Basic client's site from having a price list.
+- ⏳ Expiry date on every lead (24 Oct 2026, owner's ask; Android 2.91): `leadExpiry()` / `expiryLabel()` in expire.ts mirror EXPIRE_SQL
+  (new +30 d from created_at, shown +60 d, not_interested +30 d from last contact; a future callback or a handed-out flyer code
+  (`mail_code_at`) keeps it, both capped at created_at + 90 d; sold / live / paytest / manual = never). `summary()` carries
+  `expiresAt`, `expiresLabel` ("Expires Nov 13 (in 20 days)"), `expiresKept` (callback | flyer); `mail_code_at` joined LIST_COLS.
+  Web `expiryLine()` on lead cards + the lead header, Android `ExpiryLine` (HomeScreen.kt) on LeadCard + LeadScreen header; red /
+  orange inside 7 days. When the expiry rules change, change both EXPIRE_SQL and leadExpiry. `test/worker/expiry.test.ts`.

@@ -186,7 +186,7 @@ import {
   rankQueue,
 } from "./queue.ts";
 import { recordHit, siteReport } from "./stats.ts";
-import { EXPIRE_SQL } from "./expire.ts";
+import { EXPIRE_SQL, expiryLabel, leadExpiry } from "./expire.ts";
 import { assignMailCode, backfillMailCodes, mailCsv, mailList, markHandedOut, pruneCodeCounters } from "./mailcodes.ts";
 import {
   addonPrice,
@@ -365,7 +365,7 @@ interface ActivityCols {
  * leads tab spin for seconds (Oct 2026). `has_pitch` stands in for pitch_json.
  */
 const LIST_COLS =
-  "id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, found_url, score, status, sales_status, look, lint_json, (pitch_json IS NOT NULL) AS has_pitch, follow_up, last_contact, contact, best_time, shown_at, lat, lng, custom_domain, domain_active, preview_opens, preview_opened_at, mail_code, mail_opens, mail_opened_at, error, rewrite, pages_project, live_url, published_at, fetched_at, created_at, updated_at";
+  "id, place_id, run_id, category, name, phone, address, rating, review_count, presence, reason, found_url, score, status, sales_status, look, lint_json, (pitch_json IS NOT NULL) AS has_pitch, follow_up, last_contact, contact, best_time, shown_at, lat, lng, custom_domain, domain_active, preview_opens, preview_opened_at, mail_code, mail_code_at, mail_opens, mail_opened_at, error, rewrite, pages_project, live_url, published_at, fetched_at, created_at, updated_at";
 
 function summary(
   l: LeadRow & {
@@ -442,6 +442,11 @@ function summary(
       ? (lint.publishBlockers?.length ?? 0) + (lint.errors?.length ?? 0)
       : null,
     createdAt: l.created_at,
+    /** When the preview is taken down (null = never: sold, live, practice lead, typed-in business) + why it's kept longer. */
+    ...(() => {
+      const e = leadExpiry(l);
+      return { expiresAt: e?.at ?? null, expiresLabel: e ? expiryLabel(e.at) : null, expiresKept: e?.kept ?? null };
+    })(),
   };
   /** The one thing to do next on this lead (title, one line, button, route), the same on every screen. */
   return { ...out, nextStep: nextStepFor(out, localDate()) };

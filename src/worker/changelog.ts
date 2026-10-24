@@ -18,6 +18,18 @@ export type ChangeEntry = {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    n: 82,
+    date: "2026-10-24",
+    android: "2.91",
+    title: "See when each lead's preview expires",
+    items: [
+      "Every lead card and lead page now shows \"⏳ Expires Nov 13 (in 20 days)\": the day the preview is taken down if nothing happens. It turns orange inside the last week.",
+      "The rules: New leads 30 days after they were found, Shown leads 60 days, Not interested 30 days after the last contact. Sold and Live sites never expire.",
+      "A callback date or a flyer code you hand out keeps a lead longer (it says \"kept for the callback\" or \"kept for the flyer code\"), up to 90 days after it was found.",
+      "Phone app: update to 2.91 to see it there.",
+    ],
+  },
+  {
     n: 81,
     date: "2026-10-22",
     title: "Search Console: how to see a client's site",

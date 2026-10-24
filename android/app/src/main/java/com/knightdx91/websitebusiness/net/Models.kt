@@ -113,6 +113,11 @@ data class Lead(
     val mailOpenedAt: Long? = null,
     /** The practice lead (training aid): $1 payments, never expires, never counted, resettable. */
     val payTest: Boolean = false,
+    /** When the daily clean-up takes the preview down ("Expires Nov 12 (in 19 days)"); null = never (sold, live, practice). */
+    val expiresAt: Long? = null,
+    val expiresLabel: String? = null,
+    /** "callback" / "flyer" when one is keeping it past the normal 30 / 60 days. */
+    val expiresKept: String? = null,
     val contact: String?,
     val bestTime: String?,
     val unpaidSignup: Boolean,
@@ -152,6 +157,9 @@ data class Lead(
             lastContact = if (j.isNull("lastContact")) null else j.optLong("lastContact"),
             previewOpens = j.optInt("previewOpens", 0),
             payTest = j.optBoolean("payTest"),
+            expiresAt = if (j.isNull("expiresAt") || !j.has("expiresAt")) null else j.optLong("expiresAt"),
+            expiresLabel = j.str("expiresLabel"),
+            expiresKept = j.str("expiresKept"),
             previewOpenedAt = if (j.isNull("previewOpenedAt")) null else j.optLong("previewOpenedAt"),
             mailCode = j.str("mailCode"),
             mailOpens = j.optInt("mailOpens", 0),

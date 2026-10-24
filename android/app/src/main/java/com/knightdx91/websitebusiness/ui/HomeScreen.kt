@@ -283,6 +283,7 @@ fun LeadCard(l: Lead, onOpen: () -> Unit, onCall: () -> Unit, onPreview: () -> U
             }
             if (l.followUp != null && (l.salesStatus == "new" || l.salesStatus == "shown")) Text("📅 Call back ${niceDay(l.followUp)}", style = MaterialTheme.typography.bodySmall, color = Warn)
             if (l.unpaidSignup) Text("✍️ Signed, payment not finished", style = MaterialTheme.typography.bodySmall, color = Warn)
+            ExpiryLine(l)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onCall) { Text(if (l.ready) "📞 Call guide" else "📞 Call") }
@@ -291,4 +292,13 @@ fun LeadCard(l: Lead, onOpen: () -> Unit, onCall: () -> Unit, onPreview: () -> U
             }
         }
     }
+}
+
+/** "⏳ Expires Nov 12 (in 19 days)": when the daily clean-up takes the preview down; bold orange inside a week. */
+@Composable
+fun ExpiryLine(l: Lead) {
+    val label = l.expiresLabel ?: return
+    val soon = (l.expiresAt ?: Long.MAX_VALUE) - System.currentTimeMillis() < 7L * 86_400_000
+    val why = when (l.expiresKept) { "callback" -> " · kept for the callback"; "flyer" -> " · kept for the flyer code"; else -> "" }
+    Text("⏳ $label$why", style = MaterialTheme.typography.bodySmall, color = if (soon) Warn else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = if (soon) FontWeight.SemiBold else null)
 }
